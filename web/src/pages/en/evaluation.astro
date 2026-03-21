@@ -1,66 +1,66 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import Layout from '../../layouts/Layout.astro';
 
 const tests = [
   {
     name: 'test_sum_equals_capacity',
-    description: 'Odvozené hodiny musí odpovídat deklarované kapacitě osoby.',
+    description: 'Derived hours must match the declared capacity of the person.',
     expected: '\u03A3(hours) = capacity \u00B1 0.01h',
   },
   {
     name: 'test_ratio_sum_equals_one',
-    description: 'Poměry se musí sečíst na 1.0 pro každou osobu s items.',
+    description: 'Ratios must sum to 1.0 for every person with items.',
     expected: '\u03A3(ratio) = 1.0 \u00B1 0.001',
   },
   {
     name: 'test_no_negative_hours',
-    description: 'Žádná osoba nesmí mít záporné odvozené hodiny.',
+    description: 'No person may have negative derived hours.',
     expected: 'All hours \u2265 0',
   },
   {
     name: 'test_no_negative_scores',
-    description: 'Žádné skóre nesmí být záporné.',
+    description: 'No score may be negative.',
     expected: 'All scores \u2265 0',
   },
   {
     name: 'test_score_formula_simple',
-    description: 'V simple režimu: Score se počítá jako JS násobeno CW.',
+    description: 'In simple mode: Score is calculated as JS multiplied by CW.',
     expected: 'Score = JS \u00D7 CW',
   },
   {
     name: 'test_score_formula_full',
-    description: 'V full režimu: Score se počítá jako JS násobeno CW násobeno RS.',
+    description: 'In full mode: Score is calculated as JS multiplied by CW multiplied by RS.',
     expected: 'Score = JS \u00D7 CW \u00D7 RS',
   },
   {
     name: 'test_full_mode_invariants',
-    description: 'Full režim také zaručí že součet = kapacita.',
+    description: 'Full mode also guarantees that sum equals capacity.',
     expected: 'Full mode: \u03A3 = capacity \u00B1 0.01h',
   },
   {
     name: 'test_all_invariants_flag',
-    description: 'Příznak invariant_ok musí odrážet skutečné výsledky kontroly.',
+    description: 'The invariant_ok flag must reflect the actual check results.',
     expected: 'invariant_ok reflects actual checks',
   },
   {
     name: 'test_empty_items_no_crash',
-    description: 'Osoba s 0 items musí dostat 0h, bez pádu.',
+    description: 'A person with 0 items must get 0h, without crashing.',
     expected: 'Person with 0 items \u2192 0h, no crash',
   },
   {
     name: 'test_cw_ordering',
-    description: 'CW musí zachovat pořadí: owner \u2265 key \u2265 reviewer \u2265 consulted.',
+    description: 'CW must preserve ordering: owner \u2265 key \u2265 reviewer \u2265 consulted.',
     expected: 'owner \u2265 key \u2265 reviewer \u2265 consulted',
   },
 ];
 ---
-<Layout title="Evaluace a testy">
+<Layout title="Evaluation and tests" lang="en">
 <div class="container section evaluation-page">
 
   <div class="page-header">
-    <div class="tag">Evaluace</div>
-    <h1>Testy a evaluace EDPA v1.0.0</h1>
-    <p class="subtitle">Matematická rigorizita ověřena 10 invariantními testy</p>
+    <div class="tag">Evaluation</div>
+    <h1>Tests and evaluation of EDPA v1.0.0</h1>
+    <p class="subtitle">Mathematical rigor verified by 10 invariant tests</p>
   </div>
 
   <!-- Test summary -->
@@ -74,13 +74,13 @@ const tests = [
     <div class="summary-bar">
       <div class="bar-fill"></div>
     </div>
-    <p class="summary-text">Všechny invariantní testy procházejí. Matematické garance EDPA jsou ověřeny.</p>
+    <p class="summary-text">All invariant tests pass. The mathematical guarantees of EDPA are verified.</p>
   </div>
 
-  <!-- 1. Invariantní testy -->
-  <section id="invariantni-testy">
-    <h2>1. Invariantní testy</h2>
-    <p>EDPA engine je validován 10 automatickými testy, které ověřují základní matematické garance modelu. Každý test je spuštěn při každém buildu.</p>
+  <!-- 1. Invariant tests -->
+  <section id="invariant-tests">
+    <h2>1. Invariant tests</h2>
+    <p>The EDPA engine is validated by 10 automated tests that verify the fundamental mathematical guarantees of the model. Each test is run on every build.</p>
 
     <div class="tests-grid">
       {tests.map((test, i) => (
@@ -92,7 +92,7 @@ const tests = [
           </div>
           <p class="test-desc">{test.description}</p>
           <div class="test-expected">
-            <span class="expected-label">Očekávání:</span>
+            <span class="expected-label">Expected:</span>
             <code>{test.expected}</code>
           </div>
         </div>
@@ -100,89 +100,89 @@ const tests = [
     </div>
   </section>
 
-  <!-- 2. Auto-kalibrace -->
-  <section id="auto-kalibrace">
-    <h2>2. Auto-kalibrace (Karpathy loop)</h2>
-    <p>Automatický kalibrační systém inspirovaný Karpathyho autoresearch vzorem. Jeden soubor, jedna metrika, jedna smyčka.</p>
+  <!-- 2. Auto-calibration -->
+  <section id="auto-calibration">
+    <h2>2. Auto-calibration (Karpathy loop)</h2>
+    <p>Automatic calibration system inspired by Karpathy's autoresearch pattern. One file, one metric, one loop.</p>
 
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card accent">
-        <div class="tag" style="color:var(--ac3)">Konfigurace</div>
+        <div class="tag" style="color:var(--ac3)">Configuration</div>
         <table>
           <tbody>
             <tr><td><strong>Target</strong></td><td><code>cw_heuristics.yaml</code></td></tr>
             <tr><td><strong>Metric</strong></td><td>MAD (Mean Absolute Deviation)</td></tr>
             <tr><td><strong>Direction</strong></td><td>lower is better</td></tr>
-            <tr><td><strong>Budget</strong></td><td>50 experimentů (~2h)</td></tr>
-            <tr><td><strong>Memory</strong></td><td><code>git log</code> na kalibrační větvi</td></tr>
+            <tr><td><strong>Budget</strong></td><td>50 experiments (~2h)</td></tr>
+            <tr><td><strong>Memory</strong></td><td><code>git log</code> on calibration branch</td></tr>
             <tr><td><strong>Evaluator</strong></td><td><code>evaluate_cw.py</code> (LOCKED)</td></tr>
           </tbody>
         </table>
       </div>
 
       <div class="card green">
-        <div class="tag" style="color:var(--gn)">Očekávané výsledky</div>
+        <div class="tag" style="color:var(--gn)">Expected results</div>
         <ul>
-          <li>Typické zlepšení: <strong>15&ndash;30% redukce MAD</strong></li>
-          <li>Po 50 experimentech: heuristika odpovídá reálným vzorcům týmu</li>
-          <li>Diminishing returns po ~30 experimentech</li>
-          <li>Prerequisite: &ge; 20 manuálně potvrzených CW záznamů</li>
+          <li>Typical improvement: <strong>15&ndash;30% MAD reduction</strong></li>
+          <li>After 50 experiments: heuristic matches real team patterns</li>
+          <li>Diminishing returns after ~30 experiments</li>
+          <li>Prerequisite: &ge; 20 manually confirmed CW records</li>
         </ul>
       </div>
     </div>
 
-    <h3>Smyčka</h3>
+    <h3>Loop</h3>
     <div class="card" style="margin-top:12px">
       <ol class="loop-steps">
         <li><code>git checkout -b calibration/{`{timestamp}`}</code></li>
-        <li>Pro každý experiment (1..budget):
+        <li>For each experiment (1..budget):
           <ol class="loop-substeps">
-            <li>Načti aktuální heuristiku + historii experimentů</li>
-            <li>Navrhni JEDNU změnu parametru (threshold, weight, signal score)</li>
+            <li>Load current heuristic + experiment history</li>
+            <li>Propose ONE parameter change (threshold, weight, signal score)</li>
             <li><code>git commit -m "exp {`{n}`}: {`{param}`} {`{old}`} -&gt; {`{new}`}"</code></li>
-            <li>Spusť: <code>python evaluate_cw.py --ground-truth ... --heuristics ...</code></li>
-            <li>Parsuj MAD z výstupu</li>
-            <li>Pokud MAD &lt; předchozí_best: <span style="color:var(--gn)">KEEP</span> | Jinak: <span style="color:var(--rd)">REVERT</span></li>
-            <li>Loguj do <code>calibration_log.tsv</code></li>
+            <li>Run: <code>python evaluate_cw.py --ground-truth ... --heuristics ...</code></li>
+            <li>Parse MAD from output</li>
+            <li>If MAD &lt; previous_best: <span style="color:var(--gn)">KEEP</span> | Otherwise: <span style="color:var(--rd)">REVERT</span></li>
+            <li>Log to <code>calibration_log.tsv</code></li>
           </ol>
         </li>
-        <li>Vytiskni souhrn: initial MAD, final MAD, % zlepšení</li>
-        <li>Zeptej se uživatele: merge kalibrační větev do main?</li>
+        <li>Print summary: initial MAD, final MAD, % improvement</li>
+        <li>Ask user: merge calibration branch into main?</li>
       </ol>
     </div>
 
-    <h3>Bezpečnostní omezení</h3>
+    <h3>Safety constraints</h3>
     <div class="grid grid-2" style="margin-top:12px">
-      <div class="note"><strong>Evaluator je LOCKED</strong> — agent nesmí editovat <code>evaluate_cw.py</code>. Oddělení optimalizéru od objektivní funkce.</div>
-      <div class="note"><strong>Jedna změna per experiment</strong> — pokud změníš 5 věcí, nevíš co fungovalo.</div>
+      <div class="note"><strong>Evaluator is LOCKED</strong> — the agent must not edit <code>evaluate_cw.py</code>. Separation of optimizer from objective function.</div>
+      <div class="note"><strong>One change per experiment</strong> — if you change 5 things, you don't know what worked.</div>
     </div>
 
-    <h3>Strategie eskalace</h3>
+    <h3>Escalation strategy</h3>
     <div class="card" style="margin-top:12px">
       <table>
         <thead>
-          <tr><th>Experimenty</th><th>Focus</th><th>Parametry</th></tr>
+          <tr><th>Experiments</th><th>Focus</th><th>Parameters</th></tr>
         </thead>
         <tbody>
-          <tr><td>1&ndash;10</td><td>role_weights</td><td>4 parametry (největší impact)</td></tr>
-          <tr><td>11&ndash;25</td><td>signal weights</td><td>6 parametrů</td></tr>
-          <tr><td>26&ndash;50</td><td>threshold + fine-tuning</td><td>kombinované ladění</td></tr>
+          <tr><td>1&ndash;10</td><td>role_weights</td><td>4 parameters (highest impact)</td></tr>
+          <tr><td>11&ndash;25</td><td>signal weights</td><td>6 parameters</td></tr>
+          <tr><td>26&ndash;50</td><td>threshold + fine-tuning</td><td>combined tuning</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
-  <!-- 3. CW Heuristika -->
-  <section id="cw-heuristika">
-    <h2>3. CW Heuristika</h2>
-    <p>Výchozí váhy pro automatické přiřazení Contribution Weight na základě GitHub signálů.</p>
+  <!-- 3. CW Heuristic -->
+  <section id="cw-heuristic">
+    <h2>3. CW Heuristic</h2>
+    <p>Default weights for automatic Contribution Weight assignment based on GitHub signals.</p>
 
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card cyan">
         <div class="tag" style="color:var(--cy)">Role weights</div>
         <table>
           <thead>
-            <tr><th>Role</th><th style="text-align:right">CW</th><th>Vizualizace</th></tr>
+            <tr><th>Role</th><th style="text-align:right">CW</th><th>Visualization</th></tr>
           </thead>
           <tbody>
             <tr><td><strong>owner</strong></td><td style="text-align:right">1.0</td><td><div class="cw-bar" style="width:100%;background:var(--gn)"></div></td></tr>
@@ -211,74 +211,74 @@ const tests = [
       </div>
     </div>
 
-    <div class="note" style="margin-top:16px"><strong>Pravidlo:</strong> Nejsilnější signál určuje CW. Evidence Score = součet všech signálů. Pokud Evidence Score &ge; threshold (default 1.0), osoba je přiřazena k itemu.</div>
+    <div class="note" style="margin-top:16px"><strong>Rule:</strong> The strongest signal determines CW. Evidence Score = sum of all signals. If Evidence Score &ge; threshold (default 1.0), the person is assigned to the item.</div>
   </section>
 
-  <!-- 4. Srovnání metod -->
-  <section id="srovnani">
-    <h2>4. Srovnání metod</h2>
+  <!-- 4. Method comparison -->
+  <section id="comparison">
+    <h2>4. Method comparison</h2>
     <div class="card">
       <table class="comparison-table">
         <thead>
           <tr>
-            <th>Kritérium</th>
+            <th>Criterion</th>
             <th style="color:var(--gn)">EDPA v1.0.0</th>
-            <th>Ruční timesheets</th>
-            <th>Fixní alokace</th>
+            <th>Manual timesheets</th>
+            <th>Fixed allocation</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Přesnost</td>
-            <td><span class="badge badge-green">Vysoká</span></td>
-            <td><span class="badge badge-yellow">Střední</span></td>
-            <td><span class="badge badge-red">Nízká</span></td>
+            <td>Accuracy</td>
+            <td><span class="badge badge-green">High</span></td>
+            <td><span class="badge badge-yellow">Medium</span></td>
+            <td><span class="badge badge-red">Low</span></td>
           </tr>
           <tr>
-            <td>Úsilí</td>
-            <td><span class="badge badge-green">Minimální</span></td>
-            <td><span class="badge badge-red">Vysoké</span></td>
-            <td><span class="badge badge-green">Žádné</span></td>
+            <td>Effort</td>
+            <td><span class="badge badge-green">Minimal</span></td>
+            <td><span class="badge badge-red">High</span></td>
+            <td><span class="badge badge-green">None</span></td>
           </tr>
           <tr>
-            <td>Auditovatelnost</td>
-            <td><span class="badge badge-green">Plná</span></td>
-            <td><span class="badge badge-yellow">Částečná</span></td>
-            <td><span class="badge badge-red">Žádná</span></td>
+            <td>Auditability</td>
+            <td><span class="badge badge-green">Full</span></td>
+            <td><span class="badge badge-yellow">Partial</span></td>
+            <td><span class="badge badge-red">None</span></td>
           </tr>
           <tr>
             <td>Dual-view</td>
-            <td><span class="badge badge-green">Ano</span></td>
-            <td><span class="badge badge-red">Ne</span></td>
-            <td><span class="badge badge-red">Ne</span></td>
+            <td><span class="badge badge-green">Yes</span></td>
+            <td><span class="badge badge-red">No</span></td>
+            <td><span class="badge badge-red">No</span></td>
           </tr>
           <tr>
-            <td>Mat. garance</td>
+            <td>Math. guarantee</td>
             <td><span class="badge badge-green">&Sigma; = capacity</span></td>
-            <td><span class="badge badge-red">Žádná</span></td>
-            <td><span class="badge badge-yellow">Složitější</span></td>
+            <td><span class="badge badge-red">None</span></td>
+            <td><span class="badge badge-yellow">Complex</span></td>
           </tr>
           <tr>
-            <td>Automatizace</td>
+            <td>Automation</td>
             <td><span class="badge badge-green">GitHub Actions</span></td>
-            <td><span class="badge badge-red">Manuální</span></td>
-            <td><span class="badge badge-yellow">Částečná</span></td>
+            <td><span class="badge badge-red">Manual</span></td>
+            <td><span class="badge badge-yellow">Partial</span></td>
           </tr>
         </tbody>
       </table>
     </div>
   </section>
 
-  <!-- 5. Demo výpočet -->
+  <!-- 5. Demo calculation -->
   <section id="demo">
-    <h2>5. Demo výpočet</h2>
-    <p>Statická ukázka výpočtu EDPA pro 3 osoby a 5 work items. Provozní varianta (Simple mode).</p>
+    <h2>5. Demo calculation</h2>
+    <p>Static demonstration of EDPA calculation for 3 people and 5 work items. Operational variant (Simple mode).</p>
 
-    <h3>Kapacita</h3>
+    <h3>Capacity</h3>
     <div class="card" style="margin-top:12px">
       <table>
         <thead>
-          <tr><th>Osoba</th><th>FTE</th><th style="text-align:right">Kapacita (h)</th></tr>
+          <tr><th>Person</th><th>FTE</th><th style="text-align:right">Capacity (h)</th></tr>
         </thead>
         <tbody>
           <tr><td><strong>Alice</strong></td><td>0.5</td><td style="text-align:right">40h</td></tr>
@@ -288,7 +288,7 @@ const tests = [
       </table>
     </div>
 
-    <h3>Work items &amp; přiřazení</h3>
+    <h3>Work items &amp; assignments</h3>
     <div class="card" style="margin-top:12px">
       <table>
         <thead>
@@ -304,7 +304,7 @@ const tests = [
       </table>
     </div>
 
-    <h3>Výpočet skóre (Score = JS &times; CW)</h3>
+    <h3>Score calculation (Score = JS &times; CW)</h3>
     <div class="card" style="margin-top:12px">
       <table>
         <thead>
@@ -321,7 +321,7 @@ const tests = [
       </table>
     </div>
 
-    <h3>Odvozené hodiny (DH = Score / &Sigma;Score &times; Capacity)</h3>
+    <h3>Derived Hours (DH = Score / &Sigma;Score &times; Capacity)</h3>
     <div class="card" style="margin-top:12px">
       <table>
         <thead>
@@ -342,25 +342,25 @@ const tests = [
       <div class="card green" style="text-align:center">
         <div class="tag" style="color:var(--gn)">Alice</div>
         <div class="verify-sum">&Sigma; = 40.00h</div>
-        <div class="verify-cap">Kapacita: 40h</div>
+        <div class="verify-cap">Capacity: 40h</div>
         <span class="badge badge-green">VERIFIED</span>
       </div>
       <div class="card green" style="text-align:center">
         <div class="tag" style="color:var(--gn)">Bob</div>
         <div class="verify-sum">&Sigma; = 80.00h</div>
-        <div class="verify-cap">Kapacita: 80h</div>
+        <div class="verify-cap">Capacity: 80h</div>
         <span class="badge badge-green">VERIFIED</span>
       </div>
       <div class="card green" style="text-align:center">
         <div class="tag" style="color:var(--gn)">Carol</div>
         <div class="verify-sum">&Sigma; = 60.00h</div>
-        <div class="verify-cap">Kapacita: 60h</div>
+        <div class="verify-cap">Capacity: 60h</div>
         <span class="badge badge-green">VERIFIED</span>
       </div>
     </div>
 
     <div class="formula" style="margin-top:16px">&Sigma; DerivedHours[P, *] = Capacity[P, I]
-Platí pro každou osobu. Vždy. Bez výjimky.</div>
+Holds for every person. Always. No exceptions.</div>
   </section>
 
 </div>

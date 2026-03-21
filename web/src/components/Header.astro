@@ -4,17 +4,24 @@ interface Props {
 }
 const { currentPath } = Astro.props;
 
+const isEn = currentPath.startsWith('/en/') || currentPath === '/en';
+const prefix = isEn ? '/en' : '';
+
 const links = [
-  { href: '/', label: 'EDPA' },
-  { href: '/dashboard/', label: 'Dashboard' },
-  { href: '/presentation/', label: 'Prezentace' },
-  { href: '/methodology/', label: 'Metodika' },
-  { href: '/evaluation/', label: 'Evaluace' },
+  { href: `${prefix}/`, label: 'EDPA' },
+  { href: `${prefix}/dashboard/`, label: 'Dashboard' },
+  { href: `${prefix}/presentation/`, label: isEn ? 'Presentation' : 'Prezentace' },
+  { href: `${prefix}/methodology/`, label: isEn ? 'Methodology' : 'Metodika' },
+  { href: `${prefix}/evaluation/`, label: isEn ? 'Evaluation' : 'Evaluace' },
 ];
+
+const switchPath = isEn
+  ? currentPath.replace(/^\/en(\/|$)/, '/')
+  : `/en${currentPath}`;
 ---
 <header class="site-header">
   <div class="container header-inner">
-    <a href="/" class="logo">
+    <a href={`${prefix}/`} class="logo">
       <span class="logo-text">EDPA</span>
       <span class="logo-version">v1.0.0</span>
     </a>
@@ -22,12 +29,15 @@ const links = [
       {links.map(link => (
         <a
           href={link.href}
-          class:list={['nav-link', { active: currentPath === link.href || (link.href !== '/' && currentPath.startsWith(link.href)) }]}
+          class:list={['nav-link', { active: currentPath === link.href || (link.href !== `${prefix}/` && currentPath.startsWith(link.href)) }]}
         >
           {link.label}
         </a>
       ))}
     </nav>
+    <div class="lang-switch">
+      <a href={switchPath} class="lang-link">{isEn ? 'CS' : 'EN'}</a>
+    </div>
   </div>
 </header>
 
@@ -84,6 +94,24 @@ const links = [
   }
   .nav-link:hover { background: var(--s2); color: var(--t1); }
   .nav-link.active { background: rgba(99, 102, 241, 0.12); color: var(--ac2); }
+  .lang-switch {
+    margin-left: 8px;
+  }
+  .lang-link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--t3);
+    padding: 4px 8px;
+    border: 1px solid var(--bd);
+    border-radius: 4px;
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+  .lang-link:hover {
+    color: var(--ac2);
+    border-color: var(--ac);
+  }
   @media (max-width: 768px) {
     .main-nav { display: none; }
   }

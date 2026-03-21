@@ -7,39 +7,43 @@ import Layout from '../layouts/Layout.astro';
   <div class="page-header">
     <div class="tag">Metodika</div>
     <h1>EDPA — Evidence-Driven Proportional Allocation</h1>
-    <p class="subtitle">Odvozovani kapacity z dodavkove evidence</p>
-    <p class="meta">Verze 2.2 &middot; Brezen 2026 &middot; Jaroslav Urbanek, Lead Architect</p>
+    <p class="subtitle">Odvozování kapacity z dodávkové evidence</p>
+    <p class="meta">Verze 2.2 &middot; Březen 2026 &middot; Jaroslav Urbanek, Lead Architect</p>
   </div>
 
-  <nav class="toc card accent">
+  <div class="methodology-layout">
+
+  <aside class="sidebar-toc" id="sidebarToc">
     <div class="toc-title">Obsah</div>
     <ol class="toc-list">
-      <li><a href="#shrnuti">Shrnuti</a></li>
-      <li><a href="#terminologie">Terminologie</a></li>
-      <li><a href="#architektura">Architektura modelu</a></li>
-      <li><a href="#hierarchie">Hierarchie work items</a></li>
-      <li><a href="#model">Model EDPA</a></li>
-      <li><a href="#dual-view">Dual-view</a></li>
-      <li><a href="#kadence">Kadence</a></li>
-      <li><a href="#ucici-smycka">Ucici smycka</a></li>
-      <li><a href="#github-implementace">GitHub implementace</a></li>
-      <li><a href="#vykazy">Vykazy a audit</a></li>
-      <li><a href="#predpoklady">Predpoklady a rizika</a></li>
-      <li><a href="#srovnani">Srovnani</a></li>
-      <li><a href="#implementacni-plan">Implementacni plan</a></li>
+      <li><a href="#shrnuti" class="toc-link" data-section="shrnuti">Shrnutí</a></li>
+      <li><a href="#terminologie" class="toc-link" data-section="terminologie">Terminologie</a></li>
+      <li><a href="#architektura" class="toc-link" data-section="architektura">Architektura modelu</a></li>
+      <li><a href="#hierarchie" class="toc-link" data-section="hierarchie">Hierarchie work items</a></li>
+      <li><a href="#model" class="toc-link" data-section="model">Model EDPA</a></li>
+      <li><a href="#dual-view" class="toc-link" data-section="dual-view">Dual-view</a></li>
+      <li><a href="#kadence" class="toc-link" data-section="kadence">Kadence</a></li>
+      <li><a href="#ucici-smycka" class="toc-link" data-section="ucici-smycka">Učící smyčka</a></li>
+      <li><a href="#github-implementace" class="toc-link" data-section="github-implementace">GitHub implementace</a></li>
+      <li><a href="#vykazy" class="toc-link" data-section="vykazy">Výkazy a audit</a></li>
+      <li><a href="#predpoklady" class="toc-link" data-section="predpoklady">Předpoklady a rizika</a></li>
+      <li><a href="#srovnani" class="toc-link" data-section="srovnani">Srovnání</a></li>
+      <li><a href="#implementacni-plan" class="toc-link" data-section="implementacni-plan">Implementační plán</a></li>
     </ol>
-  </nav>
+  </aside>
 
-  <!-- 1. Shrnuti -->
+  <div class="methodology-content">
+
+  <!-- 1. Shrnutí -->
   <section id="shrnuti">
-    <h2>1. Shrnuti</h2>
-    <div class="quote">Cas se nemeri, odvozuje se. Nikdo neloguje hodiny. Nikdo nevyplnuje timesheets.</div>
-    <p>Clovek deklaruje kapacitu na obdobi. System identifikuje work items, na nichz se prokazatelne podilel. Kapacita se ex post rozpada pomerove mezi relevantni items podle Job Size a miry contribution.</p>
-    <p>Vysledkem je vykaz, ktery je vedlejsim produktem dodavky, ne separatni administrativni aktivitou.</p>
-    <p>Model poskytuje dva komplementarni pohledy na stejna data:</p>
+    <h2>1. Shrnutí</h2>
+    <div class="quote">Čas se neměří, odvozuje se. Nikdo neloguje hodiny. Nikdo nevyplňuje timesheets.</div>
+    <p>Člověk deklaruje kapacitu na období. Systém identifikuje work items, na nichž se prokazatelně podílel. Kapacita se ex post rozpadá poměrově mezi relevantní items podle Job Size a míry contribution.</p>
+    <p>Výsledkem je výkaz, který je vedlejším produktem dodávky, ne separátní administrativní aktivitou.</p>
+    <p>Model poskytuje dva komplementární pohledy na stejná data:</p>
     <ul>
-      <li><strong>Per-person pohled:</strong> jak se kapacita cloveka rozlozi mezi jeho items &rarr; vykazy, timesheets</li>
-      <li><strong>Per-item pohled:</strong> jak se prace na itemu rozlozi mezi lidi &rarr; nakladova alokace, audit per deliverable</li>
+      <li><strong>Per-person pohled:</strong> jak se kapacita člověka rozloží mezi jeho items &rarr; výkazy, timesheets</li>
+      <li><strong>Per-item pohled:</strong> jak se práce na itemu rozloží mezi lidi &rarr; nákladová alokace, audit per deliverable</li>
     </ul>
   </section>
 
@@ -52,51 +56,51 @@ import Layout from '../layouts/Layout.astro';
           <tr><th>Pojem</th><th>Definice</th><th>Konfigurace</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>Iterace</strong></td><td>Delivery cyklus. Stories se planuji, dodavaji a uzaviraji.</td><td>1t (AI-native) / 2t (klasicky)</td></tr>
-          <tr><td><strong>Planning Interval</strong></td><td>Planovaci cyklus. Features se planuji, koordinuji a vyhodnocuji.</td><td>5t (4+1 IP) / 10t (8+2 IP)</td></tr>
-          <tr><td><strong>IP Iterace</strong></td><td>Innovation &amp; Planning iterace na konci PI.</td><td>Posledni iterace v PI</td></tr>
-          <tr><td><strong>Job Size (JS)</strong></td><td>Relativni odhad velikosti work itemu. Upravena Fibonacci.</td><td>1, 2, 3, 5, 8, 13, 20</td></tr>
-          <tr><td><strong>WSJF</strong></td><td>Prioritizacni skore: (BV + TC + RR) / JS</td><td>Per uroven nezavisle</td></tr>
-          <tr><td><strong>CW</strong></td><td>Contribution Weight — mira zapojeni osoby na itemu. Nezavisle per osoba.</td><td>0.15&ndash;1.0</td></tr>
-          <tr><td><strong>Evidence Score</strong></td><td>Surovy soucet signalu aktivity z GitHub. Detekcni vrstva.</td><td>Automaticky</td></tr>
-          <tr><td><strong>RS</strong></td><td>Relevance Signal — normalizovany signal odvozeny z Evidence Score.</td><td>Automaticky</td></tr>
-          <tr><td><strong>Derived Hours</strong></td><td>Odvozene hodiny, vystup modelu.</td><td>Po Iteration Close</td></tr>
+          <tr><td><strong>Iterace</strong></td><td>Delivery cyklus. Stories se plánují, dodávají a uzavírají.</td><td>1t (AI-native) / 2t (klasicky)</td></tr>
+          <tr><td><strong>Planning Interval</strong></td><td>Plánovací cyklus. Features se plánují, koordinují a vyhodnocují.</td><td>5t (4+1 IP) / 10t (8+2 IP)</td></tr>
+          <tr><td><strong>IP Iterace</strong></td><td>Innovation &amp; Planning iterace na konci PI.</td><td>Poslední iterace v PI</td></tr>
+          <tr><td><strong>Job Size (JS)</strong></td><td>Relativní odhad velikosti work itemu. Upravená Fibonacci.</td><td>1, 2, 3, 5, 8, 13, 20</td></tr>
+          <tr><td><strong>WSJF</strong></td><td>Prioritizační skóre: (BV + TC + RR) / JS</td><td>Per úroveň nezávisle</td></tr>
+          <tr><td><strong>CW</strong></td><td>Contribution Weight — míra zapojení osoby na itemu. Nezávisle per osoba.</td><td>0.15&ndash;1.0</td></tr>
+          <tr><td><strong>Evidence Score</strong></td><td>Surový součet signálů aktivity z GitHub. Detekční vrstva.</td><td>Automaticky</td></tr>
+          <tr><td><strong>RS</strong></td><td>Relevance Signal — normalizovaný signál odvozený z Evidence Score.</td><td>Automaticky</td></tr>
+          <tr><td><strong>Derived Hours</strong></td><td>Odvozené hodiny, výstup modelu.</td><td>Po Iteration Close</td></tr>
         </tbody>
       </table>
-      <div class="note">Evidence Score je detekcni vrstva &rarr; Relevance Signal je matematicky vstup &rarr; Contribution Weight je podil &rarr; Derived Hours jsou vystup.</div>
+      <div class="note">Evidence Score je detekční vrstva &rarr; Relevance Signal je matematický vstup &rarr; Contribution Weight je podíl &rarr; Derived Hours jsou výstup.</div>
     </div>
   </section>
 
   <!-- 3. Architektura modelu -->
   <section id="architektura">
     <h2>3. Architektura modelu</h2>
-    <h3>3.1 Tri oddelene vrstvy</h3>
+    <h3>3.1 Tři oddělené vrstvy</h3>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Vrstva</th><th>Ucel</th><th>Kde zije</th></tr>
+          <tr><th>Vrstva</th><th>Účel</th><th>Kde žije</th></tr>
         </thead>
         <tbody>
-          <tr><td class="layer-operational"><strong>Operational Metadata</strong></td><td>Ziva delivery data</td><td>GitHub Issues + Projects</td></tr>
+          <tr><td class="layer-operational"><strong>Operational Metadata</strong></td><td>Živá delivery data</td><td>GitHub Issues + Projects</td></tr>
           <tr><td class="layer-capacity"><strong>Capacity Registry</strong></td><td>Kapacita lidi, role, FTE</td><td>YAML / JSON v repo</td></tr>
-          <tr><td class="layer-evidence"><strong>Evidence &amp; Reporting</strong></td><td>Frozen snapshoty, vykazy, podpisy</td><td>/snapshots, /reports, /signed</td></tr>
+          <tr><td class="layer-evidence"><strong>Evidence &amp; Reporting</strong></td><td>Frozen snapshoty, výkazy, podpisy</td><td>/snapshots, /reports, /signed</td></tr>
         </tbody>
       </table>
     </div>
 
     <h3>3.2 Source of truth</h3>
     <p><strong>GitHub JE source of truth pro:</strong> issue hierarchy, ownership, status, Job Size, WSJF inputs, review trail, delivery audit trail.</p>
-    <p><strong>GitHub NENI source of truth pro:</strong> hodinovou kapacitu, FTE, derived hours, podpisove stavy. Tyto ziji v evidence vrstve.</p>
+    <p><strong>GitHub NENÍ source of truth pro:</strong> hodinovou kapacitu, FTE, derived hours, podpisové stavy. Tyto žijí v evidence vrstvě.</p>
   </section>
 
   <!-- 4. Hierarchie work items -->
   <section id="hierarchie">
     <h2>4. Hierarchie work items</h2>
-    <div class="formula" style="white-space:pre;line-height:2;font-size:16px"><span class="wi-initiative"><b>Initiative</b></span> (cely projekt, business case)
-  └── <span class="wi-epic"><b>Epic</b></span> (strategicky cil, 6-9 mesicu)
-       └── <span class="wi-feature"><b>Feature</b></span> (musi se vejit do Planning Intervalu)
-            └── <span class="wi-story"><b>Story</b></span> (dodavano v Iteraci)
-                 └── <span class="wi-task"><b>Task</b></span> (technicka prace, volitelne)</div>
+    <div class="formula" style="white-space:pre;line-height:2;font-size:16px"><span class="wi-initiative"><b>Initiative</b></span> (celý projekt, business case)
+  └── <span class="wi-epic"><b>Epic</b></span> (strategický cíl, 6-9 měsíců)
+       └── <span class="wi-feature"><b>Feature</b></span> (musí se vejít do Planning Intervalu)
+            └── <span class="wi-story"><b>Story</b></span> (dodáváno v Iteraci)
+                 └── <span class="wi-task"><b>Task</b></span> (technická práce, volitelné)</div>
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:var(--pk)"></div> Initiative</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--ac2)"></div> Epic</div>
@@ -104,12 +108,12 @@ import Layout from '../layouts/Layout.astro';
       <div class="legend-item"><div class="legend-dot" style="background:var(--gn)"></div> Story</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--yl)"></div> Task</div>
     </div>
-    <p>Kazda uroven ma <strong>vlastni nezavisly Job Size a WSJF</strong>. Feature WSJF se nepocita ze Stories pod ni.</p>
+    <p>Každá úroveň má <strong>vlastní nezávislý Job Size a WSJF</strong>. Feature WSJF se nepočítá ze Stories pod ní.</p>
 
     <div class="card" style="margin-top:16px">
       <table>
         <thead>
-          <tr><th>Uroven</th><th>JS max</th><th>GitHub mapping</th></tr>
+          <tr><th>Úroveň</th><th>JS max</th><th>GitHub mapping</th></tr>
         </thead>
         <tbody>
           <tr><td class="wi-epic"><b>Epic</b></td><td>20</td><td>Issue Type: Epic</td></tr>
@@ -121,11 +125,11 @@ import Layout from '../layouts/Layout.astro';
       </table>
     </div>
 
-    <p style="margin-top:16px">Nad limitem se item rozpada. Granularity guardrails vynucuji rozumnou granularitu.</p>
+    <p style="margin-top:16px">Nad limitem se item rozpadá. Granularity guardrails vynucují rozumnou granularitu.</p>
 
     <div class="formula"><strong>WSJF:</strong> (<span class="wsjf-bv">BV</span> + <span class="wsjf-tc">TC</span> + <span class="wsjf-rr">RR</span>) / <span class="wsjf-js">JS</span>
 <span class="wsjf-bv">BV</span> = Business Value, <span class="wsjf-tc">TC</span> = Time Criticality, <span class="wsjf-rr">RR</span> = Risk Reduction
-Pocita se per uroven nezavisle.</div>
+Počítá se per úroveň nezávisle.</div>
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:var(--gn)"></div> BV — Business Value</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--or)"></div> TC — Time Criticality</div>
@@ -142,14 +146,14 @@ Pocita se per uroven nezavisle.</div>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Vstup</th><th>Zdroj</th><th>Priklad</th></tr>
+          <tr><th>Vstup</th><th>Zdroj</th><th>Příklad</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>Capacity[P, I]</code></td><td>Potvrzeno pri Iteration Planning</td><td>40h</td></tr>
-          <tr><td><code>RelevantItems[P, I]</code></td><td>Automaticky z GitHub evidence</td><td>6 items pres 3 urovne</td></tr>
+          <tr><td><code>Capacity[P, I]</code></td><td>Potvrzeno při Iteration Planning</td><td>40h</td></tr>
+          <tr><td><code>RelevantItems[P, I]</code></td><td>Automaticky z GitHub evidence</td><td>6 items přes 3 úrovně</td></tr>
           <tr><td><code>JobSize[item]</code></td><td>Custom field na issue</td><td>Fibonacci 1&ndash;20</td></tr>
-          <tr><td><code>CW[P, item]</code></td><td>Z evidence / manualni override</td><td>0.15&ndash;1.0</td></tr>
-          <tr><td><code>RS[P, item]</code></td><td>Normalizovano z Evidence Score</td><td>0.25&ndash;1.0</td></tr>
+          <tr><td><code>CW[P, item]</code></td><td>Z evidence / manuální override</td><td>0.15&ndash;1.0</td></tr>
+          <tr><td><code>RS[P, item]</code></td><td>Normalizováno z Evidence Score</td><td>0.25&ndash;1.0</td></tr>
         </tbody>
       </table>
     </div>
@@ -158,12 +162,12 @@ Pocita se per uroven nezavisle.</div>
     <div class="card">
       <table>
         <thead>
-          <tr><th>GitHub signal</th><th style="text-align:right">Evidence Score</th><th style="text-align:right">Typicky CW</th></tr>
+          <tr><th>GitHub signal</th><th style="text-align:right">Evidence Score</th><th style="text-align:right">Typický CW</th></tr>
         </thead>
         <tbody>
           <tr><td>Assignee na issue</td><td style="text-align:right">+4</td><td style="text-align:right;color:var(--gn)">1.0 (owner)</td></tr>
-          <tr><td>Explicitni <code>/contribute</code> prikaz</td><td style="text-align:right">+3</td><td style="text-align:right;color:var(--cy)">explicit</td></tr>
-          <tr><td>PR author referencujici item</td><td style="text-align:right">+2</td><td style="text-align:right;color:var(--cy)">0.6 (key)</td></tr>
+          <tr><td>Explicitní <code>/contribute</code> příkaz</td><td style="text-align:right">+3</td><td style="text-align:right;color:var(--cy)">explicit</td></tr>
+          <tr><td>PR author referencující item</td><td style="text-align:right">+2</td><td style="text-align:right;color:var(--cy)">0.6 (key)</td></tr>
           <tr><td>Commit author s ref v message</td><td style="text-align:right">+1</td><td style="text-align:right;color:var(--yl)">0.25 (reviewer)</td></tr>
           <tr><td>PR reviewer</td><td style="text-align:right">+1</td><td style="text-align:right;color:var(--yl)">0.25 (reviewer)</td></tr>
           <tr><td>Issue / PR comment</td><td style="text-align:right">+0.5</td><td style="text-align:right;color:var(--or)">0.15 (consulted)</td></tr>
@@ -172,59 +176,59 @@ Pocita se per uroven nezavisle.</div>
     </div>
     <ul>
       <li>Threshold: Evidence Score &ge; 1.0</li>
-      <li>Heuristika: nejsilnejsi signal &rarr; vychozi CW</li>
+      <li>Heuristika: nejsilnější signál &rarr; výchozí CW</li>
       <li>Override: <code>/contribute @osoba weight:0.6</code></li>
-      <li>Commit count se neprevadi na cas</li>
+      <li>Commit count se nepřevádí na čas</li>
     </ul>
 
-    <h3>5.3 Vypocet — dve varianty</h3>
-    <div class="formula"><strong>Auditni varianta (Full):</strong>
+    <h3>5.3 Výpočet — dvě varianty</h3>
+    <div class="formula"><strong>Auditní varianta (Full):</strong>
 Score[P, item] = JobSize[item] &times; CW[P, item] &times; RS[P, item]
 DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
-    <div class="formula"><strong>Provozni varianta (Simple):</strong>
+    <div class="formula"><strong>Provozní varianta (Simple):</strong>
 Score[P, item] = JobSize[item] &times; CW[P, item]
 DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
-    <div class="note">Doporuceni: zacit provozni variantou. Evidence Score a RS zachovat ve snapshotu pro auditni obhajobu.</div>
+    <div class="note">Doporučení: začít provozní variantou. Evidence Score a RS zachovat ve snapshotu pro auditní obhajobu.</div>
 
-    <h3>5.4 Matematicka garance</h3>
+    <h3>5.4 Matematická garance</h3>
     <div class="formula">&Sigma; DerivedHours[P, item] = Capacity[P, I]
 
-Soucet odvozenych hodin je presne kapacita osoby na Iteraci.
-Plati pro obe varianty. Vzdy. Bez vyjimky.</div>
+Součet odvozených hodin je přesně kapacita osoby na Iteraci.
+Platí pro obě varianty. Vždy. Bez výjimky.</div>
   </section>
 
   <!-- 6. Dual-view -->
   <section id="dual-view">
-    <h2>6. Dual-view CW: dve otazky, jeden dataset</h2>
-    <p>CW = 0.25 pro reviewera muze znamenat dve veci. Jsou to dve ruzne otazky — model resi obe ze stejnych dat:</p>
+    <h2>6. Dual-view CW: dvě otázky, jeden dataset</h2>
+    <p>CW = 0.25 pro reviewera může znamenat dvě věci. Jsou to dvě různé otázky — model řeší obě ze stejných dat:</p>
 
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card green">
         <div class="tag" style="color:var(--gn)">Per-person normalizace</div>
-        <p><strong>Otazka:</strong> Jak se kapacita cloveka P rozlozi mezi jeho items?</p>
+        <p><strong>Otázka:</strong> Jak se kapacita člověka P rozloží mezi jeho items?</p>
         <div class="formula">DerivedHours[P, item] = (Score[P, item] / &Sigma; Score[P, *]) &times; Capacity[P, I]
 
 Garance: &Sigma; DerivedHours[P, *] = Capacity</div>
-        <p class="meta">Vystup: vykaz per osoba pro OP TAK</p>
+        <p class="meta">Výstup: výkaz per osoba pro OP TAK</p>
       </div>
       <div class="card cyan">
         <div class="tag" style="color:var(--cy)">Per-item normalizace</div>
-        <p><strong>Otazka:</strong> Jak se prace na itemu X rozlozi mezi lidi?</p>
+        <p><strong>Otázka:</strong> Jak se práce na itemu X rozloží mezi lidi?</p>
         <div class="formula">ItemShare[P, item] = DerivedHours[P, item] / &Sigma; DerivedHours[*, item]
 
 Garance: &Sigma; podilu na itemu = 100 %</div>
-        <p class="meta">Vystup: nakladova karta per deliverable</p>
+        <p class="meta">Výstup: nákladová karta per deliverable</p>
       </div>
     </div>
 
     <div class="card" style="margin-top:16px">
       <table>
         <thead>
-          <tr><th>Pohled</th><th>Otazka</th><th>Vystup</th><th>Garance</th></tr>
+          <tr><th>Pohled</th><th>Otázka</th><th>Výstup</th><th>Garance</th></tr>
         </thead>
         <tbody>
-          <tr><td>Per-person</td><td>Kolik hodin P stravil na cem?</td><td>Vykaz, OP TAK</td><td style="color:var(--gn)">&Sigma; = kapacita</td></tr>
-          <tr><td>Per-item</td><td>Kolik lidi a hodin stal item X?</td><td>Nakladova alokace</td><td style="color:var(--cy)">&Sigma; podilu = 100%</td></tr>
+          <tr><td>Per-person</td><td>Kolik hodin P strávil na čem?</td><td>Výkaz, OP TAK</td><td style="color:var(--gn)">&Sigma; = kapacita</td></tr>
+          <tr><td>Per-item</td><td>Kolik lidí a hodin stál item X?</td><td>Nákladová alokace</td><td style="color:var(--cy)">&Sigma; podilu = 100%</td></tr>
         </tbody>
       </table>
     </div>
@@ -235,14 +239,14 @@ Garance: &Sigma; podilu na itemu = 100 %</div>
     <h2>7. Konfigurace kadence</h2>
     <div class="grid grid-2">
       <div class="card yellow">
-        <div class="tag" style="color:var(--yl)">Varianta A: Klasicka (2/10)</div>
+        <div class="tag" style="color:var(--yl)">Varianta A: Klasická (2/10)</div>
         <table>
           <thead>
-            <tr><th>Cyklus</th><th>Delka</th><th>1.0 FTE</th><th>0.5</th><th>0.25</th></tr>
+            <tr><th>Cyklus</th><th>Délka</th><th>1.0 FTE</th><th>0.5</th><th>0.25</th></tr>
           </thead>
           <tbody>
-            <tr><td>Iterace</td><td>2 tydny</td><td>80h</td><td>40h</td><td>20h</td></tr>
-            <tr><td>PI</td><td>10 tydnu</td><td>400h</td><td>200h</td><td>100h</td></tr>
+            <tr><td>Iterace</td><td>2 týdny</td><td>80h</td><td>40h</td><td>20h</td></tr>
+            <tr><td>PI</td><td>10 týdnů</td><td>400h</td><td>200h</td><td>100h</td></tr>
           </tbody>
         </table>
       </div>
@@ -250,34 +254,34 @@ Garance: &Sigma; podilu na itemu = 100 %</div>
         <div class="tag" style="color:var(--gn)">Varianta B: AI-Native (1/5)</div>
         <table>
           <thead>
-            <tr><th>Cyklus</th><th>Delka</th><th>1.0 FTE</th><th>0.5</th><th>0.25</th></tr>
+            <tr><th>Cyklus</th><th>Délka</th><th>1.0 FTE</th><th>0.5</th><th>0.25</th></tr>
           </thead>
           <tbody>
-            <tr><td>Iterace</td><td>1 tyden</td><td>40h</td><td>20h</td><td>10h</td></tr>
-            <tr><td>PI</td><td>5 tydnu</td><td>200h</td><td>100h</td><td>50h</td></tr>
+            <tr><td>Iterace</td><td>1 týden</td><td>40h</td><td>20h</td><td>10h</td></tr>
+            <tr><td>PI</td><td>5 týdnů</td><td>200h</td><td>100h</td><td>50h</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-    <div class="note">Doporuceni: zacit na A. Po prvnim PI vyhodnotit prechod na B na zaklade velocity a lead time dat.</div>
+    <div class="note">Doporučení: začít na A. Po prvním PI vyhodnotit přechod na B na základě velocity a lead time dat.</div>
   </section>
 
-  <!-- 8. Ucici smycka -->
+  <!-- 8. Učící smyčka -->
   <section id="ucici-smycka">
-    <h2>8. Ucici smycka</h2>
+    <h2>8. Učící smyčka</h2>
     <div class="grid grid-2">
       <div class="card green">
         <div class="tag" style="color:var(--gn)">Velocity tracking</div>
-        <div class="formula">Story_Velocity = &Sigma; JS uzavrenych Stories / iterace
-Feature_Velocity = &Sigma; JS uzavrenych Features / PI
+        <div class="formula">Story_Velocity = &Sigma; JS uzavřených Stories / iterace
+Feature_Velocity = &Sigma; JS uzavřených Features / PI
 Accuracy = Actual / Planned &times; 100 %</div>
       </div>
       <div class="card accent">
         <div class="tag" style="color:var(--ac3)">Kalibrace</div>
         <ul>
-          <li><strong>CW:</strong> Po 2&ndash;3 iteracich vyhodnotit heuristiku. PM podhodnocen? Arch nadhodnocen?</li>
-          <li><strong>Job Size:</strong> Referencni Story &ldquo;3&rdquo; &ne; Feature &ldquo;3&rdquo;. Per uroven nezavisle.</li>
-          <li><strong>AI:</strong> Vykazujes cas na dodani, ne minuty kodu. AI &rarr; velocity, ne vykaz.</li>
+          <li><strong>CW:</strong> Po 2&ndash;3 iteracích vyhodnotit heuristiku. PM podhodnocen? Arch nadhodnocen?</li>
+          <li><strong>Job Size:</strong> Referenční Story &ldquo;3&rdquo; &ne; Feature &ldquo;3&rdquo;. Per úroveň nezávisle.</li>
+          <li><strong>AI:</strong> Vykazuješ čas na dodání, ne minuty kódu. AI &rarr; velocity, ne výkaz.</li>
         </ul>
       </div>
     </div>
@@ -298,13 +302,13 @@ Accuracy = Actual / Planned &times; 100 %</div>
           <tr><td>Job Size</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
           <tr><td>BV / TC / RR</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
           <tr><td>WSJF Score</td><td>Number</td><td>Auto (Action)</td></tr>
-          <tr><td>Planning Interval</td><td>Iteration</td><td>5 nebo 10 tydnu</td></tr>
-          <tr><td>Iteration</td><td>Iteration</td><td>1 nebo 2 tydny</td></tr>
-          <tr><td>Team</td><td>Single select</td><td>Tymove hodnoty</td></tr>
+          <tr><td>Planning Interval</td><td>Iteration</td><td>5 nebo 10 týdnů</td></tr>
+          <tr><td>Iteration</td><td>Iteration</td><td>1 nebo 2 týdny</td></tr>
+          <tr><td>Team</td><td>Single select</td><td>Týmové hodnoty</td></tr>
           <tr><td>Primary Owner</td><td>Assignee</td><td>Accountable owner</td></tr>
         </tbody>
       </table>
-      <div class="note">Co <strong>nedrzet</strong> jako GitHub field: Capacity, Derived Hours, FTE, podpisovy stav &rarr; patri do evidence vrstvy.</div>
+      <div class="note">Co <strong>nedržet</strong> jako GitHub field: Capacity, Derived Hours, FTE, podpisový stav &rarr; patří do evidence vrstvy.</div>
     </div>
 
     <h3>9.2 GitHub Actions</h3>
@@ -314,10 +318,10 @@ Accuracy = Actual / Planned &times; 100 %</div>
           <tr><th>#</th><th>Action</th><th>Trigger</th><th>Funkce</th></tr>
         </thead>
         <tbody>
-          <tr><td>1</td><td><strong>WSJF Calculator</strong></td><td>Field change</td><td>Auto-vypocet WSJF</td></tr>
-          <tr><td>2</td><td><strong>Contributor Detector</strong></td><td>PR merge / review</td><td>Detekce kontributoru + evidence</td></tr>
-          <tr><td>3</td><td><strong>Iteration Close</strong></td><td>Manualni dispatch</td><td>Snapshot + vykazy (MD/JSON/XLSX) + per-item</td></tr>
-          <tr><td>4</td><td><strong>PI Close</strong></td><td>Manualni dispatch</td><td>Agregace iteraci</td></tr>
+          <tr><td>1</td><td><strong>WSJF Calculator</strong></td><td>Field change</td><td>Auto-výpočet WSJF</td></tr>
+          <tr><td>2</td><td><strong>Contributor Detector</strong></td><td>PR merge / review</td><td>Detekce kontributorů + evidence</td></tr>
+          <tr><td>3</td><td><strong>Iteration Close</strong></td><td>Manuální dispatch</td><td>Snapshot + výkazy (MD/JSON/XLSX) + per-item</td></tr>
+          <tr><td>4</td><td><strong>PI Close</strong></td><td>Manuální dispatch</td><td>Agregace iterací</td></tr>
           <tr><td>5</td><td><strong>Velocity Tracker</strong></td><td>Iter/PI close</td><td>Velocity JSON + dashboard</td></tr>
         </tbody>
       </table>
@@ -332,7 +336,7 @@ feature/F-102-anon-engine</div>
 
   <!-- 10. Vykazy a audit -->
   <section id="vykazy">
-    <h2>10. Vykazy a audit</h2>
+    <h2>10. Výkazy a audit</h2>
 
     <h3>10.1 Pipeline</h3>
     <div class="formula" style="white-space:pre">/snapshots/
@@ -340,40 +344,40 @@ feature/F-102-anon-engine</div>
 
 /reports/
   iteration-PI-2026-1.3/
-    vykaz-urbanek.md                   &larr; citelny vykaz
-    vykaz-urbanek.json                 &larr; strojova data
-    summary.xlsx                       &larr; souhrnny Excel
+    vykaz-urbanek.md                   &larr; čitelný výkaz
+    vykaz-urbanek.json                 &larr; strojová data
+    summary.xlsx                       &larr; souhrnný Excel
     item-costs.xlsx                    &larr; per-item pohled
 
 /signed/
-  PI-2026-1.3-urbanek.pdf             &larr; BankID podepsany</div>
+  PI-2026-1.3-urbanek.pdf             &larr; BankID podepsaný</div>
 
     <h3>10.2 Freeze rule</h3>
-    <p>Po Iteration Close: snapshot je <strong>frozen</strong>. Evidence se neprepisuje in-place. Kazda oprava je nova revize. Zasadni pro auditni obhajobu.</p>
+    <p>Po Iteration Close: snapshot je <strong>frozen</strong>. Evidence se nepřepisuje in-place. Každá oprava je nová revize. Zásadní pro auditní obhajobu.</p>
 
     <h3>10.3 Auditni princip</h3>
-    <p>Prukaznost stoji na 5 pilírich:</p>
+    <p>Průkaznost stojí na 5 pilírich:</p>
     <ol class="audit-pillars">
       <li>GitHub delivery evidence</li>
       <li>Capacity registry (YAML)</li>
-      <li>Frozen snapshot (reprodukovatelny vstup)</li>
-      <li>Reprodukovatelny vypocet (Score = JS &times; CW &times; RS)</li>
-      <li>Podepsany vystup (BankID, zakon 21/2020 Sb.)</li>
+      <li>Frozen snapshot (reprodukovatelný vstup)</li>
+      <li>Reprodukovatelný výpočet (Score = JS &times; CW &times; RS)</li>
+      <li>Podepsaný výstup (BankID, zákon 21/2020 Sb.)</li>
     </ol>
   </section>
 
-  <!-- 11. Predpoklady a rizika -->
+  <!-- 11. Předpoklady a rizika -->
   <section id="predpoklady">
-    <h2>11. Predpoklady a rizika</h2>
+    <h2>11. Předpoklady a rizika</h2>
     <div class="grid grid-2">
       <div class="card green">
-        <div class="tag" style="color:var(--gn)">Predpoklady</div>
+        <div class="tag" style="color:var(--gn)">Předpoklady</div>
         <ul>
-          <li>Vsechny items se uzaviraji (nedodane se presouvaji)</li>
-          <li>Kapacita potvrzena pri Iteration Planning</li>
-          <li>Branch naming dodrzen (CI check)</li>
-          <li>Job Size konzistentni per uroven</li>
-          <li>CW se kalibruje po prvnich iteracich</li>
+          <li>Všechny items se uzavírají (nedodané se přesouvají)</li>
+          <li>Kapacita potvrzena při Iteration Planning</li>
+          <li>Branch naming dodržen (CI check)</li>
+          <li>Job Size konzistentní per úroveň</li>
+          <li>CW se kalibruje po prvních iteracích</li>
         </ul>
       </div>
       <div class="card">
@@ -383,74 +387,96 @@ feature/F-102-anon-engine</div>
             <tr><th>Riziko</th><th>Mitigace</th></tr>
           </thead>
           <tbody>
-            <tr><td>Auditor neuzna</td><td>Metodika + snapshoty + BankID</td></tr>
+            <tr><td>Auditor neuzná</td><td>Metodika + snapshoty + BankID</td></tr>
             <tr><td>CW neodpovida</td><td>Override + kalibrace</td></tr>
             <tr><td>Commit bez S-/F-/E-XXX</td><td>CI check blokuje PR</td></tr>
             <tr><td>PM/Arch bez commitu</td><td>Comments + /contribute</td></tr>
-            <tr><td>0 items pro osobu</td><td>Procesni eskalace</td></tr>
+            <tr><td>0 items pro osobu</td><td>Procesní eskalace</td></tr>
           </tbody>
         </table>
       </div>
     </div>
   </section>
 
-  <!-- 12. Srovnani -->
+  <!-- 12. Srovnání -->
   <section id="srovnani">
-    <h2>12. Srovnani s alternativami</h2>
+    <h2>12. Srovnání s alternativami</h2>
 
     <div class="grid grid-3" style="margin-bottom:20px">
       <div class="card" style="border-left:3px solid var(--or)">
         <h3 style="color:var(--or);margin-bottom:8px">Fixed Split v1</h3>
-        <p style="font-size:14px;color:var(--t2)">Predem definovane kose (napr. 60% Dev, 20% Arch, 20% QA). Hodiny se rozdeluji fixne podle role, nezavisle na skutecnem prispevku. Jednoduche, ale nepresne.</p>
+        <p style="font-size:14px;color:var(--t2)">Předem definované koše (např. 60% Dev, 20% Arch, 20% QA). Hodiny se rozdělují fixně podle role, nezávisle na skutečném příspěvku. Jednoduché, ale nepřesné.</p>
       </div>
       <div class="card" style="border-left:3px solid var(--gn)">
         <h3 style="color:var(--gn);margin-bottom:8px">EDPA v1.0.0</h3>
-        <p style="font-size:14px;color:var(--t2)">Evidence-Driven Proportional Allocation. Hodiny se odvozuji automaticky z GitHub delivery evidence (commity, PR, reviews). Matematicka garance: &Sigma; = Capacity.</p>
+        <p style="font-size:14px;color:var(--t2)">Evidence-Driven Proportional Allocation. Hodiny se odvozují automaticky z GitHub delivery evidence (commity, PR, reviews). Matematická garance: &Sigma; = Capacity.</p>
       </div>
       <div class="card" style="border-left:3px solid var(--rd)">
-        <h3 style="color:var(--rd);margin-bottom:8px">Rucni timesheets</h3>
-        <p style="font-size:14px;color:var(--t2)">Kazdy clen tymu rucne vyplnuje hodiny. Subjektivni, administrativne narocne, nema per-item pohled, neauditovatelne bez doplnkove evidence.</p>
+        <h3 style="color:var(--rd);margin-bottom:8px">Ruční timesheets</h3>
+        <p style="font-size:14px;color:var(--t2)">Každý člen týmu ručně vyplňuje hodiny. Subjektivní, administrativně náročné, nemá per-item pohled, neauditovatelné bez doplňkové evidence.</p>
       </div>
     </div>
 
     <div class="card">
       <table>
         <thead>
-          <tr><th>Vlastnost</th><th style="color:var(--or)">Fixed Split v1</th><th style="color:var(--gn)">EDPA v1.0.0</th><th style="color:var(--rd)">Rucni timesheets</th></tr>
+          <tr><th>Vlastnost</th><th style="color:var(--or)">Fixed Split v1</th><th style="color:var(--gn)">EDPA v1.0.0</th><th style="color:var(--rd)">Ruční timesheets</th></tr>
         </thead>
         <tbody>
-          <tr><td>Fixovane kose</td><td>Ano</td><td style="color:var(--gn)">Ne</td><td>Ne</td></tr>
-          <tr><td>Prazdne urovne</td><td style="color:var(--rd)">Problem</td><td style="color:var(--gn)">Neexistuji</td><td>N/A</td></tr>
-          <tr><td>Per-person pohled</td><td>Ano</td><td style="color:var(--gn)">Ano (primarni)</td><td>Ano</td></tr>
+          <tr><td>Fixované koše</td><td>Ano</td><td style="color:var(--gn)">Ne</td><td>Ne</td></tr>
+          <tr><td>Prázdné úrovně</td><td style="color:var(--rd)">Problem</td><td style="color:var(--gn)">Neexistují</td><td>N/A</td></tr>
+          <tr><td>Per-person pohled</td><td>Ano</td><td style="color:var(--gn)">Ano (primární)</td><td>Ano</td></tr>
           <tr><td>Per-item pohled</td><td style="color:var(--rd)">Ne</td><td style="color:var(--gn)">Ano (dual-view)</td><td>Ne</td></tr>
-          <tr><td>Cross-funkcni</td><td>Omezena</td><td style="color:var(--gn)">Plna</td><td>Plna</td></tr>
-          <tr><td>Automatizace</td><td>Stredni</td><td style="color:var(--gn)">Vysoka</td><td style="color:var(--rd)">Zadna</td></tr>
-          <tr><td>Mat. garance</td><td>Slozitejsi</td><td style="color:var(--gn)">Nativne</td><td style="color:var(--rd)">Ne</td></tr>
+          <tr><td>Cross-funkcni</td><td>Omezená</td><td style="color:var(--gn)">Plná</td><td>Plná</td></tr>
+          <tr><td>Automatizace</td><td>Střední</td><td style="color:var(--gn)">Vysoká</td><td style="color:var(--rd)">Žádná</td></tr>
+          <tr><td>Mat. garance</td><td>Složitější</td><td style="color:var(--gn)">Nativně</td><td style="color:var(--rd)">Ne</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
-  <!-- 13. Implementacni plan -->
+  <!-- 13. Implementační plán -->
   <section id="implementacni-plan">
-    <h2>13. Implementacni plan</h2>
+    <h2>13. Implementační plán</h2>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Faze</th><th>Cas</th><th>Obsah</th></tr>
+          <tr><th>Fáze</th><th>Čas</th><th>Obsah</th></tr>
         </thead>
         <tbody>
           <tr><td style="color:var(--gn)"><strong>Den 1</strong></td><td>6h</td><td>GitHub org, Projects setup, custom fields</td></tr>
           <tr><td style="color:var(--cy)"><strong>Tyden 1</strong></td><td>3 dny</td><td>Actions 1&ndash;2 (WSJF + Contributor Detector)</td></tr>
           <tr><td style="color:var(--ac2)"><strong>Tyden 2</strong></td><td>2 dny</td><td>Actions 3&ndash;5 (Iteration Close + PI Close + Velocity)</td></tr>
-          <tr><td style="color:var(--yl)"><strong>Iterace 1</strong></td><td>1&ndash;2t</td><td>Pilotni provoz, prvni vykazy, kalibrace CW</td></tr>
+          <tr><td style="color:var(--yl)"><strong>Iterace 1</strong></td><td>1&ndash;2t</td><td>Pilotní provoz, první výkazy, kalibrace CW</td></tr>
           <tr><td style="color:var(--or)"><strong>Retro PI 1</strong></td><td>1 den</td><td>Kadence, CW accuracy, velocity, dual-view validace</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
+  </div><!-- /methodology-content -->
+  </div><!-- /methodology-layout -->
 </div>
+
+<script>
+  // Scroll-spy: highlight active TOC link based on scroll position
+  const links = document.querySelectorAll('.toc-link');
+  const sections = document.querySelectorAll('section[id]');
+
+  function updateActive() {
+    let current = '';
+    for (const section of sections) {
+      const top = section.getBoundingClientRect().top;
+      if (top <= 100) current = section.id;
+    }
+    links.forEach(link => {
+      link.classList.toggle('active', link.dataset.section === current);
+    });
+  }
+
+  window.addEventListener('scroll', updateActive, { passive: true });
+  updateActive();
+</script>
 </Layout>
 
 <style>
@@ -483,29 +509,61 @@ feature/F-102-anon-engine</div>
     margin-top: 6px;
   }
 
-  .toc {
-    margin-bottom: 48px;
+  .methodology-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+  .sidebar-toc {
+    position: sticky;
+    top: 72px;
+    max-height: calc(100vh - 88px);
+    overflow-y: auto;
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    padding: 20px 16px;
   }
   .toc-title {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     color: var(--t3);
-    margin-bottom: 12px;
+    margin-bottom: 14px;
   }
   .toc-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px 24px;
-    padding-left: 20px;
-    font-size: 13px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
   }
-  .toc-list a {
-    color: var(--t2);
+  .toc-list li {
+    margin-bottom: 0;
   }
-  .toc-list a:hover {
+  .toc-link {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--t3);
+    padding: 5px 10px;
+    border-left: 2px solid transparent;
+    border-radius: 0 4px 4px 0;
+    transition: all 0.15s;
+    text-decoration: none;
+    line-height: 1.4;
+  }
+  .toc-link:hover {
+    color: var(--t1);
+    background: var(--s2);
+  }
+  .toc-link.active {
     color: var(--ac2);
+    border-left-color: var(--ac);
+    background: rgba(99, 102, 241, 0.06);
+  }
+  .methodology-content {
+    min-width: 0;
   }
 
   section {
@@ -556,9 +614,13 @@ feature/F-102-anon-engine</div>
     margin-bottom: 6px;
   }
 
-  @media (max-width: 768px) {
-    .toc-list {
+  @media (max-width: 900px) {
+    .methodology-layout {
       grid-template-columns: 1fr;
+    }
+    .sidebar-toc {
+      position: static;
+      max-height: none;
     }
     .page-header h1 {
       font-size: 18px;

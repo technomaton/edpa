@@ -28,6 +28,11 @@ const velocityData = iterations.map(it => {
 
 <Layout title="Dashboard — kashealth">
   <div class="container" style="padding-top: 32px; padding-bottom: 40px;">
+    <!-- Demo version switcher -->
+    <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+      <a href="/dashboard/" class="btn-secondary btn" style="font-size: 12px;">Generic demo</a>
+      <a href="/dashboard/kashealth/" class="btn-primary btn" style="font-size: 12px;">kashealth.cz — Case study</a>
+    </div>
     <!-- Header bar -->
     <div class="dash-header card" style="margin-bottom: 20px; border-left: 3px solid var(--ac);">
       <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -131,7 +136,7 @@ const velocityData = iterations.map(it => {
             ))}
           </select>
         </label>
-        <button class="btn btn-primary" id="btnEdpa">EDPA vypocet</button>
+        <button class="btn btn-primary" id="btnEdpa">EDPA výpočet</button>
       </div>
       <div id="edpaResult"></div>
     </div>

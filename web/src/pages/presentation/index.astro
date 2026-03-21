@@ -4,7 +4,7 @@ import '../../styles/presentation.css';
 import Header from '../../components/Header.astro';
 
 const title = 'EDPA Prezentace — Generic';
-const description = 'EDPA v1.0.0 governance prezentace — Evidence-Driven Proportional Allocation pro libovolny tym.';
+const description = 'EDPA v1.0.0 governance prezentace — Evidence-Driven Proportional Allocation pro libovolný tým.';
 ---
 <!doctype html>
 <html lang="cs">
@@ -22,9 +22,9 @@ const description = 'EDPA v1.0.0 governance prezentace — Evidence-Driven Propo
     <div class="nav-l"><span class="logo">EDPA v1.0.0</span><span class="nav-label">&middot; Open Source Governance</span></div>
     <div class="nav-c" id="dots"></div>
     <div class="nav-r">
-      <button class="pres-btn" id="btnPrev">&larr; Zpet</button>
+      <button class="pres-btn" id="btnPrev">&larr; Zpět</button>
       <span class="pg" id="pgN">1/20</span>
-      <button class="pres-btn" id="btnNext">Dale &rarr;</button>
+      <button class="pres-btn" id="btnNext">Dále &rarr;</button>
     </div>
   </div>
 
@@ -35,8 +35,8 @@ const S=[
 
 // 0: TITLE
 `<div style="text-align:center;max-width:850px;margin:0 auto">
-<div class="s-tag fade">Vas projekt &middot; Evidence-driven governance pro vas tym</div>
-<div class="s-h1 fade d1" style="font-size:44px;background:linear-gradient(135deg,var(--ac2),var(--cy));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Kompletni governance reseni</div>
+<div class="s-tag fade">Váš projekt &middot; Evidence-driven governance pro váš tým</div>
+<div class="s-h1 fade d1" style="font-size:44px;background:linear-gradient(135deg,var(--ac2),var(--cy));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Kompletní governance řešení</div>
 <div class="fade d2" style="font-size:18px;color:var(--t2);margin:16px 0 6px">EDPA — Evidence-Driven Proportional Allocation</div>
 <div class="fade d3" style="font-size:14px;color:var(--t3);font-style:italic;margin-bottom:24px">Capacity derivation from delivery evidence</div>
 <div class="sg sg4 fade d4" style="max-width:700px;margin:0 auto">
@@ -50,75 +50,75 @@ const S=[
 
 // 1: WHAT WE DELIVER
 `<div class="s-tag fade">Obsah prezentace</div>
-<div class="s-h1 fade d1">Co dnes predkladame</div>
-<div class="s-sub fade d2">Kompletni governance reseni pro projekt — od toolingu pres metodiku po automatizaci. Vse v jednom GitHub repo template.</div>
+<div class="s-h1 fade d1">Co dnes předkládáme</div>
+<div class="s-sub fade d2">Kompletní governance řešení pro projekt — od toolingu přes metodiku po automatizaci. Vše v jednom GitHub repo template.</div>
 <div class="sg sg5 fade d3">
-<div class="sc a" style="min-height:140px"><div class="sc-i">&#x1F4AC;</div><div class="sc-t">1. Tooling</div><div class="sc-l">Teams + GitHub<br>Minimalni naklady<br>0 Jira</div></div>
-<div class="sc c" style="min-height:140px"><div class="sc-i">&#x1F511;</div><div class="sc-t">2. Identita</div><div class="sc-l">Vase domena<br>Clenove + guests<br>Hybridni model</div></div>
-<div class="sc g" style="min-height:140px"><div class="sc-i">&#x26A1;</div><div class="sc-t">3. EDPA</div><div class="sc-l">Bez timesheetu<br>Dual-view CW<br>BankID audit</div></div>
+<div class="sc a" style="min-height:140px"><div class="sc-i">&#x1F4AC;</div><div class="sc-t">1. Tooling</div><div class="sc-l">Teams + GitHub<br>Minimální náklady<br>0 Jira</div></div>
+<div class="sc c" style="min-height:140px"><div class="sc-i">&#x1F511;</div><div class="sc-t">2. Identita</div><div class="sc-l">Vaše doména<br>Členové + guests<br>Hybridní model</div></div>
+<div class="sc g" style="min-height:140px"><div class="sc-i">&#x26A1;</div><div class="sc-t">3. EDPA</div><div class="sc-l">Bez timesheetů<br>Dual-view CW<br>BankID audit</div></div>
 <div class="sc y" style="min-height:140px"><div class="sc-i">&#x1F916;</div><div class="sc-t">4. AI Skills</div><div class="sc-l">4 composable<br>26+ platforem<br>Auto-kalibrace</div></div>
-<div class="sc o" style="min-height:140px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">5. Template</div><div class="sc-l">GitHub repo<br>30 souboru, 24KB<br>Okamzite pouzitelne</div></div>
+<div class="sc o" style="min-height:140px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">5. Template</div><div class="sc-l">GitHub repo<br>30 souborů, 24KB<br>Okamžitě použitelné</div></div>
 </div>`,
 
 // 2: PROBLEM
 `<div class="s-tag fade">Kontext</div>
-<div class="s-h1 fade d1">Proc potrebujete vlastni reseni</div>
+<div class="s-h1 fade d1">Proč potřebujete vlastní řešení</div>
 <div class="sg sg2 fade d2">
-<div class="sc o"><div class="sc-i">&#x1F500;</div><div class="sc-l"><b>Ruzne tenanty</b><br>Vice organizaci = prepinani tenantu, ztracene notifikace, fragmentovana komunikace.</div></div>
-<div class="sc o"><div class="sc-i">&#x1F512;</div><div class="sc-l"><b>Zavislost na IT</b><br>Kazda zmena opravneni = zadost na IT oddeleni. Tydny cekani.</div></div>
-<div class="sc o"><div class="sc-i">&#x1F4DD;</div><div class="sc-l"><b>Rucni timesheets</b><br>Subjektivni, administrativne narocne, neauditovatelne, nikdo je nema rad.</div></div>
-<div class="sc o"><div class="sc-i">&#x1F504;</div><div class="sc-l"><b>Riziko migrace</b><br>Pri spin-offu bude nutne vse presunout. Cim pozdeji, tim drazsi.</div></div>
+<div class="sc o"><div class="sc-i">&#x1F500;</div><div class="sc-l"><b>Různé tenanty</b><br>Více organizací = přepínání tenantů, ztracené notifikace, fragmentovaná komunikace.</div></div>
+<div class="sc o"><div class="sc-i">&#x1F512;</div><div class="sc-l"><b>Závislost na IT</b><br>Každá změna oprávnění = žádost na IT oddělení. Týdny čekání.</div></div>
+<div class="sc o"><div class="sc-i">&#x1F4DD;</div><div class="sc-l"><b>Ruční timesheets</b><br>Subjektivní, administrativně náročné, neauditovatelné, nikdo je nemá rád.</div></div>
+<div class="sc o"><div class="sc-i">&#x1F504;</div><div class="sc-l"><b>Riziko migrace</b><br>Při spin-offu bude nutné vše přesunout. Čím později, tím dražší.</div></div>
 </div>
-<div class="qt fade d3">Cil: Centralni stack vlastneny projektem od dne 1. Automatizovane vykazovani. Zadna budouci migrace.</div>`,
+<div class="qt fade d3">Cíl: Centrální stack vlastněný projektem od dne 1. Automatizované vykazování. Žádná budoucí migrace.</div>`,
 
 // 3: TOOLING
 `<div class="s-tag fade">Tooling stack</div>
-<div class="s-h1 fade d1">Teams + GitHub = kompletni stack</div>
+<div class="s-h1 fade d1">Teams + GitHub = kompletní stack</div>
 <div class="cols fade d2">
 <div class="col">
 <table>
-<thead><tr><th>Nastroj</th><th>Plan</th><th>Naklady</th></tr></thead>
+<thead><tr><th>Nástroj</th><th>Plan</th><th>Naklady</th></tr></thead>
 <tbody>
-<tr><td><b>M365 Business Basic</b></td><td>Clenove tymu</td><td>6 $/uzivatel/mes</td></tr>
-<tr><td><b>GitHub Team</b></td><td>Vyvojari</td><td>4 $/uzivatel/mes</td></tr>
-<tr><td><b>Vlastni domena</b></td><td>Registrator</td><td>~1 $/mes</td></tr>
-<tr style="background:rgba(99,102,241,.05)"><td><b>CELKEM</b></td><td><b>Vas tym</b></td><td style="color:var(--gn)"><b>Minimalni naklady</b></td></tr>
+<tr><td><b>M365 Business Basic</b></td><td>Členové týmu</td><td>6 $/uživatel/měs</td></tr>
+<tr><td><b>GitHub Team</b></td><td>Vývojáři</td><td>4 $/uživatel/měs</td></tr>
+<tr><td><b>Vlastní doména</b></td><td>Registrátor</td><td>~1 $/měs</td></tr>
+<tr style="background:rgba(99,102,241,.05)"><td><b>CELKEM</b></td><td><b>Vas tym</b></td><td style="color:var(--gn)"><b>Minimální náklady</b></td></tr>
 </tbody>
 </table>
-<div style="margin-top:8px;font-size:11px;color:var(--t3)">Radove stovky Kc/mesic za cely tym</div>
+<div style="margin-top:8px;font-size:11px;color:var(--t3)">Řádově stovky Kč/měsíc za celý tým</div>
 </div>
 <div class="col">
-<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>GitHub nahrazuje:</b><br>Jira &#x2192; Issues + Projects<br>Confluence &#x2192; Wiki + Pages<br>Tempo &#x2192; EDPA (odvozene hodiny)<br>Roadmaps &#x2192; Projects Roadmap<br>Automation &#x2192; GitHub Actions</div></div>
-<div class="s-note"><b>0 Jira, 0 Confluence.</b> GitHub-only governance s sub-issues (8 urovni), issue types, custom fields.</div>
+<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>GitHub nahrazuje:</b><br>Jira &#x2192; Issues + Projects<br>Confluence &#x2192; Wiki + Pages<br>Tempo &#x2192; EDPA (odvozené hodiny)<br>Roadmaps &#x2192; Projects Roadmap<br>Automation &#x2192; GitHub Actions</div></div>
+<div class="s-note"><b>0 Jira, 0 Confluence.</b> GitHub-only governance s sub-issues (8 úrovní), issue types, custom fields.</div>
 </div></div>`,
 
 // 4: IDENTITY
 `<div class="s-tag fade">Identita</div>
-<div class="s-h1 fade d1">Vlastni domena — hybridni model</div>
+<div class="s-h1 fade d1">Vlastní doména — hybridní model</div>
 <div class="cols fade d2">
 <div class="col">
-<div class="sc o" style="margin-bottom:10px;padding:12px"><div style="font-size:12px"><b>&#x26A0;&#xFE0F; Klicove omezeni:</b> Hoste v Teams <b>nemohou planovat schuzky</b>. Hardcoded v Entra ID.</div></div>
+<div class="sc o" style="margin-bottom:10px;padding:12px"><div style="font-size:12px"><b>&#x26A0;&#xFE0F; Klíčové omezení:</b> Hosté v Teams <b>nemohou plánovat schůzky</b>. Hardcoded v Entra ID.</div></div>
 <table>
-<thead><tr><th>Ucet</th><th>Role</th><th>Typ</th></tr></thead>
+<thead><tr><th>Účet</th><th>Role</th><th>Typ</th></tr></thead>
 <tbody>
-<tr style="background:rgba(99,102,241,.04)"><td><b>lead@vasedomena.cz</b></td><td>Lead Architect</td><td style="color:var(--gn)">Clen &#x2713;</td></tr>
-<tr style="background:rgba(99,102,241,.04)"><td><b>devops@vasedomena.cz</b></td><td>DevSecOps</td><td style="color:var(--gn)">Clen &#x2713;</td></tr>
-<tr style="background:rgba(99,102,241,.04)"><td><b>pm@vasedomena.cz</b></td><td>Project Manager</td><td style="color:var(--gn)">Clen &#x2713;</td></tr>
+<tr style="background:rgba(99,102,241,.04)"><td><b>lead@vasedomena.cz</b></td><td>Lead Architect</td><td style="color:var(--gn)">Člen &#x2713;</td></tr>
+<tr style="background:rgba(99,102,241,.04)"><td><b>devops@vasedomena.cz</b></td><td>DevSecOps</td><td style="color:var(--gn)">Člen &#x2713;</td></tr>
+<tr style="background:rgba(99,102,241,.04)"><td><b>pm@vasedomena.cz</b></td><td>Project Manager</td><td style="color:var(--gn)">Člen &#x2713;</td></tr>
 <tr><td>@partnera.cz</td><td>Developer</td><td style="color:var(--yl)">Guest</td></tr>
 <tr><td>@partnerb.cz</td><td>Developer</td><td style="color:var(--yl)">Guest</td></tr>
 </tbody>
 </table>
 </div>
 <div class="col">
-<div class="sc a" style="margin-bottom:8px"><div class="sc-t">Vrstva 1 &middot; Plni clenove</div><div class="sc-l">Kmenovy tym &middot; M365 Basic &middot; Planuji schuzky</div></div>
-<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Vrstva 2 &middot; Sdilene kanaly</div><div class="sc-l">B2B Direct Connect &middot; Bez prepinani tenantu</div></div>
-<div class="sc y"><div class="sc-t">Vrstva 3 &middot; Guest fallback</div><div class="sc-l">Pokud IT nekooperuje &middot; Funkcni, horsi UX</div></div>
+<div class="sc a" style="margin-bottom:8px"><div class="sc-t">Vrstva 1 &middot; Plní členové</div><div class="sc-l">Kmenový tým &middot; M365 Basic &middot; Plánují schůzky</div></div>
+<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Vrstva 2 &middot; Sdílené kanály</div><div class="sc-l">B2B Direct Connect &middot; Bez přepínání tenantů</div></div>
+<div class="sc y"><div class="sc-t">Vrstva 3 &middot; Guest fallback</div><div class="sc-l">Pokud IT nekooperuje &middot; Funkční, horší UX</div></div>
 </div></div>`,
 
 // 5: EDPA CORE
 `<div class="s-tag fade">EDPA v1.0.0</div>
-<div class="s-h1 fade d1">Cas se nemeri — odvozuje se</div>
-<div class="qt fade d2">Clovek deklaruje kapacitu. System identifikuje work items, na nichz se podilel. Kapacita se rozpadne pomerove podle evidence.</div>
+<div class="s-h1 fade d1">Čas se neměří — odvozuje se</div>
+<div class="qt fade d2">Člověk deklaruje kapacitu. Systém identifikuje work items, na nichž se podílel. Kapacita se rozpadne poměrově podle evidence.</div>
 <div class="cols fade d3">
 <div class="col">
 <div class="fm">Score = JobSize x CW x RS
@@ -126,13 +126,13 @@ const S=[
 DerivedHours = (Score / &#x2211;Scores) x Capacity
 
 <b>Garance: &#x2211; DerivedHours = Capacity</b>
-Vzdy. Bez vyjimky.</div>
-<div class="s-p">Dve varianty: <code>JS x CW</code> (provozni) a <code>JS x CW x RS</code> (auditni)</div>
+Vždy. Bez výjimky.</div>
+<div class="s-p">Dvě varianty: <code>JS x CW</code> (provozní) a <code>JS x CW x RS</code> (auditní)</div>
 </div>
 <div class="col">
-<div class="sc g" style="margin-bottom:8px"><div class="sc-l"><b>Nikdo neloguje hodiny.</b> Vykaz je vedlejsi produkt dodavky.</div></div>
+<div class="sc g" style="margin-bottom:8px"><div class="sc-l"><b>Nikdo neloguje hodiny.</b> Výkaz je vedlejší produkt dodávky.</div></div>
 <div class="sc c" style="margin-bottom:8px"><div class="sc-l"><b>Evidence z GitHubu.</b> Commity, PR, reviews, comments &#x2192; auto-detekce.</div></div>
-<div class="sc a"><div class="sc-l"><b>BankID podpis.</b> Frozen snapshot + BankID = pravne silnejsi nez papir.</div></div>
+<div class="sc a"><div class="sc-l"><b>BankID podpis.</b> Frozen snapshot + BankID = právně silnější než papír.</div></div>
 </div></div>`,
 
 // 6: DUAL VIEW
@@ -140,39 +140,39 @@ Vzdy. Bez vyjimky.</div>
 <div class="s-h1 fade d1">Dva pohledy, jeden dataset</div>
 <div class="sg sg2 fade d2" style="margin-top:16px">
 <div class="sc g" style="min-height:180px"><div class="sc-i">&#x1F464;</div><div class="sc-t">Per-Person</div>
-<div style="font-size:14px;font-weight:600;color:var(--gn);margin-bottom:6px">Jak se kapacita cloveka rozlozi?</div>
+<div style="font-size:14px;font-weight:600;color:var(--gn);margin-bottom:6px">Jak se kapacita člověka rozloží?</div>
 <div class="fm" style="font-size:11px;border-left-color:var(--gn);margin:6px 0">DerivedHours = (Score / &#x2211;Scores) x Capacity
 Garance: &#x2211; = Capacity</div>
-<div class="sc-l">&#x2192; <b>Vykaz per osoba</b> pro audit</div></div>
+<div class="sc-l">&#x2192; <b>Výkaz per osoba</b> pro audit</div></div>
 <div class="sc c" style="min-height:180px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">Per-Item</div>
-<div style="font-size:14px;font-weight:600;color:var(--cy);margin-bottom:6px">Kolik lidi a hodin stal item X?</div>
+<div style="font-size:14px;font-weight:600;color:var(--cy);margin-bottom:6px">Kolik lidí a hodin stál item X?</div>
 <div class="fm" style="font-size:11px;border-left-color:var(--cy);margin:6px 0">ItemShare = DerivedHours[P] / &#x2211; DerivedHours[*]
 Garance: &#x2211; podilu = 100%</div>
-<div class="sc-l">&#x2192; <b>Nakladova karta</b> per deliverable</div></div>
+<div class="sc-l">&#x2192; <b>Nákladová karta</b> per deliverable</div></div>
 </div>
-<div class="s-note fade d3">Oba pohledy ze stejnych dat (CW, JS, Capacity). Zadna duplikace, zadny konflikt.</div>`,
+<div class="s-note fade d3">Oba pohledy ze stejných dat (CW, JS, Capacity). Žádná duplikace, žádný konflikt.</div>`,
 
 // 7: THREE LAYERS
 `<div class="s-tag fade">Architektura</div>
-<div class="s-h1 fade d1">Tri oddelene vrstvy</div>
+<div class="s-h1 fade d1">Tři oddělené vrstvy</div>
 <div class="sg sg3 fade d2" style="margin-top:16px">
-<div class="sc a" style="min-height:170px"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">Operational Metadata</div><div class="sc-v" style="color:var(--ac2);font-size:14px">GitHub Issues + Projects</div><div class="sc-l" style="margin-top:6px">Ziva delivery data &middot; Hierarchie &middot; Status &middot; Job Size &middot; WSJF</div></div>
+<div class="sc a" style="min-height:170px"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">Operational Metadata</div><div class="sc-v" style="color:var(--ac2);font-size:14px">GitHub Issues + Projects</div><div class="sc-l" style="margin-top:6px">Živá delivery data &middot; Hierarchie &middot; Status &middot; Job Size &middot; WSJF</div></div>
 <div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">Capacity Registry</div><div class="sc-v" style="color:var(--cy);font-size:14px">YAML config v repo</div><div class="sc-l" style="margin-top:6px">Kapacita &middot; Role &middot; FTE &middot; Potvrzeno pri Iteration Planning</div></div>
-<div class="sc g" style="min-height:170px"><div class="sc-i">&#x1F512;</div><div class="sc-t">Evidence &amp; Reporting</div><div class="sc-v" style="color:var(--gn);font-size:14px">/snapshots &middot; /reports &middot; /signed</div><div class="sc-l" style="margin-top:6px">Frozen snapshoty &middot; Vykazy &middot; BankID &middot; Immutable</div></div>
+<div class="sc g" style="min-height:170px"><div class="sc-i">&#x1F512;</div><div class="sc-t">Evidence &amp; Reporting</div><div class="sc-v" style="color:var(--gn);font-size:14px">/snapshots &middot; /reports &middot; /signed</div><div class="sc-l" style="margin-top:6px">Frozen snapshoty &middot; Výkazy &middot; BankID &middot; Immutable</div></div>
 </div>
-<div class="fade d3" style="margin-top:12px;text-align:center;font-size:12px;color:var(--t3)">GitHub <b>neni</b> source of truth pro: kapacitu, FTE, derived hours, podpisy &#x2192; ty ziji v evidence vrstve.</div>`,
+<div class="fade d3" style="margin-top:12px;text-align:center;font-size:12px;color:var(--t3)">GitHub <b>není</b> source of truth pro: kapacitu, FTE, derived hours, podpisy &#x2192; ty žijí v evidence vrstvě.</div>`,
 
 // 8: HIERARCHY
 `<div class="s-tag fade">Hierarchie</div>
 <div class="s-h1 fade d1">SAFe-like hierarchie v GitHubu</div>
 <div class="cols fade d2">
 <div class="col">
-<div class="fm" style="font-size:13px;line-height:2;border-left-color:var(--ac)"><span style="color:var(--pk)">Initiative</span> (cely projekt)
-  &#x2514;&#x2500;&#x2500; <span style="color:var(--ac2)">Epic</span> (strategicky cil, 6-9 mes.)
+<div class="fm" style="font-size:13px;line-height:2;border-left-color:var(--ac)"><span style="color:var(--pk)">Initiative</span> (celý projekt)
+  &#x2514;&#x2500;&#x2500; <span style="color:var(--ac2)">Epic</span> (strategický cíl, 6-9 měs.)
        &#x2514;&#x2500;&#x2500; <span style="color:var(--cy)">Feature</span> (vejde se do PI)
-            &#x2514;&#x2500;&#x2500; <span style="color:var(--gn)">Story</span> (dodavano v Iteraci)
-                 &#x2514;&#x2500;&#x2500; <span style="color:var(--yl)">Task</span> (technicka prace)</div>
-<div class="s-p"><b>WSJF = (<span style="color:var(--gn)">BV</span> + <span style="color:var(--or)">TC</span> + <span style="color:var(--cy)">RR</span>) / <span style="color:var(--yl)">JS</span></b> — nezavisly per uroven, vrstvy se neporovnavaji.</div>
+            &#x2514;&#x2500;&#x2500; <span style="color:var(--gn)">Story</span> (dodáváno v Iteraci)
+                 &#x2514;&#x2500;&#x2500; <span style="color:var(--yl)">Task</span> (technická práce)</div>
+<div class="s-p"><b>WSJF = (<span style="color:var(--gn)">BV</span> + <span style="color:var(--or)">TC</span> + <span style="color:var(--cy)">RR</span>) / <span style="color:var(--yl)">JS</span></b> — nezávislý per úroveň, vrstvy se neporovnávají.</div>
 <div class="s-p">Naming: <code>PI-2026-1.3</code> = 3. iterace v 1. PI roku 2026.</div>
 </div>
 <div class="col">
@@ -183,17 +183,17 @@ Garance: &#x2211; podilu = 100%</div>
 <tr><td style="color:var(--gn)"><b>Story</b></td><td>8 / 5</td><td>Sub-issue</td></tr>
 <tr><td style="color:var(--yl)"><b>Task</b></td><td>&#x2014;</td><td>Checklist</td></tr>
 </tbody></table>
-<div class="s-note" style="margin-top:8px">GitHub sub-issues (GA 04/2025): 8 urovni, issue types, custom fields.</div>
+<div class="s-note" style="margin-top:8px">GitHub sub-issues (GA 04/2025): 8 úrovní, issue types, custom fields.</div>
 </div></div>`,
 
 // 9: EVIDENCE
 `<div class="s-tag fade">Evidence detection</div>
-<div class="s-h1 fade d1">Automaticka detekce kontributoru</div>
+<div class="s-h1 fade d1">Automatická detekce kontributorů</div>
 <div class="cols fade d2">
 <div class="col">
 <table><thead><tr><th>GitHub signal</th><th style="text-align:right">Body</th><th style="text-align:right">CW</th></tr></thead><tbody>
 <tr><td>Assignee na issue</td><td style="text-align:right"><b>+4</b></td><td style="text-align:right;color:var(--gn)">1.0</td></tr>
-<tr><td><code>/contribute</code> prikaz</td><td style="text-align:right"><b>+3</b></td><td style="text-align:right;color:var(--cy)">0.6</td></tr>
+<tr><td><code>/contribute</code> příkaz</td><td style="text-align:right"><b>+3</b></td><td style="text-align:right;color:var(--cy)">0.6</td></tr>
 <tr><td>PR author &#x2192; item</td><td style="text-align:right"><b>+2</b></td><td style="text-align:right;color:var(--cy)">0.6</td></tr>
 <tr><td>Commit s S-/F-/E-XXX</td><td style="text-align:right"><b>+1</b></td><td style="text-align:right;color:var(--yl)">0.25</td></tr>
 <tr><td>PR reviewer</td><td style="text-align:right"><b>+1</b></td><td style="text-align:right;color:var(--yl)">0.25</td></tr>
@@ -201,38 +201,38 @@ Garance: &#x2211; podilu = 100%</div>
 </tbody></table>
 </div>
 <div class="col">
-<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Threshold</div><div class="sc-l">Evidence Score &#x2265; 1.0 &#x2192; relevantni kontributor</div></div>
+<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Threshold</div><div class="sc-l">Evidence Score &#x2265; 1.0 &#x2192; relevantní kontributor</div></div>
 <div class="sc c" style="margin-bottom:8px"><div class="sc-t">Override</div><div class="sc-l"><code>/contribute @username weight:0.6</code></div></div>
 <div class="sc y" style="margin-bottom:8px"><div class="sc-t">Branch naming</div><div class="sc-l"><code>feature/S-200-omop-parser</code><br>CI blokuje PR bez reference</div></div>
-<div class="sc o"><div class="sc-t">Commit &#x2260; cas</div><div class="sc-l">Commity = signal relevance, ne hodiny. AI meni patterns.</div></div>
+<div class="sc o"><div class="sc-t">Commit &#x2260; cas</div><div class="sc-l">Commity = signál relevance, ne hodiny. AI mění patterns.</div></div>
 </div></div>`,
 
 // 10: SKILLS
 `<div class="s-tag fade">AI Agent Skills</div>
 <div class="s-h1 fade d1">4 composable EDPA skills</div>
-<div class="s-sub fade d2">Claude Code skills = automatizace governance. Agent v terminalu rozumi EDPA a provadi ho za vas.</div>
+<div class="s-sub fade d2">Claude Code skills = automatizace governance. Agent v terminálu rozumí EDPA a provádí ho za vás.</div>
 <div class="sg sg2 fade d3">
 <div class="sc a" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F3D7;&#xFE0F;</div><div><div style="font-weight:600">edpa-setup</div><div class="sc-l">~450 tokenu &middot; "Set up governance for my project"<br>GitHub Projects, capacity registry, CW heuristics, branch naming</div></div></div>
-<div class="sc c" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x26A1;</div><div><div style="font-weight:600">edpa-engine</div><div class="sc-l">~760 tokenu &middot; "Close iteration PI-2026-1.3"<br>Evidence gathering, EDPA vypocet, invariant validace</div></div></div>
-<div class="sc g" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F4C4;</div><div><div style="font-weight:600">edpa-reports</div><div class="sc-l">~505 tokenu &middot; "Generate reports"<br>MD/JSON/XLSX vykazy, frozen snapshots, per-item alokace</div></div></div>
-<div class="sc o" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F52C;</div><div><div style="font-weight:600">edpa-autocalib</div><div class="sc-l">~625 tokenu &middot; "Calibrate CW heuristics"<br>Karpathy autoresearch: 50 experimentu overnight, MAD optimalizace</div></div></div>
+<div class="sc c" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x26A1;</div><div><div style="font-weight:600">edpa-engine</div><div class="sc-l">~760 tokenu &middot; "Close iteration PI-2026-1.3"<br>Evidence gathering, EDPA výpočet, invariant validace</div></div></div>
+<div class="sc g" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F4C4;</div><div><div style="font-weight:600">edpa-reports</div><div class="sc-l">~505 tokenu &middot; "Generate reports"<br>MD/JSON/XLSX výkazy, frozen snapshots, per-item alokace</div></div></div>
+<div class="sc o" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F52C;</div><div><div style="font-weight:600">edpa-autocalib</div><div class="sc-l">~625 tokenu &middot; "Calibrate CW heuristics"<br>Karpathy autoresearch: 50 experimentů overnight, MAD optimalizace</div></div></div>
 </div>
-<div class="s-note fade d4"><b>26+ platforem:</b> Claude Code (nativni), Codex CLI, Gemini CLI, Cursor, Windsurf, Aider... Skills ziji v repo — kazdy clen tymu je ma automaticky.</div>`,
+<div class="s-note fade d4"><b>26+ platforem:</b> Claude Code (nativni), Codex CLI, Gemini CLI, Cursor, Windsurf, Aider... Skills žijí v repo — každý člen týmu je má automaticky.</div>`,
 
 // 11: HOW SKILLS WORK
 `<div class="s-tag fade">Jak to funguje</div>
-<div class="s-h1 fade d1">Denni workflow s EDPA skills</div>
+<div class="s-h1 fade d1">Denní workflow s EDPA skills</div>
 <div class="sg fade d2" style="gap:8px">
-<div class="sc g" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:30px">1</div><div><div style="font-weight:500">Tym pracuje normalne</div><div class="sc-l">Koduji na <code>feature/S-200-omop-parser</code> branchich. PR, review, merge. Nic navic.</div></div></div>
-<div class="sc c" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:30px">2</div><div><div style="font-weight:500">CI sbira evidence automaticky</div><div class="sc-l">Branch naming check &#x2192; evidence detection &#x2192; contributor metadata na issues. Zadny rucni zasah.</div></div></div>
-<div class="sc a" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:30px">3</div><div><div style="font-weight:500">Konec iterace: "Close iteration PI-2026-1.3"</div><div class="sc-l">Claude Code spusti <b>edpa-engine</b> &#x2192; stahne evidence &#x2192; spocita Score &#x2192; odvodi hodiny &#x2192; zvaliduje invarianty.</div></div></div>
-<div class="sc y" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:30px">4</div><div><div style="font-weight:500">"Generate reports"</div><div class="sc-l"><b>edpa-reports</b> &#x2192; MD/JSON vykazy per osoba + per-item alokace + frozen snapshot + Excel. 30 sekund.</div></div></div>
-<div class="sc o" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--or);width:30px">5</div><div><div style="font-weight:500">BankID podpis</div><div class="sc-l">Clen zkontroluje vykaz &#x2192; podepise BankID &#x2192; ulozeno v <code>/signed/</code>. Pravne silnejsi nez papir.</div></div></div>
+<div class="sc g" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:30px">1</div><div><div style="font-weight:500">Tým pracuje normálně</div><div class="sc-l">Kódují na <code>feature/S-200-omop-parser</code> branchích. PR, review, merge. Nic navíc.</div></div></div>
+<div class="sc c" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:30px">2</div><div><div style="font-weight:500">CI sbírá evidence automaticky</div><div class="sc-l">Branch naming check &#x2192; evidence detection &#x2192; contributor metadata na issues. Žádný ruční zásah.</div></div></div>
+<div class="sc a" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:30px">3</div><div><div style="font-weight:500">Konec iterace: "Close iteration PI-2026-1.3"</div><div class="sc-l">Claude Code spusti <b>edpa-engine</b> &#x2192; stáhne evidence &#x2192; spočítá Score &#x2192; odvodí hodiny &#x2192; zvaliduje invarianty.</div></div></div>
+<div class="sc y" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:30px">4</div><div><div style="font-weight:500">"Generate reports"</div><div class="sc-l"><b>edpa-reports</b> &#x2192; MD/JSON výkazy per osoba + per-item alokace + frozen snapshot + Excel. 30 sekund.</div></div></div>
+<div class="sc o" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--or);width:30px">5</div><div><div style="font-weight:500">BankID podpis</div><div class="sc-l">Člen zkontroluje výkaz &#x2192; podepíše BankID &#x2192; uloženo v <code>/signed/</code>. Právně silnější než papír.</div></div></div>
 </div>`,
 
 // 12: REPO TEMPLATE
 `<div class="s-tag fade">GitHub Template</div>
-<div class="s-h1 fade d1">30 souboru, okamzite pouzitelne</div>
+<div class="s-h1 fade d1">30 souborů, okamžitě použitelné</div>
 <div class="cols fade d2">
 <div class="col">
 <div class="fm" style="font-size:10px;line-height:1.7;border-left-color:var(--ac)"><b>.claude/skills/edpa-governance/</b>
@@ -240,7 +240,7 @@ Garance: &#x2211; podilu = 100%</div>
 &#x251C;&#x2500;&#x2500; edpa-engine/SKILL.md
 &#x251C;&#x2500;&#x2500; edpa-reports/SKILL.md
 &#x251C;&#x2500;&#x2500; edpa-autocalib/SKILL.md
-&#x251C;&#x2500;&#x2500; references/ (7 souboru)
+&#x251C;&#x2500;&#x2500; references/ (7 souborů)
 &#x251C;&#x2500;&#x2500; scripts/evaluate_cw.py
 &#x251C;&#x2500;&#x2500; examples/capacity-example.yaml
 &#x2514;&#x2500;&#x2500; plugin.json
@@ -263,7 +263,7 @@ Edituj <code>config/</code> &#x2192; hotovo.
 </div></div>
 <div class="sc c" style="margin-bottom:8px"><div class="sc-t">Pro jiny projekt</div><div class="sc-l">
 "Use this template" na GitHubu.<br>
-<code>config/capacity.yaml</code> = tvuj tym.<br>
+<code>config/capacity.yaml</code> = tvůj tým.<br>
 Claude Code: "Set up EDPA for My Project"
 </div></div>
 <div class="sc a"><div class="sc-t">Obsah</div><div class="sc-l">4 skills + 7 references + 3 configs + 5 GitHub templates + CI workflow + evaluator + metodika</div></div>
@@ -272,7 +272,7 @@ Claude Code: "Set up EDPA for My Project"
 // 13: AUTO-CALIBRATION
 `<div class="s-tag fade">Auto-kalibrace</div>
 <div class="s-h1 fade d1">Karpathyho autoresearch loop</div>
-<div class="s-sub fade d2">Po 1. PI (10 tydnu) ma tym &#x2265; 20 potvrzenych CW zaznamu. Agent pres noc optimalizuje heuristiku.</div>
+<div class="s-sub fade d2">Po 1. PI (10 týdnů) má tým &#x2265; 20 potvrzených CW záznamů. Agent přes noc optimalizuje heuristiku.</div>
 <div class="cols fade d3">
 <div class="col">
 <div class="fm" style="font-size:11px;border-left-color:var(--or)"><b>One file, one metric, one loop:</b>
@@ -280,48 +280,48 @@ Claude Code: "Set up EDPA for My Project"
 Target:  cw_heuristics.yaml
 Metric:  MAD (mean absolute deviation)
 Dir:     lower
-Budget:  50 experimentu (~2h)
+Budget:  50 experimentů (~2h)
 Memory:  git log
 
 Loop:
-1. Nacti historii + vysledky
-2. Navrhni JEDNU zmenu
+1. Načti historii + výsledky
+2. Navrhni JEDNU změnu
 3. Commit &#x2192; evaluate &#x2192; keep/revert
 4. Opakuj 50x</div>
 </div>
 <div class="col">
-<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Prinos</div><div class="sc-l">15-30% snizeni odchylky CW. Presnejsi vykazy bez manualni diskuse na retro.</div></div>
-<div class="sc o" style="margin-bottom:8px"><div class="sc-t">Bezpecnost</div><div class="sc-l">Agent <b>nesmi editovat evaluator</b> (evaluate_cw.py). Oddeleni optimalizatoru od cilove funkce.</div></div>
-<div class="sc a"><div class="sc-t">Budouci faze</div><div class="sc-l">Aktivace nejdrive po 1. PI. Predtim: nedostatek ground truth dat.</div></div>
+<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Přínos</div><div class="sc-l">15-30% snížení odchylky CW. Přesnější výkazy bez manuální diskuse na retro.</div></div>
+<div class="sc o" style="margin-bottom:8px"><div class="sc-t">Bezpečnost</div><div class="sc-l">Agent <b>nesmí editovat evaluátor</b></b> (evaluate_cw.py). Oddělení optimalizátoru od cílové funkce.</div></div>
+<div class="sc a"><div class="sc-t">Budoucí fáze</div><div class="sc-l">Aktivace nejdříve po 1. PI. Předtím: nedostatek ground truth dat.</div></div>
 </div></div>`,
 
 // 14: CADENCE
 `<div class="s-tag fade">Kadence</div>
-<div class="s-h1 fade d1">Konfigurovatelny delivery rytmus</div>
+<div class="s-h1 fade d1">Konfigurovatelný delivery rytmus</div>
 <div class="sg sg2 fade d2" style="margin-top:16px">
-<div class="sc y" style="min-height:170px"><div class="sc-t">Varianta A &middot; Klasicka (2/10)</div>
-<div style="font-size:22px;font-weight:700;color:var(--yl);margin:8px 0">2 tydny</div>
+<div class="sc y" style="min-height:170px"><div class="sc-t">Varianta A &middot; Klasická (2/10)</div>
+<div style="font-size:22px;font-weight:700;color:var(--yl);margin:8px 0">2 týdny</div>
 <table style="margin:0"><tbody>
-<tr><td>PI</td><td>10 tydnu (4+1 IP)</td></tr>
+<tr><td>PI</td><td>10 týdnů (4+1 IP)</td></tr>
 <tr><td>1.0 FTE</td><td>80h / iterace</td></tr>
 <tr><td>Story max</td><td>8 SP</td></tr>
 </tbody></table>
-<div style="margin-top:6px"><span class="tg tg-y">Doporuceno pro start</span></div>
+<div style="margin-top:6px"><span class="tg tg-y">Doporučeno pro start</span></div>
 </div>
 <div class="sc g" style="min-height:170px"><div class="sc-t">Varianta B &middot; AI-Native (1/5)</div>
-<div style="font-size:22px;font-weight:700;color:var(--gn);margin:8px 0">1 tyden</div>
+<div style="font-size:22px;font-weight:700;color:var(--gn);margin:8px 0">1 týden</div>
 <table style="margin:0"><tbody>
-<tr><td>PI</td><td>5 tydnu (4+1 IP)</td></tr>
+<tr><td>PI</td><td>5 týdnů (4+1 IP)</td></tr>
 <tr><td>1.0 FTE</td><td>40h / iterace</td></tr>
 <tr><td>Story max</td><td>5 SP</td></tr>
 </tbody></table>
-<div style="margin-top:6px"><span class="tg tg-g">Po stabilizaci procesu</span></div>
+<div style="margin-top:6px"><span class="tg tg-g">Po stabilizaci procesů</span></div>
 </div></div>
-<div class="s-note fade d3">EDPA funguje identicky pro obe varianty — meni se jen <code>Capacity[P, I]</code>.</div>`,
+<div class="s-note fade d3">EDPA funguje identicky pro obe varianty — mění se jen <code>Capacity[P, I]</code>.</div>`,
 
 // 15: TEAM
 `<div class="s-tag fade">Tym</div>
-<div class="s-h1 fade d1">Priklad tymu &middot; Konfigurovatelne</div>
+<div class="s-h1 fade d1">Příklad týmu &middot; Konfigurovatelné</div>
 <div class="cols fade d2">
 <div class="col" style="flex:2">
 <table><thead><tr><th>Role</th><th>Pozice</th><th>Tym</th><th>FTE</th><th>h/iter</th></tr></thead><tbody>
@@ -347,7 +347,7 @@ Loop:
 <div class="sg fade d2" style="gap:6px">
 <div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F9EE;</div><div><div style="font-weight:500;font-size:12px">1. WSJF Calculator</div><div class="sc-l">Field change &#x2192; auto WSJF score</div></div></div>
 <div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F50D;</div><div><div style="font-weight:500;font-size:12px">2. Contributor Detector</div><div class="sc-l">PR merge &#x2192; kontributor evidence + CW</div></div></div>
-<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4F8;</div><div><div style="font-weight:500;font-size:12px">3. Iteration Close</div><div class="sc-l">Dispatch &#x2192; frozen snapshot + vykazy</div></div></div>
+<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4F8;</div><div><div style="font-weight:500;font-size:12px">3. Iteration Close</div><div class="sc-l">Dispatch &#x2192; frozen snapshot + výkazy</div></div></div>
 <div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4CA;</div><div><div style="font-weight:500;font-size:12px">4. PI Close</div><div class="sc-l">Dispatch &#x2192; PI agregace + trend metriky</div></div></div>
 <div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4C8;</div><div><div style="font-weight:500;font-size:12px">5. Velocity Tracker</div><div class="sc-l">Iter/PI close &#x2192; velocity JSON + dashboard</div></div></div>
 <div class="sc p" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x2705;</div><div><div style="font-weight:500;font-size:12px">6. Branch Naming Check</div><div class="sc-l">PR &#x2192; blokuje bez S-/F-/E-XXX reference</div></div></div>
@@ -358,44 +358,44 @@ Loop:
 <div class="s-h1 fade d1">Rizika a mitigace</div>
 <div class="fade d2"><table style="margin-top:12px">
 <thead><tr><th>Riziko</th><th>Dopad</th><th>Mitigace</th></tr></thead><tbody>
-<tr><td><b>Auditor neuzna EDPA</b></td><td><span class="tg tg-r">Vysoky</span></td><td>Metodika + snapshoty + reprodukovatelnost + BankID</td></tr>
-<tr><td><b>CW neodpovida realite</b></td><td><span class="tg tg-y">Stredni</span></td><td>Override + auto-kalibrace (Karpathy loop po 1. PI)</td></tr>
-<tr><td><b>IT partnera odmitne B2B</b></td><td><span class="tg tg-y">Stredni</span></td><td>Guest pristup = fallback bez zavislosti na IT</td></tr>
-<tr><td><b>Commit bez reference</b></td><td><span class="tg tg-y">Stredni</span></td><td>CI check blokuje PR + pre-commit hook</td></tr>
-<tr><td><b>PM/Arch bez commitu</b></td><td><span class="tg tg-y">Stredni</span></td><td>Comments + <code>/contribute</code> prikaz</td></tr>
-<tr><td><b>Skill na spatne platforme</b></td><td><span class="tg tg-g">Nizky</span></td><td>AgentSkills standard: 26+ platforem, convert.sh</td></tr>
+<tr><td><b>Auditor neuzná EDPA</b></td><td><span class="tg tg-r">Vysoký</span></td><td>Metodika + snapshoty + reprodukovatelnost + BankID</td></tr>
+<tr><td><b>CW neodpovídá realitě</b></td><td><span class="tg tg-y">Střední</span></td><td>Override + auto-kalibrace (Karpathy loop po 1. PI)</td></tr>
+<tr><td><b>IT partnera odmitne B2B</b></td><td><span class="tg tg-y">Střední</span></td><td>Guest přístup = fallback bez závislosti na IT</td></tr>
+<tr><td><b>Commit bez reference</b></td><td><span class="tg tg-y">Střední</span></td><td>CI check blokuje PR + pre-commit hook</td></tr>
+<tr><td><b>PM/Arch bez commitu</b></td><td><span class="tg tg-y">Střední</span></td><td>Comments + <code>/contribute</code> příkaz</td></tr>
+<tr><td><b>Skill na špatné platformě</b></td><td><span class="tg tg-g">Nízký</span></td><td>AgentSkills standard: 26+ platforem, convert.sh</td></tr>
 </tbody></table></div>`,
 
 // 18: IMPLEMENTATION
 `<div class="s-tag fade">Implementace</div>
-<div class="s-h1 fade d1">Plan nasazeni</div>
+<div class="s-h1 fade d1">Plán nasazení</div>
 <div class="sg fade d2" style="gap:6px">
-<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:32px;text-align:center">D1</div><div><div style="font-weight:500">Domena + M365 + GitHub org</div><div class="sc-l">Vlastni domena &middot; M365 licence &middot; GitHub Team &middot; Repo z template &middot; 6h</div></div></div>
+<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:32px;text-align:center">D1</div><div><div style="font-weight:500">Domena + M365 + GitHub org</div><div class="sc-l">Vlastní doména &middot; M365 licence &middot; GitHub Team &middot; Repo z template &middot; 6h</div></div></div>
 <div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:32px;text-align:center">D2</div><div><div style="font-weight:500">GitHub Projects + custom fields</div><div class="sc-l">Issue types, hierarchie, views, iterations, DoR &middot; 4h</div></div></div>
 <div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:32px;text-align:center">T1</div><div><div style="font-weight:500">Actions 1-3</div><div class="sc-l">WSJF Calculator + Contributor Detector + Branch Check &middot; 3 dny</div></div></div>
 <div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:32px;text-align:center">T2</div><div><div style="font-weight:500">Actions 4-6 + EDPA skills</div><div class="sc-l">Iteration Close + PI Close + Velocity + skill bundle deployment &middot; 2 dny</div></div></div>
-<div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--or);width:32px;text-align:center">I1</div><div><div style="font-weight:500">Pilotni iterace + kalibrace</div><div class="sc-l">Prvni EDPA vykazy &middot; CW kalibrace &middot; End-to-end test &middot; 2 tydny</div></div></div>
+<div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--or);width:32px;text-align:center">I1</div><div><div style="font-weight:500">Pilotní iterace + kalibrace</div><div class="sc-l">První EDPA výkazy &middot; CW kalibrace &middot; End-to-end test &middot; 2 týdny</div></div></div>
 <div class="sc p" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--pk);width:32px;text-align:center">R1</div><div><div style="font-weight:500">Retro po 1. PI &#x2192; auto-kalibrace</div><div class="sc-l">Kadence 1/5 vs 2/10 &middot; CW accuracy &middot; Karpathy loop &middot; 1 den</div></div></div>
 </div>`,
 
 // 19: CLOSING
 `<div style="text-align:center;max-width:850px;margin:0 auto">
-<div class="s-tag fade">Zaver</div>
-<div class="s-h1 fade d1" style="font-size:32px">Minimalni investice, maximalni efekt</div>
+<div class="s-tag fade">Závěr</div>
+<div class="s-h1 fade d1" style="font-size:32px">Minimální investice, maximální efekt</div>
 <div class="sg sg4 fade d2" style="margin-top:20px">
-<div class="sc g" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--gn)">Min.</div><div class="sc-l">Naklady/mesic<br>Cely tym</div></div>
-<div class="sc a" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--ac2)">EDPA</div><div class="sc-l">Bez timesheetu<br>Dual-view</div></div>
+<div class="sc g" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--gn)">Min.</div><div class="sc-l">Náklady/měsíc<br>Celý tým</div></div>
+<div class="sc a" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--ac2)">EDPA</div><div class="sc-l">Bez timesheetů<br>Dual-view</div></div>
 <div class="sc c" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--cy)">4 Skills</div><div class="sc-l">26+ platforem<br>Composable</div></div>
-<div class="sc y" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--yl)">30</div><div class="sc-l">souboru v template<br>Okamzite</div></div>
+<div class="sc y" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--yl)">30</div><div class="sc-l">souborů v template<br>Okamžitě</div></div>
 </div>
-<div class="qt fade d3" style="margin-top:20px;text-align:left">Clovek deklaruje kapacitu.<br>System identifikuje work items z delivery evidence.<br>Kapacita se rozpadne pomerne. Bez timesheetu. Bez Jiry.<br>Agent to cele automatizuje.</div>
+<div class="qt fade d3" style="margin-top:20px;text-align:left">Člověk deklaruje kapacitu.<br>Systém identifikuje work items z delivery evidence.<br>Kapacita se rozpadne poměrně. Bez timesheetů. Bez Jiry.<br>Agent to celé automatizuje.</div>
 <div class="fade d4" style="margin-top:20px">
-<div style="font-size:13px;color:var(--t2);margin-bottom:8px">Dalsi kroky:</div>
+<div style="font-size:13px;color:var(--t2);margin-bottom:8px">Další kroky:</div>
 <div class="sg sg4" style="max-width:700px;margin:0 auto;gap:6px">
-<div class="sc g" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--gn)">1. Vyhodnoceni EDPA</div></div>
-<div class="sc c" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--cy)">2. Setup domeny</div></div>
-<div class="sc a" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--ac2)">3. Den 1: nasazeni</div></div>
-<div class="sc y" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--yl)">4. Prvni PI</div></div>
+<div class="sc g" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--gn)">1. Vyhodnocení EDPA</div></div>
+<div class="sc c" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--cy)">2. Setup domény</div></div>
+<div class="sc a" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--ac2)">3. Den 1: nasazení</div></div>
+<div class="sc y" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--yl)">4. První PI</div></div>
 </div></div>
 <div class="fade d5" style="margin-top:16px;font-size:11px;color:var(--t3)">EDPA v1.0.0 — Open Source &middot; Evidence-Driven Proportional Allocation</div>
 </div>`

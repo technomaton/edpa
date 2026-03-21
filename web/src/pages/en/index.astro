@@ -1,0 +1,459 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Evidence-Driven Proportional Allocation" lang="en">
+
+  <!-- Hero Section -->
+  <section class="hero section">
+    <div class="container hero-inner">
+      <p class="tag">Evidence-Driven Proportional Allocation</p>
+      <h1 class="hero-headline">Time is not measured — it is derived</h1>
+      <p class="hero-subtitle">
+        EDPA v1.0.0 replaces manual timesheets with automatic hour derivation
+        from GitHub delivery evidence. Mathematical guarantee, zero administration.
+      </p>
+      <div class="grid grid-4 hero-stats">
+        <div class="card accent">
+          <p class="stat-label">Timesheets</p>
+          <p class="stat-value">Zero</p>
+          <p class="stat-desc">No manual logging</p>
+        </div>
+        <div class="card green">
+          <p class="stat-label">Guarantee</p>
+          <p class="stat-value">Sum = Capacity</p>
+          <p class="stat-desc">Mathematically guaranteed</p>
+        </div>
+        <div class="card cyan">
+          <p class="stat-label">Analytics</p>
+          <p class="stat-value">Dual-view</p>
+          <p class="stat-desc">Per-person & per-item</p>
+        </div>
+        <div class="card yellow">
+          <p class="stat-label">Calibration</p>
+          <p class="stat-value">Self-tuning</p>
+          <p class="stat-desc">Auto-calibration (Karpathy loop)</p>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <a href="/en/dashboard/" class="btn btn-primary">Dashboard demo</a>
+        <a href="/en/presentation/" class="btn btn-secondary">Presentation</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Problem Section -->
+  <section class="section" id="problem">
+    <div class="container">
+      <p class="tag">Context</p>
+      <h2 class="section-title">Why do we need EDPA?</h2>
+      <div class="grid grid-4 problem-grid">
+        <div class="card orange">
+          <h3 class="card-heading">Inaccuracy</h3>
+          <p class="card-text">
+            Manual timesheets are subjective. People estimate, round,
+            forget. Data does not reflect reality.
+          </p>
+        </div>
+        <div class="card orange">
+          <h3 class="card-heading">Audit nightmare</h3>
+          <p class="card-text">
+            During audits it is impossible to prove retroactively who worked on what.
+            Evidence is missing, provability is lacking.
+          </p>
+        </div>
+        <div class="card orange">
+          <h3 class="card-heading">Administrative burden</h3>
+          <p class="card-text">
+            Filling out reports takes time that could go into development.
+            Nobody likes timesheets.
+          </p>
+        </div>
+        <div class="card orange">
+          <h3 class="card-heading">No per-item view</h3>
+          <p class="card-text">
+            Traditional systems show only personal reports. How much did
+            a specific deliverable cost? Impossible to determine.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Solution / How it Works -->
+  <section class="section" id="solution">
+    <div class="container">
+      <p class="tag">Solution</p>
+      <h2 class="section-title">How EDPA works</h2>
+      <div class="formula">Score = JobSize × ContributionWeight × RelevanceSignal
+DerivedHours = (Score / ΣScores) × Capacity
+
+Guarantee: Σ DerivedHours = Capacity — always, no exceptions.</div>
+      <p class="desc">
+        The system consists of three separate layers that collaborate
+        to automatically derive working hours.
+      </p>
+      <div class="grid grid-3 layers-grid">
+        <div class="card accent">
+          <h3 class="card-heading">Operational Metadata</h3>
+          <p class="layer-source">GitHub Issues + Projects</p>
+          <p class="card-text">
+            Live delivery data. Hierarchy, status, Job Size, WSJF.
+            Everything the team already uses daily.
+          </p>
+        </div>
+        <div class="card cyan">
+          <h3 class="card-heading">Capacity Registry</h3>
+          <p class="layer-source">YAML config in repo</p>
+          <p class="card-text">
+            Capacity, roles, FTE. Confirmed at Iteration Planning.
+            The only manual input to the system.
+          </p>
+        </div>
+        <div class="card green">
+          <h3 class="card-heading">Evidence &amp; Reporting</h3>
+          <p class="layer-source">/snapshots &middot; /reports &middot; /signed</p>
+          <p class="card-text">
+            Frozen snapshots, reports, BankID signatures. Immutable and
+            auditable.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Evidence Detection -->
+  <section class="section" id="evidence">
+    <div class="container">
+      <p class="tag">Evidence detection</p>
+      <h2 class="section-title">Signals from GitHub</h2>
+      <p class="desc">
+        EDPA automatically detects developer contributions from GitHub activities.
+        Each signal has an assigned weight (priority) and corresponding ContributionWeight.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Signal</th>
+              <th>Priority</th>
+              <th>CW</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>Assignee</code></td>
+              <td class="td-priority">+4</td>
+              <td class="td-cw">1.0</td>
+              <td>Primary issue resolver</td>
+            </tr>
+            <tr>
+              <td><code>/contribute</code></td>
+              <td class="td-priority">+3</td>
+              <td class="td-cw">0.6</td>
+              <td>Explicit collaboration sign-up</td>
+            </tr>
+            <tr>
+              <td><code>PR author</code></td>
+              <td class="td-priority">+2</td>
+              <td class="td-cw">0.6</td>
+              <td>Pull request author</td>
+            </tr>
+            <tr>
+              <td><code>Commit</code></td>
+              <td class="td-priority">+1</td>
+              <td class="td-cw">0.25</td>
+              <td>Commit in a relevant branch</td>
+            </tr>
+            <tr>
+              <td><code>PR reviewer</code></td>
+              <td class="td-priority">+1</td>
+              <td class="td-cw">0.25</td>
+              <td>Pull request code review</td>
+            </tr>
+            <tr>
+              <td><code>Comment</code></td>
+              <td class="td-priority">+0.5</td>
+              <td class="td-cw">0.15</td>
+              <td>Comment in issue or PR</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dual-View -->
+  <section class="section" id="dual-view">
+    <div class="container">
+      <p class="tag">Dual-View analytics</p>
+      <h2 class="section-title">Two views, one dataset</h2>
+      <div class="grid grid-2 dual-grid">
+        <div class="card green">
+          <h3 class="dual-title dual-title-green">Per-Person</h3>
+          <p class="dual-question">
+            How is a person's capacity distributed across items?
+          </p>
+          <div class="formula dual-formula">DerivedHours = (Score / ΣScores) × Capacity
+Guarantee: Σ = Capacity</div>
+          <p class="dual-usecase">Report for audit</p>
+        </div>
+        <div class="card cyan">
+          <h3 class="dual-title dual-title-cyan">Per-Item</h3>
+          <p class="dual-question">
+            How many people and hours did item X cost?
+          </p>
+          <div class="formula dual-formula dual-formula-cyan">ItemShare = DerivedHours[P] / Σ DerivedHours[*]
+Guarantee: Σ shares = 100%</div>
+          <p class="dual-usecase">Cost allocation per deliverable</p>
+        </div>
+      </div>
+      <div class="note">
+        Both views are derived from the same data (CW, JobSize, Capacity).
+        No duplication, no conflict.
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Grid -->
+  <section class="section" id="features">
+    <div class="container">
+      <p class="tag">Key features</p>
+      <h2 class="section-title">Why EDPA works</h2>
+      <div class="grid grid-3 features-grid">
+        <div class="card accent">
+          <h3 class="card-heading">Zero manual input</h3>
+          <p class="card-text">
+            No timesheets. The report is a byproduct of delivery.
+            The team works, the system calculates.
+          </p>
+        </div>
+        <div class="card green">
+          <h3 class="card-heading">Mathematical guarantee</h3>
+          <p class="card-text">
+            Σ DerivedHours = Capacity. Always.
+            Proportional allocation ensures consistency.
+          </p>
+        </div>
+        <div class="card cyan">
+          <h3 class="card-heading">Dual-view analytics</h3>
+          <p class="card-text">
+            Per-person reports for reporting. Per-item cost cards
+            for management. One dataset.
+          </p>
+        </div>
+        <div class="card yellow">
+          <h3 class="card-heading">Audit-grade (BankID)</h3>
+          <p class="card-text">
+            Frozen snapshots + BankID signatures. Legally stronger
+            than paper reports.
+          </p>
+        </div>
+        <div class="card accent">
+          <h3 class="card-heading">Self-tuning</h3>
+          <p class="card-text">
+            Karpathy loop: compare → adjust → repeat.
+            The system automatically calibrates to real data.
+          </p>
+        </div>
+        <div class="card green">
+          <h3 class="card-heading">GitHub-native</h3>
+          <p class="card-text">
+            GitHub Actions, branch naming conventions, issue tracking.
+            No external tools.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="section cta-section" id="cta">
+    <div class="container cta-inner">
+      <h2 class="section-title cta-title">Explore EDPA</h2>
+      <p class="cta-desc">
+        Dashboard, case study, presentation, methodology and evaluation — all in one place.
+      </p>
+      <div class="cta-links">
+        <a href="/en/dashboard/" class="btn btn-primary">Dashboard demo</a>
+        <a href="/en/dashboard/kashealth/" class="btn btn-secondary">kashealth.cz case study</a>
+        <a href="/en/presentation/" class="btn btn-secondary">Presentation</a>
+        <a href="/en/methodology/" class="btn btn-secondary">Methodology</a>
+        <a href="/en/evaluation/" class="btn btn-secondary">Evaluation &amp; tests</a>
+      </div>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  /* Hero */
+  .hero { padding-top: 100px; padding-bottom: 60px; }
+  .hero-inner { text-align: center; }
+  .hero-headline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, var(--ac2), var(--cy));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-subtitle {
+    font-size: 16px;
+    color: var(--t2);
+    line-height: 1.6;
+    max-width: 640px;
+    margin: 0 auto 32px;
+  }
+  .hero-stats { max-width: 900px; margin: 0 auto 32px; }
+  .hero-stats .card { text-align: center; padding: 20px 16px; }
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--t3);
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--t1);
+    margin-bottom: 4px;
+  }
+  .stat-desc {
+    font-size: 12px;
+    color: var(--t2);
+  }
+  .hero-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* Section titles */
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(22px, 3vw, 30px);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 20px;
+    color: var(--t1);
+  }
+
+  /* Shared card heading */
+  .card-heading {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--t1);
+    margin-bottom: 8px;
+  }
+  .problem-grid .card-heading { color: var(--or); }
+  .card-text {
+    font-size: 13px;
+    color: var(--t2);
+    line-height: 1.6;
+  }
+
+  /* Section description */
+  .desc {
+    font-size: 14px;
+    color: var(--t2);
+    line-height: 1.6;
+    max-width: 700px;
+    margin-bottom: 24px;
+  }
+
+  /* Layer source label */
+  .layer-source {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--t3);
+    margin-bottom: 10px;
+  }
+
+  /* Evidence table */
+  .table-wrap {
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .table-wrap table { margin: 0; }
+  .td-priority, .td-cw {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+  .td-priority { color: var(--yl); }
+  .td-cw { color: var(--gn); }
+
+  /* Dual-View */
+  .dual-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .dual-title-green { color: var(--gn); }
+  .dual-title-cyan { color: var(--cy); }
+  .dual-question {
+    font-size: 14px;
+    color: var(--t2);
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  .dual-formula {
+    font-size: 12px;
+    margin: 12px 0;
+  }
+  .dual-formula-cyan {
+    border-left-color: var(--cy);
+    color: var(--cy);
+  }
+  .dual-usecase {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ac3);
+    margin-top: 8px;
+  }
+
+  /* CTA */
+  .cta-section {
+    text-align: center;
+  }
+  .cta-title {
+    background: linear-gradient(135deg, var(--ac2), var(--cy));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .cta-desc {
+    font-size: 15px;
+    color: var(--t2);
+    line-height: 1.6;
+    max-width: 540px;
+    margin: 0 auto 24px;
+  }
+  .cta-links {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .hero { padding-top: 72px; padding-bottom: 40px; }
+    .hero-headline { font-size: 26px; }
+    .hero-stats { gap: 12px; }
+    .dual-grid { gap: 16px; }
+    .cta-links { flex-direction: column; align-items: center; }
+  }
+</style>

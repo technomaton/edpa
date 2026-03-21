@@ -1,6 +1,6 @@
 ---
-import Layout from '../../layouts/Layout.astro';
-import { people, items, iterations, project, config } from '../../lib/demo-data-generic';
+import Layout from '../../../layouts/Layout.astro';
+import { people, items, iterations, project, config } from '../../../lib/demo-data-generic';
 const stories = items.filter(i => i.level === 'Story');
 const storiesDone = stories.filter(i => i.status === 'Done');
 const features = items.filter(i => i.level === 'Feature');
@@ -24,12 +24,12 @@ const velocityData = iterations.map(it => {
 });
 ---
 
-<Layout title="Dashboard — SaaS Platform">
+<Layout title="Dashboard — SaaS Platform" lang="en">
   <div class="container" style="padding-top: 32px; padding-bottom: 40px;">
     <!-- Demo version switcher -->
     <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-      <a href="/dashboard/" class="btn-primary btn" style="font-size: 12px;">Generic demo</a>
-      <a href="/dashboard/kashealth/" class="btn-secondary btn" style="font-size: 12px;">kashealth.cz — Case study</a>
+      <a href="/en/dashboard/" class="btn-primary btn" style="font-size: 12px;">Generic demo</a>
+      <a href="/en/dashboard/kashealth/" class="btn-secondary btn" style="font-size: 12px;">kashealth.cz — Case study</a>
     </div>
     <!-- Header bar -->
     <div class="dash-header card" style="margin-bottom: 20px; border-left: 3px solid var(--ac);">
@@ -38,7 +38,7 @@ const velocityData = iterations.map(it => {
         <span class="badge badge-blue">{config.pi}</span>
         {activeIteration && <span class="badge badge-green">{activeIteration.name} (active)</span>}
         <div class="mode-toggle" style="margin-left: auto;">
-          <span class="badge badge-yellow" style="cursor: pointer;" id="modeLabel">Simple: JS x CW</span>
+          <span class="badge badge-yellow" style="cursor: pointer;" id="modeLabel">Operational (Simple): JS x CW</span>
         </div>
       </div>
       <div style="font-size: 11px; color: var(--t3); margin-top: 6px;">{project.organization} | {project.registration} | EDPA v1.0.0</div>
@@ -158,8 +158,8 @@ const velocityData = iterations.map(it => {
 
   <script>
     import Chart from 'chart.js/auto';
-    import { edpa, itemView, wsjf } from '../../lib/edpa-engine';
-    import { people, items, iterations } from '../../lib/demo-data-generic';
+    import { edpa, itemView, wsjf } from '../../../lib/edpa-engine';
+    import { people, items, iterations } from '../../../lib/demo-data-generic';
     let mode: 'simple' | 'full' = 'simple';
     const charts: Record<string, Chart> = {};
 
@@ -220,7 +220,7 @@ const velocityData = iterations.map(it => {
       toggleBtn.addEventListener('click', () => {
         mode = mode === 'simple' ? 'full' : 'simple';
         if (modeDisplay) modeDisplay.textContent = mode === 'full' ? 'JS x CW x RS' : 'JS x CW';
-        if (modeLabel) modeLabel.textContent = mode === 'full' ? 'Full: JS x CW x RS' : 'Simple: JS x CW';
+        if (modeLabel) modeLabel.textContent = mode === 'full' ? 'Audit (Full): JS x CW x RS' : 'Operational (Simple): JS x CW';
       });
     }
 

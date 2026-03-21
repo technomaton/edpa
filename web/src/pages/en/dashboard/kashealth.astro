@@ -1,8 +1,10 @@
 ---
-import Layout from '../../layouts/Layout.astro';
-import { people, items, iterations, project, config } from '../../lib/demo-data-generic';
+import Layout from '../../../layouts/Layout.astro';
+import { people, items, iterations, project, config } from '../../../lib/demo-data-kashealth';
 const stories = items.filter(i => i.level === 'Story');
 const storiesDone = stories.filter(i => i.status === 'Done');
+const storiesIP = stories.filter(i => i.status === 'In Progress');
+const storiesPlanned = stories.filter(i => i.status === 'Planned');
 const features = items.filter(i => i.level === 'Feature');
 const featuresDone = features.filter(i => i.status === 'Done');
 const spDone = storiesDone.reduce((a, i) => a + i.js, 0);
@@ -24,24 +26,25 @@ const velocityData = iterations.map(it => {
 });
 ---
 
-<Layout title="Dashboard — SaaS Platform">
+<Layout title="Dashboard — kashealth" lang="en">
   <div class="container" style="padding-top: 32px; padding-bottom: 40px;">
     <!-- Demo version switcher -->
     <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-      <a href="/dashboard/" class="btn-primary btn" style="font-size: 12px;">Generic demo</a>
-      <a href="/dashboard/kashealth/" class="btn-secondary btn" style="font-size: 12px;">kashealth.cz — Case study</a>
+      <a href="/en/dashboard/" class="btn-secondary btn" style="font-size: 12px;">Generic demo</a>
+      <a href="/en/dashboard/kashealth/" class="btn-primary btn" style="font-size: 12px;">kashealth.cz — Case study</a>
     </div>
     <!-- Header bar -->
     <div class="dash-header card" style="margin-bottom: 20px; border-left: 3px solid var(--ac);">
       <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <span style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: var(--t1);">{project.name}</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; background: linear-gradient(135deg, var(--ac), var(--cy)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">kashealth.cz</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--t1);">{project.name}</span>
         <span class="badge badge-blue">{config.pi}</span>
-        {activeIteration && <span class="badge badge-green">{activeIteration.name} (active)</span>}
+        {activeIteration && <span class="badge badge-green">{activeIteration.name} ({activeIteration.dates})</span>}
         <div class="mode-toggle" style="margin-left: auto;">
-          <span class="badge badge-yellow" style="cursor: pointer;" id="modeLabel">Simple: JS x CW</span>
+          <span class="badge badge-yellow" style="cursor: pointer;" id="modeLabel">Operational (Simple): JS x CW</span>
         </div>
       </div>
-      <div style="font-size: 11px; color: var(--t3); margin-top: 6px;">{project.organization} | {project.registration} | EDPA v1.0.0</div>
+      <div style="font-size: 11px; color: var(--t3); margin-top: 6px;">{project.program} | {project.organization} | {project.registration} | EDPA v1.0.0</div>
     </div>
 
     <!-- KPI row -->
@@ -49,7 +52,7 @@ const velocityData = iterations.map(it => {
       <div class="card green" style="text-align: center;">
         <div class="tag">Stories Done</div>
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: var(--gn);">{storiesDone.length}</div>
-        <div style="font-size: 11px; color: var(--t2);">of {stories.length} total</div>
+        <div style="font-size: 11px; color: var(--t2);">of {stories.length} ({storiesIP.length} IP, {storiesPlanned.length} Planned)</div>
       </div>
       <div class="card cyan" style="text-align: center;">
         <div class="tag">Features</div>
@@ -84,7 +87,7 @@ const velocityData = iterations.map(it => {
         </div>
       </div>
       <div class="card">
-        <div class="tag">Capacity by Team</div>
+        <div class="tag">Capacity per Team</div>
         <div style="position: relative; height: 220px;">
           <canvas id="teamChart"></canvas>
         </div>
@@ -140,7 +143,7 @@ const velocityData = iterations.map(it => {
 
     <!-- Per-Item View -->
     <div class="card">
-      <div class="tag">Per-Item View — Hierarchical Breakdown</div>
+      <div class="tag">Per-Item View — Epic / Feature / Story Breakdown</div>
       <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
         <label style="font-size: 12px; color: var(--t2);">
           Iteration (for Stories):
@@ -158,13 +161,13 @@ const velocityData = iterations.map(it => {
 
   <script>
     import Chart from 'chart.js/auto';
-    import { edpa, itemView, wsjf } from '../../lib/edpa-engine';
-    import { people, items, iterations } from '../../lib/demo-data-generic';
+    import { edpa, itemView, wsjf } from '../../../lib/edpa-engine';
+    import { people, items, iterations } from '../../../lib/demo-data-kashealth';
     let mode: 'simple' | 'full' = 'simple';
     const charts: Record<string, Chart> = {};
 
     // Velocity chart
-    const velLabels = iterations.map(i => i.name.replace('PI-Q1.', 'Iter '));
+    const velLabels = iterations.map(i => i.name.replace('PI-2026-1.', ''));
     const velData = iterations.map(it =>
       items.filter(i => i.level === 'Story' && i.iteration === it.id && i.status === 'Done')
         .reduce((a, i) => a + i.js, 0)
@@ -195,15 +198,15 @@ const velocityData = iterations.map(it => {
     }
 
     // Team capacity chart
-    const coreH = people.filter(p => p.team === 'Core').reduce((a, p) => a + p.capacity, 0);
-    const platH = people.filter(p => p.team === 'Platform').reduce((a, p) => a + p.capacity, 0);
+    const cvutH = people.filter(p => p.team === 'CVUT').reduce((a, p) => a + p.capacity, 0);
+    const mcH = people.filter(p => p.team === 'Medicalc').reduce((a, p) => a + p.capacity, 0);
     const teamCanvas = document.getElementById('teamChart') as HTMLCanvasElement;
     if (teamCanvas) {
       charts.team = new Chart(teamCanvas, {
         type: 'doughnut',
         data: {
-          labels: [`Core ${coreH}h`, `Platform ${platH}h`],
-          datasets: [{ data: [coreH, platH], backgroundColor: ['rgba(99,102,241,0.6)', 'rgba(34,211,238,0.6)'], borderWidth: 0 }]
+          labels: [`CVUT ${cvutH}h`, `Medicalc ${mcH}h`],
+          datasets: [{ data: [cvutH, mcH], backgroundColor: ['rgba(99,102,241,0.6)', 'rgba(34,211,238,0.6)'], borderWidth: 0 }]
         },
         options: {
           responsive: true, maintainAspectRatio: false, cutout: '55%',
@@ -220,7 +223,7 @@ const velocityData = iterations.map(it => {
       toggleBtn.addEventListener('click', () => {
         mode = mode === 'simple' ? 'full' : 'simple';
         if (modeDisplay) modeDisplay.textContent = mode === 'full' ? 'JS x CW x RS' : 'JS x CW';
-        if (modeLabel) modeLabel.textContent = mode === 'full' ? 'Full: JS x CW x RS' : 'Simple: JS x CW';
+        if (modeLabel) modeLabel.textContent = mode === 'full' ? 'Audit (Full): JS x CW x RS' : 'Operational (Simple): JS x CW';
       });
     }
 
@@ -353,8 +356,8 @@ const velocityData = iterations.map(it => {
               </div>`;
             if (fiv && fiv.totalHours > 0) h += renderItemCard(fiv);
 
-            const stories = items.filter(s => s.level === 'Story' && s.parentId === feat.id && s.iteration === itId && s.status === 'Done').sort((a, b) => wsjf(b) - wsjf(a));
-            for (const story of stories) {
+            const storyItems = items.filter(s => s.level === 'Story' && s.parentId === feat.id && s.iteration === itId && s.status === 'Done').sort((a, b) => wsjf(b) - wsjf(a));
+            for (const story of storyItems) {
               const siv = itemView(story.id, itId, people, items, mode);
               h += `<div style="margin-left: 24px;">
                 <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--gn); margin: 6px 0 3px;">
