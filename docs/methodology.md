@@ -73,7 +73,7 @@ Granularity rules: Story max 8 SP (2/10) or 5 SP (1/5), Feature max 13, Epic max
 
 ## 5. The Model: Evidence-Driven Proportional Allocation
 
-### 5.0 Iteration Planning Protocol
+### 5.1 Iteration Planning Protocol
 
 Before EDPA derives hours (ex-post), the team must plan the iteration (ex-ante). Planning requires confirmed capacity as input.
 
@@ -96,7 +96,7 @@ The `planning_factor` is a **team-level** property (configured per team in `capa
 
 **Why plan to 80%?** Planning to 100% capacity forces the team into one of three failure modes: undelivered stories (velocity miss), overwork, or scope creep. The 80% heuristic is consistent with SAFe load factor, Scrum velocity-based planning, and Kanban WIP limits.
 
-### 5.1 Inputs
+### 5.2 Inputs
 
 For person **P** and Iteration **I**:
 
@@ -108,7 +108,7 @@ For person **P** and Iteration **I**:
 | `ContributionWeight[P, item]` | From evidence / manual override | 0.15–1.0 |
 | `RelevanceSignal[P, item]` | Normalized from Evidence Score | 0.25–1.0 |
 
-### 5.2 Evidence Detection
+### 5.3 Evidence Detection
 
 | GitHub signal | Evidence score | Typical CW |
 |---|---:|---:|
@@ -125,7 +125,7 @@ Rules:
 - Manual override: `/contribute @person weight:0.6`
 - Commit count does NOT convert to time — only signals relevance
 
-### 5.3 Calculation — Two Variants
+### 5.4 Calculation — Two Variants
 
 **Methodologically pure variant (audit):**
 ```text
@@ -141,7 +141,7 @@ DerivedHours[P, item] = (Score[P, item] / SumScores[P, I]) x Capacity[P, I]
 
 Recommendation: start with operational variant. Preserve Evidence Score and Relevance Signal in snapshots for audit defense.
 
-### 5.4 Mathematical Guarantee
+### 5.5 Mathematical Guarantee
 
 ```text
 Σ DerivedHours[P, item] = Capacity[P, I]

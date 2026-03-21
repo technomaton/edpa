@@ -20,9 +20,7 @@ import Layout from '../../layouts/Layout.astro';
       <li><a href="#terminology" class="toc-link" data-section="terminology">Terminology</a></li>
       <li><a href="#architecture" class="toc-link" data-section="architecture">Model architecture</a></li>
       <li><a href="#hierarchy" class="toc-link" data-section="hierarchy">Work item hierarchy</a></li>
-      <li><a href="#model" class="toc-link" data-section="model">EDPA Model</a>
-        <ol class="toc-sublist"><li><a href="#planning-protocol" class="toc-link">Iteration Planning Protocol</a></li></ol>
-      </li>
+      <li><a href="#model" class="toc-link" data-section="model">EDPA Model</a></li>
       <li><a href="#dual-view" class="toc-link" data-section="dual-view">Dual-view</a></li>
       <li><a href="#cadence" class="toc-link" data-section="cadence">Cadence</a></li>
       <li><a href="#learning-loop" class="toc-link" data-section="learning-loop">Learning loop</a></li>
@@ -145,7 +143,7 @@ Computed per level independently.</div>
     <h2>5. Model: Evidence-Driven Proportional Allocation</h2>
 
     <div id="planning-protocol">
-    <h3>5.0 Iteration Planning Protocol</h3>
+    <h3>5.1 Iteration Planning Protocol</h3>
     <p>Before EDPA derives hours (ex-post), the team must plan the iteration (ex-ante). Planning requires confirmed capacity as input.</p>
     <div class="card">
       <ol>
@@ -159,7 +157,7 @@ Computed per level independently.</div>
     <div class="note" style="margin-top: 12px;"><strong>Why 80%?</strong> Planning to 100% forces one of three failure modes: undelivered stories, overwork, or scope creep. The 80% heuristic aligns with SAFe load factor, Scrum velocity-based planning, and Kanban WIP limits. Different teams may choose different factors based on their support load and maturity.</div>
     </div>
 
-    <h3>5.1 Inputs</h3>
+    <h3>5.2 Inputs</h3>
     <div class="card">
       <table>
         <thead>
@@ -175,7 +173,7 @@ Computed per level independently.</div>
       </table>
     </div>
 
-    <h3>5.2 Evidence detection</h3>
+    <h3>5.3 Evidence detection</h3>
     <div class="card">
       <table>
         <thead>
@@ -198,7 +196,7 @@ Computed per level independently.</div>
       <li>Commit count is not converted to time</li>
     </ul>
 
-    <h3>5.3 Calculation — two variants</h3>
+    <h3>5.4 Calculation — two variants</h3>
     <div class="formula"><strong>Audit variant (Full):</strong>
 Score[P, item] = JobSize[item] &times; CW[P, item] &times; RS[P, item]
 DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
@@ -207,7 +205,7 @@ Score[P, item] = JobSize[item] &times; CW[P, item]
 DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
     <div class="note">Recommendation: start with the operational variant. Keep Evidence Score and RS in the snapshot for audit defense.</div>
 
-    <h3>5.4 Mathematical guarantee</h3>
+    <h3>5.5 Mathematical guarantee</h3>
     <div class="formula">&Sigma; DerivedHours[P, item] = Capacity[P, I]
 
 The sum of derived hours exactly equals the person's capacity for the Iteration.
@@ -421,7 +419,7 @@ feature/F-102-anon-engine</div>
 
     <div class="grid grid-3" style="margin-bottom:20px">
       <div class="card" style="border-left:3px solid var(--or)">
-        <h3 style="color:var(--or);margin-bottom:8px">Fixed Split v1</h3>
+        <h3 style="color:var(--or);margin-bottom:8px">Fixed Split</h3>
         <p style="font-size:14px;color:var(--t2)">Pre-defined buckets (e.g., 60% Dev, 20% Arch, 20% QA). Hours are split fixedly by role, regardless of actual contribution. Simple, but inaccurate.</p>
       </div>
       <div class="card" style="border-left:3px solid var(--gn)">
@@ -437,7 +435,7 @@ feature/F-102-anon-engine</div>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Property</th><th style="color:var(--or)">Fixed Split v1</th><th style="color:var(--gn)">EDPA v1.0.0</th><th style="color:var(--rd)">Manual timesheets</th></tr>
+          <tr><th>Property</th><th style="color:var(--or)">Fixed Split</th><th style="color:var(--gn)">EDPA v1.0.0</th><th style="color:var(--rd)">Manual timesheets</th></tr>
         </thead>
         <tbody>
           <tr><td>Fixed buckets</td><td>Yes</td><td style="color:var(--gn)">No</td><td>No</td></tr>

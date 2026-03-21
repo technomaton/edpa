@@ -20,9 +20,7 @@ import Layout from '../layouts/Layout.astro';
       <li><a href="#terminologie" class="toc-link" data-section="terminologie">Terminologie</a></li>
       <li><a href="#architektura" class="toc-link" data-section="architektura">Architektura modelu</a></li>
       <li><a href="#hierarchie" class="toc-link" data-section="hierarchie">Hierarchie work items</a></li>
-      <li><a href="#model" class="toc-link" data-section="model">Model EDPA</a>
-        <ol class="toc-sublist"><li><a href="#planning-protocol" class="toc-link">Iteration Planning Protocol</a></li></ol>
-      </li>
+      <li><a href="#model" class="toc-link" data-section="model">Model EDPA</a></li>
       <li><a href="#dual-view" class="toc-link" data-section="dual-view">Dual-view</a></li>
       <li><a href="#kadence" class="toc-link" data-section="kadence">Kadence</a></li>
       <li><a href="#ucici-smycka" class="toc-link" data-section="ucici-smycka">Učící smyčka</a></li>
@@ -145,7 +143,7 @@ Počítá se per úroveň nezávisle.</div>
     <h2>5. Model: Evidence-Driven Proportional Allocation</h2>
 
     <div id="planning-protocol">
-    <h3>5.0 Iteration Planning Protocol</h3>
+    <h3>5.1 Protokol plánování iterace</h3>
     <p>Než EDPA odvodí hodiny (ex-post), tým musí naplánovat iteraci (ex-ante). Plánování vyžaduje potvrzenou kapacitu jako vstup.</p>
     <div class="card">
       <ol>
@@ -159,7 +157,7 @@ Počítá se per úroveň nezávisle.</div>
     <div class="note" style="margin-top: 12px;"><strong>Proč 80%?</strong> Plánování na 100% vynucuje jeden ze tří failure modes: nedodané stories, přetížení, nebo scope creep. Heuristika 80% je konzistentní se SAFe load factor, Scrum velocity-based planning a Kanban WIP limits. Různé týmy si mohou zvolit různé faktory podle svého support loadu a zralosti.</div>
     </div>
 
-    <h3>5.1 Vstupy</h3>
+    <h3>5.2 Vstupy</h3>
     <div class="card">
       <table>
         <thead>
@@ -175,7 +173,7 @@ Počítá se per úroveň nezávisle.</div>
       </table>
     </div>
 
-    <h3>5.2 Evidence detection</h3>
+    <h3>5.3 Evidence detection</h3>
     <div class="card">
       <table>
         <thead>
@@ -198,7 +196,7 @@ Počítá se per úroveň nezávisle.</div>
       <li>Commit count se nepřevádí na čas</li>
     </ul>
 
-    <h3>5.3 Výpočet — dvě varianty</h3>
+    <h3>5.4 Výpočet — dvě varianty</h3>
     <div class="formula"><strong>Auditní varianta (Full):</strong>
 Score[P, item] = JobSize[item] &times; CW[P, item] &times; RS[P, item]
 DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
@@ -207,7 +205,7 @@ Score[P, item] = JobSize[item] &times; CW[P, item]
 DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
     <div class="note">Doporučení: začít provozní variantou. Evidence Score a RS zachovat ve snapshotu pro auditní obhajobu.</div>
 
-    <h3>5.4 Matematická garance</h3>
+    <h3>5.5 Matematická garance</h3>
     <div class="formula">&Sigma; DerivedHours[P, item] = Capacity[P, I]
 
 Součet odvozených hodin je přesně kapacita osoby na Iteraci.
@@ -421,7 +419,7 @@ feature/F-102-anon-engine</div>
 
     <div class="grid grid-3" style="margin-bottom:20px">
       <div class="card" style="border-left:3px solid var(--or)">
-        <h3 style="color:var(--or);margin-bottom:8px">Fixed Split v1</h3>
+        <h3 style="color:var(--or);margin-bottom:8px">Fixed Split</h3>
         <p style="font-size:14px;color:var(--t2)">Předem definované koše (např. 60% Dev, 20% Arch, 20% QA). Hodiny se rozdělují fixně podle role, nezávisle na skutečném příspěvku. Jednoduché, ale nepřesné.</p>
       </div>
       <div class="card" style="border-left:3px solid var(--gn)">
@@ -437,7 +435,7 @@ feature/F-102-anon-engine</div>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Vlastnost</th><th style="color:var(--or)">Fixed Split v1</th><th style="color:var(--gn)">EDPA v1.0.0</th><th style="color:var(--rd)">Ruční timesheets</th></tr>
+          <tr><th>Vlastnost</th><th style="color:var(--or)">Fixed Split</th><th style="color:var(--gn)">EDPA v1.0.0</th><th style="color:var(--rd)">Ruční timesheets</th></tr>
         </thead>
         <tbody>
           <tr><td>Fixované koše</td><td>Ano</td><td style="color:var(--gn)">Ne</td><td>Ne</td></tr>
