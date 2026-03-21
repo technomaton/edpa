@@ -144,6 +144,21 @@ Počítá se per úroveň nezávisle.</div>
   <section id="model">
     <h2>5. Model: Evidence-Driven Proportional Allocation</h2>
 
+    <div id="planning-protocol">
+    <h3>5.0 Iteration Planning Protocol</h3>
+    <p>Než EDPA odvodí hodiny (ex-post), tým musí naplánovat iteraci (ex-ante). Plánování vyžaduje potvrzenou kapacitu jako vstup.</p>
+    <div class="card">
+      <ol>
+        <li><strong>Potvrdit kapacitu</strong> &mdash; Každý člen týmu potvrdí dostupnost. Jde o závazek, ne odhad. Externí spolupracovníci vyjednávají alokaci explicitně. Výsledek: <code>availability: confirmed</code> v <code>capacity.yaml</code>.</li>
+        <li><strong>Vypočítat Planning Capacity</strong> &mdash; <code>Planning_Capacity = &Sigma; Capacity[P, I] &times; planning_factor</code>. <code>planning_factor</code> je <strong>vlastnost týmu</strong> (konfigurováno per tým v <code>capacity.yaml</code> pod <code>teams:</code>). Výchozí: 0.8.</li>
+        <li><strong>Vybrat práci</strong> &mdash; Vytáhni stories z prioritizovaného backlogu (WSJF pořadí) dokud <code>&Sigma; JobSize</code> nedosáhne historické velocity &times; <code>planning_factor</code>. Neplánuj na 100%.</li>
+        <li><strong>Buffer</strong> &mdash; Zbylých ~20% absorbuje support, maintenance, incidenty a neplánovanou práci. Pokud buffer položky generují evidenci, EDPA je alokuje normálně.</li>
+        <li><strong>Edge case</strong> &mdash; Pokud žádná neplánovaná práce nenastane, veškerá kapacita jde na plánované položky. Garance <code>&Sigma; = Capacity</code> platí vždy.</li>
+      </ol>
+    </div>
+    <div class="note" style="margin-top: 12px;"><strong>Proč 80%?</strong> Plánování na 100% vynucuje jeden ze tří failure modes: nedodané stories, přetížení, nebo scope creep. Heuristika 80% je konzistentní se SAFe load factor, Scrum velocity-based planning a Kanban WIP limits. Různé týmy si mohou zvolit různé faktory podle svého support loadu a zralosti.</div>
+    </div>
+
     <h3>5.1 Vstupy</h3>
     <div class="card">
       <table>
