@@ -1,0 +1,407 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { people, items, iterations, project, config } from '../../lib/demo-data-kashealth';
+const stories = items.filter(i => i.level === 'Story');
+const storiesDone = stories.filter(i => i.status === 'Done');
+const storiesIP = stories.filter(i => i.status === 'In Progress');
+const storiesPlanned = stories.filter(i => i.status === 'Planned');
+const features = items.filter(i => i.level === 'Feature');
+const featuresDone = features.filter(i => i.status === 'Done');
+const spDone = storiesDone.reduce((a, i) => a + i.js, 0);
+const totalCapacity = people.reduce((a, p) => a + p.capacity, 0);
+const totalFte = people.reduce((a, p) => a + p.fte, 0);
+const closedIterations = iterations.filter(i => i.status === 'closed');
+const activeIteration = iterations.find(i => i.status === 'active');
+
+const velocityData = iterations.map(it => {
+  const doneStories = items.filter(i => i.level === 'Story' && i.iteration === it.id && i.status === 'Done');
+  return {
+    name: it.name,
+    dates: it.dates,
+    status: it.status,
+    sp: doneStories.reduce((a, i) => a + i.js, 0),
+    done: doneStories.length,
+    inProgress: items.filter(i => i.level === 'Story' && i.iteration === it.id && i.status === 'In Progress').length,
+  };
+});
+---
+
+<Layout title="Dashboard — kashealth">
+  <div class="container" style="padding-top: 32px; padding-bottom: 40px;">
+    <!-- Header bar -->
+    <div class="dash-header card" style="margin-bottom: 20px; border-left: 3px solid var(--ac);">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; background: linear-gradient(135deg, var(--ac), var(--cy)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">kashealth.cz</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--t1);">{project.name}</span>
+        <span class="badge badge-blue">{config.pi}</span>
+        {activeIteration && <span class="badge badge-green">{activeIteration.name} ({activeIteration.dates})</span>}
+        <div class="mode-toggle" style="margin-left: auto;">
+          <span class="badge badge-yellow" style="cursor: pointer;" id="modeLabel">Simple: JS x CW</span>
+        </div>
+      </div>
+      <div style="font-size: 11px; color: var(--t3); margin-top: 6px;">{project.program} | {project.organization} | {project.registration} | EDPA v2.2</div>
+    </div>
+
+    <!-- KPI row -->
+    <div class="grid grid-5" style="margin-bottom: 20px;">
+      <div class="card green" style="text-align: center;">
+        <div class="tag">Stories Done</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: var(--gn);">{storiesDone.length}</div>
+        <div style="font-size: 11px; color: var(--t2);">of {stories.length} ({storiesIP.length} IP, {storiesPlanned.length} Planned)</div>
+      </div>
+      <div class="card cyan" style="text-align: center;">
+        <div class="tag">Features</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: var(--cy);">{featuresDone.length}/{features.length}</div>
+        <div style="font-size: 11px; color: var(--t2);">{features.filter(f => f.status === 'Active').length} Active</div>
+      </div>
+      <div class="card accent" style="text-align: center;">
+        <div class="tag">Team</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: var(--ac2);">{people.length}</div>
+        <div style="font-size: 11px; color: var(--t2);">{totalFte.toFixed(1)} FTE | {totalCapacity}h/iter</div>
+      </div>
+      <div class="card yellow" style="text-align: center;">
+        <div class="tag">SP Delivered</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: var(--yl);">{spDone}</div>
+        <div style="font-size: 11px; color: var(--t2);">{closedIterations.length} closed iterations</div>
+      </div>
+      <div class="card orange" style="text-align: center;">
+        <div class="tag">Mode</div>
+        <div id="modeDisplay" style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: var(--or);">JS x CW</div>
+        <div style="margin-top: 6px;">
+          <button class="btn btn-secondary" id="toggleMode" style="font-size: 10px; padding: 4px 10px;">Toggle</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid grid-2" style="margin-bottom: 20px;">
+      <div class="card">
+        <div class="tag">Velocity — SP per Iteration</div>
+        <div style="position: relative; height: 220px;">
+          <canvas id="velocityChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="tag">Capacity per Team</div>
+        <div style="position: relative; height: 220px;">
+          <canvas id="teamChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Iteration table -->
+    <div class="card" style="margin-bottom: 24px;">
+      <div class="tag">Iterations in {config.pi}</div>
+      <table>
+        <thead>
+          <tr><th>Iteration</th><th>Period</th><th>Status</th><th>Stories Done</th><th>In Progress</th><th>SP Done</th></tr>
+        </thead>
+        <tbody>
+          {velocityData.map(v => (
+            <tr>
+              <td style="font-weight: 500;">{v.name}</td>
+              <td>{v.dates}</td>
+              <td><span class={`badge ${v.status === 'closed' ? 'badge-green' : v.status === 'active' ? 'badge-yellow' : 'badge-red'}`}>{v.status}</span></td>
+              <td style="color: var(--gn);">{v.done}</td>
+              <td style="color: var(--yl);">{v.inProgress}</td>
+              <td>{v.sp}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Per-Person EDPA Calculator -->
+    <div class="card" style="margin-bottom: 24px;">
+      <div class="tag">EDPA Per-Person Calculator</div>
+      <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
+        <label style="font-size: 12px; color: var(--t2);">
+          Iteration:
+          <select id="selIteration" style="margin-left: 4px;">
+            {closedIterations.map(it => (
+              <option value={it.id}>{it.name} ({it.dates})</option>
+            ))}
+          </select>
+        </label>
+        <label style="font-size: 12px; color: var(--t2);">
+          Person:
+          <select id="selPerson" style="margin-left: 4px;">
+            {people.map(p => (
+              <option value={p.id}>{p.name} ({p.role}, {p.capacity}h)</option>
+            ))}
+          </select>
+        </label>
+        <button class="btn btn-primary" id="btnEdpa">EDPA vypocet</button>
+      </div>
+      <div id="edpaResult"></div>
+    </div>
+
+    <!-- Per-Item View -->
+    <div class="card">
+      <div class="tag">Per-Item View — Epic / Feature / Story Breakdown</div>
+      <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
+        <label style="font-size: 12px; color: var(--t2);">
+          Iteration (for Stories):
+          <select id="selItemIteration" style="margin-left: 4px;">
+            {closedIterations.map(it => (
+              <option value={it.id}>{it.name}</option>
+            ))}
+          </select>
+        </label>
+        <button class="btn btn-primary" id="btnItemView">Compute Items</button>
+      </div>
+      <div id="itemViewResult"></div>
+    </div>
+  </div>
+
+  <script>
+    import Chart from 'chart.js/auto';
+    import { edpa, itemView, wsjf } from '../../lib/edpa-engine';
+    import { people, items, iterations } from '../../lib/demo-data-kashealth';
+    let mode: 'simple' | 'full' = 'simple';
+    const charts: Record<string, Chart> = {};
+
+    // Velocity chart
+    const velLabels = iterations.map(i => i.name.replace('PI-2026-1.', ''));
+    const velData = iterations.map(it =>
+      items.filter(i => i.level === 'Story' && i.iteration === it.id && i.status === 'Done')
+        .reduce((a, i) => a + i.js, 0)
+    );
+    const velColors = iterations.map(i =>
+      i.status === 'active' ? 'rgba(251,191,36,0.5)' :
+      i.status === 'planned' ? 'rgba(90,99,128,0.3)' :
+      'rgba(52,211,153,0.6)'
+    );
+
+    const velCanvas = document.getElementById('velocityChart') as HTMLCanvasElement;
+    if (velCanvas) {
+      charts.vel = new Chart(velCanvas, {
+        type: 'bar',
+        data: {
+          labels: velLabels,
+          datasets: [{ label: 'SP Done', data: velData, backgroundColor: velColors, borderRadius: 4 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#5a6380', font: { family: 'JetBrains Mono', size: 10 } } },
+            y: { grid: { color: 'rgba(42,48,68,0.4)' }, ticks: { color: '#5a6380', font: { family: 'JetBrains Mono', size: 10 }, callback: (v: any) => v + ' SP' } }
+          }
+        }
+      });
+    }
+
+    // Team capacity chart
+    const cvutH = people.filter(p => p.team === 'CVUT').reduce((a, p) => a + p.capacity, 0);
+    const mcH = people.filter(p => p.team === 'Medicalc').reduce((a, p) => a + p.capacity, 0);
+    const teamCanvas = document.getElementById('teamChart') as HTMLCanvasElement;
+    if (teamCanvas) {
+      charts.team = new Chart(teamCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: [`CVUT ${cvutH}h`, `Medicalc ${mcH}h`],
+          datasets: [{ data: [cvutH, mcH], backgroundColor: ['rgba(99,102,241,0.6)', 'rgba(34,211,238,0.6)'], borderWidth: 0 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '55%',
+          plugins: { legend: { position: 'bottom', labels: { color: '#8891a8', font: { family: 'DM Sans', size: 11 }, usePointStyle: true } } }
+        }
+      });
+    }
+
+    // Mode toggle
+    const toggleBtn = document.getElementById('toggleMode');
+    const modeDisplay = document.getElementById('modeDisplay');
+    const modeLabel = document.getElementById('modeLabel');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        mode = mode === 'simple' ? 'full' : 'simple';
+        if (modeDisplay) modeDisplay.textContent = mode === 'full' ? 'JS x CW x RS' : 'JS x CW';
+        if (modeLabel) modeLabel.textContent = mode === 'full' ? 'Full: JS x CW x RS' : 'Simple: JS x CW';
+      });
+    }
+
+    // Level colors
+    const levelColors: Record<string, string> = { Epic: 'var(--ac2)', Feature: 'var(--cy)', Story: 'var(--gn)', Init: 'var(--pk)' };
+    const levelBadge: Record<string, string> = { Epic: 'badge-blue', Feature: 'badge-cyan', Story: 'badge-green', Init: 'badge-red' };
+
+    // Per-Person EDPA
+    const btnEdpa = document.getElementById('btnEdpa');
+    if (btnEdpa) {
+      btnEdpa.addEventListener('click', () => {
+        const pid = (document.getElementById('selPerson') as HTMLSelectElement).value;
+        const itId = (document.getElementById('selIteration') as HTMLSelectElement).value;
+        const result = edpa(pid, itId, people, items, mode);
+        if (!result) { document.getElementById('edpaResult')!.innerHTML = '<div class="note">No data found.</div>'; return; }
+
+        const it = iterations.find(i => i.id === result.iteration);
+        const sH = result.items.filter(x => x.level === 'Story').reduce((a, x) => a + x.hours, 0);
+        const fH = result.items.filter(x => x.level === 'Feature').reduce((a, x) => a + x.hours, 0);
+        const eH = result.items.filter(x => x.level === 'Epic').reduce((a, x) => a + x.hours, 0);
+
+        let h = `<div class="note" style="margin-bottom: 12px;">
+          <strong>${result.person.name}</strong> | ${it?.name} (${it?.dates}) |
+          ${result.totalHours.toFixed(1)}h / ${result.person.capacity}h |
+          ${result.items.length} items |
+          S: ${sH.toFixed(1)}h  F: ${fH.toFixed(1)}h  E: ${eH.toFixed(1)}h |
+          <span class="badge ${result.ok ? 'badge-green' : 'badge-red'}">${result.ok ? 'OK' : 'MISMATCH'}</span>
+        </div>`;
+
+        h += `<div style="font-size: 11px; color: var(--t3); margin-bottom: 8px; font-family: 'JetBrains Mono', monospace;">
+          Score = JS x CW${mode === 'full' ? ' x RS' : ''} | DerivedHours = (Score / TotalScores) x Capacity
+        </div>`;
+
+        h += `<table><thead><tr><th>Item</th><th>Type</th><th>JS</th><th>CW</th>`;
+        if (mode === 'full') h += `<th>RS</th>`;
+        h += `<th>Score</th><th>Ratio</th><th>Hours</th><th></th></tr></thead><tbody>`;
+
+        for (const x of result.items) {
+          const pct = x.ratio * 100;
+          h += `<tr>
+            <td>${x.id}: ${x.title}</td>
+            <td><span class="badge ${levelBadge[x.level] || 'badge-blue'}">${x.level}</span></td>
+            <td>${x.js}</td><td>${x.cw}</td>`;
+          if (mode === 'full') h += `<td>${x.rs}</td>`;
+          h += `<td style="color: var(--yl);">${x.score.toFixed(2)}</td>
+            <td>${pct.toFixed(1)}%</td>
+            <td style="font-weight: 600;">${x.hours.toFixed(1)}</td>
+            <td><div style="background: var(--s3); border-radius: 2px; height: 6px; width: 60px; overflow: hidden;">
+              <div style="height: 100%; width: ${pct}%; background: ${levelColors[x.level] || 'var(--ac)'}; border-radius: 2px;"></div>
+            </div></td></tr>`;
+        }
+
+        h += `<tr style="border-top: 2px solid var(--bd);">
+          <td colspan="${mode === 'full' ? 5 : 4}"></td>
+          <td style="font-weight: 600;">${result.totalScore.toFixed(2)}</td>
+          <td style="font-weight: 600;">100%</td>
+          <td style="font-weight: 700;">${result.totalHours.toFixed(1)}</td>
+          <td></td></tr></tbody></table>`;
+
+        h += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+          <div><div class="tag">Hours by Level</div><canvas id="personLevelChart"></canvas></div>
+          <div><div class="tag">Hours by Item</div><canvas id="personItemChart"></canvas></div>
+        </div>`;
+
+        document.getElementById('edpaResult')!.innerHTML = h;
+
+        // Destroy existing charts before creating new ones
+        if (charts.pLevel) charts.pLevel.destroy();
+        if (charts.pItem) charts.pItem.destroy();
+
+        const plCanvas = document.getElementById('personLevelChart') as HTMLCanvasElement;
+        if (plCanvas) {
+          charts.pLevel = new Chart(plCanvas, {
+            type: 'doughnut',
+            data: {
+              labels: [`Story ${sH.toFixed(0)}h`, `Feature ${fH.toFixed(0)}h`, `Epic ${eH.toFixed(0)}h`],
+              datasets: [{ data: [sH, fH, eH], backgroundColor: ['#34d399', '#22d3ee', '#a78bfa'], borderWidth: 0 }]
+            },
+            options: { responsive: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { color: '#8891a8', font: { family: 'DM Sans', size: 10 }, usePointStyle: true } } } }
+          });
+        }
+
+        const piCanvas = document.getElementById('personItemChart') as HTMLCanvasElement;
+        if (piCanvas) {
+          charts.pItem = new Chart(piCanvas, {
+            type: 'bar',
+            data: {
+              labels: result.items.map(x => x.id),
+              datasets: [{
+                data: result.items.map(x => +x.hours.toFixed(1)),
+                backgroundColor: result.items.map(x => x.level === 'Story' ? '#34d399' : x.level === 'Feature' ? '#22d3ee' : '#a78bfa'),
+                borderRadius: 3
+              }]
+            },
+            options: {
+              responsive: true, plugins: { legend: { display: false } },
+              scales: {
+                x: { grid: { display: false }, ticks: { color: '#5a6380', font: { family: 'JetBrains Mono', size: 8 }, maxRotation: 45 } },
+                y: { grid: { color: 'rgba(42,48,68,0.4)' }, ticks: { color: '#5a6380', font: { family: 'JetBrains Mono', size: 9 }, callback: (v: any) => v + 'h' } }
+              }
+            }
+          });
+        }
+      });
+    }
+
+    // Per-Item View
+    const btnItemView = document.getElementById('btnItemView');
+    if (btnItemView) {
+      btnItemView.addEventListener('click', () => {
+        const itId = (document.getElementById('selItemIteration') as HTMLSelectElement).value;
+        let h = '';
+
+        const epics = items.filter(i => i.level === 'Epic').sort((a, b) => wsjf(b) - wsjf(a));
+        for (const epic of epics) {
+          const eiv = itemView(epic.id, itId, people, items, mode);
+          h += `<div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--ac2); margin: 20px 0 8px; display: flex; align-items: center; gap: 8px;">
+            ${epic.id}: ${epic.title} (JS:${epic.js}, WSJF:${wsjf(epic)})
+            ${eiv ? `<span style="font-size: 11px; color: var(--t2);">${eiv.totalHours.toFixed(1)}h total</span>` : ''}
+          </div>`;
+          if (eiv && eiv.totalHours > 0) h += renderItemCard(eiv);
+
+          const feats = items.filter(f => f.level === 'Feature' && f.parentId === epic.id).sort((a, b) => wsjf(b) - wsjf(a));
+          for (const feat of feats) {
+            const fiv = itemView(feat.id, itId, people, items, mode);
+            h += `<div style="margin-left: 24px;">
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--cy); margin: 10px 0 4px;">
+                &#x2514; ${feat.id}: ${feat.title} (JS:${feat.js}, ${feat.status})
+                ${fiv ? `<span style="color: var(--t2);">${fiv.totalHours.toFixed(1)}h</span>` : ''}
+              </div>`;
+            if (fiv && fiv.totalHours > 0) h += renderItemCard(fiv);
+
+            const storyItems = items.filter(s => s.level === 'Story' && s.parentId === feat.id && s.iteration === itId && s.status === 'Done').sort((a, b) => wsjf(b) - wsjf(a));
+            for (const story of storyItems) {
+              const siv = itemView(story.id, itId, people, items, mode);
+              h += `<div style="margin-left: 24px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--gn); margin: 6px 0 3px;">
+                  &#x2514; ${story.id}: ${story.title} (JS:${story.js})
+                  ${siv ? `<span style="color: var(--t2);">${siv.totalHours.toFixed(1)}h</span>` : ''}
+                </div>`;
+              if (siv && siv.totalHours > 0) h += renderItemCard(siv);
+              h += `</div>`;
+            }
+            h += `</div>`;
+          }
+        }
+        document.getElementById('itemViewResult')!.innerHTML = h;
+      });
+    }
+
+    function renderItemCard(iv: any): string {
+      const clr = iv.item.level === 'Epic' ? 'var(--ac2)' : iv.item.level === 'Feature' ? 'var(--cy)' : 'var(--gn)';
+      let h = `<div style="background: var(--s2); border: 1px solid var(--bd); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;">
+        <table><thead><tr><th>Contributor</th><th>Role</th><th>CW</th><th>Hours</th><th>Share</th><th></th></tr></thead><tbody>`;
+      for (const c of iv.contributors) {
+        const pct = iv.totalHours > 0 ? (c.hours / iv.totalHours * 100) : 0;
+        h += `<tr>
+          <td style="font-weight: 500;">${c.person?.name || '?'}</td>
+          <td style="font-size: 10px; color: var(--t3);">${c.person?.role || ''}</td>
+          <td>${c.cw}</td>
+          <td style="font-weight: 600;">${c.hours.toFixed(1)}</td>
+          <td>${pct.toFixed(1)}%</td>
+          <td><div style="background: var(--s3); border-radius: 2px; height: 5px; width: 50px; overflow: hidden;">
+            <div style="height: 100%; width: ${pct}%; background: ${clr}; border-radius: 2px;"></div>
+          </div></td></tr>`;
+      }
+      h += `<tr style="border-top: 1px solid var(--bd);"><td colspan="3"></td>
+        <td style="font-weight: 700;">${iv.totalHours.toFixed(1)}</td>
+        <td style="font-weight: 600;">100%</td><td></td></tr></tbody></table></div>`;
+      return h;
+    }
+  </script>
+</Layout>
+
+<style>
+  select {
+    background: var(--s2);
+    color: var(--t1);
+    border: 1px solid var(--bd);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  select:focus { border-color: var(--ac); outline: none; }
+</style>

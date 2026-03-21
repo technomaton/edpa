@@ -1,0 +1,90 @@
+---
+interface Props {
+  currentPath: string;
+}
+const { currentPath } = Astro.props;
+
+const links = [
+  { href: '/', label: 'EDPA' },
+  { href: '/dashboard/', label: 'Dashboard' },
+  { href: '/presentation/', label: 'Prezentace' },
+  { href: '/methodology/', label: 'Metodika' },
+  { href: '/evaluation/', label: 'Evaluace' },
+];
+---
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="/" class="logo">
+      <span class="logo-text">EDPA</span>
+      <span class="logo-version">v2.2</span>
+    </a>
+    <nav class="main-nav">
+      {links.map(link => (
+        <a
+          href={link.href}
+          class:list={['nav-link', { active: currentPath === link.href || (link.href !== '/' && currentPath.startsWith(link.href)) }]}
+        >
+          {link.label}
+        </a>
+      ))}
+    </nav>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(8, 10, 16, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--bd);
+    height: 56px;
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+  .logo-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--ac), var(--cy));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .logo-version {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--t3);
+    padding: 2px 5px;
+    background: var(--s2);
+    border-radius: 4px;
+  }
+  .main-nav {
+    display: flex;
+    gap: 4px;
+  }
+  .nav-link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--t2);
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+  .nav-link:hover { background: var(--s2); color: var(--t1); }
+  .nav-link.active { background: rgba(99, 102, 241, 0.12); color: var(--ac2); }
+  @media (max-width: 768px) {
+    .main-nav { display: none; }
+  }
+</style>
