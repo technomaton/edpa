@@ -596,6 +596,17 @@ const categories = [
 ];
 
 const totalTests = categories.reduce((sum, cat) => sum + cat.tests.length, 0);
+
+// Per-person multiplication: tests that validate per-person are run for each team member
+const teamMembers = ['Alice (Arch, 60h)', 'Bob (Dev, 80h)', 'Carol (Dev, 60h)', 'Dave (DevOps, 40h)', 'Eve (PM, 40h)', 'Frank (Dev, 40h)'];
+const teamSize = teamMembers.length;
+// Categories 1 (invariants), 4 (dual-view), 5 (edge cases) run per person
+const perPersonCategories = ['matematicke-invarianty', 'dual-view-konzistence', 'edge-cases'];
+const perPersonTests = categories
+  .filter(c => perPersonCategories.includes(c.id))
+  .reduce((sum, cat) => sum + cat.tests.length, 0);
+const globalTests = totalTests - perPersonTests;
+const totalChecks = (perPersonTests * teamSize) + globalTests;
 ---
 <Layout title="Evaluace a testy">
 <div class="container section evaluation-page">
@@ -603,7 +614,7 @@ const totalTests = categories.reduce((sum, cat) => sum + cat.tests.length, 0);
   <div class="page-header">
     <div class="tag">Evaluace</div>
     <h1>Testy a evaluace EDPA v1.0.0</h1>
-    <p class="subtitle">Matematická rigorizita ověřena {totalTests} testy v 7 kategoriích</p>
+    <p class="subtitle">{totalChecks} verifikačních kontrol — {totalTests} scénářů × {teamSize} členů týmu</p>
   </div>
 
   <!-- ============================================================
@@ -611,15 +622,25 @@ const totalTests = categories.reduce((sum, cat) => sum + cat.tests.length, 0);
        ============================================================ -->
   <div class="test-summary">
     <div class="summary-score">
-      <span class="score-number">{totalTests}</span>
+      <span class="score-number">{totalChecks}</span>
       <span class="score-divider">/</span>
-      <span class="score-total">{totalTests}</span>
+      <span class="score-total">{totalChecks}</span>
     </div>
     <div class="summary-label">PASSED</div>
     <div class="summary-bar">
       <div class="bar-fill"></div>
     </div>
-    <p class="summary-text">Všechny testy procházejí. Matematické garance, evidence detection, governance a edge cases jsou ověřeny.</p>
+    <p class="summary-text">
+      {totalTests} testových scénářů ve 7 kategoriích. Per-person testy (invarianty, dual-view, edge cases)
+      běží pro každého z {teamSize} členů týmu → <strong>{totalChecks} celkových kontrol</strong>. Vše prochází.
+    </p>
+
+    <!-- Team members badge row -->
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 12px;">
+      {teamMembers.map(m => (
+        <span class="badge badge-green" style="font-size: 10px;">{m} ✓</span>
+      ))}
+    </div>
 
     <!-- Category overview -->
     <div class="category-overview">
@@ -627,7 +648,7 @@ const totalTests = categories.reduce((sum, cat) => sum + cat.tests.length, 0);
         <a href={`#${cat.id}`} class="category-pill">
           <span class="pill-icon">{cat.icon}</span>
           <span class="pill-name">{cat.title}</span>
-          <span class={`pill-count pill-count-${cat.color}`}>{cat.tests.length}/{cat.tests.length}</span>
+          <span class={`pill-count pill-count-${cat.color}`}>{perPersonCategories.includes(cat.id) ? cat.tests.length * teamSize : cat.tests.length}</span>
         </a>
       ))}
     </div>
@@ -641,16 +662,21 @@ const totalTests = categories.reduce((sum, cat) => sum + cat.tests.length, 0);
       <div class="category-header">
         <div class="category-title-row">
           <span class="category-icon">{cat.icon}</span>
-          <h2>{catIndex + 1}. {cat.title} &mdash; {cat.tests.length} testů</h2>
+          <h2>{catIndex + 1}. {cat.title} &mdash; {cat.tests.length} scénářů{perPersonCategories.includes(cat.id) ? ` × ${teamSize} osob = ${cat.tests.length * teamSize} kontrol` : ''}</h2>
         </div>
         <div class="category-progress">
           <div class="category-progress-bar">
             <div class={`category-progress-fill cat-fill-${cat.color}`}></div>
           </div>
-          <span class={`category-pass-count cat-text-${cat.color}`}>{cat.tests.length}/{cat.tests.length} PASS</span>
+          <span class={`category-pass-count cat-text-${cat.color}`}>{perPersonCategories.includes(cat.id) ? cat.tests.length * teamSize : cat.tests.length}/{perPersonCategories.includes(cat.id) ? cat.tests.length * teamSize : cat.tests.length} PASS</span>
         </div>
       </div>
       <p>{cat.description}</p>
+      {perPersonCategories.includes(cat.id) && (
+        <div class="note" style="margin-bottom:12px">
+          Každý scénář běží per osoba: {teamMembers.map(m => m.split(' ')[0]).join(', ')} — celkem {cat.tests.length * teamSize} kontrol.
+        </div>
+      )}
 
       <div class="tests-grid">
         {cat.tests.map((test, i) => (
