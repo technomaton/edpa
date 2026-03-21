@@ -8,7 +8,7 @@ export interface Props {
   description?: string;
 }
 
-const { title, description = 'EDPA v2.2 — Evidence-Driven Proportional Allocation. Automaticke odvozeni hodin z delivery evidence.' } = Astro.props;
+const { title, description = 'EDPA v1.0.0 — Evidence-Driven Proportional Allocation. Automaticke odvozeni hodin z delivery evidence.' } = Astro.props;
 ---
 <!doctype html>
 <html lang="cs">
@@ -18,7 +18,7 @@ const { title, description = 'EDPA v2.2 — Evidence-Driven Proportional Allocat
   <meta name="description" content={description} />
   <meta name="author" content="TECHNOMATON Group" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <title>{title} | EDPA v2.2</title>
+  <title>{title} | EDPA v1.0.0</title>
 </head>
 <body>
   <Header currentPath={Astro.url.pathname} />

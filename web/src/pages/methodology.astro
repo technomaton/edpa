@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 ---
-<Layout title="Metodika EDPA v2.2">
+<Layout title="Metodika EDPA v1.0.0">
 <div class="container section methodology-page">
 
   <div class="page-header">
@@ -92,11 +92,18 @@ import Layout from '../layouts/Layout.astro';
   <!-- 4. Hierarchie work items -->
   <section id="hierarchie">
     <h2>4. Hierarchie work items</h2>
-    <div class="formula" style="white-space:pre;line-height:1.8">Initiative (cely projekt, business case)
-  Epic (strategicky cil, 6-9 mesicu)
-    Feature (musi se vejit do Planning Intervalu)
-      Story (dodavano v Iteraci)
-        Task (technicka prace, volitelne)</div>
+    <div class="formula" style="white-space:pre;line-height:2;font-size:16px"><span class="wi-initiative"><b>Initiative</b></span> (cely projekt, business case)
+  └── <span class="wi-epic"><b>Epic</b></span> (strategicky cil, 6-9 mesicu)
+       └── <span class="wi-feature"><b>Feature</b></span> (musi se vejit do Planning Intervalu)
+            └── <span class="wi-story"><b>Story</b></span> (dodavano v Iteraci)
+                 └── <span class="wi-task"><b>Task</b></span> (technicka prace, volitelne)</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--pk)"></div> Initiative</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--ac2)"></div> Epic</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--cy)"></div> Feature</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--gn)"></div> Story</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--yl)"></div> Task</div>
+    </div>
     <p>Kazda uroven ma <strong>vlastni nezavisly Job Size a WSJF</strong>. Feature WSJF se nepocita ze Stories pod ni.</p>
 
     <div class="card" style="margin-top:16px">
@@ -105,20 +112,26 @@ import Layout from '../layouts/Layout.astro';
           <tr><th>Uroven</th><th>JS max</th><th>GitHub mapping</th></tr>
         </thead>
         <tbody>
-          <tr><td>Epic</td><td>20</td><td>Issue Type: Epic</td></tr>
-          <tr><td>Feature</td><td>13</td><td>Issue Type: Feature</td></tr>
-          <tr><td>Story (2/10)</td><td>8</td><td>Issue Type: Story</td></tr>
-          <tr><td>Story (1/5)</td><td>5</td><td>Issue Type: Story</td></tr>
-          <tr><td>Task</td><td>&mdash;</td><td>Issue Type: Task</td></tr>
+          <tr><td class="wi-epic"><b>Epic</b></td><td>20</td><td>Issue Type: Epic</td></tr>
+          <tr><td class="wi-feature"><b>Feature</b></td><td>13</td><td>Issue Type: Feature</td></tr>
+          <tr><td class="wi-story"><b>Story</b> (2/10)</td><td>8</td><td>Issue Type: Story</td></tr>
+          <tr><td class="wi-story"><b>Story</b> (1/5)</td><td>5</td><td>Issue Type: Story</td></tr>
+          <tr><td class="wi-task"><b>Task</b></td><td>&mdash;</td><td>Issue Type: Task</td></tr>
         </tbody>
       </table>
     </div>
 
     <p style="margin-top:16px">Nad limitem se item rozpada. Granularity guardrails vynucuji rozumnou granularitu.</p>
 
-    <div class="formula"><strong>WSJF:</strong> (BV + TC + RR) / JS
-BV = Business Value, TC = Time Criticality, RR = Risk Reduction
+    <div class="formula"><strong>WSJF:</strong> (<span class="wsjf-bv">BV</span> + <span class="wsjf-tc">TC</span> + <span class="wsjf-rr">RR</span>) / <span class="wsjf-js">JS</span>
+<span class="wsjf-bv">BV</span> = Business Value, <span class="wsjf-tc">TC</span> = Time Criticality, <span class="wsjf-rr">RR</span> = Risk Reduction
 Pocita se per uroven nezavisle.</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--gn)"></div> BV — Business Value</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--or)"></div> TC — Time Criticality</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--cy)"></div> RR — Risk Reduction</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--yl)"></div> JS — Job Size</div>
+    </div>
   </section>
 
   <!-- 5. Model EDPA -->
@@ -384,10 +397,26 @@ feature/F-102-anon-engine</div>
   <!-- 12. Srovnani -->
   <section id="srovnani">
     <h2>12. Srovnani s alternativami</h2>
+
+    <div class="grid grid-3" style="margin-bottom:20px">
+      <div class="card" style="border-left:3px solid var(--or)">
+        <h3 style="color:var(--or);margin-bottom:8px">Fixed Split v1</h3>
+        <p style="font-size:14px;color:var(--t2)">Predem definovane kose (napr. 60% Dev, 20% Arch, 20% QA). Hodiny se rozdeluji fixne podle role, nezavisle na skutecnem prispevku. Jednoduche, ale nepresne.</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--gn)">
+        <h3 style="color:var(--gn);margin-bottom:8px">EDPA v1.0.0</h3>
+        <p style="font-size:14px;color:var(--t2)">Evidence-Driven Proportional Allocation. Hodiny se odvozuji automaticky z GitHub delivery evidence (commity, PR, reviews). Matematicka garance: &Sigma; = Capacity.</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--rd)">
+        <h3 style="color:var(--rd);margin-bottom:8px">Rucni timesheets</h3>
+        <p style="font-size:14px;color:var(--t2)">Kazdy clen tymu rucne vyplnuje hodiny. Subjektivni, administrativne narocne, nema per-item pohled, neauditovatelne bez doplnkove evidence.</p>
+      </div>
+    </div>
+
     <div class="card">
       <table>
         <thead>
-          <tr><th>Vlastnost</th><th>Fixed Split v1</th><th style="color:var(--gn)">EDPA v2.2</th><th>Rucni timesheets</th></tr>
+          <tr><th>Vlastnost</th><th style="color:var(--or)">Fixed Split v1</th><th style="color:var(--gn)">EDPA v1.0.0</th><th style="color:var(--rd)">Rucni timesheets</th></tr>
         </thead>
         <tbody>
           <tr><td>Fixovane kose</td><td>Ano</td><td style="color:var(--gn)">Ne</td><td>Ne</td></tr>
