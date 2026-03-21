@@ -1,0 +1,26 @@
+{
+  "name": "edpa",
+  "version": "2.2.0",
+  "description": "EDPA — Evidence-Driven Proportional Allocation. Derive hours from Git evidence. No timesheets.",
+  "author": {
+    "name": "TECHNOMATON Group",
+    "url": "https://github.com/technomaton"
+  },
+  "license": "MIT",
+  "tier": "community",
+  "hooks": "",
+  "mcpServers": "../../.mcp.json",
+  "skills": [
+    "skills/edpa-setup/SKILL.md",
+    "skills/edpa-engine/SKILL.md",
+    "skills/edpa-reports/SKILL.md",
+    "skills/edpa-autocalib/SKILL.md"
+  ],
+  "commands": [
+    "commands/edpa/setup.md",
+    "commands/edpa/close-iteration.md",
+    "commands/edpa/reports.md",
+    "commands/edpa/calibrate.md"
+  ],
+  "agents": []
+}

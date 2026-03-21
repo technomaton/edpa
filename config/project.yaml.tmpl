@@ -1,0 +1,28 @@
+# EDPA Project Configuration
+# Edit this file to match your project
+
+project:
+  name: "My Project"                          # ← Change this
+  registration: ""                            # Grant registration number (if applicable)
+  program: ""                                 # Funding program (e.g., OP TAK)
+  organizations:
+    - name: ""                                # Primary organization
+    - name: ""                                # Partner organization
+  domain: ""                                  # Domain URL (e.g., myproject.cz)
+
+governance:
+  methodology: "EDPA v2.2"
+  calculation_mode: "simple"                  # simple (JS×CW) or full (JS×CW×RS)
+  audit_mode: "full"                          # always store RS in snapshots
+
+naming:
+  pi_pattern: "PI-{year}-{pi_num}"            # e.g., PI-2026-1
+  iteration_pattern: "PI-{year}-{pi_num}.{iter_num}"  # e.g., PI-2026-1.3
+  branch_pattern: "{type}/{item_id}-{description}"    # e.g., feature/S-200-omop-parser
+  item_prefixes:
+    initiative: "I"
+    epic: "E"
+    feature: "F"
+    story: "S"
+    task: "T"
+    bug: "B"

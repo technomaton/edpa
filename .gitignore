@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# EDPA — DO NOT IGNORE these (they are audit artifacts):
+# snapshots/
+# reports/
+# data/ground_truth.yaml
+
+# Temporary
+*.tmp
+*.bak

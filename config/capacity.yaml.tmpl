@@ -1,0 +1,35 @@
+# EDPA Capacity Registry
+# Edit this file with your team details
+# Updated at each Iteration Planning
+
+cadence:
+  iteration_weeks: 2                          # 1 (AI-native) or 2 (classic)
+  pi_weeks: 10                                # 5 or 10
+  delivery_iterations_per_pi: 4               # PI minus IP iteration
+  ip_iterations_per_pi: 1                     # Innovation & Planning
+
+# Team members — add/remove as needed
+people:
+  # EXAMPLE — replace with your team:
+  - id: example-arch
+    name: "Architect Name"
+    role: Arch                                # Arch, Dev, DevSecOps, PM, QA
+    team: "Org A"                             # Organization name
+    fte: 0.5
+    capacity_per_iteration: 40                # hours (FTE × 80 for 2-week iter)
+    email: "arch@example.com"
+    availability: confirmed                   # confirmed, partial, unavailable
+
+  - id: example-dev
+    name: "Developer Name"
+    role: Dev
+    team: "Org A"
+    fte: 1.0
+    capacity_per_iteration: 80
+    email: "dev@example.com"
+    availability: confirmed
+
+# Calculated at runtime by EDPA engine:
+# total_fte: sum of people[].fte
+# total_capacity_per_iteration: sum of people[].capacity_per_iteration
+# total_capacity_per_pi: total_capacity_per_iteration × delivery_iterations_per_pi

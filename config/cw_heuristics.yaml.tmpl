@@ -1,0 +1,30 @@
+# EDPA Contribution Weight Heuristics v2.2
+# These defaults work for most teams. Auto-calibration (after 1st PI) will optimize them.
+
+version: "2.2"
+
+# Minimum evidence score to be considered a contributor
+evidence_threshold: 1.0
+
+# CW assigned per evidence role (highest signal wins)
+role_weights:
+  owner: 1.0          # assignee on issue
+  key: 0.6            # PR author, explicit /contribute
+  reviewer: 0.25      # PR reviewer, commit author
+  consulted: 0.15     # issue/PR comment only
+
+# Evidence signals and their scoring weights
+signals:
+  assignee: 4.0             # GitHub issue assignee
+  contribute_command: 3.0    # /contribute @person weight:X
+  pr_author: 2.0            # PR author referencing item
+  commit_author: 1.0        # Commit message with S-XXX/F-XXX/E-XXX
+  pr_reviewer: 1.0          # Approved/reviewed PR referencing item
+  issue_comment: 0.5        # Meaningful comment on issue/PR
+
+# Rules
+rules:
+  - "Highest signal determines CW (no summing)"
+  - "Manual override (/contribute) takes precedence over auto-detection"
+  - "Commit count does NOT convert to time — only signals relevance"
+  - "In Progress items are excluded from EDPA calculation"

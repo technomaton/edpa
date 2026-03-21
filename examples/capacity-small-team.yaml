@@ -1,0 +1,38 @@
+# Example: 3-person startup team
+# Classic cadence (2-week iterations, 10-week PI)
+
+cadence:
+  iteration_weeks: 2
+  pi_weeks: 10
+  delivery_iterations_per_pi: 4
+  ip_iterations_per_pi: 1
+
+people:
+  - id: alice
+    name: "Alice"
+    role: Arch
+    team: "Acme Corp"
+    fte: 0.5
+    capacity_per_iteration: 40
+    email: "alice@acme.com"
+    availability: confirmed
+
+  - id: bob
+    name: "Bob"
+    role: Dev
+    team: "Acme Corp"
+    fte: 1.0
+    capacity_per_iteration: 80
+    email: "bob@acme.com"
+    availability: confirmed
+
+  - id: carol
+    name: "Carol"
+    role: Dev
+    team: "Acme Corp"
+    fte: 0.75
+    capacity_per_iteration: 60
+    email: "carol@acme.com"
+    availability: confirmed
+
+# Total: 3 people, 2.25 FTE, 180h/iteration, 720h/PI
