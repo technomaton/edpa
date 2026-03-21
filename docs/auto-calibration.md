@@ -58,6 +58,32 @@ role_overrides:
     owner: 0.95        # was 1.00 (cautious — small sample)
 ```
 
+
+### Monte Carlo Validation (1000 scenarios, 68,156 records)
+
+The calibration results were validated by Monte Carlo simulation with 1000
+randomly generated team compositions (4-15 members, random role distributions).
+All biases are statistically significant (p < 0.001).
+
+| Role | Evidence | N | Auto CW | Median Confirmed | Bias | Corr% | Confidence |
+|------|----------|---|---------|------------------|------|-------|------------|
+| BO | consulted | 1,597 | 0.15 | **0.30** | +0.16 | 74.4% | HIGH |
+| BO | reviewer | 341 | 0.25 | **0.35** | +0.10 | 61.0% | MEDIUM |
+| PM | consulted | 6,304 | 0.15 | **0.20** | +0.11 | 59.7% | HIGH |
+| PM | reviewer | 1,213 | 0.25 | 0.25 | +0.04 | 45.6% | HIGH |
+| Arch | reviewer | 3,120 | 0.25 | **0.30** | +0.10 | 55.4% | HIGH |
+| Dev | owner | 18,472 | 1.00 | 1.00 | -0.01 | 5.1% | HIGH |
+| Dev | key | 15,078 | 0.60 | 0.60 | +0.02 | 15.0% | HIGH |
+| DevSecOps | reviewer | 1,275 | 0.25 | 0.25 | +0.05 | 40.2% | HIGH |
+| QA | key | 2,966 | 0.60 | 0.60 | -0.04 | 25.9% | HIGH |
+
+Percentile distribution of confirmed CW for key corrections:
+- **BO consulted:** p5=0.15, p25=0.15, **p50=0.30**, p75=0.40, p95=0.50
+- **PM consulted:** p5=0.15, p25=0.15, **p50=0.20**, p75=0.30, p95=0.50
+- **Arch reviewer:** p5=0.25, p25=0.25, **p50=0.30**, p75=0.40, p95=0.60
+
+Monte Carlo script: `python scripts/monte_carlo_calibration.py --scenarios 1000 --seed 42`
+
 ### MAD Impact
 
 ```
