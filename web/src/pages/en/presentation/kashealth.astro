@@ -1,0 +1,408 @@
+---
+import '../../../styles/global.css';
+import '../../../styles/presentation.css';
+import Header from '../../../components/Header.astro';
+
+const title = 'EDPA Presentation — kashealth.cz';
+const description = 'EDPA v1.0.0 governance presentation for kashealth.cz — Medical Platform and Data e-shop.';
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content={description} />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>{title} | EDPA v1.0.0</title>
+</head>
+<body class="presentation-body">
+  <Header currentPath="/en/presentation/" />
+  <div class="deck" id="deck"></div>
+  <div class="pres-nav">
+    <div class="nav-l"><span class="logo">kashealth.cz</span><span class="nav-label">&middot; EDPA v1.0.0 &middot; Complete solution</span></div>
+    <div class="nav-c" id="dots"></div>
+    <div class="nav-r">
+      <button class="pres-btn" id="btnPrev">&larr; Back</button>
+      <span class="pg" id="pgN">1/20</span>
+      <button class="pres-btn" id="btnNext">Next &rarr;</button>
+    </div>
+  </div>
+
+<script>
+import { initSlideDeck } from '../../../scripts/slide-engine';
+
+const S=[
+
+// 0: TITLE
+`<div style="text-align:center;max-width:850px;margin:0 auto">
+<div class="s-tag fade">Medical Platform and Data e-shop &middot; CZ.01.01.01/01/24_062/0007440 &middot; OP TAK</div>
+<div class="s-h1 fade d1" style="font-size:44px;background:linear-gradient(135deg,var(--ac2),var(--cy));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Complete governance solution</div>
+<div class="fade d2" style="font-size:18px;color:var(--t2);margin:16px 0 6px">EDPA — Evidence-Driven Proportional Allocation</div>
+<div class="fade d3" style="font-size:14px;color:var(--t3);font-style:italic;margin-bottom:24px">Capacity derivation from delivery evidence</div>
+<div class="sg sg4 fade d4" style="max-width:700px;margin:0 auto">
+<div class="sc a" style="text-align:center;padding:12px"><div class="sc-t">Tooling</div><div style="font-size:12px;color:var(--ac2)">Teams + GitHub</div></div>
+<div class="sc c" style="text-align:center;padding:12px"><div class="sc-t">Methodology</div><div style="font-size:12px;color:var(--cy)">EDPA v1.0.0</div></div>
+<div class="sc g" style="text-align:center;padding:12px"><div class="sc-t">Skills</div><div style="font-size:12px;color:var(--gn)">4 composable</div></div>
+<div class="sc y" style="text-align:center;padding:12px"><div class="sc-t">Template</div><div style="font-size:12px;color:var(--yl)">GitHub repo</div></div>
+</div>
+<div class="fade d5" style="margin-top:20px;font-size:12px;color:var(--t3)">Jaroslav Urbanek &middot; Lead Architect &middot; March 2026<br>CVUT FBMI + Medicalc software s.r.o.</div>
+</div>`,
+
+// 1: WHAT WE DELIVER
+`<div class="s-tag fade">Presentation contents</div>
+<div class="s-h1 fade d1">What we present today</div>
+<div class="s-sub fade d2">Complete governance solution for the project — from tooling through methodology to automation. All in one GitHub repo template.</div>
+<div class="sg sg5 fade d3">
+<div class="sc a" style="min-height:140px"><div class="sc-i">&#x1F4AC;</div><div class="sc-t">1. Tooling</div><div class="sc-l">Teams + GitHub<br>~1,520 CZK/month<br>15 people, 0 Jira</div></div>
+<div class="sc c" style="min-height:140px"><div class="sc-i">&#x1F511;</div><div class="sc-t">2. Identity</div><div class="sc-l">kashealth.cz<br>5 members + guests<br>Hybrid model</div></div>
+<div class="sc g" style="min-height:140px"><div class="sc-i">&#x26A1;</div><div class="sc-t">3. EDPA</div><div class="sc-l">No timesheets<br>Dual-view CW<br>BankID audit</div></div>
+<div class="sc y" style="min-height:140px"><div class="sc-i">&#x1F916;</div><div class="sc-t">4. AI Skills</div><div class="sc-l">4 composable<br>26+ platforms<br>Auto-calibration</div></div>
+<div class="sc o" style="min-height:140px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">5. Template</div><div class="sc-l">GitHub repo<br>30 files, 24KB<br>Ready to use</div></div>
+</div>`,
+
+// 2: PROBLEM
+`<div class="s-tag fade">Context</div>
+<div class="s-h1 fade d1">Why we need our own solution</div>
+<div class="sg sg2 fade d2">
+<div class="sc o"><div class="sc-i">&#x1F500;</div><div class="sc-l"><b>Multiple tenants</b><br>CVUT Teams &#x2260; Medicalc Teams. Switching organizations, lost notifications.</div></div>
+<div class="sc o"><div class="sc-i">&#x1F512;</div><div class="sc-l"><b>IT dependency</b><br>Every permission change = IT department request. Weeks of waiting.</div></div>
+<div class="sc o"><div class="sc-i">&#x1F4DD;</div><div class="sc-l"><b>Manual timesheets</b><br>Subjective, administratively demanding, unauditable, nobody likes them.</div></div>
+<div class="sc o"><div class="sc-i">&#x1F504;</div><div class="sc-l"><b>Migration risk</b><br>During spin-off everything must be moved. The later, the more expensive.</div></div>
+</div>
+<div class="qt fade d3">Goal: Central stack owned by the project from day 1. Automated reporting. No future migration.</div>`,
+
+// 3: TOOLING
+`<div class="s-tag fade">Tooling stack</div>
+<div class="s-h1 fade d1">Teams + GitHub = complete stack</div>
+<div class="cols fade d2">
+<div class="col">
+<table>
+<thead><tr><th>Tool</th><th>Plan</th><th>9 months</th></tr></thead>
+<tbody>
+<tr><td><b>M365 Business Basic</b></td><td>5x @kashealth.cz</td><td>270 $</td></tr>
+<tr><td><b>GitHub Team</b></td><td>8 developers</td><td>288 $</td></tr>
+<tr><td><b>Domain kashealth.cz</b></td><td>WEDOS</td><td>~8 $</td></tr>
+<tr style="background:rgba(99,102,241,.05)"><td><b>TOTAL</b></td><td><b>15 people</b></td><td style="color:var(--gn)"><b>~566 $</b></td></tr>
+</tbody>
+</table>
+<div style="margin-top:8px;font-size:11px;color:var(--t3)">~1,520 CZK/month &middot; 100 CZK/person</div>
+</div>
+<div class="col">
+<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>GitHub replaces:</b><br>Jira &#x2192; Issues + Projects<br>Confluence &#x2192; Wiki + Pages<br>Tempo &#x2192; EDPA (derived hours)<br>Roadmaps &#x2192; Projects Roadmap<br>Automation &#x2192; GitHub Actions</div></div>
+<div class="s-note"><b>0 Jira, 0 Confluence.</b> GitHub-only governance with sub-issues (8 levels), issue types, custom fields.</div>
+</div></div>`,
+
+// 4: IDENTITY
+`<div class="s-tag fade">Identity</div>
+<div class="s-h1 fade d1">kashealth.cz — hybrid model</div>
+<div class="cols fade d2">
+<div class="col">
+<div class="sc o" style="margin-bottom:10px;padding:12px"><div style="font-size:12px"><b>&#x26A0;&#xFE0F; Key limitation:</b> Guests in Teams <b>cannot schedule meetings</b>. Hardcoded in Entra ID.</div></div>
+<table>
+<thead><tr><th>Account</th><th>Role</th><th>Type</th></tr></thead>
+<tbody>
+<tr style="background:rgba(99,102,241,.04)"><td><b>urbanek@kashealth.cz</b></td><td>Arch</td><td style="color:var(--gn)">Member &#x2713;</td></tr>
+<tr style="background:rgba(99,102,241,.04)"><td><b>tuma@kashealth.cz</b></td><td>DevSecOps</td><td style="color:var(--gn)">Member &#x2713;</td></tr>
+<tr style="background:rgba(99,102,241,.04)"><td><b>batek@kashealth.cz</b></td><td>PM/CVUT</td><td style="color:var(--gn)">Member &#x2713;</td></tr>
+<tr style="background:rgba(99,102,241,.04)"><td><b>pm@kashealth.cz</b></td><td>PM/MC</td><td style="color:var(--gn)">Member &#x2713;</td></tr>
+<tr><td>@cvut.cz</td><td>Dev/R&D</td><td style="color:var(--yl)">Guest</td></tr>
+<tr><td>@medicalc.cz</td><td>Dev</td><td style="color:var(--yl)">Guest</td></tr>
+</tbody>
+</table>
+</div>
+<div class="col">
+<div class="sc a" style="margin-bottom:8px"><div class="sc-t">Layer 1 &middot; Full members</div><div class="sc-l">5 people &middot; M365 Basic &middot; Schedule meetings</div></div>
+<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Layer 2 &middot; Shared channels</div><div class="sc-l">B2B Direct Connect &middot; No tenant switching</div></div>
+<div class="sc y"><div class="sc-t">Layer 3 &middot; Guest fallback</div><div class="sc-l">If IT does not cooperate &middot; Functional, worse UX</div></div>
+</div></div>`,
+
+// 5: EDPA CORE
+`<div class="s-tag fade">EDPA v1.0.0</div>
+<div class="s-h1 fade d1">Time is not measured — it is derived</div>
+<div class="qt fade d2">A person declares capacity. The system identifies work items they contributed to. Capacity is proportionally split based on evidence.</div>
+<div class="cols fade d3">
+<div class="col">
+<div class="fm">Score = JobSize x CW x RS
+
+DerivedHours = (Score / &#x2211;Scores) x Capacity
+
+<b>Guarantee: &#x2211; DerivedHours = Capacity</b>
+Always. No exceptions.</div>
+<div class="s-p">Two variants: <code>JS x CW</code> (operational) and <code>JS x CW x RS</code> (audit)</div>
+</div>
+<div class="col">
+<div class="sc g" style="margin-bottom:8px"><div class="sc-l"><b>Nobody logs hours.</b> The report is a byproduct of delivery.</div></div>
+<div class="sc c" style="margin-bottom:8px"><div class="sc-l"><b>Evidence from GitHub.</b> Commits, PRs, reviews, comments &#x2192; auto-detection.</div></div>
+<div class="sc a"><div class="sc-l"><b>BankID signature.</b> Frozen snapshot + BankID = legally stronger than paper.</div></div>
+</div></div>`,
+
+// 6: DUAL VIEW
+`<div class="s-tag fade">Dual-View</div>
+<div class="s-h1 fade d1">Two views, one dataset</div>
+<div class="sg sg2 fade d2" style="margin-top:16px">
+<div class="sc g" style="min-height:180px"><div class="sc-i">&#x1F464;</div><div class="sc-t">Per-Person</div>
+<div style="font-size:14px;font-weight:600;color:var(--gn);margin-bottom:6px">How is a person's capacity distributed?</div>
+<div class="fm" style="font-size:11px;border-left-color:var(--gn);margin:6px 0">DerivedHours = (Score / &#x2211;Scores) x Capacity
+Guarantee: &#x2211; = Capacity</div>
+<div class="sc-l">&#x2192; <b>Report per person</b> for OP TAK</div></div>
+<div class="sc c" style="min-height:180px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">Per-Item</div>
+<div style="font-size:14px;font-weight:600;color:var(--cy);margin-bottom:6px">How many people and hours did item X cost?</div>
+<div class="fm" style="font-size:11px;border-left-color:var(--cy);margin:6px 0">ItemShare = DerivedHours[P] / &#x2211; DerivedHours[*]
+Guarantee: &#x2211; shares = 100%</div>
+<div class="sc-l">&#x2192; <b>Cost card</b> per deliverable</div></div>
+</div>
+<div class="s-note fade d3">Both views from the same data (CW, JS, Capacity). No duplication, no conflict.</div>`,
+
+// 7: THREE LAYERS
+`<div class="s-tag fade">Architecture</div>
+<div class="s-h1 fade d1">Three separate layers</div>
+<div class="sg sg3 fade d2" style="margin-top:16px">
+<div class="sc a" style="min-height:170px"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">Operational Metadata</div><div class="sc-v" style="color:var(--ac2);font-size:14px">GitHub Issues + Projects</div><div class="sc-l" style="margin-top:6px">Live delivery data &middot; Hierarchy &middot; Status &middot; Job Size &middot; WSJF</div></div>
+<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">Capacity Registry</div><div class="sc-v" style="color:var(--cy);font-size:14px">YAML config in repo</div><div class="sc-l" style="margin-top:6px">Capacity &middot; Roles &middot; FTE &middot; Confirmed at Iteration Planning</div></div>
+<div class="sc g" style="min-height:170px"><div class="sc-i">&#x1F512;</div><div class="sc-t">Evidence &amp; Reporting</div><div class="sc-v" style="color:var(--gn);font-size:14px">/snapshots &middot; /reports &middot; /signed</div><div class="sc-l" style="margin-top:6px">Frozen snapshots &middot; Reports &middot; BankID &middot; Immutable</div></div>
+</div>
+<div class="fade d3" style="margin-top:12px;text-align:center;font-size:12px;color:var(--t3)">GitHub is <b>not</b> source of truth for: capacity, FTE, derived hours, signatures &#x2192; those live in the evidence layer.</div>`,
+
+// 8: HIERARCHY
+`<div class="s-tag fade">Hierarchy</div>
+<div class="s-h1 fade d1">SAFe-like hierarchy in GitHub</div>
+<div class="cols fade d2">
+<div class="col">
+<div class="fm" style="font-size:13px;line-height:2;border-left-color:var(--ac)"><span style="color:var(--pk)">Initiative</span> (entire project)
+  &#x2514;&#x2500;&#x2500; <span style="color:var(--ac2)">Epic</span> (strategic goal, 6-9 months)
+       &#x2514;&#x2500;&#x2500; <span style="color:var(--cy)">Feature</span> (fits within a PI)
+            &#x2514;&#x2500;&#x2500; <span style="color:var(--gn)">Story</span> (delivered in an Iteration)
+                 &#x2514;&#x2500;&#x2500; <span style="color:var(--yl)">Task</span> (technical work)</div>
+<div class="s-p"><b>WSJF = (<span style="color:var(--gn)">BV</span> + <span style="color:var(--or)">TC</span> + <span style="color:var(--cy)">RR</span>) / <span style="color:var(--yl)">JS</span></b> — independent per level, layers are not compared.</div>
+<div class="s-p">Naming: <code>PI-2026-1.3</code> = 3rd iteration in 1st PI of 2026.</div>
+</div>
+<div class="col">
+<table><thead><tr><th>Level</th><th>JS max</th><th>GitHub</th></tr></thead><tbody>
+<tr><td style="color:var(--pk)"><b>Initiative</b></td><td>&#x2014;</td><td>Top-level issue</td></tr>
+<tr><td style="color:var(--ac2)"><b>Epic</b></td><td>20</td><td>Sub-issue</td></tr>
+<tr><td style="color:var(--cy)"><b>Feature</b></td><td>13</td><td>Sub-issue</td></tr>
+<tr><td style="color:var(--gn)"><b>Story</b></td><td>8 / 5</td><td>Sub-issue</td></tr>
+<tr><td style="color:var(--yl)"><b>Task</b></td><td>&#x2014;</td><td>Checklist</td></tr>
+</tbody></table>
+<div class="s-note" style="margin-top:8px">GitHub sub-issues (GA 04/2025): 8 levels, issue types, custom fields.</div>
+</div></div>`,
+
+// 9: EVIDENCE
+`<div class="s-tag fade">Evidence detection</div>
+<div class="s-h1 fade d1">Automatic contributor detection</div>
+<div class="cols fade d2">
+<div class="col">
+<table><thead><tr><th>GitHub signal</th><th style="text-align:right">Points</th><th style="text-align:right">CW</th></tr></thead><tbody>
+<tr><td>Issue assignee</td><td style="text-align:right"><b>+4</b></td><td style="text-align:right;color:var(--gn)">1.0</td></tr>
+<tr><td><code>/contribute</code> command</td><td style="text-align:right"><b>+3</b></td><td style="text-align:right;color:var(--cy)">0.6</td></tr>
+<tr><td>PR author &#x2192; item</td><td style="text-align:right"><b>+2</b></td><td style="text-align:right;color:var(--cy)">0.6</td></tr>
+<tr><td>Commit with S-/F-/E-XXX</td><td style="text-align:right"><b>+1</b></td><td style="text-align:right;color:var(--yl)">0.25</td></tr>
+<tr><td>PR reviewer</td><td style="text-align:right"><b>+1</b></td><td style="text-align:right;color:var(--yl)">0.25</td></tr>
+<tr><td>Issue comment</td><td style="text-align:right"><b>+0.5</b></td><td style="text-align:right;color:var(--or)">0.15</td></tr>
+</tbody></table>
+</div>
+<div class="col">
+<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Threshold</div><div class="sc-l">Evidence Score &#x2265; 1.0 &#x2192; relevant contributor</div></div>
+<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Override</div><div class="sc-l"><code>/contribute @urbanek weight:0.6</code></div></div>
+<div class="sc y" style="margin-bottom:8px"><div class="sc-t">Branch naming</div><div class="sc-l"><code>feature/S-200-omop-parser</code><br>CI blocks PRs without reference</div></div>
+<div class="sc o"><div class="sc-t">Commit &#x2260; time</div><div class="sc-l">Commits = relevance signal, not hours. AI changes patterns.</div></div>
+</div></div>`,
+
+// 10: SKILLS
+`<div class="s-tag fade">AI Agent Skills</div>
+<div class="s-h1 fade d1">4 composable EDPA skills</div>
+<div class="s-sub fade d2">Claude Code skills = governance automation. Agent in terminal understands EDPA and executes it for you.</div>
+<div class="sg sg2 fade d3">
+<div class="sc a" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F3D7;&#xFE0F;</div><div><div style="font-weight:600">edpa-setup</div><div class="sc-l">~450 tokens &middot; "Set up governance for my project"<br>GitHub Projects, capacity registry, CW heuristics, branch naming</div></div></div>
+<div class="sc c" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x26A1;</div><div><div style="font-weight:600">edpa-engine</div><div class="sc-l">~760 tokens &middot; "Close iteration PI-2026-1.3"<br>Evidence gathering, EDPA calculation, invariant validation</div></div></div>
+<div class="sc g" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F4C4;</div><div><div style="font-weight:600">edpa-reports</div><div class="sc-l">~505 tokens &middot; "Generate reports"<br>MD/JSON/XLSX reports, frozen snapshots, per-item allocation</div></div></div>
+<div class="sc o" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F52C;</div><div><div style="font-weight:600">edpa-autocalib</div><div class="sc-l">~625 tokens &middot; "Calibrate CW heuristics"<br>Karpathy autoresearch: 50 experiments overnight, MAD optimization</div></div></div>
+</div>
+<div class="s-note fade d4"><b>26+ platforms:</b> Claude Code (native), Codex CLI, Gemini CLI, Cursor, Windsurf, Aider... Skills live in repo — every team member gets them automatically.</div>`,
+
+// 11: HOW SKILLS WORK
+`<div class="s-tag fade">How it works</div>
+<div class="s-h1 fade d1">Daily workflow with EDPA skills</div>
+<div class="sg fade d2" style="gap:8px">
+<div class="sc g" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:30px">1</div><div><div style="font-weight:500">Team works normally</div><div class="sc-l">Coding on <code>feature/S-200-omop-parser</code> branches. PR, review, merge. Nothing extra.</div></div></div>
+<div class="sc c" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:30px">2</div><div><div style="font-weight:500">CI collects evidence automatically</div><div class="sc-l">Branch naming check &#x2192; evidence detection &#x2192; contributor metadata on issues. No manual intervention.</div></div></div>
+<div class="sc a" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:30px">3</div><div><div style="font-weight:500">End of iteration: "Close iteration PI-2026-1.3"</div><div class="sc-l">Claude Code runs <b>edpa-engine</b> &#x2192; pulls evidence &#x2192; computes Score &#x2192; derives hours &#x2192; validates invariants.</div></div></div>
+<div class="sc y" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:30px">4</div><div><div style="font-weight:500">"Generate reports"</div><div class="sc-l"><b>edpa-reports</b> &#x2192; MD/JSON reports per person + per-item allocation + frozen snapshot + Excel. 30 seconds.</div></div></div>
+<div class="sc o" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--or);width:30px">5</div><div><div style="font-weight:500">BankID signature</div><div class="sc-l">Member reviews report &#x2192; signs with BankID &#x2192; stored in <code>/signed/</code>. Legally stronger than paper.</div></div></div>
+</div>`,
+
+// 12: REPO TEMPLATE
+`<div class="s-tag fade">GitHub Template</div>
+<div class="s-h1 fade d1">30 files, ready to use</div>
+<div class="cols fade d2">
+<div class="col">
+<div class="fm" style="font-size:10px;line-height:1.7;border-left-color:var(--ac)"><b>.claude/skills/edpa-governance/</b>
+&#x251C;&#x2500;&#x2500; edpa-setup/SKILL.md
+&#x251C;&#x2500;&#x2500; edpa-engine/SKILL.md
+&#x251C;&#x2500;&#x2500; edpa-reports/SKILL.md
+&#x251C;&#x2500;&#x2500; edpa-autocalib/SKILL.md
+&#x251C;&#x2500;&#x2500; references/ (7 files)
+&#x251C;&#x2500;&#x2500; scripts/evaluate_cw.py
+&#x251C;&#x2500;&#x2500; examples/capacity-kashealth.yaml
+&#x2514;&#x2500;&#x2500; plugin.json
+
+<b>.github/</b>
+&#x251C;&#x2500;&#x2500; workflows/branch-naming.yml
+&#x251C;&#x2500;&#x2500; ISSUE_TEMPLATE/ (epic, feature, story)
+&#x2514;&#x2500;&#x2500; PULL_REQUEST_TEMPLATE.md
+
+<b>config/</b> (capacity, heuristics, project)
+<b>docs/</b> methodology.md
+<b>data/</b> ground_truth.yaml
+<b>snapshots/</b> + <b>reports/</b> (auto-generated)</div>
+</div>
+<div class="col">
+<div class="sc g" style="margin-bottom:8px"><div class="sc-t">For kashealth.cz</div><div class="sc-l">
+<code>gh repo create kashealth/medical-platform</code><br>
+<code>--template kashealth/edpa-governance-template</code><br><br>
+Edit <code>config/</code> &#x2192; done.
+</div></div>
+<div class="sc c" style="margin-bottom:8px"><div class="sc-t">For another project</div><div class="sc-l">
+"Use this template" on GitHub.<br>
+<code>config/capacity.yaml</code> = your team.<br>
+Claude Code: "Set up EDPA for My Project"
+</div></div>
+<div class="sc a"><div class="sc-t">Contents</div><div class="sc-l">4 skills + 7 references + 3 configs + 5 GitHub templates + CI workflow + evaluator + methodology</div></div>
+</div></div>`,
+
+// 13: AUTO-CALIBRATION
+`<div class="s-tag fade">Auto-calibration</div>
+<div class="s-h1 fade d1">Karpathy's autoresearch loop</div>
+<div class="s-sub fade d2">After 1st PI (10 weeks) the team has &#x2265; 20 confirmed CW records. Agent optimizes heuristics overnight.</div>
+<div class="cols fade d3">
+<div class="col">
+<div class="fm" style="font-size:11px;border-left-color:var(--or)"><b>One file, one metric, one loop:</b>
+
+Target:  cw_heuristics.yaml
+Metric:  MAD (mean absolute deviation)
+Dir:     lower
+Budget:  50 experiments (~2h)
+Memory:  git log
+
+Loop:
+1. Load history + results
+2. Propose ONE change
+3. Commit &#x2192; evaluate &#x2192; keep/revert
+4. Repeat 50x</div>
+</div>
+<div class="col">
+<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Benefit</div><div class="sc-l">15-30% CW deviation reduction. More accurate reports without manual discussion at retro.</div></div>
+<div class="sc o" style="margin-bottom:8px"><div class="sc-t">Safety</div><div class="sc-l">Agent <b>must not edit evaluator</b> (evaluate_cw.py). Separation of optimizer from objective function.</div></div>
+<div class="sc a"><div class="sc-t">Future phase</div><div class="sc-l">Activation earliest after 1st PI. Before that: insufficient ground truth data.</div></div>
+</div></div>`,
+
+// 14: CADENCE
+`<div class="s-tag fade">Cadence</div>
+<div class="s-h1 fade d1">Configurable delivery rhythm</div>
+<div class="sg sg2 fade d2" style="margin-top:16px">
+<div class="sc y" style="min-height:170px"><div class="sc-t">Variant A &middot; Classic (2/10)</div>
+<div style="font-size:22px;font-weight:700;color:var(--yl);margin:8px 0">2 weeks</div>
+<table style="margin:0"><tbody>
+<tr><td>PI</td><td>10 weeks (4+1 IP)</td></tr>
+<tr><td>1.0 FTE</td><td>80h / iteration</td></tr>
+<tr><td>Story max</td><td>8 SP</td></tr>
+</tbody></table>
+<div style="margin-top:6px"><span class="tg tg-y">Recommended for start</span></div>
+</div>
+<div class="sc g" style="min-height:170px"><div class="sc-t">Variant B &middot; AI-Native (1/5)</div>
+<div style="font-size:22px;font-weight:700;color:var(--gn);margin:8px 0">1 week</div>
+<table style="margin:0"><tbody>
+<tr><td>PI</td><td>5 weeks (4+1 IP)</td></tr>
+<tr><td>1.0 FTE</td><td>40h / iteration</td></tr>
+<tr><td>Story max</td><td>5 SP</td></tr>
+</tbody></table>
+<div style="margin-top:6px"><span class="tg tg-g">After process stabilization</span></div>
+</div></div>
+<div class="s-note fade d3">EDPA works identically for both variants — only <code>Capacity[P, I]</code> changes.</div>`,
+
+// 15: TEAM
+`<div class="s-tag fade">Team</div>
+<div class="s-h1 fade d1">8 members &middot; 4.75 FTE &middot; 380h/iteration</div>
+<div class="cols fade d2">
+<div class="col" style="flex:2">
+<table><thead><tr><th>Name</th><th>Role</th><th>Team</th><th>FTE</th><th>h/iter</th></tr></thead><tbody>
+<tr><td><b>J. Urbanek</b></td><td><span class="tg tg-b">Arch</span></td><td>CVUT</td><td>0.5</td><td>40h</td></tr>
+<tr><td><b>O. Tuma</b></td><td><span class="tg tg-c">DevSecOps</span></td><td>CVUT</td><td>1.0</td><td>80h</td></tr>
+<tr><td><b>Turyna</b></td><td><span class="tg tg-g">Dev</span></td><td>CVUT</td><td>0.75</td><td>60h</td></tr>
+<tr><td><b>Matousek</b></td><td><span class="tg tg-g">Dev</span></td><td>CVUT</td><td>0.75</td><td>60h</td></tr>
+<tr><td><b>PM Medicalc</b></td><td><span class="tg tg-y">PM</span></td><td>MC</td><td>0.5</td><td>40h</td></tr>
+<tr><td><b>Sr Dev MC</b></td><td><span class="tg tg-g">Dev</span></td><td>MC</td><td>0.5</td><td>40h</td></tr>
+<tr><td><b>DB Spec MC</b></td><td><span class="tg tg-g">Dev</span></td><td>MC</td><td>0.5</td><td>40h</td></tr>
+<tr><td><b>DevOps MC</b></td><td><span class="tg tg-g">Dev</span></td><td>MC</td><td>0.25</td><td>20h</td></tr>
+</tbody></table>
+</div>
+<div class="col">
+<div class="sc a" style="margin-bottom:8px;text-align:center"><div class="sc-t">CVUT FBMI</div><div class="sc-v" style="color:var(--ac2)">240h</div><div class="sc-l">4 people &middot; 3.0 FTE</div></div>
+<div class="sc c" style="text-align:center"><div class="sc-t">Medicalc</div><div class="sc-v" style="color:var(--cy)">140h</div><div class="sc-l">4 people &middot; 1.75 FTE</div></div>
+<div style="margin-top:8px;text-align:center;font-size:12px;color:var(--t3)">PI: <b>1,900h</b></div>
+</div></div>`,
+
+// 16: GITHUB ACTIONS
+`<div class="s-tag fade">Automation</div>
+<div class="s-h1 fade d1">6 GitHub Actions</div>
+<div class="sg fade d2" style="gap:6px">
+<div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F9EE;</div><div><div style="font-weight:500;font-size:12px">1. WSJF Calculator</div><div class="sc-l">Field change &#x2192; auto WSJF score</div></div></div>
+<div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F50D;</div><div><div style="font-weight:500;font-size:12px">2. Contributor Detector</div><div class="sc-l">PR merge &#x2192; contributor evidence + CW</div></div></div>
+<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4F8;</div><div><div style="font-weight:500;font-size:12px">3. Iteration Close</div><div class="sc-l">Dispatch &#x2192; frozen snapshot + reports</div></div></div>
+<div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4CA;</div><div><div style="font-weight:500;font-size:12px">4. PI Close</div><div class="sc-l">Dispatch &#x2192; PI aggregation + trend metrics</div></div></div>
+<div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4C8;</div><div><div style="font-weight:500;font-size:12px">5. Velocity Tracker</div><div class="sc-l">Iter/PI close &#x2192; velocity JSON + dashboard</div></div></div>
+<div class="sc p" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x2705;</div><div><div style="font-weight:500;font-size:12px">6. Branch Naming Check</div><div class="sc-l">PR &#x2192; blocks without S-/F-/E-XXX reference</div></div></div>
+</div>`,
+
+// 17: RISKS
+`<div class="s-tag fade">Risks</div>
+<div class="s-h1 fade d1">Risks and mitigations</div>
+<div class="fade d2"><table style="margin-top:12px">
+<thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead><tbody>
+<tr><td><b>Auditor rejects EDPA</b></td><td><span class="tg tg-r">High</span></td><td>Methodology + snapshots + reproducibility + BankID</td></tr>
+<tr><td><b>CW does not match reality</b></td><td><span class="tg tg-y">Medium</span></td><td>Override + auto-calibration (Karpathy loop after 1st PI)</td></tr>
+<tr><td><b>CVUT IT rejects B2B</b></td><td><span class="tg tg-y">Medium</span></td><td>Guest access = fallback without IT dependency</td></tr>
+<tr><td><b>Commit without reference</b></td><td><span class="tg tg-y">Medium</span></td><td>CI check blocks PR + pre-commit hook</td></tr>
+<tr><td><b>PM/Arch without commits</b></td><td><span class="tg tg-y">Medium</span></td><td>Comments + <code>/contribute</code> command</td></tr>
+<tr><td><b>Skill on wrong platform</b></td><td><span class="tg tg-g">Low</span></td><td>AgentSkills standard: 26+ platforms, convert.sh</td></tr>
+</tbody></table></div>`,
+
+// 18: IMPLEMENTATION
+`<div class="s-tag fade">Implementation</div>
+<div class="s-h1 fade d1">Deployment plan</div>
+<div class="sg fade d2" style="gap:6px">
+<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:32px;text-align:center">D1</div><div><div style="font-weight:500">Domain + M365 + GitHub org</div><div class="sc-l">kashealth.cz &middot; 5 licenses &middot; GitHub Team &middot; Repo from template &middot; 6h</div></div></div>
+<div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:32px;text-align:center">D2</div><div><div style="font-weight:500">GitHub Projects + custom fields</div><div class="sc-l">Issue types, hierarchy, views, iterations, DoR &middot; 4h</div></div></div>
+<div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:32px;text-align:center">T1</div><div><div style="font-weight:500">Actions 1-3</div><div class="sc-l">WSJF Calculator + Contributor Detector + Branch Check &middot; 3 days</div></div></div>
+<div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:32px;text-align:center">T2</div><div><div style="font-weight:500">Actions 4-6 + EDPA skills</div><div class="sc-l">Iteration Close + PI Close + Velocity + skill bundle deployment &middot; 2 days</div></div></div>
+<div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--or);width:32px;text-align:center">I1</div><div><div style="font-weight:500">Pilot iteration + calibration</div><div class="sc-l">First EDPA reports &middot; CW calibration &middot; End-to-end test &middot; 2 weeks</div></div></div>
+<div class="sc p" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--pk);width:32px;text-align:center">R1</div><div><div style="font-weight:500">Retro after 1st PI &#x2192; auto-calibration</div><div class="sc-l">Cadence 1/5 vs 2/10 &middot; CW accuracy &middot; Karpathy loop &middot; 1 day</div></div></div>
+</div>`,
+
+// 19: CLOSING
+`<div style="text-align:center;max-width:850px;margin:0 auto">
+<div class="s-tag fade">Conclusion</div>
+<div class="s-h1 fade d1" style="font-size:32px">Minimal investment, maximum impact</div>
+<div class="sg sg4 fade d2" style="margin-top:20px">
+<div class="sc g" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--gn)">1,520</div><div class="sc-l">CZK/month<br>15 people</div></div>
+<div class="sc a" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--ac2)">EDPA</div><div class="sc-l">No timesheets<br>Dual-view</div></div>
+<div class="sc c" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--cy)">4 Skills</div><div class="sc-l">26+ platforms<br>Composable</div></div>
+<div class="sc y" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--yl)">30</div><div class="sc-l">files in template<br>Instant</div></div>
+</div>
+<div class="qt fade d3" style="margin-top:20px;text-align:left">A person declares capacity.<br>The system identifies work items from delivery evidence.<br>Capacity is split proportionally. No timesheets. No Jira.<br>The agent automates it all.</div>
+<div class="fade d4" style="margin-top:20px">
+<div style="font-size:13px;color:var(--t2);margin-bottom:8px">Next steps:</div>
+<div class="sg sg4" style="max-width:700px;margin:0 auto;gap:6px">
+<div class="sc g" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--gn)">1. Management approval</div></div>
+<div class="sc c" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--cy)">2. CVUT IT communication</div></div>
+<div class="sc a" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--ac2)">3. Day 1: deployment</div></div>
+<div class="sc y" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--yl)">4. First PI</div></div>
+</div></div>
+<div class="fade d5" style="margin-top:16px;font-size:11px;color:var(--t3)">kashealth.cz &middot; EDPA v1.0.0 &middot; Medical Platform and Data e-shop &middot; CZ.01.01.01/01/24_062/0007440</div>
+</div>`
+];
+
+initSlideDeck(S);
+</script>
+</body>
+</html>

@@ -1,0 +1,567 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+<Layout title="EDPA v1.0.0 Methodology" lang="en">
+<div class="container section methodology-page">
+
+  <div class="page-header">
+    <div class="tag">Methodology</div>
+    <h1>EDPA — Evidence-Driven Proportional Allocation</h1>
+    <p class="subtitle">Deriving capacity from delivery evidence</p>
+    <p class="meta">Version 2.2 &middot; March 2026 &middot; Jaroslav Urbanek, Lead Architect</p>
+  </div>
+
+  <nav class="toc card accent">
+    <div class="toc-title">Contents</div>
+    <ol class="toc-list">
+      <li><a href="#summary">Summary</a></li>
+      <li><a href="#terminology">Terminology</a></li>
+      <li><a href="#architecture">Model architecture</a></li>
+      <li><a href="#hierarchy">Work item hierarchy</a></li>
+      <li><a href="#model">EDPA Model</a></li>
+      <li><a href="#dual-view">Dual-view</a></li>
+      <li><a href="#cadence">Cadence</a></li>
+      <li><a href="#learning-loop">Learning loop</a></li>
+      <li><a href="#github-implementation">GitHub implementation</a></li>
+      <li><a href="#reports">Reports and audit</a></li>
+      <li><a href="#assumptions">Assumptions and risks</a></li>
+      <li><a href="#comparison">Comparison</a></li>
+      <li><a href="#implementation-plan">Implementation plan</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1. Summary -->
+  <section id="summary">
+    <h2>1. Summary</h2>
+    <div class="quote">Time is not measured, it is derived. Nobody logs hours. Nobody fills out timesheets.</div>
+    <p>A person declares capacity for a period. The system identifies work items they demonstrably contributed to. Capacity is ex post proportionally split among relevant items based on Job Size and contribution level.</p>
+    <p>The result is a report that is a byproduct of delivery, not a separate administrative activity.</p>
+    <p>The model provides two complementary views of the same data:</p>
+    <ul>
+      <li><strong>Per-person view:</strong> how a person's capacity is distributed among their items &rarr; reports, timesheets</li>
+      <li><strong>Per-item view:</strong> how work on an item is distributed among people &rarr; cost allocation, audit per deliverable</li>
+    </ul>
+  </section>
+
+  <!-- 2. Terminology -->
+  <section id="terminology">
+    <h2>2. Terminology</h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Term</th><th>Definition</th><th>Configuration</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Iteration</strong></td><td>Delivery cycle. Stories are planned, delivered, and closed.</td><td>1w (AI-native) / 2w (classic)</td></tr>
+          <tr><td><strong>Planning Interval</strong></td><td>Planning cycle. Features are planned, coordinated, and evaluated.</td><td>5w (4+1 IP) / 10w (8+2 IP)</td></tr>
+          <tr><td><strong>IP Iteration</strong></td><td>Innovation &amp; Planning iteration at the end of PI.</td><td>Last iteration in PI</td></tr>
+          <tr><td><strong>Job Size (JS)</strong></td><td>Relative size estimate of a work item. Modified Fibonacci.</td><td>1, 2, 3, 5, 8, 13, 20</td></tr>
+          <tr><td><strong>WSJF</strong></td><td>Prioritization score: (BV + TC + RR) / JS</td><td>Independent per level</td></tr>
+          <tr><td><strong>CW</strong></td><td>Contribution Weight — degree of a person's involvement on an item. Independent per person.</td><td>0.15&ndash;1.0</td></tr>
+          <tr><td><strong>Evidence Score</strong></td><td>Raw sum of activity signals from GitHub. Detection layer.</td><td>Automatic</td></tr>
+          <tr><td><strong>RS</strong></td><td>Relevance Signal — normalized signal derived from Evidence Score.</td><td>Automatic</td></tr>
+          <tr><td><strong>Derived Hours</strong></td><td>Derived hours, model output.</td><td>After Iteration Close</td></tr>
+        </tbody>
+      </table>
+      <div class="note">Evidence Score is the detection layer &rarr; Relevance Signal is the mathematical input &rarr; Contribution Weight is the share &rarr; Derived Hours are the output.</div>
+    </div>
+  </section>
+
+  <!-- 3. Model architecture -->
+  <section id="architecture">
+    <h2>3. Model architecture</h2>
+    <h3>3.1 Three separate layers</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Purpose</th><th>Where it lives</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="layer-operational"><strong>Operational Metadata</strong></td><td>Live delivery data</td><td>GitHub Issues + Projects</td></tr>
+          <tr><td class="layer-capacity"><strong>Capacity Registry</strong></td><td>People capacity, roles, FTE</td><td>YAML / JSON in repo</td></tr>
+          <tr><td class="layer-evidence"><strong>Evidence &amp; Reporting</strong></td><td>Frozen snapshots, reports, signatures</td><td>/snapshots, /reports, /signed</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>3.2 Source of truth</h3>
+    <p><strong>GitHub IS source of truth for:</strong> issue hierarchy, ownership, status, Job Size, WSJF inputs, review trail, delivery audit trail.</p>
+    <p><strong>GitHub IS NOT source of truth for:</strong> hourly capacity, FTE, derived hours, signature states. These live in the evidence layer.</p>
+  </section>
+
+  <!-- 4. Work item hierarchy -->
+  <section id="hierarchy">
+    <h2>4. Work item hierarchy</h2>
+    <div class="formula" style="white-space:pre;line-height:2;font-size:16px"><span class="wi-initiative"><b>Initiative</b></span> (entire project, business case)
+  └── <span class="wi-epic"><b>Epic</b></span> (strategic goal, 6-9 months)
+       └── <span class="wi-feature"><b>Feature</b></span> (must fit within a Planning Interval)
+            └── <span class="wi-story"><b>Story</b></span> (delivered in an Iteration)
+                 └── <span class="wi-task"><b>Task</b></span> (technical work, optional)</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--pk)"></div> Initiative</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--ac2)"></div> Epic</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--cy)"></div> Feature</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--gn)"></div> Story</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--yl)"></div> Task</div>
+    </div>
+    <p>Each level has its <strong>own independent Job Size and WSJF</strong>. Feature WSJF is not computed from Stories below it.</p>
+
+    <div class="card" style="margin-top:16px">
+      <table>
+        <thead>
+          <tr><th>Level</th><th>JS max</th><th>GitHub mapping</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="wi-epic"><b>Epic</b></td><td>20</td><td>Issue Type: Epic</td></tr>
+          <tr><td class="wi-feature"><b>Feature</b></td><td>13</td><td>Issue Type: Feature</td></tr>
+          <tr><td class="wi-story"><b>Story</b> (2/10)</td><td>8</td><td>Issue Type: Story</td></tr>
+          <tr><td class="wi-story"><b>Story</b> (1/5)</td><td>5</td><td>Issue Type: Story</td></tr>
+          <tr><td class="wi-task"><b>Task</b></td><td>&mdash;</td><td>Issue Type: Task</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:16px">Items above the limit are broken down. Granularity guardrails enforce reasonable granularity.</p>
+
+    <div class="formula"><strong>WSJF:</strong> (<span class="wsjf-bv">BV</span> + <span class="wsjf-tc">TC</span> + <span class="wsjf-rr">RR</span>) / <span class="wsjf-js">JS</span>
+<span class="wsjf-bv">BV</span> = Business Value, <span class="wsjf-tc">TC</span> = Time Criticality, <span class="wsjf-rr">RR</span> = Risk Reduction
+Computed per level independently.</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--gn)"></div> BV — Business Value</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--or)"></div> TC — Time Criticality</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--cy)"></div> RR — Risk Reduction</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--yl)"></div> JS — Job Size</div>
+    </div>
+  </section>
+
+  <!-- 5. EDPA Model -->
+  <section id="model">
+    <h2>5. Model: Evidence-Driven Proportional Allocation</h2>
+
+    <h3>5.1 Inputs</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Input</th><th>Source</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Capacity[P, I]</code></td><td>Confirmed at Iteration Planning</td><td>40h</td></tr>
+          <tr><td><code>RelevantItems[P, I]</code></td><td>Automatic from GitHub evidence</td><td>6 items across 3 levels</td></tr>
+          <tr><td><code>JobSize[item]</code></td><td>Custom field on issue</td><td>Fibonacci 1&ndash;20</td></tr>
+          <tr><td><code>CW[P, item]</code></td><td>From evidence / manual override</td><td>0.15&ndash;1.0</td></tr>
+          <tr><td><code>RS[P, item]</code></td><td>Normalized from Evidence Score</td><td>0.25&ndash;1.0</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>5.2 Evidence detection</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>GitHub signal</th><th style="text-align:right">Evidence Score</th><th style="text-align:right">Typical CW</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Issue assignee</td><td style="text-align:right">+4</td><td style="text-align:right;color:var(--gn)">1.0 (owner)</td></tr>
+          <tr><td>Explicit <code>/contribute</code> command</td><td style="text-align:right">+3</td><td style="text-align:right;color:var(--cy)">explicit</td></tr>
+          <tr><td>PR author referencing item</td><td style="text-align:right">+2</td><td style="text-align:right;color:var(--cy)">0.6 (key)</td></tr>
+          <tr><td>Commit author with ref in message</td><td style="text-align:right">+1</td><td style="text-align:right;color:var(--yl)">0.25 (reviewer)</td></tr>
+          <tr><td>PR reviewer</td><td style="text-align:right">+1</td><td style="text-align:right;color:var(--yl)">0.25 (reviewer)</td></tr>
+          <tr><td>Issue / PR comment</td><td style="text-align:right">+0.5</td><td style="text-align:right;color:var(--or)">0.15 (consulted)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li>Threshold: Evidence Score &ge; 1.0</li>
+      <li>Heuristic: strongest signal &rarr; default CW</li>
+      <li>Override: <code>/contribute @person weight:0.6</code></li>
+      <li>Commit count is not converted to time</li>
+    </ul>
+
+    <h3>5.3 Calculation — two variants</h3>
+    <div class="formula"><strong>Audit variant (Full):</strong>
+Score[P, item] = JobSize[item] &times; CW[P, item] &times; RS[P, item]
+DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
+    <div class="formula"><strong>Operational variant (Simple):</strong>
+Score[P, item] = JobSize[item] &times; CW[P, item]
+DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
+    <div class="note">Recommendation: start with the operational variant. Keep Evidence Score and RS in the snapshot for audit defense.</div>
+
+    <h3>5.4 Mathematical guarantee</h3>
+    <div class="formula">&Sigma; DerivedHours[P, item] = Capacity[P, I]
+
+The sum of derived hours exactly equals the person's capacity for the Iteration.
+Holds for both variants. Always. No exceptions.</div>
+  </section>
+
+  <!-- 6. Dual-view -->
+  <section id="dual-view">
+    <h2>6. Dual-view CW: two questions, one dataset</h2>
+    <p>CW = 0.25 for a reviewer can mean two things. These are two different questions — the model solves both from the same data:</p>
+
+    <div class="grid grid-2" style="margin-top:16px">
+      <div class="card green">
+        <div class="tag" style="color:var(--gn)">Per-person normalization</div>
+        <p><strong>Question:</strong> How is person P's capacity distributed among their items?</p>
+        <div class="formula">DerivedHours[P, item] = (Score[P, item] / &Sigma; Score[P, *]) &times; Capacity[P, I]
+
+Guarantee: &Sigma; DerivedHours[P, *] = Capacity</div>
+        <p class="meta">Output: report per person for audit</p>
+      </div>
+      <div class="card cyan">
+        <div class="tag" style="color:var(--cy)">Per-item normalization</div>
+        <p><strong>Question:</strong> How is work on item X distributed among people?</p>
+        <div class="formula">ItemShare[P, item] = DerivedHours[P, item] / &Sigma; DerivedHours[*, item]
+
+Guarantee: &Sigma; shares per item = 100 %</div>
+        <p class="meta">Output: cost card per deliverable</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <table>
+        <thead>
+          <tr><th>View</th><th>Question</th><th>Output</th><th>Guarantee</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Per-person</td><td>How many hours did P spend on what?</td><td>Report, audit</td><td style="color:var(--gn)">&Sigma; = capacity</td></tr>
+          <tr><td>Per-item</td><td>How many people and hours did item X cost?</td><td>Cost allocation</td><td style="color:var(--cy)">&Sigma; shares = 100%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 7. Cadence -->
+  <section id="cadence">
+    <h2>7. Cadence configuration</h2>
+    <div class="grid grid-2">
+      <div class="card yellow">
+        <div class="tag" style="color:var(--yl)">Variant A: Classic (2/10)</div>
+        <table>
+          <thead>
+            <tr><th>Cycle</th><th>Duration</th><th>1.0 FTE</th><th>0.5</th><th>0.25</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Iteration</td><td>2 weeks</td><td>80h</td><td>40h</td><td>20h</td></tr>
+            <tr><td>PI</td><td>10 weeks</td><td>400h</td><td>200h</td><td>100h</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card green">
+        <div class="tag" style="color:var(--gn)">Variant B: AI-Native (1/5)</div>
+        <table>
+          <thead>
+            <tr><th>Cycle</th><th>Duration</th><th>1.0 FTE</th><th>0.5</th><th>0.25</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Iteration</td><td>1 week</td><td>40h</td><td>20h</td><td>10h</td></tr>
+            <tr><td>PI</td><td>5 weeks</td><td>200h</td><td>100h</td><td>50h</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="note">Recommendation: start with A. After the first PI, evaluate transition to B based on velocity and lead time data.</div>
+  </section>
+
+  <!-- 8. Learning loop -->
+  <section id="learning-loop">
+    <h2>8. Learning loop</h2>
+    <div class="grid grid-2">
+      <div class="card green">
+        <div class="tag" style="color:var(--gn)">Velocity tracking</div>
+        <div class="formula">Story_Velocity = &Sigma; JS of closed Stories / iteration
+Feature_Velocity = &Sigma; JS of closed Features / PI
+Accuracy = Actual / Planned &times; 100 %</div>
+      </div>
+      <div class="card accent">
+        <div class="tag" style="color:var(--ac3)">Calibration</div>
+        <ul>
+          <li><strong>CW:</strong> After 2&ndash;3 iterations, evaluate the heuristic. PM underestimated? Arch overestimated?</li>
+          <li><strong>Job Size:</strong> Reference Story &ldquo;3&rdquo; &ne; Feature &ldquo;3&rdquo;. Independent per level.</li>
+          <li><strong>AI:</strong> You report time for delivery, not minutes of coding. AI &rarr; velocity, not report.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. GitHub implementation -->
+  <section id="github-implementation">
+    <h2>9. GitHub implementation</h2>
+
+    <h3>9.1 Custom fields</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Values</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Issue Type</td><td>Issue type</td><td>Initiative, Epic, Feature, Story, Task, Bug</td></tr>
+          <tr><td>Job Size</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
+          <tr><td>BV / TC / RR</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
+          <tr><td>WSJF Score</td><td>Number</td><td>Auto (Action)</td></tr>
+          <tr><td>Planning Interval</td><td>Iteration</td><td>5 or 10 weeks</td></tr>
+          <tr><td>Iteration</td><td>Iteration</td><td>1 or 2 weeks</td></tr>
+          <tr><td>Team</td><td>Single select</td><td>Team values</td></tr>
+          <tr><td>Primary Owner</td><td>Assignee</td><td>Accountable owner</td></tr>
+        </tbody>
+      </table>
+      <div class="note">What <strong>not to keep</strong> as a GitHub field: Capacity, Derived Hours, FTE, signature state &rarr; belong to the evidence layer.</div>
+    </div>
+
+    <h3>9.2 GitHub Actions</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Action</th><th>Trigger</th><th>Function</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td><strong>WSJF Calculator</strong></td><td>Field change</td><td>Auto WSJF calculation</td></tr>
+          <tr><td>2</td><td><strong>Contributor Detector</strong></td><td>PR merge / review</td><td>Contributor detection + evidence</td></tr>
+          <tr><td>3</td><td><strong>Iteration Close</strong></td><td>Manual dispatch</td><td>Snapshot + reports (MD/JSON/XLSX) + per-item</td></tr>
+          <tr><td>4</td><td><strong>PI Close</strong></td><td>Manual dispatch</td><td>Iteration aggregation</td></tr>
+          <tr><td>5</td><td><strong>Velocity Tracker</strong></td><td>Iter/PI close</td><td>Velocity JSON + dashboard</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>9.3 Branch naming &amp; DoR</h3>
+    <div class="formula" style="white-space:pre">feature/S-200-omop-parser
+bugfix/S-215-upload-validation
+feature/F-102-anon-engine</div>
+    <p>CI check blocks PRs without reference to an issue (<code>S-XXX</code>, <code>F-XXX</code>, <code>E-XXX</code>). DoR: Issue Type, Parent, Job Size, BV+TC+RR, Owner.</p>
+  </section>
+
+  <!-- 10. Reports and audit -->
+  <section id="reports">
+    <h2>10. Reports and audit</h2>
+
+    <h3>10.1 Pipeline</h3>
+    <div class="formula" style="white-space:pre">/snapshots/
+  iteration-PI-2026-1.3.json          &larr; frozen snapshot
+
+/reports/
+  iteration-PI-2026-1.3/
+    report-urbanek.md                  &larr; human-readable report
+    report-urbanek.json                &larr; machine data
+    summary.xlsx                       &larr; summary Excel
+    item-costs.xlsx                    &larr; per-item view
+
+/signed/
+  PI-2026-1.3-urbanek.pdf             &larr; BankID signed</div>
+
+    <h3>10.2 Freeze rule</h3>
+    <p>After Iteration Close: snapshot is <strong>frozen</strong>. Evidence is not overwritten in-place. Every correction is a new revision. Essential for audit defense.</p>
+
+    <h3>10.3 Audit principle</h3>
+    <p>Provability rests on 5 pillars:</p>
+    <ol class="audit-pillars">
+      <li>GitHub delivery evidence</li>
+      <li>Capacity registry (YAML)</li>
+      <li>Frozen snapshot (reproducible input)</li>
+      <li>Reproducible calculation (Score = JS &times; CW &times; RS)</li>
+      <li>Signed output (BankID, law 21/2020 Sb.)</li>
+    </ol>
+  </section>
+
+  <!-- 11. Assumptions and risks -->
+  <section id="assumptions">
+    <h2>11. Assumptions and risks</h2>
+    <div class="grid grid-2">
+      <div class="card green">
+        <div class="tag" style="color:var(--gn)">Assumptions</div>
+        <ul>
+          <li>All items are closed (undelivered items are moved)</li>
+          <li>Capacity confirmed at Iteration Planning</li>
+          <li>Branch naming enforced (CI check)</li>
+          <li>Job Size consistent per level</li>
+          <li>CW is calibrated after the first iterations</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="tag" style="color:var(--rd)">Risks</div>
+        <table>
+          <thead>
+            <tr><th>Risk</th><th>Mitigation</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Auditor rejects</td><td>Methodology + snapshots + BankID</td></tr>
+            <tr><td>CW mismatch</td><td>Override + calibration</td></tr>
+            <tr><td>Commit without S-/F-/E-XXX</td><td>CI check blocks PR</td></tr>
+            <tr><td>PM/Arch without commits</td><td>Comments + /contribute</td></tr>
+            <tr><td>0 items for a person</td><td>Process escalation</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12. Comparison -->
+  <section id="comparison">
+    <h2>12. Comparison with alternatives</h2>
+
+    <div class="grid grid-3" style="margin-bottom:20px">
+      <div class="card" style="border-left:3px solid var(--or)">
+        <h3 style="color:var(--or);margin-bottom:8px">Fixed Split v1</h3>
+        <p style="font-size:14px;color:var(--t2)">Pre-defined buckets (e.g., 60% Dev, 20% Arch, 20% QA). Hours are split fixedly by role, regardless of actual contribution. Simple, but inaccurate.</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--gn)">
+        <h3 style="color:var(--gn);margin-bottom:8px">EDPA v1.0.0</h3>
+        <p style="font-size:14px;color:var(--t2)">Evidence-Driven Proportional Allocation. Hours are derived automatically from GitHub delivery evidence (commits, PRs, reviews). Mathematical guarantee: &Sigma; = Capacity.</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--rd)">
+        <h3 style="color:var(--rd);margin-bottom:8px">Manual timesheets</h3>
+        <p style="font-size:14px;color:var(--t2)">Each team member manually fills in hours. Subjective, administratively demanding, has no per-item view, unauditable without additional evidence.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Property</th><th style="color:var(--or)">Fixed Split v1</th><th style="color:var(--gn)">EDPA v1.0.0</th><th style="color:var(--rd)">Manual timesheets</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Fixed buckets</td><td>Yes</td><td style="color:var(--gn)">No</td><td>No</td></tr>
+          <tr><td>Empty levels</td><td style="color:var(--rd)">Problem</td><td style="color:var(--gn)">Do not exist</td><td>N/A</td></tr>
+          <tr><td>Per-person view</td><td>Yes</td><td style="color:var(--gn)">Yes (primary)</td><td>Yes</td></tr>
+          <tr><td>Per-item view</td><td style="color:var(--rd)">No</td><td style="color:var(--gn)">Yes (dual-view)</td><td>No</td></tr>
+          <tr><td>Cross-functional</td><td>Limited</td><td style="color:var(--gn)">Full</td><td>Full</td></tr>
+          <tr><td>Automation</td><td>Medium</td><td style="color:var(--gn)">High</td><td style="color:var(--rd)">None</td></tr>
+          <tr><td>Math. guarantee</td><td>Complex</td><td style="color:var(--gn)">Native</td><td style="color:var(--rd)">No</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 13. Implementation plan -->
+  <section id="implementation-plan">
+    <h2>13. Implementation plan</h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Phase</th><th>Time</th><th>Contents</th></tr>
+        </thead>
+        <tbody>
+          <tr><td style="color:var(--gn)"><strong>Day 1</strong></td><td>6h</td><td>GitHub org, Projects setup, custom fields</td></tr>
+          <tr><td style="color:var(--cy)"><strong>Week 1</strong></td><td>3 days</td><td>Actions 1&ndash;2 (WSJF + Contributor Detector)</td></tr>
+          <tr><td style="color:var(--ac2)"><strong>Week 2</strong></td><td>2 days</td><td>Actions 3&ndash;5 (Iteration Close + PI Close + Velocity)</td></tr>
+          <tr><td style="color:var(--yl)"><strong>Iteration 1</strong></td><td>1&ndash;2w</td><td>Pilot operation, first reports, CW calibration</td></tr>
+          <tr><td style="color:var(--or)"><strong>Retro PI 1</strong></td><td>1 day</td><td>Cadence, CW accuracy, velocity, dual-view validation</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+</Layout>
+
+<style>
+  .methodology-page {
+    padding-bottom: 40px;
+  }
+  .page-header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--bd);
+    margin-bottom: 40px;
+  }
+  .page-header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--ac), var(--cy));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-top: 8px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: var(--t2);
+    font-style: italic;
+    margin-top: 4px;
+  }
+  .meta {
+    font-size: 11px;
+    color: var(--t3);
+    margin-top: 6px;
+  }
+
+  .toc {
+    margin-bottom: 48px;
+  }
+  .toc-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--t3);
+    margin-bottom: 12px;
+  }
+  .toc-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 24px;
+    padding-left: 20px;
+    font-size: 13px;
+  }
+  .toc-list a {
+    color: var(--t2);
+  }
+  .toc-list a:hover {
+    color: var(--ac2);
+  }
+
+  section {
+    margin-bottom: 48px;
+    scroll-margin-top: 72px;
+  }
+  h2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--t1);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--bd);
+  }
+  h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ac3);
+    margin: 24px 0 12px;
+  }
+  p {
+    font-size: 14px;
+    color: var(--t2);
+    margin-bottom: 8px;
+    line-height: 1.7;
+  }
+  ul, ol {
+    font-size: 14px;
+    color: var(--t2);
+    padding-left: 20px;
+    margin: 8px 0;
+  }
+  li {
+    margin-bottom: 4px;
+    line-height: 1.6;
+  }
+
+  .layer-operational { color: var(--ac2); }
+  .layer-capacity { color: var(--cy); }
+  .layer-evidence { color: var(--gn); }
+
+  .audit-pillars {
+    padding-left: 24px;
+  }
+  .audit-pillars li {
+    margin-bottom: 6px;
+  }
+
+  @media (max-width: 768px) {
+    .toc-list {
+      grid-template-columns: 1fr;
+    }
+    .page-header h1 {
+      font-size: 18px;
+    }
+  }
+</style>
