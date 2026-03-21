@@ -27,5 +27,9 @@ const { title, description = 'EDPA v1.0.0 — Evidence-Driven Proportional Alloc
     <slot />
   </main>
   <Footer />
+  <script>
+    import { inject } from '@vercel/analytics';
+    inject();
+  </script>
 </body>
 </html>
