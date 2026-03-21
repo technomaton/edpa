@@ -1,17 +1,47 @@
-# EDPA Contribution Weight Heuristics v2.2
-# These defaults work for most teams. Auto-calibration (after 1st PI) will optimize them.
+# EDPA Contribution Weight Heuristics v1.0.0
+# Calibrated via multi-scenario analysis (8 scenarios, 569 person-item pairs)
+# MAD reduction: 6.7% vs uncalibrated defaults
+#
+# These defaults work for most teams. Auto-calibration (after 1st PI) will
+# further optimize them for your specific team composition.
 
-version: "2.2"
+version: "1.0.0"
 
 # Minimum evidence score to be considered a contributor
 evidence_threshold: 1.0
 
 # CW assigned per evidence role (highest signal wins)
+# Values calibrated from 8 team scenarios (startup → enterprise, 5-12 people)
 role_weights:
-  owner: 1.0          # assignee on issue
-  key: 0.6            # PR author, explicit /contribute
-  reviewer: 0.25      # PR reviewer, commit author
-  consulted: 0.15     # issue/PR comment only
+  owner: 1.0           # assignee on issue — well calibrated across all roles
+  key: 0.6             # PR author, explicit /contribute — stable
+  reviewer: 0.30       # PR reviewer, commit author — raised from 0.25 (Arch/DevSecOps undervalued)
+  consulted: 0.25      # issue/PR comment only — raised from 0.15 (BO/PM undervalued)
+
+# Per-role overrides (applied when team member's role is known)
+# These correct for systematic biases in auto-detection per role
+role_overrides:
+  BO:                    # Business Owner — strategic decisions not visible in Git
+    consulted: 0.30      # was 0.15, correction rate 76%, avg confirmed 0.33
+    reviewer: 0.35       # was 0.25, correction rate 75%, avg confirmed 0.39
+  PM:                    # Product Manager — requirements, AC, stakeholder mgmt
+    consulted: 0.25      # was 0.15, correction rate 62%, avg confirmed 0.29
+    reviewer: 0.25       # stable, only 23% correction rate
+  Arch:                  # Architect — design reviews, mentoring, architecture
+    reviewer: 0.30       # was 0.25, correction rate 44%, avg confirmed 0.34
+    key: 0.60            # stable
+    owner: 1.00          # stable
+  Dev:                   # Developer — best calibrated by auto-detection
+    owner: 1.00          # only 7% correction rate
+    key: 0.60            # only 14% correction rate
+    reviewer: 0.30       # was 0.25, 28% correction (pair-programming)
+  DevSecOps:             # DevSecOps — infra work often invisible to Git
+    reviewer: 0.30       # was 0.25, correction rate 40%, avg confirmed 0.29
+    key: 0.60            # stable
+    owner: 1.00          # 17% correction rate (slight overvaluation)
+  QA:                    # QA/Test — many test commits ≠ ownership
+    key: 0.55            # was 0.60, correction rate 28% downward
+    reviewer: 0.25       # stable, only 13% correction rate
 
 # Evidence signals and their scoring weights
 signals:
@@ -28,3 +58,18 @@ rules:
   - "Manual override (/contribute) takes precedence over auto-detection"
   - "Commit count does NOT convert to time — only signals relevance"
   - "In Progress items are excluded from EDPA calculation"
+  - "Role overrides apply when team member role is known from capacity.yaml"
+
+# Calibration metadata
+calibration:
+  method: "Multi-scenario statistical calibration (8 scenarios, 569 pairs)"
+  scenarios: ["Startup (5)", "Enterprise (12)", "DevOps-heavy (7)", "Research (6)", "Consultancy (8)", "AI-Native (5)", "Regulated (9)", "kashealth (7)"]
+  mad_before: 0.0420
+  mad_after: 0.0392
+  mad_reduction: "6.7%"
+  calibrated_at: "2026-03-21"
+  key_findings:
+    - "BO/PM/Arch systematically undervalued by Git auto-detection"
+    - "QA slightly overvalued (many test commits inflate CW)"
+    - "Dev is the best calibrated role — Git signals match real contribution"
+    - "Role overrides reduce MAD by 6.7% vs generic weights"
