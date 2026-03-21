@@ -179,12 +179,13 @@ td {
 .badge-yellow { background: rgba(251, 191, 36, 0.12); color: var(--yl); }
 .badge-red { background: rgba(248, 113, 113, 0.12); color: var(--rd); }
 .badge-cyan { background: rgba(34, 211, 238, 0.12); color: var(--cy); }
+.badge-orange { background: rgba(249, 115, 22, 0.12); color: var(--or); }
 
 /* Work item hierarchy colors */
 .wi-initiative { color: var(--pk); }
 .wi-epic { color: var(--ac2); }
 .wi-feature { color: var(--cy); }
-.wi-story { color: var(--gn); }
+.wi-story { color: var(--or); }
 .wi-task { color: var(--yl); }
 
 /* WSJF component colors */
