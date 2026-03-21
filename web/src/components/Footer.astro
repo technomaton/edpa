@@ -1,0 +1,43 @@
+---
+---
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-left">
+      <span class="footer-brand">EDPA v2.2</span>
+      <span class="footer-sep">&middot;</span>
+      <span>Evidence-Driven Proportional Allocation</span>
+    </div>
+    <div class="footer-right">
+      <a href="https://github.com/technomaton-group/edpa" class="footer-link">GitHub</a>
+      <span class="footer-sep">&middot;</span>
+      <span>MIT License</span>
+      <span class="footer-sep">&middot;</span>
+      <span>TECHNOMATON Group</span>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-top: 1px solid var(--bd);
+    padding: 20px 0;
+    margin-top: 80px;
+    font-size: 11px;
+    color: var(--t3);
+  }
+  .footer-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-brand {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+  .footer-sep { margin: 0 6px; }
+  .footer-link { color: var(--t3); }
+  .footer-link:hover { color: var(--ac2); }
+  @media (max-width: 768px) {
+    .footer-inner { flex-direction: column; gap: 8px; text-align: center; }
+  }
+</style>
