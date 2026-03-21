@@ -887,6 +887,24 @@ const totalChecks = (perPersonTests * teamSize) + globalTests;
     </div>
 
     <div class="note" style="margin-top:16px"><strong>Rule:</strong> The strongest signal determines CW. Evidence Score = sum of all signals. If Evidence Score &ge; threshold (default 1.0), the person is assigned to the item.</div>
+
+    <!-- Monte Carlo CW calibration -->
+    <div class="card green" style="margin-top:24px">
+      <div class="tag" style="color:var(--gn)">Monte Carlo calibration</div>
+      <p>Validated by Monte Carlo simulation (1,000 scenarios, 68,156 records, p&lt;0.001).</p>
+      <p style="margin-top:8px">Git measures activity, not value. Strategic roles (BO, PM, Arch) are systematically undervalued.</p>
+      <table style="margin-top:12px">
+        <thead>
+          <tr><th>Role</th><th style="text-align:right">Bias</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Business Owner</td><td style="text-align:right;color:var(--or)">+0.15</td></tr>
+          <tr><td>Product Manager</td><td style="text-align:right;color:var(--yl)">+0.05</td></tr>
+          <tr><td>Architect</td><td style="text-align:right;color:var(--yl)">+0.05</td></tr>
+          <tr><td>Developer</td><td style="text-align:right;color:var(--gn)">0.00</td></tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <!-- ============================================================

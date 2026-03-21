@@ -42,7 +42,7 @@ export const iterations: Iteration[] = [
 export const items: WorkItem[] = [
   // Epics
   { id: 'E-1', title: 'User Management', level: 'Epic', js: 13, bv: 13, tc: 8, rr: 5, parentId: null, status: 'Active', iteration: null, contributions: [
-    { personId: 'alice', cw: 0.25, rs: 1 }, { personId: 'eve', cw: 0.50, rs: 1 }, { personId: 'bob', cw: 0.15, rs: 0.6 }
+    { personId: 'alice', cw: 0.30, rs: 1 }, { personId: 'eve', cw: 0.50, rs: 1 }, { personId: 'bob', cw: 0.15, rs: 0.6 }
   ]},
   { id: 'E-2', title: 'Billing & Subscriptions', level: 'Epic', js: 8, bv: 8, tc: 13, rr: 8, parentId: null, status: 'Active', iteration: null, contributions: [
     { personId: 'alice', cw: 0.20, rs: 0.8 }, { personId: 'eve', cw: 0.55, rs: 1 }, { personId: 'frank', cw: 0.15, rs: 0.5 }
@@ -66,7 +66,7 @@ export const items: WorkItem[] = [
 
   // Stories PI-2026-1.1 (all Done)
   { id: 'S-100', title: 'JWT auth implementation', level: 'Story', js: 8, bv: 8, tc: 5, rr: 3, parentId: 'F-10', status: 'Done', iteration: 'PI-2026-1.1', contributions: [
-    { personId: 'bob', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.25, rs: 0.8 }
+    { personId: 'bob', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.30, rs: 0.8 }
   ]},
   { id: 'S-101', title: 'OAuth2 integration', level: 'Story', js: 5, bv: 5, tc: 3, rr: 2, parentId: 'F-10', status: 'Done', iteration: 'PI-2026-1.1', contributions: [
     { personId: 'bob', cw: 1, rs: 1 }, { personId: 'dave', cw: 0.6, rs: 1 }
@@ -92,10 +92,10 @@ export const items: WorkItem[] = [
     { personId: 'carol', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.6, rs: 0.8 }
   ]},
   { id: 'S-108', title: 'Plan upgrade flow', level: 'Story', js: 3, bv: 3, tc: 3, rr: 2, parentId: 'F-21', status: 'Done', iteration: 'PI-2026-1.2', contributions: [
-    { personId: 'carol', cw: 1, rs: 1 }, { personId: 'eve', cw: 0.25, rs: 0.5 }
+    { personId: 'carol', cw: 1, rs: 1 }, { personId: 'eve', cw: 0.20, rs: 0.5 }
   ]},
   { id: 'S-109', title: 'CI/CD pipeline setup', level: 'Story', js: 5, bv: 5, tc: 5, rr: 3, parentId: 'F-10', status: 'Done', iteration: 'PI-2026-1.2', contributions: [
-    { personId: 'dave', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.25, rs: 0.6 }
+    { personId: 'dave', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.30, rs: 0.6 }
   ]},
 
   // Stories PI-2026-1.3 (all Done)
@@ -109,7 +109,7 @@ export const items: WorkItem[] = [
     { personId: 'bob', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.6, rs: 1 }, { personId: 'dave', cw: 0.15, rs: 0.5 }
   ]},
   { id: 'S-113', title: 'Rate limiting', level: 'Story', js: 3, bv: 3, tc: 3, rr: 5, parentId: 'F-11', status: 'Done', iteration: 'PI-2026-1.3', contributions: [
-    { personId: 'dave', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.25, rs: 0.6 }
+    { personId: 'dave', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.30, rs: 0.6 }
   ]},
   { id: 'S-114', title: 'E2E test suite', level: 'Story', js: 3, bv: 3, tc: 2, rr: 2, parentId: 'F-10', status: 'Done', iteration: 'PI-2026-1.3', contributions: [
     { personId: 'alice', cw: 1, rs: 1 }, { personId: 'bob', cw: 0.25, rs: 0.6 }
@@ -117,7 +117,7 @@ export const items: WorkItem[] = [
 
   // Stories PI-2026-1.4 (active iteration — mix Done + In Progress)
   { id: 'S-115', title: 'API documentation', level: 'Story', js: 2, bv: 2, tc: 1, rr: 1, parentId: 'F-10', status: 'Done', iteration: 'PI-2026-1.4', contributions: [
-    { personId: 'alice', cw: 1, rs: 1 }, { personId: 'eve', cw: 0.15, rs: 0.5 }
+    { personId: 'alice', cw: 1, rs: 1 }, { personId: 'eve', cw: 0.20, rs: 0.5 }
   ]},
   { id: 'S-116', title: 'Architecture review', level: 'Story', js: 3, bv: 3, tc: 2, rr: 3, parentId: 'F-11', status: 'Done', iteration: 'PI-2026-1.4', contributions: [
     { personId: 'alice', cw: 1, rs: 1 }, { personId: 'carol', cw: 0.25, rs: 0.6 }
@@ -137,7 +137,7 @@ export const items: WorkItem[] = [
 
   // Stories PI-2026-1.5 (IP — all Planned)
   { id: 'S-121', title: 'Tech debt cleanup', level: 'Story', js: 5, bv: 3, tc: 2, rr: 5, parentId: 'F-11', status: 'Planned', iteration: 'PI-2026-1.5', contributions: [
-    { personId: 'carol', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.25, rs: 0.6 }
+    { personId: 'carol', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.30, rs: 0.6 }
   ]},
   { id: 'S-122', title: 'Monitoring setup', level: 'Story', js: 3, bv: 3, tc: 3, rr: 3, parentId: 'F-20', status: 'Planned', iteration: 'PI-2026-1.5', contributions: [
     { personId: 'dave', cw: 1, rs: 1 }, { personId: 'frank', cw: 0.25, rs: 0.6 }

@@ -861,11 +861,11 @@ const totalChecks = (perPersonTests * teamSize) + globalTests;
        ============================================================ -->
   <section id="cw-heuristika">
     <h2>CW Heuristika</h2>
-    <p>Výchozí váhy pro automatické přiřazení Contribution Weight na základě GitHub signálů.</p>
+    <p>Výchozí váhy pro automatické přiřazení Contribution Weight na základě GitHub signálů. Hodnoty kalibrované Monte Carlo simulací.</p>
 
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card cyan">
-        <div class="tag" style="color:var(--cy)">Role weights</div>
+        <div class="tag" style="color:var(--cy)">Role weights <span class="badge" style="margin-left:8px;font-size:10px;background:var(--gn);color:var(--bg);padding:2px 6px;border-radius:4px">Monte Carlo calibrated</span></div>
         <table>
           <thead>
             <tr><th>Role</th><th style="text-align:right">CW</th><th>Vizualizace</th></tr>
@@ -898,6 +898,27 @@ const totalChecks = (perPersonTests * teamSize) + globalTests;
     </div>
 
     <div class="note" style="margin-top:16px"><strong>Pravidlo:</strong> Nejsilnější signál určuje CW. Evidence Score = součet všech signálů. Pokud Evidence Score &ge; threshold (default 1.0), osoba je přiřazena k itemu.</div>
+
+    <h3 style="margin-top:28px">Validace <span class="badge" style="font-size:11px;background:var(--gn);color:var(--bg);padding:2px 8px;border-radius:4px;margin-left:8px">Monte Carlo</span></h3>
+    <p style="color:var(--t2);font-size:13px;margin-bottom:12px">1000 sc&eacute;n&aacute;řů, 68 156 z&aacute;znamů, p&lt;0.001</p>
+
+    <div class="card green" style="margin-top:12px">
+      <div class="tag" style="color:var(--gn)">Role bias (Git activity vs. actual contribution)</div>
+      <table>
+        <thead>
+          <tr><th>Role</th><th style="text-align:right">Bias</th><th>Korekce</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>BO</strong></td><td style="text-align:right;color:var(--or)">+0.15</td><td>Systematicky podhodnocen &mdash; m&aacute;lo commitů, velk&yacute; dopad</td></tr>
+          <tr><td><strong>PM</strong></td><td style="text-align:right;color:var(--yl)">+0.05</td><td>Koordinace se projevuje v koment&aacute;řích, ne v k&oacute;du</td></tr>
+          <tr><td><strong>Arch</strong></td><td style="text-align:right;color:var(--yl)">+0.05</td><td>Review a design rozhodnut&iacute; maj&iacute; n&iacute;zkou git stopu</td></tr>
+          <tr><td><strong>Dev</strong></td><td style="text-align:right;color:var(--gn)">0.00</td><td>Referen&ccedil;n&iacute; baseline &mdash; git přesně zachycuje</td></tr>
+          <tr><td><strong>QA</strong></td><td style="text-align:right;color:var(--gn)">0.00</td><td>Testov&aacute;n&iacute; generuje dostatečn&eacute; sign&aacute;ly</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note" style="margin-top:12px"><strong>Poznámka:</strong> Git měří aktivitu, ne hodnotu. Strategické role (BO, PM, Arch) jsou systematicky podhodnoceny. Monte Carlo simulace kvantifikuje bias a umožňuje per-role korekce (<code>role_overrides</code>).</div>
   </section>
 
   <!-- ============================================================

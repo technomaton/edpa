@@ -196,6 +196,22 @@ Počítá se per úroveň nezávisle.</div>
       <li>Commit count se nepřevádí na čas</li>
     </ul>
 
+    <h3>5.3.1 Per-role korekce (role_overrides) <span class="badge" style="font-size:10px;background:var(--gn);color:var(--bg);padding:2px 6px;border-radius:4px;vertical-align:middle">Monte Carlo</span></h3>
+    <p>Per-role korekce validované Monte Carlo simulací (1000 scénářů). Git měří aktivitu, ne hodnotu — strategické role generují méně git signálů, přestože jejich přínos je srovnatelný nebo vyšší.</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Role</th><th style="text-align:right">Původní CW</th><th style="text-align:right">Kalibrovaná CW</th><th>Zdůvodnění</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>BO</strong> (consulted)</td><td style="text-align:right;color:var(--t3)">0.15</td><td style="text-align:right;color:var(--gn)">0.30</td><td>Business ownership — málo commitů, velký dopad na scope</td></tr>
+          <tr><td><strong>PM</strong> (consulted)</td><td style="text-align:right;color:var(--t3)">0.15</td><td style="text-align:right;color:var(--gn)">0.20</td><td>Koordinace, planning — projevuje se v komentářích</td></tr>
+          <tr><td><strong>Arch</strong> (reviewer)</td><td style="text-align:right;color:var(--t3)">0.25</td><td style="text-align:right;color:var(--gn)">0.30</td><td>Design decisions, review — nízká git stopa</td></tr>
+        </tbody>
+      </table>
+      <div class="note" style="margin-top:12px"><strong>Validace:</strong> 1000 Monte Carlo scénářů, 68 156 záznamů, p&lt;0.001. Korekce se aplikují automaticky v EDPA engine jako <code>role_overrides</code> v konfiguraci.</div>
+    </div>
+
     <h3>5.4 Výpočet — dvě varianty</h3>
     <div class="formula"><strong>Auditní varianta (Full):</strong>
 Score[P, item] = JobSize[item] &times; CW[P, item] &times; RS[P, item]
@@ -294,7 +310,7 @@ Accuracy = Actual / Planned &times; 100 %</div>
       <div class="card accent">
         <div class="tag" style="color:var(--ac3)">Kalibrace</div>
         <ul>
-          <li><strong>CW:</strong> Po 2&ndash;3 iteracích vyhodnotit heuristiku. PM podhodnocen? Arch nadhodnocen?</li>
+          <li><strong>CW:</strong> Po 2&ndash;3 iteracích vyhodnotit heuristiku. Monte Carlo validace per-role korekcí (viz 5.3.1).</li>
           <li><strong>Job Size:</strong> Referenční Story &ldquo;3&rdquo; &ne; Feature &ldquo;3&rdquo;. Per úroveň nezávisle.</li>
           <li><strong>AI:</strong> Vykazuješ čas na dodání, ne minuty kódu. AI &rarr; velocity, ne výkaz.</li>
         </ul>

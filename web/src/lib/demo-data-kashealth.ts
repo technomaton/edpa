@@ -65,10 +65,10 @@ export const items: WorkItem[] = [
     { personId: 'urbanek', cw: 0.35, rs: 1 }, { personId: 'turyna', cw: 0.35, rs: 1 }, { personId: 'd1', cw: 0.30, rs: 0.8 }
   ]},
   { id: 'F-110', title: 'Katalog datasetu', level: 'Feature', js: 8, bv: 8, tc: 8, rr: 3, parentId: 'E-11', status: 'Active', iteration: null, contributions: [
-    { personId: 'matousek', cw: 0.45, rs: 1 }, { personId: 'd2', cw: 0.40, rs: 1 }, { personId: 'pm', cw: 0.15, rs: 0.5 }
+    { personId: 'matousek', cw: 0.45, rs: 1 }, { personId: 'd2', cw: 0.40, rs: 1 }, { personId: 'pm', cw: 0.20, rs: 0.5 }
   ]},
   { id: 'F-111', title: 'Objednavkovy system', level: 'Feature', js: 5, bv: 5, tc: 13, rr: 5, parentId: 'E-11', status: 'Active', iteration: null, contributions: [
-    { personId: 'd1', cw: 0.40, rs: 1 }, { personId: 'd2', cw: 0.35, rs: 0.8 }, { personId: 'pm', cw: 0.25, rs: 0.8 }
+    { personId: 'd1', cw: 0.40, rs: 1 }, { personId: 'd2', cw: 0.35, rs: 0.8 }, { personId: 'pm', cw: 0.20, rs: 0.8 }
   ]},
   { id: 'F-120', title: 'FHIR bridge', level: 'Feature', js: 8, bv: 5, tc: 5, rr: 13, parentId: 'E-12', status: 'Active', iteration: null, contributions: [
     { personId: 'tuma', cw: 0.40, rs: 1 }, { personId: 'do', cw: 0.45, rs: 1 }, { personId: 'urbanek', cw: 0.15, rs: 0.5 }
@@ -76,10 +76,10 @@ export const items: WorkItem[] = [
 
   // Stories PI-2026-1.1 (all Done)
   { id: 'S-200', title: 'OMOP parser impl.', level: 'Story', js: 8, bv: 8, tc: 5, rr: 3, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.1', contributions: [
-    { personId: 'turyna', cw: 1, rs: 1 }, { personId: 'tuma', cw: 0.6, rs: 1 }, { personId: 'urbanek', cw: 0.25, rs: 0.8 }
+    { personId: 'turyna', cw: 1, rs: 1 }, { personId: 'tuma', cw: 0.6, rs: 1 }, { personId: 'urbanek', cw: 0.30, rs: 0.8 }
   ]},
   { id: 'S-201', title: 'Unit testy OMOP', level: 'Story', js: 5, bv: 5, tc: 3, rr: 2, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.1', contributions: [
-    { personId: 'turyna', cw: 1, rs: 1 }, { personId: 'urbanek', cw: 0.25, rs: 0.6 }
+    { personId: 'turyna', cw: 1, rs: 1 }, { personId: 'urbanek', cw: 0.30, rs: 0.6 }
   ]},
   { id: 'S-202', title: 'OMOP validace schemat', level: 'Story', js: 3, bv: 3, tc: 2, rr: 2, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.1', contributions: [
     { personId: 'tuma', cw: 1, rs: 1 }, { personId: 'turyna', cw: 0.25, rs: 0.6 }
@@ -99,7 +99,7 @@ export const items: WorkItem[] = [
     { personId: 'urbanek', cw: 1, rs: 1 }, { personId: 'turyna', cw: 0.6, rs: 1 }, { personId: 'd1', cw: 0.15, rs: 0.5 }
   ]},
   { id: 'S-207', title: 'K-anonymity algoritmus', level: 'Story', js: 5, bv: 5, tc: 5, rr: 3, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.2', contributions: [
-    { personId: 'turyna', cw: 1, rs: 1 }, { personId: 'urbanek', cw: 0.25, rs: 0.8 }
+    { personId: 'turyna', cw: 1, rs: 1 }, { personId: 'urbanek', cw: 0.30, rs: 0.8 }
   ]},
   { id: 'S-208', title: 'Anonymizace testy', level: 'Story', js: 3, bv: 3, tc: 3, rr: 2, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.2', contributions: [
     { personId: 'd1', cw: 1, rs: 1 }, { personId: 'turyna', cw: 0.25, rs: 0.6 }
@@ -116,7 +116,7 @@ export const items: WorkItem[] = [
     { personId: 'matousek', cw: 1, rs: 1 }
   ]},
   { id: 'S-212', title: 'Objednavka workflow', level: 'Story', js: 5, bv: 5, tc: 8, rr: 3, parentId: 'F-111', status: 'Done', iteration: 'PI-2026-1.3', contributions: [
-    { personId: 'd1', cw: 1, rs: 1 }, { personId: 'd2', cw: 0.6, rs: 0.8 }, { personId: 'pm', cw: 0.15, rs: 0.5 }
+    { personId: 'd1', cw: 1, rs: 1 }, { personId: 'd2', cw: 0.6, rs: 0.8 }, { personId: 'pm', cw: 0.20, rs: 0.5 }
   ]},
   { id: 'S-213', title: 'Objednavka notifikace', level: 'Story', js: 3, bv: 3, tc: 3, rr: 2, parentId: 'F-111', status: 'Done', iteration: 'PI-2026-1.3', contributions: [
     { personId: 'd2', cw: 1, rs: 1 }, { personId: 'd1', cw: 0.25, rs: 0.6 }
@@ -139,7 +139,7 @@ export const items: WorkItem[] = [
     { personId: 'urbanek', cw: 1, rs: 1 }, { personId: 'tuma', cw: 0.15, rs: 0.5 }
   ]},
   { id: 'S-219', title: 'Architektura review', level: 'Story', js: 3, bv: 3, tc: 2, rr: 3, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.4', contributions: [
-    { personId: 'urbanek', cw: 1, rs: 1 }, { personId: 'turyna', cw: 0.25, rs: 0.6 }, { personId: 'pm', cw: 0.15, rs: 0.5 }
+    { personId: 'urbanek', cw: 1, rs: 1 }, { personId: 'turyna', cw: 0.25, rs: 0.6 }, { personId: 'pm', cw: 0.20, rs: 0.5 }
   ]},
   { id: 'S-220', title: 'Performance testy', level: 'Story', js: 5, bv: 5, tc: 3, rr: 3, parentId: 'F-111', status: 'Done', iteration: 'PI-2026-1.4', contributions: [
     { personId: 'd1', cw: 1, rs: 1 }, { personId: 'tuma', cw: 0.25, rs: 0.6 }
@@ -159,7 +159,7 @@ export const items: WorkItem[] = [
 
   // Stories PI-2026-1.5 (IP -- all Planned)
   { id: 'S-225', title: 'Anon edge cases', level: 'Story', js: 5, bv: 5, tc: 5, rr: 5, parentId: 'F-102', status: 'Planned', iteration: 'PI-2026-1.5', contributions: [
-    { personId: 'turyna', cw: 1, rs: 1 }, { personId: 'urbanek', cw: 0.25, rs: 0.8 }
+    { personId: 'turyna', cw: 1, rs: 1 }, { personId: 'urbanek', cw: 0.30, rs: 0.8 }
   ]},
   { id: 'S-226', title: 'Monitoring setup', level: 'Story', js: 3, bv: 3, tc: 3, rr: 3, parentId: 'F-120', status: 'Planned', iteration: 'PI-2026-1.5', contributions: [
     { personId: 'do', cw: 1, rs: 1 }, { personId: 'tuma', cw: 0.25, rs: 0.6 }

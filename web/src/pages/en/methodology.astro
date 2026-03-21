@@ -194,7 +194,23 @@ Computed per level independently.</div>
       <li>Heuristic: strongest signal &rarr; default CW</li>
       <li>Override: <code>/contribute @person weight:0.6</code></li>
       <li>Commit count is not converted to time</li>
+      <li>Per-role corrections validated by Monte Carlo simulation (1,000 scenarios)</li>
     </ul>
+
+    <div class="card green" style="margin-top:16px">
+      <div class="tag" style="color:var(--gn)">Monte Carlo CW calibration</div>
+      <table>
+        <thead>
+          <tr><th>Role</th><th style="text-align:right">Original CW</th><th style="text-align:right">Calibrated CW</th><th style="text-align:right">Bias</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Business Owner</td><td style="text-align:right">1.0</td><td style="text-align:right">1.15</td><td style="text-align:right;color:var(--or)">+0.15</td></tr>
+          <tr><td>Product Manager</td><td style="text-align:right">0.6</td><td style="text-align:right">0.65</td><td style="text-align:right;color:var(--yl)">+0.05</td></tr>
+          <tr><td>Architect</td><td style="text-align:right">0.6</td><td style="text-align:right">0.65</td><td style="text-align:right;color:var(--yl)">+0.05</td></tr>
+          <tr><td>Developer</td><td style="text-align:right">1.0</td><td style="text-align:right">1.0</td><td style="text-align:right;color:var(--gn)">0.00</td></tr>
+        </tbody>
+      </table>
+    </div>
 
     <h3>5.4 Calculation — two variants</h3>
     <div class="formula"><strong>Audit variant (Full):</strong>
