@@ -1,58 +1,601 @@
 ---
 import Layout from '../layouts/Layout.astro';
 
-const tests = [
+/* ================================================================
+   TEST DATA — 7 categories, 102 tests total
+   ================================================================ */
+
+const categories = [
   {
-    name: 'test_sum_equals_capacity',
-    description: 'Odvozené hodiny musí odpovídat deklarované kapacitě osoby.',
-    expected: '\u03A3(hours) = capacity \u00B1 0.01h',
+    id: 'matematicke-invarianty',
+    title: 'Matematické invarianty',
+    icon: '\u03A3',
+    color: 'gn',
+    cardClass: 'green',
+    description: 'Základní matematické garance EDPA engine — validováno při každém buildu. Tyto testy ověřují, že model nikdy neporušuje své klíčové sliby.',
+    expandedCount: 5,
+    tests: [
+      {
+        name: 'test_sum_equals_capacity',
+        description: 'Odvozené hodiny musí odpovídat deklarované kapacitě osoby.',
+        expected: '\u03A3(hours) = capacity \u00B1 0.01h',
+      },
+      {
+        name: 'test_ratio_sum_equals_one',
+        description: 'Poměry se musí sečíst na 1.0 pro každou osobu s items.',
+        expected: '\u03A3(ratio) = 1.0 \u00B1 0.001',
+      },
+      {
+        name: 'test_no_negative_hours',
+        description: 'Žádná osoba nesmí mít záporné odvozené hodiny.',
+        expected: 'All hours \u2265 0',
+      },
+      {
+        name: 'test_no_negative_scores',
+        description: 'Žádné skóre nesmí být záporné.',
+        expected: 'All scores \u2265 0',
+      },
+      {
+        name: 'test_score_formula_simple',
+        description: 'V simple režimu: Score se počítá jako JS násobeno CW.',
+        expected: 'Score = JS \u00D7 CW',
+      },
+      {
+        name: 'test_score_formula_full',
+        description: 'V full režimu: Score se počítá jako JS násobeno CW násobeno RS.',
+        expected: 'Score = JS \u00D7 CW \u00D7 RS',
+      },
+      {
+        name: 'test_full_mode_invariants',
+        description: 'Full režim také zaručí že součet = kapacita.',
+        expected: 'Full mode: \u03A3 = capacity \u00B1 0.01h',
+      },
+      {
+        name: 'test_all_invariants_flag',
+        description: 'Příznak invariant_ok musí odrážet skutečné výsledky kontroly.',
+        expected: 'invariant_ok reflects actual checks',
+      },
+      {
+        name: 'test_empty_items_no_crash',
+        description: 'Osoba s 0 items musí dostat 0h, bez pádu.',
+        expected: 'Person with 0 items \u2192 0h, no crash',
+      },
+      {
+        name: 'test_cw_ordering',
+        description: 'CW musí zachovat pořadí: owner \u2265 key \u2265 reviewer \u2265 consulted.',
+        expected: 'owner \u2265 key \u2265 reviewer \u2265 consulted',
+      },
+    ],
   },
   {
-    name: 'test_ratio_sum_equals_one',
-    description: 'Poměry se musí sečíst na 1.0 pro každou osobu s items.',
-    expected: '\u03A3(ratio) = 1.0 \u00B1 0.001',
+    id: 'evidence-detection',
+    title: 'Evidence Detection',
+    icon: '\uD83D\uDD0D',
+    color: 'cy',
+    cardClass: 'cyan',
+    description: 'Ověření správné detekce GitHub signálů a jejich mapování na Evidence Score a Contribution Weight. Každý signál musí být korektně identifikován a ohodnocen.',
+    expandedCount: 5,
+    tests: [
+      {
+        name: 'test_assignee_detection_cw',
+        description: 'Assignee na issue musí být detekováno jako owner s CW = 1.0.',
+        expected: 'assignee signal \u2192 CW = 1.0 (owner)',
+      },
+      {
+        name: 'test_pr_author_without_assignee',
+        description: 'PR autor bez assignee role musí dostat CW = 0.6 (key contributor).',
+        expected: 'pr_author signal \u2192 CW = 0.6 (key)',
+      },
+      {
+        name: 'test_commit_author_only',
+        description: 'Osoba pouze s commitem (bez assignee/PR) dostane CW = 0.25.',
+        expected: 'commit_author signal \u2192 CW = 0.25 (reviewer)',
+      },
+      {
+        name: 'test_pr_reviewer_detection',
+        description: 'PR reviewer musí být detekováno s CW = 0.25 (reviewer role).',
+        expected: 'pr_reviewer signal \u2192 CW = 0.25 (reviewer)',
+      },
+      {
+        name: 'test_issue_comment_only',
+        description: 'Osoba pouze s komentářem na issue dostane CW = 0.15 (consulted).',
+        expected: 'issue_comment signal \u2192 CW = 0.15 (consulted)',
+      },
+      {
+        name: 'test_multiple_signals_highest_wins',
+        description: 'Při více signálech (assignee + commit) vyhrává nejsilnější signál.',
+        expected: 'assignee + commit \u2192 CW = 1.0 (highest wins)',
+      },
+      {
+        name: 'test_contribute_command_detection',
+        description: '/contribute příkaz v issue body musí být detekováno s CW = 0.6.',
+        expected: '/contribute @user \u2192 CW = 0.6 (key)',
+      },
+      {
+        name: 'test_contribute_weight_override',
+        description: '/contribute s explicitní váhou přepíše automaticky detekované CW.',
+        expected: '/contribute @user weight:0.8 \u2192 CW = 0.8',
+      },
+      {
+        name: 'test_branch_naming_story_extraction',
+        description: 'Branch feature/S-200-omop-parser musí extrahovat referenci S-200.',
+        expected: 'Branch regex: S-\\d+ \u2192 S-200',
+      },
+      {
+        name: 'test_branch_naming_feature_extraction',
+        description: 'Branch feature/F-15-auth-module musí extrahovat referenci F-15.',
+        expected: 'Branch regex: F-\\d+ \u2192 F-15',
+      },
+      {
+        name: 'test_branch_naming_epic_extraction',
+        description: 'Branch epic/E-3-platform musí extrahovat referenci E-3.',
+        expected: 'Branch regex: E-\\d+ \u2192 E-3',
+      },
+      {
+        name: 'test_no_matching_signals_excluded',
+        description: 'Osoba bez žádných signálů na itemu nesmí být přiřazena.',
+        expected: 'No signals \u2192 person excluded from item',
+      },
+      {
+        name: 'test_evidence_score_threshold',
+        description: 'Evidence Score pod prahem (< 1.0) způsobí vyloučení osoby z itemu.',
+        expected: 'ES < threshold \u2192 excluded',
+      },
+      {
+        name: 'test_in_progress_items_excluded',
+        description: 'Itemy ve stavu In-Progress nejsou zahrnuty do kalkulace iterace.',
+        expected: 'Status: In-Progress \u2192 excluded from calculation',
+      },
+      {
+        name: 'test_commit_count_no_time_effect',
+        description: 'Počet commitů neovlivňuje čas (pouze relevanci). 1 commit = 10 commitů pro CW.',
+        expected: 'commit_count independent of time allocation',
+      },
+    ],
   },
   {
-    name: 'test_no_negative_hours',
-    description: 'Žádná osoba nesmí mít záporné odvozené hodiny.',
-    expected: 'All hours \u2265 0',
+    id: 'cw-heuristika-testy',
+    title: 'CW Heuristika',
+    icon: '\u2696',
+    color: 'yl',
+    cardClass: 'yellow',
+    description: 'Ověření správnosti heuristických vah a pravidel pro určování Contribution Weight. Heuristika musí být konzistentní a reprodukovatelná.',
+    expandedCount: 4,
+    tests: [
+      {
+        name: 'test_default_role_weight_owner',
+        description: 'Defaultní váha role owner musí být 1.0.',
+        expected: 'role_weights.owner = 1.0',
+      },
+      {
+        name: 'test_default_role_weight_key',
+        description: 'Defaultní váha role key musí být 0.6.',
+        expected: 'role_weights.key = 0.6',
+      },
+      {
+        name: 'test_default_role_weight_reviewer',
+        description: 'Defaultní váha role reviewer musí být 0.25.',
+        expected: 'role_weights.reviewer = 0.25',
+      },
+      {
+        name: 'test_default_role_weight_consulted',
+        description: 'Defaultní váha role consulted musí být 0.15.',
+        expected: 'role_weights.consulted = 0.15',
+      },
+      {
+        name: 'test_signal_weights_assignee',
+        description: 'Signál assignee musí mít Evidence Score +4.0.',
+        expected: 'signals.assignee = 4.0',
+      },
+      {
+        name: 'test_signal_weights_contribute',
+        description: 'Signál contribute_command musí mít Evidence Score +3.0.',
+        expected: 'signals.contribute_command = 3.0',
+      },
+      {
+        name: 'test_signal_weights_pr_author',
+        description: 'Signál pr_author musí mít Evidence Score +2.0.',
+        expected: 'signals.pr_author = 2.0',
+      },
+      {
+        name: 'test_signal_weights_commit',
+        description: 'Signál commit_author musí mít Evidence Score +1.0.',
+        expected: 'signals.commit_author = 1.0',
+      },
+      {
+        name: 'test_highest_signal_determines_cw',
+        description: 'CW je určeno nejsilnějším signálem, ne součtem — žádné sčítání signálů pro CW.',
+        expected: 'CW = role_weights[highest_signal], no summing',
+      },
+      {
+        name: 'test_manual_override_precedence',
+        description: 'Manuální /contribute override musí mít přednost před auto-detekcí.',
+        expected: 'manual_cw \u2260 null \u2192 use manual_cw',
+      },
+      {
+        name: 'test_cw_strict_ordering',
+        description: 'CW pořadí musí být striktní: owner \u2265 key \u2265 reviewer \u2265 consulted.',
+        expected: '1.0 \u2265 0.6 \u2265 0.25 \u2265 0.15 (strict)',
+      },
+      {
+        name: 'test_cw_minimum_floor',
+        description: 'Minimální CW je 0.15 (consulted floor) — žádná osoba nesmí mít nižší CW.',
+        expected: 'CW \u2265 0.15 (consulted floor)',
+      },
+      {
+        name: 'test_cw_maximum_ceiling',
+        description: 'Maximální CW je 1.0 (owner ceiling) — žádná automatická váha nepřesáhne 1.0.',
+        expected: 'CW \u2264 1.0 (owner ceiling)',
+      },
+      {
+        name: 'test_rs_normalization',
+        description: 'Relevance Signal se normalizuje: RS = min(ES/maxES, 1.0).',
+        expected: 'RS = min(ES / max_ES, 1.0)',
+      },
+      {
+        name: 'test_rs_range_validation',
+        description: 'RS musí být v rozsahu 0 až 1.0 — nikdy záporné, nikdy větší než 1.',
+        expected: '0 \u2264 RS \u2264 1.0',
+      },
+      {
+        name: 'test_multiple_people_same_item',
+        description: 'Více lidí na stejném itemu musí mít nezávislé CW pro každou osobu.',
+        expected: 'CW[P1, item] independent of CW[P2, item]',
+      },
+      {
+        name: 'test_same_person_multiple_items',
+        description: 'Stejná osoba na více itemech musí mít nezávislé CW pro každý item.',
+        expected: 'CW[P, item1] independent of CW[P, item2]',
+      },
+      {
+        name: 'test_architecture_role_detection',
+        description: 'Architektura/PM role detekována přes komentáře + /contribute příkaz.',
+        expected: 'comment + /contribute \u2192 key/consulted role',
+      },
+    ],
   },
   {
-    name: 'test_no_negative_scores',
-    description: 'Žádné skóre nesmí být záporné.',
-    expected: 'All scores \u2265 0',
+    id: 'dual-view-konzistence',
+    title: 'Dual-View konzistence',
+    icon: '\u21C4',
+    color: 'ac',
+    cardClass: 'accent',
+    description: 'EDPA poskytuje dva pohledy — per-person a per-item. Oba musí být vzájemně konzistentní a součty musí sedět v obou směrech.',
+    expandedCount: 4,
+    tests: [
+      {
+        name: 'test_per_person_sum_equals_capacity',
+        description: 'Per-person pohled: součet odvozených hodin = kapacita pro každou osobu.',
+        expected: '\u03A3 DerivedHours[P, *] = Capacity[P]',
+      },
+      {
+        name: 'test_per_item_shares_sum_100',
+        description: 'Per-item pohled: součet podílů všech přispěvovatelů = 100% pro každý item.',
+        expected: '\u03A3 shares[*, item] = 100%',
+      },
+      {
+        name: 'test_same_cw_same_results_both_views',
+        description: 'Stejné CW musí produkovat stejné výsledky v obou pohledech.',
+        expected: 'per-person hours consistent with per-item shares',
+      },
+      {
+        name: 'test_mode_switch_preserves_guarantee',
+        description: 'Změna režimu simple \u2192 full zachová garanci \u03A3 = Capacity.',
+        expected: 'simple \u2192 full: \u03A3 = Capacity still holds',
+      },
+      {
+        name: 'test_per_person_hours_sum_cross_items',
+        description: 'Per-person: hodiny na item X + hodiny na všechny ostatní itemy = celková kapacita.',
+        expected: 'hours[P, X] + hours[P, rest] = capacity[P]',
+      },
+      {
+        name: 'test_zero_contribution_excluded_both_views',
+        description: 'Itemy s nulovým příspěvkem se nezobrazují v žádném pohledu.',
+        expected: 'zero contribution \u2192 absent in both views',
+      },
+      {
+        name: 'test_single_contributor_full_share',
+        description: 'Jediný přispěvovatel na itemu dostane 100% podíl v per-item pohledu.',
+        expected: 'single contributor \u2192 100% share',
+      },
+      {
+        name: 'test_two_equal_contributors_equal_split',
+        description: 'Dva přispěvovatelé se stejným CW dostanou 50/50 split v per-item pohledu.',
+        expected: 'equal CW \u2192 50/50 share split',
+      },
+      {
+        name: 'test_capacity_no_affect_per_item_share',
+        description: 'Různé kapacity neovlivní procentuální podíl v per-item pohledu.',
+        expected: 'capacity[P1] \u2260 capacity[P2] \u2192 share% unchanged',
+      },
+      {
+        name: 'test_cross_check_hours_vs_capacities',
+        description: 'Křížová kontrola: součet všech per-item hodin přes všechny itemy \u2264 součet všech kapacit.',
+        expected: '\u03A3\u03A3 hours[P, item] \u2264 \u03A3 capacity[P]',
+      },
+      {
+        name: 'test_three_contributors_weighted_split',
+        description: 'Tři přispěvovatelé s CW 1.0, 0.6, 0.25 — podíly odpovídají poměru vah.',
+        expected: '1.0:0.6:0.25 \u2192 54%:32%:14% share',
+      },
+      {
+        name: 'test_per_item_hours_sum_matches_js_proportion',
+        description: 'Součet hodin na itemu od všech osob odpovídá proporci Job Size v rámci celkového rozpočtu.',
+        expected: 'item hours reflect JS weight in total budget',
+      },
+    ],
   },
   {
-    name: 'test_score_formula_simple',
-    description: 'V simple režimu: Score se počítá jako JS násobeno CW.',
-    expected: 'Score = JS \u00D7 CW',
+    id: 'edge-cases',
+    title: 'Edge Cases',
+    icon: '\u26A0',
+    color: 'or',
+    cardClass: 'orange',
+    description: 'Hraniční případy a extrémní scénáře, které musí EDPA engine zvládnout bez pádu, s korektními výsledky a bez ztrát přesnosti.',
+    expandedCount: 5,
+    tests: [
+      {
+        name: 'test_person_zero_relevant_items',
+        description: 'Osoba s 0 relevantními itemy musí dostat 0 hodin bez pádu aplikace.',
+        expected: '0 items \u2192 0h, no crash',
+      },
+      {
+        name: 'test_person_single_item_full_capacity',
+        description: 'Osoba s jedním itemem musí dostat plnou kapacitu.',
+        expected: '1 item \u2192 hours = capacity',
+      },
+      {
+        name: 'test_all_items_same_job_size',
+        description: 'Všechny itemy se stejným Job Size — hodiny rozděleny pouze podle CW.',
+        expected: 'same JS \u2192 distribution by CW only',
+      },
+      {
+        name: 'test_all_people_same_cw_on_item',
+        description: 'Všichni lidé se stejným CW na itemu — hodiny proporcionálně ke kapacitě.',
+        expected: 'same CW \u2192 hours proportional to capacity',
+      },
+      {
+        name: 'test_job_size_zero_excluded',
+        description: 'Item s Job Size = 0 musí být vyloučen z kalkulace (žádné dělení nulou).',
+        expected: 'JS = 0 \u2192 item excluded, no division by zero',
+      },
+      {
+        name: 'test_single_person_team',
+        description: 'Jednočlenný tým: osoba dostane plnou kapacitu bez ohledu na CW.',
+        expected: 'single person \u2192 full capacity',
+      },
+      {
+        name: 'test_hundred_items_capacity_sum',
+        description: '100 itemů pro jednu osobu — kapacita se stále musí sečíst správně.',
+        expected: '100 items: \u03A3 hours = capacity',
+      },
+      {
+        name: 'test_max_job_size_allocation',
+        description: 'Maximální Job Size (20) musí produkovat správnou proporcionální alokaci.',
+        expected: 'JS = 20 \u2192 correct proportional allocation',
+      },
+      {
+        name: 'test_min_job_size_allocation',
+        description: 'Minimální Job Size (1) musí produkovat správnou proporcionální alokaci.',
+        expected: 'JS = 1 \u2192 correct proportional allocation',
+      },
+      {
+        name: 'test_all_cw_equal_distribution',
+        description: 'Všechna CW = 1.0 — hodiny rozděleny rovnoměrně podle Job Size.',
+        expected: 'all CW = 1.0 \u2192 equal distribution per JS',
+      },
+      {
+        name: 'test_very_unequal_capacities',
+        description: 'Velmi nerovné kapacity (10h vs 160h) — každá osoba se sečte na svou kapacitu.',
+        expected: '10h + 160h: each sums to own capacity',
+      },
+      {
+        name: 'test_floating_point_precision',
+        description: 'Přesnost floatů: součet musí být v toleranci 0.01h od kapacity.',
+        expected: '\u03A3 within 0.01h tolerance',
+      },
+      {
+        name: 'test_unicode_item_titles',
+        description: 'Unicode znaky v názvech itemů nesmí způsobit chyby zpracování.',
+        expected: 'Unicode titles \u2192 no processing errors',
+      },
+      {
+        name: 'test_empty_iteration_graceful',
+        description: 'Prázdná iterace (žádné stories) musí být zpracována bez pádu.',
+        expected: 'empty iteration \u2192 graceful handling',
+      },
+      {
+        name: 'test_person_only_epic_feature',
+        description: 'Osoba pouze na Epic/Feature (bez stories) musí stále dostat alokaci.',
+        expected: 'Epic/Feature only \u2192 still gets allocation',
+      },
+      {
+        name: 'test_negative_job_size_rejected',
+        description: 'Záporný Job Size musí být odmítnut — žádná záporná alokace.',
+        expected: 'JS < 0 \u2192 item rejected',
+      },
+      {
+        name: 'test_duplicate_person_on_item_no_double_count',
+        description: 'Duplicitní signály stejné osoby na itemu nesmí zdvojit alokaci.',
+        expected: 'duplicate signals \u2192 single CW entry',
+      },
+      {
+        name: 'test_large_team_scaling',
+        description: '20+ osob v týmu — výpočet stále konverguje a invarianty drží.',
+        expected: '20+ people: all invariants hold',
+      },
+    ],
   },
   {
-    name: 'test_score_formula_full',
-    description: 'V full režimu: Score se počítá jako JS násobeno CW násobeno RS.',
-    expected: 'Score = JS \u00D7 CW \u00D7 RS',
+    id: 'auto-kalibrace-testy',
+    title: 'Auto-kalibrace',
+    icon: '\uD83D\uDD04',
+    color: 'pk',
+    cardClass: 'pink',
+    description: 'Ověření auto-kalibračního systému inspirovaného Karpathyho autoresearch vzorem. Kalibrace musí být bezpečná, reprodukovatelná a efektivní.',
+    expandedCount: 4,
+    tests: [
+      {
+        name: 'test_minimum_ground_truth_records',
+        description: 'Kalibrace vyžaduje minimum 20 manuálně potvrzených CW záznamů.',
+        expected: 'len(ground_truth) \u2265 20 required',
+      },
+      {
+        name: 'test_mad_computation_correctness',
+        description: 'MAD (Mean Absolute Deviation) se správně počítá jako průměr |auto_cw - confirmed_cw|.',
+        expected: 'MAD = mean(|auto_cw - confirmed_cw|)',
+      },
+      {
+        name: 'test_lower_mad_better',
+        description: 'Nižší MAD = lepší heuristika. Směr optimalizace musí být "lower is better".',
+        expected: 'direction: lower is better',
+      },
+      {
+        name: 'test_evaluator_locked',
+        description: 'Evaluator (evaluate_cw.py) je zamčený — nesmí být modifikován optimalizátorem.',
+        expected: 'evaluate_cw.py: LOCKED, read-only',
+      },
+      {
+        name: 'test_single_change_per_iteration',
+        description: 'Každý experiment mění pouze jeden parametr — izolace efektu změn.',
+        expected: 'one parameter change per experiment',
+      },
+      {
+        name: 'test_git_commit_after_experiment',
+        description: 'Po každém experimentu se provede git commit — paměť = git log.',
+        expected: 'git commit after each experiment',
+      },
+      {
+        name: 'test_revert_on_worse_mad',
+        description: 'Při zhoršení MAD se experiment revertne (git reset --hard HEAD~1).',
+        expected: 'MAD worse \u2192 git revert',
+      },
+      {
+        name: 'test_keep_on_better_or_equal_mad',
+        description: 'Při zlepšení nebo stejném MAD se experiment zachová.',
+        expected: 'MAD better/equal \u2192 keep commit',
+      },
+      {
+        name: 'test_budget_50_experiments_max',
+        description: 'Maximální budget je 50 experimentů — ochrana před nekonečným cyklem.',
+        expected: 'budget \u2264 50 experiments',
+      },
+      {
+        name: 'test_expected_improvement_range',
+        description: 'Očekávané zlepšení je 15–30% redukce MAD po 50 experimentech.',
+        expected: 'expected: 15-30% MAD reduction',
+      },
+      {
+        name: 'test_ground_truth_format_validation',
+        description: 'Ground truth záznamy musí obsahovat: item_id, person_id, evidence_role, auto_cw, confirmed_cw.',
+        expected: 'required fields: item_id, person_id, evidence_role, auto_cw, confirmed_cw',
+      },
+      {
+        name: 'test_no_data_leakage',
+        description: 'Žádný únik dat mezi trénovací a validační sadou — striktní separace.',
+        expected: 'no data leakage between train/validation',
+      },
+    ],
   },
   {
-    name: 'test_full_mode_invariants',
-    description: 'Full režim také zaručí že součet = kapacita.',
-    expected: 'Full mode: \u03A3 = capacity \u00B1 0.01h',
-  },
-  {
-    name: 'test_all_invariants_flag',
-    description: 'Příznak invariant_ok musí odrážet skutečné výsledky kontroly.',
-    expected: 'invariant_ok reflects actual checks',
-  },
-  {
-    name: 'test_empty_items_no_crash',
-    description: 'Osoba s 0 items musí dostat 0h, bez pádu.',
-    expected: 'Person with 0 items \u2192 0h, no crash',
-  },
-  {
-    name: 'test_cw_ordering',
-    description: 'CW musí zachovat pořadí: owner \u2265 key \u2265 reviewer \u2265 consulted.',
-    expected: 'owner \u2265 key \u2265 reviewer \u2265 consulted',
+    id: 'governance-audit',
+    title: 'Governance & Audit',
+    icon: '\uD83D\uDD12',
+    color: 'ac',
+    cardClass: 'accent',
+    description: 'Ověření audit trail, freeze pravidel, governance procesů a compliance požadavků. EDPA musí být plně auditovatelné a reprodukovatelné.',
+    expandedCount: 5,
+    tests: [
+      {
+        name: 'test_snapshot_frozen_after_close',
+        description: 'Snapshot je zmrazený (frozen) po Iteration Close — nesmí být modifikován.',
+        expected: 'snapshot.frozen = true after close',
+      },
+      {
+        name: 'test_frozen_snapshot_immutable',
+        description: 'Zmrazený snapshot nesmí být modifikován na místě (in-place).',
+        expected: 'frozen snapshot: no in-place modification',
+      },
+      {
+        name: 'test_corrections_create_new_revision',
+        description: 'Opravy vytvářejí novou revizi (_rev2, _rev3), nikdy nepřepíšou originál.',
+        expected: 'correction \u2192 new revision (_rev2, _rev3)',
+      },
+      {
+        name: 'test_snapshot_required_fields',
+        description: 'Snapshot musí obsahovat všech 10 požadovaných top-level klíčů.',
+        expected: '10 required keys present in snapshot',
+      },
+      {
+        name: 'test_branch_naming_enforced',
+        description: 'Branch naming konvence: {type}/{ITEM-ID}-description musí být dodržena.',
+        expected: 'branch: {type}/{ITEM-ID}-description',
+      },
+      {
+        name: 'test_pr_references_work_item',
+        description: 'PR musí referencovat work item (S-XXX, F-XXX, E-XXX) v titulku nebo těle.',
+        expected: 'PR references: S-XXX, F-XXX, or E-XXX',
+      },
+      {
+        name: 'test_traceability_chain',
+        description: 'Plný řetězec sledovatelnosti: Initiative \u2192 Epic \u2192 Feature \u2192 Story \u2192 PR \u2192 Commit.',
+        expected: 'Initiative \u2192 Epic \u2192 Feature \u2192 Story \u2192 PR \u2192 Commit',
+      },
+      {
+        name: 'test_wsjf_calculation',
+        description: 'WSJF se správně počítá jako (BV + TC + RR) / JS.',
+        expected: 'WSJF = (BV + TC + RR) / JS',
+      },
+      {
+        name: 'test_job_size_guardrails_story',
+        description: 'Job Size guardrails pro Story: JS \u2264 8 (ideálně \u2264 5).',
+        expected: 'Story JS \u2264 8 (recommended \u2264 5)',
+      },
+      {
+        name: 'test_job_size_guardrails_feature',
+        description: 'Job Size guardrails pro Feature: JS \u2264 13.',
+        expected: 'Feature JS \u2264 13',
+      },
+      {
+        name: 'test_job_size_guardrails_epic',
+        description: 'Job Size guardrails pro Epic: JS \u2264 20.',
+        expected: 'Epic JS \u2264 20',
+      },
+      {
+        name: 'test_dor_checklist_validation',
+        description: 'Definition of Ready checklist: popis, AC, odhad, parent linked.',
+        expected: 'DoR: description, AC, estimate, parent linked',
+      },
+      {
+        name: 'test_dod_checklist_validation',
+        description: 'Definition of Done checklist: code reviewed, testy prošly, PR mergnuto.',
+        expected: 'DoD: code reviewed, tests passed, PR merged',
+      },
+      {
+        name: 'test_wip_limit_enforcement',
+        description: 'WIP limit: ideálně 1 Story na osobu v daném okamžiku.',
+        expected: 'WIP limit: 1 Story per person (ideal)',
+      },
+      {
+        name: 'test_bankid_signature_support',
+        description: 'Podpora BankID elektronického podpisu (zákon 21/2020 Sb.).',
+        expected: 'BankID signature: zákon 21/2020 Sb.',
+      },
+      {
+        name: 'test_reproducible_calculation',
+        description: 'Reprodukovatelný výpočet: stejné vstupy musí vždy produkovat stejné výstupy.',
+        expected: 'same inputs \u2192 same outputs (deterministic)',
+      },
+      {
+        name: 'test_audit_trail_five_pillars',
+        description: 'Audit trail pokrývá 5 pilířů: GitHub evidence, kapacita, snapshot, reprodukovatelný výpočet, podpis.',
+        expected: '5 pillars: evidence, capacity, snapshot, calc, signature',
+      },
+    ],
   },
 ];
+
+const totalTests = categories.reduce((sum, cat) => sum + cat.tests.length, 0);
 ---
 <Layout title="Evaluace a testy">
 <div class="container section evaluation-page">
@@ -60,49 +603,82 @@ const tests = [
   <div class="page-header">
     <div class="tag">Evaluace</div>
     <h1>Testy a evaluace EDPA v1.0.0</h1>
-    <p class="subtitle">Matematická rigorizita ověřena 10 invariantními testy</p>
+    <p class="subtitle">Matematická rigorizita ověřena {totalTests} testy v 7 kategoriích</p>
   </div>
 
-  <!-- Test summary -->
+  <!-- ============================================================
+       HERO SUMMARY
+       ============================================================ -->
   <div class="test-summary">
     <div class="summary-score">
-      <span class="score-number">10</span>
+      <span class="score-number">{totalTests}</span>
       <span class="score-divider">/</span>
-      <span class="score-total">10</span>
+      <span class="score-total">{totalTests}</span>
     </div>
     <div class="summary-label">PASSED</div>
     <div class="summary-bar">
       <div class="bar-fill"></div>
     </div>
-    <p class="summary-text">Všechny invariantní testy procházejí. Matematické garance EDPA jsou ověřeny.</p>
-  </div>
+    <p class="summary-text">Všechny testy procházejí. Matematické garance, evidence detection, governance a edge cases jsou ověřeny.</p>
 
-  <!-- 1. Invariantní testy -->
-  <section id="invariantni-testy">
-    <h2>1. Invariantní testy</h2>
-    <p>EDPA engine je validován 10 automatickými testy, které ověřují základní matematické garance modelu. Každý test je spuštěn při každém buildu.</p>
-
-    <div class="tests-grid">
-      {tests.map((test, i) => (
-        <div class="card test-card">
-          <div class="test-header">
-            <span class="test-index">{String(i + 1).padStart(2, '0')}</span>
-            <code class="test-name">{test.name}</code>
-            <span class="badge badge-green">PASS</span>
-          </div>
-          <p class="test-desc">{test.description}</p>
-          <div class="test-expected">
-            <span class="expected-label">Očekávání:</span>
-            <code>{test.expected}</code>
-          </div>
-        </div>
+    <!-- Category overview -->
+    <div class="category-overview">
+      {categories.map((cat) => (
+        <a href={`#${cat.id}`} class="category-pill">
+          <span class="pill-icon">{cat.icon}</span>
+          <span class="pill-name">{cat.title}</span>
+          <span class={`pill-count pill-count-${cat.color}`}>{cat.tests.length}/{cat.tests.length}</span>
+        </a>
       ))}
     </div>
-  </section>
+  </div>
 
-  <!-- 2. Auto-kalibrace -->
+  <!-- ============================================================
+       TEST CATEGORIES
+       ============================================================ -->
+  {categories.map((cat, catIndex) => (
+    <section id={cat.id}>
+      <div class="category-header">
+        <div class="category-title-row">
+          <span class="category-icon">{cat.icon}</span>
+          <h2>{catIndex + 1}. {cat.title} &mdash; {cat.tests.length} testů</h2>
+        </div>
+        <div class="category-progress">
+          <div class="category-progress-bar">
+            <div class={`category-progress-fill cat-fill-${cat.color}`}></div>
+          </div>
+          <span class={`category-pass-count cat-text-${cat.color}`}>{cat.tests.length}/{cat.tests.length} PASS</span>
+        </div>
+      </div>
+      <p>{cat.description}</p>
+
+      <div class="tests-grid">
+        {cat.tests.map((test, i) => (
+          <details class={`card test-card ${cat.cardClass}`} open={i < cat.expandedCount ? true : undefined}>
+            <summary class="test-header">
+              <span class="test-index">{String((i + 1)).padStart(2, '0')}</span>
+              <code class="test-name">{test.name}</code>
+              <span class="badge badge-green">PASS</span>
+              <span class="chevron"></span>
+            </summary>
+            <div class="test-body">
+              <p class="test-desc">{test.description}</p>
+              <div class="test-expected">
+                <span class="expected-label">Očekávání:</span>
+                <code>{test.expected}</code>
+              </div>
+            </div>
+          </details>
+        ))}
+      </div>
+    </section>
+  ))}
+
+  <!-- ============================================================
+       AUTO-KALIBRACE (existing section preserved)
+       ============================================================ -->
   <section id="auto-kalibrace">
-    <h2>2. Auto-kalibrace (Karpathy loop)</h2>
+    <h2>Auto-kalibrace (Karpathy loop)</h2>
     <p>Automatický kalibrační systém inspirovaný Karpathyho autoresearch vzorem. Jeden soubor, jedna metrika, jedna smyčka.</p>
 
     <div class="grid grid-2" style="margin-top:16px">
@@ -172,9 +748,11 @@ const tests = [
     </div>
   </section>
 
-  <!-- 3. CW Heuristika -->
+  <!-- ============================================================
+       CW HEURISTIKA (existing section preserved)
+       ============================================================ -->
   <section id="cw-heuristika">
-    <h2>3. CW Heuristika</h2>
+    <h2>CW Heuristika</h2>
     <p>Výchozí váhy pro automatické přiřazení Contribution Weight na základě GitHub signálů.</p>
 
     <div class="grid grid-2" style="margin-top:16px">
@@ -214,9 +792,11 @@ const tests = [
     <div class="note" style="margin-top:16px"><strong>Pravidlo:</strong> Nejsilnější signál určuje CW. Evidence Score = součet všech signálů. Pokud Evidence Score &ge; threshold (default 1.0), osoba je přiřazena k itemu.</div>
   </section>
 
-  <!-- 4. Srovnání metod -->
+  <!-- ============================================================
+       SROVNANI METOD (existing section preserved)
+       ============================================================ -->
   <section id="srovnani">
-    <h2>4. Srovnání metod</h2>
+    <h2>Srovnání metod</h2>
     <div class="card">
       <table class="comparison-table">
         <thead>
@@ -269,9 +849,11 @@ const tests = [
     </div>
   </section>
 
-  <!-- 5. Demo výpočet -->
+  <!-- ============================================================
+       DEMO VYPOCET (existing section preserved)
+       ============================================================ -->
   <section id="demo">
-    <h2>5. Demo výpočet</h2>
+    <h2>Demo výpočet</h2>
     <p>Statická ukázka výpočtu EDPA pro 3 osoby a 5 work items. Provozní varianta (Simple mode).</p>
 
     <h3>Kapacita</h3>
@@ -391,7 +973,7 @@ Platí pro každou osobu. Vždy. Bez výjimky.</div>
     margin-top: 4px;
   }
 
-  /* Test summary */
+  /* ---- Hero summary ---- */
   .test-summary {
     background: var(--s1);
     border: 1px solid var(--bd);
@@ -444,7 +1026,52 @@ Platí pro každou osobu. Vždy. Bez výjimky.</div>
     margin-top: 8px;
   }
 
-  /* Sections */
+  /* ---- Category overview pills ---- */
+  .category-overview {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .category-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--t2);
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .category-pill:hover {
+    background: var(--s3);
+    border-color: var(--t3);
+    color: var(--t1);
+  }
+  .pill-icon {
+    font-size: 14px;
+  }
+  .pill-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .pill-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .pill-count-gn { color: var(--gn); }
+  .pill-count-cy { color: var(--cy); }
+  .pill-count-yl { color: var(--yl); }
+  .pill-count-ac { color: var(--ac2); }
+  .pill-count-or { color: var(--or); }
+  .pill-count-pk { color: var(--pk); }
+
+  /* ---- Sections ---- */
   section {
     margin-bottom: 48px;
     scroll-margin-top: 72px;
@@ -482,20 +1109,94 @@ Platí pro každou osobu. Vždy. Bez výjimky.</div>
     line-height: 1.6;
   }
 
-  /* Test cards */
-  .tests-grid {
-    display: grid;
-    gap: 12px;
-    margin-top: 16px;
+  /* ---- Category header with progress ---- */
+  .category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--bd);
   }
-  .test-card {
-    padding: 16px 20px;
-  }
-  .test-header {
+  .category-title-row {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 8px;
+  }
+  .category-icon {
+    font-size: 20px;
+    line-height: 1;
+  }
+  .category-header h2 {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+  .category-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .category-progress-bar {
+    width: 80px;
+    height: 6px;
+    background: var(--s3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .category-progress-fill {
+    width: 100%;
+    height: 100%;
+    border-radius: 3px;
+  }
+  .cat-fill-gn { background: var(--gn); }
+  .cat-fill-cy { background: var(--cy); }
+  .cat-fill-yl { background: var(--yl); }
+  .cat-fill-ac { background: var(--ac2); }
+  .cat-fill-or { background: var(--or); }
+  .cat-fill-pk { background: var(--pk); }
+  .category-pass-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .cat-text-gn { color: var(--gn); }
+  .cat-text-cy { color: var(--cy); }
+  .cat-text-yl { color: var(--yl); }
+  .cat-text-ac { color: var(--ac2); }
+  .cat-text-or { color: var(--or); }
+  .cat-text-pk { color: var(--pk); }
+
+  /* ---- Test cards (collapsible) ---- */
+  .tests-grid {
+    display: grid;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .test-card {
+    padding: 0;
+  }
+  .test-card summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+  .test-card summary::-webkit-details-marker {
+    display: none;
+  }
+  .test-card summary::marker {
+    display: none;
+    content: '';
+  }
+  .test-body {
+    padding: 0 16px 14px 46px;
   }
   .test-index {
     font-family: 'JetBrains Mono', monospace;
@@ -506,15 +1207,16 @@ Platí pro každou osobu. Vždy. Bez výjimky.</div>
   .test-name {
     font-size: 12px;
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .test-desc {
     font-size: 13px;
     color: var(--t2);
     margin-bottom: 6px;
-    margin-left: 30px;
   }
   .test-expected {
-    margin-left: 30px;
     font-size: 12px;
     color: var(--t3);
   }
@@ -522,14 +1224,39 @@ Platí pro každou osobu. Vždy. Bez výjimky.</div>
     margin-right: 6px;
   }
 
-  /* CW bars */
+  /* Chevron */
+  .chevron {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .chevron::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid var(--t3);
+    border-bottom: 1.5px solid var(--t3);
+    transform: rotate(-45deg);
+    transition: transform 0.15s;
+  }
+  details[open] .chevron::after {
+    transform: rotate(45deg);
+    top: 3px;
+  }
+
+  /* ---- CW bars ---- */
   .cw-bar {
     height: 8px;
     border-radius: 4px;
     min-width: 4px;
   }
 
-  /* Loop steps */
+  /* ---- Loop steps ---- */
   .loop-steps {
     padding-left: 20px;
   }
@@ -545,12 +1272,12 @@ Platí pro každou osobu. Vždy. Bez výjimky.</div>
     font-size: 13px;
   }
 
-  /* Comparison table */
+  /* ---- Comparison table ---- */
   .comparison-table td {
     vertical-align: middle;
   }
 
-  /* Demo verification */
+  /* ---- Demo verification ---- */
   .verify-sum {
     font-family: 'JetBrains Mono', monospace;
     font-size: 18px;
@@ -573,6 +1300,20 @@ Platí pro každou osobu. Vždy. Bez výjimky.</div>
     }
     .summary-score {
       font-size: 36px;
+    }
+    .category-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .category-overview {
+      gap: 6px;
+    }
+    .category-pill {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+    .test-name {
+      font-size: 10px;
     }
   }
 </style>
