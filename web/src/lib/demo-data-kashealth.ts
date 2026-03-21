@@ -1,4 +1,4 @@
-import type { Person, WorkItem, Iteration, ProjectConfig } from './edpa-engine';
+import type { Person, WorkItem, Iteration, ProjectConfig, Team } from './edpa-engine';
 
 export const project: ProjectConfig = {
   name: 'Medical Platform a Datovy e-shop',
@@ -14,6 +14,11 @@ export const config = {
   year: 2026,
   piNum: 1,
 };
+
+export const teams: Team[] = [
+  { id: 'CVUT', planning_factor: 0.8 },
+  { id: 'Medicalc', planning_factor: 0.75 },
+];
 
 export const people: Person[] = [
   { id: 'urbanek', name: 'J. Urbanek', role: 'Arch', team: 'CVUT', fte: 0.5, capacity: 40 },

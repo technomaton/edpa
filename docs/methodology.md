@@ -73,6 +73,29 @@ Granularity rules: Story max 8 SP (2/10) or 5 SP (1/5), Feature max 13, Epic max
 
 ## 5. The Model: Evidence-Driven Proportional Allocation
 
+### 5.0 Iteration Planning Protocol
+
+Before EDPA derives hours (ex-post), the team must plan the iteration (ex-ante). Planning requires confirmed capacity as input.
+
+**Step 1 — Confirm Capacity.** Each team member confirms availability for the iteration. This is a commitment, not an estimate. External collaborators negotiate allocation explicitly. Result: `Capacity[P, I]` in `capacity.yaml` with `availability: confirmed`.
+
+**Step 2 — Calculate Planning Capacity.**
+
+```text
+Team_Total_Capacity = Σ Capacity[P, I]
+Team_Planning_Capacity = Team_Total_Capacity × planning_factor (default 0.8)
+```
+
+The `planning_factor` is a **team-level** property (configured per team in `capacity.yaml` under `teams:`). Different teams may choose different factors based on their support load, maturity, and risk tolerance. It reserves a buffer for support, maintenance, incidents, and unplanned work.
+
+**Step 3 — Select Work.** Pull stories from the prioritized backlog (WSJF order) until `Σ JobSize` approaches historical velocity scaled by `planning_factor`. Do not plan to 100% of capacity.
+
+**Step 4 — Buffer.** The remaining ~20% absorbs unplanned work. If buffer items generate delivery evidence (commits, PRs, reviews), EDPA allocates them normally — the model is unchanged.
+
+**Step 5 — Edge case.** If no unplanned work occurs, all capacity is allocated to planned items. The mathematical guarantee (`Σ DerivedHours = Capacity`) holds regardless.
+
+**Why plan to 80%?** Planning to 100% capacity forces the team into one of three failure modes: undelivered stories (velocity miss), overwork, or scope creep. The 80% heuristic is consistent with SAFe load factor, Scrum velocity-based planning, and Kanban WIP limits.
+
 ### 5.1 Inputs
 
 For person **P** and Iteration **I**:
@@ -220,7 +243,13 @@ Recommendation: start on A, evaluate switch to B after first PI based on data.
 Story_Velocity[team, iteration] = Σ JobSize of closed Stories
 Feature_Velocity[team, PI] = Σ JobSize of closed Features
 Accuracy = Actual / Planned x 100%
+
+Planned_Velocity = Σ JobSize of planned Stories (selected at Iteration Planning)
+Actual_Velocity = Σ JobSize of all closed Stories (planned + unplanned)
+Buffer_Usage = unplanned hours / (Total_Capacity - Planning_Capacity) x 100%
 ```
+
+Buffer_Usage tracks how much of the 20% reserve was consumed by unplanned work. Consistently high buffer usage (>90%) suggests raising capacity or reducing planned scope. Consistently low usage (<30%) suggests the team can plan closer to capacity.
 
 ### 8.2 CW Calibration
 After 2–3 Iterations evaluate: does the heuristic match reality?

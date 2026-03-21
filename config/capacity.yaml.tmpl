@@ -8,6 +8,13 @@ cadence:
   delivery_iterations_per_pi: 4               # PI minus IP iteration
   ip_iterations_per_pi: 1                     # Innovation & Planning
 
+# Teams — planning_factor is a team-level decision, not a cadence property
+teams:
+  - id: "Org A"
+    planning_factor: 0.8                      # Plan to 80% of team capacity
+    # Buffer absorbs: support, maintenance, incidents, unplanned work
+    # EDPA calculation always uses 100% capacity — planning_factor is a planning heuristic only
+
 # Team members — add/remove as needed
 people:
   # EXAMPLE — replace with your team:

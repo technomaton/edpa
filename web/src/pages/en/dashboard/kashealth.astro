@@ -1,6 +1,6 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
-import { people, items, iterations, project, config } from '../../../lib/demo-data-kashealth';
+import { people, items, iterations, project, config, teams } from '../../../lib/demo-data-kashealth';
 const stories = items.filter(i => i.level === 'Story');
 const storiesDone = stories.filter(i => i.status === 'Done');
 const storiesIP = stories.filter(i => i.status === 'In Progress');
@@ -10,6 +10,8 @@ const featuresDone = features.filter(i => i.status === 'Done');
 const spDone = storiesDone.reduce((a, i) => a + i.js, 0);
 const totalCapacity = people.reduce((a, p) => a + p.capacity, 0);
 const totalFte = people.reduce((a, p) => a + p.fte, 0);
+const avgPlanningFactor = teams.length > 0 ? teams.reduce((a, t) => a + t.planning_factor, 0) / teams.length : 0.8;
+const planningCapacity = Math.round(totalCapacity * avgPlanningFactor);
 const closedIterations = iterations.filter(i => i.status === 'closed');
 const activeIteration = iterations.find(i => i.status === 'active');
 
@@ -63,6 +65,7 @@ const velocityData = iterations.map(it => {
         <div class="tag">Team</div>
         <div class="kpi-value" style="color: var(--ac2);">{people.length}</div>
         <div class="kpi-sub">{totalFte.toFixed(1)} FTE | {totalCapacity}h/iter</div>
+        <div class="kpi-sub" style="color: var(--yl); font-size: 9px;">Plan: {planningCapacity}h ({Math.round(avgPlanningFactor * 100)}%)</div>
       </div>
       <div class="card yellow text-center">
         <div class="tag">SP Delivered</div>

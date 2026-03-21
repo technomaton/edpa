@@ -62,6 +62,11 @@ export interface ItemViewResult {
   totalHours: number;
 }
 
+export interface Team {
+  id: string;
+  planning_factor: number;
+}
+
 export interface ProjectConfig {
   name: string;
   registration: string;

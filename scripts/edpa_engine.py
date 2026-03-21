@@ -242,6 +242,9 @@ def run_edpa(capacity_config, heuristics, items, mode="simple"):
 def generate_demo_data():
     """Generate sample data for demonstration."""
     capacity = {
+        "teams": [
+            {"id": "Alpha", "planning_factor": 0.8},
+        ],
         "people": [
             {"id": "alice", "name": "Alice (Arch)", "role": "Arch", "team": "Alpha",
              "fte": 0.5, "capacity_per_iteration": 40, "email": "alice@example.com"},
@@ -287,7 +290,7 @@ def generate_demo_data():
     return capacity, heuristics, items
 
 
-def print_summary(results, mode, iteration_id):
+def print_summary(results, mode, iteration_id, planning_factor=0.8):
     """Print human-readable summary table."""
     print(f"\n{'='*70}")
     print(f"EDPA v2.2 — Iteration {iteration_id} ({mode} mode)")
@@ -308,7 +311,9 @@ def print_summary(results, mode, iteration_id):
         print(f"{r['name']:<25} {r['role']:<8} {r['capacity']:>7}h {r['total_derived']:>7}h {len(r['items']):>6} {ok:>4}")
 
     print(f"{'-'*70}")
+    team_planning = round(team_capacity * planning_factor, 1)
     print(f"{'TEAM TOTAL':<25} {'':8} {team_capacity:>7}h {team_derived:>7}h")
+    print(f"{'PLANNING CAPACITY':<25} {'':8} {team_planning:>7}h  (factor: {planning_factor})")
     print(f"\nAll invariants passed: {'YES' if all_ok else 'NO'}")
 
     # Per-person detail
@@ -355,6 +360,13 @@ def main():
         print(f"      or use the Claude Code /edpa close-iteration command for automated gathering.")
         items = []
 
+    # Resolve planning_factor from teams (team-level decision, not cadence)
+    teams = capacity.get("teams", [])
+    if teams:
+        planning_factor = teams[0].get("planning_factor", 0.8)
+    else:
+        planning_factor = 0.8
+
     results = run_edpa(capacity, heuristics, items, mode=args.mode)
 
     all_passed = all(r["invariant_ok"] for r in results if r["items"])
@@ -365,6 +377,7 @@ def main():
         "mode": args.mode,
         "computed_at": datetime.now(timezone.utc).isoformat(),
         "methodology": "EDPA v2.2",
+        "planning_factor": planning_factor,
         "people": results,
         "team_total": round(team_total, 2),
         "all_invariants_passed": all_passed,
@@ -384,7 +397,7 @@ def main():
             json.dump(output, f, indent=2, ensure_ascii=False)
         print(f"\nResults written to: {output_path}")
 
-    print_summary(results, args.mode, iteration_id)
+    print_summary(results, args.mode, iteration_id, planning_factor)
 
     if not all_passed:
         sys.exit(1)

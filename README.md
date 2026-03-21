@@ -2,7 +2,7 @@
 
 **Derive hours from Git evidence. No timesheets.**
 
-[![EDPA](https://img.shields.io/badge/EDPA-v2.2-34d399)](docs/methodology.md)
+[![EDPA](https://img.shields.io/badge/EDPA-v1.0.0-34d399)](docs/methodology.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/Made_for-GitHub-181717?logo=github)](https://github.com)
 
@@ -29,7 +29,7 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 ```
 $ python scripts/edpa_engine.py --demo
 
-EDPA v2.2 — Iteration DEMO-1.1 (simple mode)
+EDPA v1.0.0 — Iteration DEMO-1.1 (simple mode)
 ======================================================================
 Person                    Role     Capacity  Derived  Items    OK
 ----------------------------------------------------------------------
@@ -178,7 +178,7 @@ cp -r claude-code/skills/* ~/.gemini/skills/
 
 | Document | Description |
 |----------|-------------|
-| [Methodology](docs/methodology.md) | Full EDPA v2.2 specification |
+| [Methodology](docs/methodology.md) | Full EDPA v1.0.0 specification |
 | [Quick Start](docs/quick-start.md) | 10-minute setup guide |
 | [Evidence Detection](docs/evidence-detection.md) | How GitHub signals map to CW |
 | [Dual-View](docs/dual-view.md) | Per-person vs per-item perspectives |
@@ -187,6 +187,18 @@ cp -r claude-code/skills/* ~/.gemini/skills/
 | [Cadence](docs/cadence.md) | Classic (2/10) vs AI-Native (1/5) |
 | [GitHub Setup](docs/github-setup.md) | Projects, custom fields, views |
 | [FAQ](docs/faq.md) | Common questions |
+
+## Simulation & Calibration
+
+| Resource | Description |
+|----------|-------------|
+| [edpa-simulation](https://github.com/technomaton/edpa-simulation) | Full EDPA simulation — 2 PIs, 10 iterations, 510 commits, 7 team members |
+| [calibrate_roles.py](https://github.com/technomaton/edpa-simulation/blob/main/scripts/calibrate_roles.py) | Multi-scenario CW calibration (8 scenarios, 569 pairs, MAD reduction 6.7%) |
+| [edpa.technomaton.com](https://edpa.technomaton.com) | Public website with interactive dashboard, presentation, methodology, evaluation |
+
+The default CW weights in `config/cw_heuristics.yaml.tmpl` are calibrated from 8 team scenarios
+(Startup, Enterprise, DevOps-heavy, Research, Consultancy, AI-Native, Regulated, kashealth).
+Key correction: BO/PM/Arch are systematically undervalued by Git auto-detection; QA slightly overvalued.
 
 ## Part of TECHNOMATON Hub
 
@@ -203,4 +215,4 @@ MIT — see [LICENSE](LICENSE)
 
 ---
 
-*Built by [TECHNOMATON Group](https://github.com/technomaton). Methodology by Jaroslav Urbanek.*
+*Built by [TECHNOMATON](https://technomaton.com). Methodology by Jaroslav Urbánek.*

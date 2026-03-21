@@ -7,6 +7,10 @@ cadence:
   delivery_iterations_per_pi: 4
   ip_iterations_per_pi: 1
 
+teams:
+  - id: "Acme Corp"
+    planning_factor: 0.8
+
 people:
   - id: alice
     name: "Alice"

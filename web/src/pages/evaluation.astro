@@ -2,7 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 
 /* ================================================================
-   TEST DATA — 7 categories, 102 tests total
+   TEST DATA — 8 categories, 114 tests total
    ================================================================ */
 
 const categories = [
@@ -593,6 +593,77 @@ const categories = [
       },
     ],
   },
+  {
+    id: 'capacity-planning',
+    title: 'Pl\u00E1nov\u00E1n\u00ED kapacity',
+    icon: '\uD83D\uDCC8',
+    color: 'cy',
+    cardClass: 'cyan',
+    description: 'Ov\u011B\u0159en\u00ED Iteration Planning Protocol \u2014 planning_factor jako vlastnost t\u00FDmu, pravidlo 80%, sledov\u00E1n\u00ED buffer usage a workflow potvrzen\u00ED kapacity.',
+    expandedCount: 5,
+    tests: [
+      {
+        name: 'test_planning_factor_team_level',
+        description: 'planning_factor mus\u00ED b\u00FDt vlastnost t\u00FDmu, ne kadence ani osoby.',
+        expected: 'teams[].planning_factor (not cadence, not person)',
+      },
+      {
+        name: 'test_planning_factor_default',
+        description: 'V\u00FDchoz\u00ED planning_factor mus\u00ED b\u00FDt 0.8 (pl\u00E1nuj na 80% celkov\u00E9 kapacity).',
+        expected: 'planning_factor default = 0.8',
+      },
+      {
+        name: 'test_planning_factor_range',
+        description: 'planning_factor mus\u00ED b\u00FDt v rozsahu (0, 1.0] \u2014 nikdy nula, nikdy nad 100%.',
+        expected: '0 < planning_factor \u2264 1.0',
+      },
+      {
+        name: 'test_planning_capacity_formula',
+        description: 'Planning Capacity = Total Capacity \u00D7 planning_factor pro ka\u017Ed\u00FD t\u00FDm.',
+        expected: 'Planning_Capacity = \u03A3 Capacity[P] \u00D7 planning_factor',
+      },
+      {
+        name: 'test_different_teams_different_factors',
+        description: 'R\u016Fzn\u00E9 t\u00FDmy mohou m\u00EDt r\u016Fzn\u00E9 hodnoty planning_factor.',
+        expected: 'teams[A].planning_factor \u2260 teams[B].planning_factor allowed',
+      },
+      {
+        name: 'test_edpa_uses_total_not_planning',
+        description: 'EDPA v\u00FDpo\u010Det v\u017Edy pou\u017E\u00EDv\u00E1 Total Capacity (100%), ne Planning Capacity.',
+        expected: 'DerivedHours uses Capacity[P], not Planning_Capacity',
+      },
+      {
+        name: 'test_buffer_absorbs_unplanned',
+        description: 'Buffer (v\u00FDchoz\u00ED 20%) absorbuje support, maintenance, incidenty a nepl\u00E1novanou pr\u00E1ci.',
+        expected: 'buffer = Total - Planning \u2192 unplanned work',
+      },
+      {
+        name: 'test_unplanned_items_generate_evidence',
+        description: 'Nepl\u00E1novan\u00E9 polo\u017Eky v bufferu generuj\u00ED evidenci a jsou alokov\u00E1ny norm\u00E1ln\u011B pomoc\u00ED EDPA.',
+        expected: 'unplanned items \u2192 evidence \u2192 normal EDPA allocation',
+      },
+      {
+        name: 'test_capacity_confirmed_at_planning',
+        description: 'Ka\u017Ed\u00FD \u010Dlen t\u00FDmu mus\u00ED potvrdit dostupnost na Iteration Planning (availability: confirmed).',
+        expected: 'availability = confirmed required',
+      },
+      {
+        name: 'test_planning_factor_no_affect_invariant',
+        description: 'planning_factor nesm\u00ED ovlivnit matematickou z\u00E1ruku \u03A3 DerivedHours = Capacity.',
+        expected: 'planning_factor \u2192 no effect on \u03A3 = Capacity',
+      },
+      {
+        name: 'test_buffer_usage_metric',
+        description: 'Metrika Buffer_Usage sleduje, kolik rezervy bylo spot\u0159ebov\u00E1no nepl\u00E1novanou prac\u00ED.',
+        expected: 'Buffer_Usage = unplanned / (Total - Planning) \u00D7 100%',
+      },
+      {
+        name: 'test_high_buffer_usage_warning',
+        description: 'Trvale vysok\u00FD buffer usage (>90%) by m\u011Bl vyvolat varov\u00E1n\u00ED k \u00FAprav\u011B kapacity nebo rozsahu.',
+        expected: 'Buffer_Usage > 90% \u2192 warning',
+      },
+    ],
+  },
 ];
 
 const totalTests = categories.reduce((sum, cat) => sum + cat.tests.length, 0);
@@ -631,7 +702,7 @@ const totalChecks = (perPersonTests * teamSize) + globalTests;
       <div class="bar-fill"></div>
     </div>
     <p class="summary-text">
-      {totalTests} testových scénářů ve 7 kategoriích. Per-person testy (invarianty, dual-view, edge cases)
+      {totalTests} testových scénářů v 8 kategoriích. Per-person testy (invarianty, dual-view, edge cases)
       běží pro každého z {teamSize} členů týmu → <strong>{totalChecks} celkových kontrol</strong>. Vše prochází.
     </p>
 

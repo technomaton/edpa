@@ -1,4 +1,4 @@
-import type { Person, WorkItem, Iteration, ProjectConfig } from './edpa-engine';
+import type { Person, WorkItem, Iteration, ProjectConfig, Team } from './edpa-engine';
 
 export const project: ProjectConfig = {
   name: 'SaaS Platform',
@@ -15,6 +15,11 @@ export const config = {
   year: 2026,
   piNum: 1,
 };
+
+export const teams: Team[] = [
+  { id: 'Core', planning_factor: 0.8 },
+  { id: 'Platform', planning_factor: 0.8 },
+];
 
 export const people: Person[] = [
   { id: 'alice', name: 'Alice', role: 'Arch', team: 'Core', fte: 0.75, capacity: 60 },

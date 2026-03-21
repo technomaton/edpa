@@ -2,7 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 
 /* ================================================================
-   TEST DATA — 7 categories, 102 tests total
+   TEST DATA — 8 categories, 114 tests total
    ================================================================ */
 
 const categories = [
@@ -593,6 +593,77 @@ const categories = [
       },
     ],
   },
+  {
+    id: 'capacity-planning',
+    title: 'Capacity Planning',
+    icon: '\uD83D\uDCC8',
+    color: 'cy',
+    cardClass: 'cyan',
+    description: 'Verification of the Iteration Planning Protocol — planning_factor as a team-level property, 80% rule, buffer usage tracking, and capacity commitment workflow.',
+    expandedCount: 5,
+    tests: [
+      {
+        name: 'test_planning_factor_team_level',
+        description: 'planning_factor must be a team-level property, not a cadence or person-level property.',
+        expected: 'teams[].planning_factor (not cadence, not person)',
+      },
+      {
+        name: 'test_planning_factor_default',
+        description: 'Default planning_factor must be 0.8 (plan to 80% of total capacity).',
+        expected: 'planning_factor default = 0.8',
+      },
+      {
+        name: 'test_planning_factor_range',
+        description: 'planning_factor must be in range (0, 1.0] — never zero, never above 100%.',
+        expected: '0 < planning_factor \u2264 1.0',
+      },
+      {
+        name: 'test_planning_capacity_formula',
+        description: 'Planning Capacity = Total Capacity \u00D7 planning_factor for each team.',
+        expected: 'Planning_Capacity = \u03A3 Capacity[P] \u00D7 planning_factor',
+      },
+      {
+        name: 'test_different_teams_different_factors',
+        description: 'Different teams may have different planning_factor values.',
+        expected: 'teams[A].planning_factor \u2260 teams[B].planning_factor allowed',
+      },
+      {
+        name: 'test_edpa_uses_total_not_planning',
+        description: 'EDPA calculation always uses Total Capacity (100%), not Planning Capacity.',
+        expected: 'DerivedHours uses Capacity[P], not Planning_Capacity',
+      },
+      {
+        name: 'test_buffer_absorbs_unplanned',
+        description: 'Buffer (20% by default) absorbs support, maintenance, incidents, and unplanned work.',
+        expected: 'buffer = Total - Planning \u2192 unplanned work',
+      },
+      {
+        name: 'test_unplanned_items_generate_evidence',
+        description: 'Unplanned items in the buffer generate evidence and are allocated normally by EDPA.',
+        expected: 'unplanned items \u2192 evidence \u2192 normal EDPA allocation',
+      },
+      {
+        name: 'test_capacity_confirmed_at_planning',
+        description: 'Each team member must confirm availability at Iteration Planning (availability: confirmed).',
+        expected: 'availability = confirmed required',
+      },
+      {
+        name: 'test_planning_factor_no_affect_invariant',
+        description: 'planning_factor must not affect the mathematical guarantee \u03A3 DerivedHours = Capacity.',
+        expected: 'planning_factor \u2192 no effect on \u03A3 = Capacity',
+      },
+      {
+        name: 'test_buffer_usage_metric',
+        description: 'Buffer_Usage metric tracks how much of the reserve was consumed by unplanned work.',
+        expected: 'Buffer_Usage = unplanned / (Total - Planning) \u00D7 100%',
+      },
+      {
+        name: 'test_high_buffer_usage_warning',
+        description: 'Consistently high buffer usage (>90%) should trigger a warning to adjust capacity or scope.',
+        expected: 'Buffer_Usage > 90% \u2192 warning',
+      },
+    ],
+  },
 ];
 
 const totalTests = categories.reduce((sum, cat) => sum + cat.tests.length, 0);
@@ -631,7 +702,7 @@ const totalChecks = (perPersonTests * teamSize) + globalTests;
       <div class="bar-fill"></div>
     </div>
     <p class="summary-text">
-      {totalTests} test scenarios across 7 categories. Per-person tests (invariants, dual-view, edge cases)
+      {totalTests} test scenarios across 8 categories. Per-person tests (invariants, dual-view, edge cases)
       run for each of the {teamSize} team members &rarr; <strong>{totalChecks} total checks</strong>. All passing.
     </p>
 
