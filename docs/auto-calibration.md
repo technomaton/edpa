@@ -19,6 +19,66 @@ Evaluator:  scripts/evaluate_cw.py (LOCKED — agent must NOT edit)
 - Typically available after 1st Planning Interval (~10 weeks, 4-5 iterations)
 - Records come from team retrospectives where auto-CW is compared to reality
 
+## Calibration Results (Simulation-Validated)
+
+Multi-scenario calibration across 8 team compositions (569 person-item pairs)
+and full 2-PI simulation (172 ground truth records) produced these findings:
+
+### Systematic Biases in Auto-Detection
+
+| Role | Evidence | Original CW | Confirmed CW | Bias | Correction Rate |
+|------|----------|-------------|--------------|------|-----------------|
+| **BO** | consulted | 0.15 | 0.32 | **+0.17** | 80% |
+| **PM** | consulted | 0.15 | 0.29 | **+0.14** | 61% |
+| **Arch** | reviewer | 0.25 | 0.36 | **+0.11** | 58% |
+| Dev | owner | 1.00 | 1.00 | 0.00 | 0% |
+| Dev | key | 0.60 | 0.60 | 0.00 | 0% |
+| DevSecOps | owner | 1.00 | 1.00 | 0.00 | 0% |
+| **QA** | owner | 1.00 | 0.90 | **−0.10** | 25% |
+
+**Key insight:** Git signals measure *activity*, not *value*. Roles that contribute
+strategically (BO decisions, PM requirements, Arch reviews) are systematically
+undervalued. QA is slightly overvalued (many test commits ≠ ownership).
+
+### Recommended Defaults (role_overrides)
+
+Applied in `config/cw_heuristics.yaml.tmpl`:
+
+```yaml
+role_overrides:
+  BO:
+    consulted: 0.30    # was 0.15, ★ 52.9% MAD improvement
+    reviewer: 0.35
+  PM:
+    consulted: 0.25    # was 0.15, ● 16.0% MAD improvement
+  Arch:
+    reviewer: 0.30     # was 0.25, ● 7.4% MAD improvement
+  QA:
+    key: 0.55          # was 0.60
+    owner: 0.95        # was 1.00 (cautious — small sample)
+```
+
+### MAD Impact
+
+```
+Original defaults:             MAD = 0.0375  [██████████████████████] baseline
+Calibrated (8 scenarios):      MAD = 0.0314  [██████████████████] ↓16.3%
+Recommended (calib+simulation): MAD = 0.0326  [██████████████████] ↓13.2%
+
+PI-1 → PI-2 trend:             MAD = 0.0412 → 0.0333  ↓19.2%
+Correction rate trend:          18.7% → 14.8% (fewer corrections = better heuristic)
+```
+
+### Per-Role MAD Improvement
+
+| Role | MAD (original) | MAD (calibrated) | Improvement |
+|------|---------------|-----------------|-------------|
+| BO | 0.1700 | 0.0800 | **52.9%** ★ |
+| PM | 0.1190 | 0.1000 | **16.0%** ● |
+| Arch | 0.0482 | 0.0446 | **7.4%** ● |
+| Dev | 0.0000 | 0.0000 | 0.0% (already perfect) |
+| DevSecOps | 0.0000 | 0.0000 | 0.0% (already perfect) |
+
 ## Loop
 
 ```
@@ -52,6 +112,15 @@ Evaluator:  scripts/evaluate_cw.py (LOCKED — agent must NOT edit)
 
 ## Expected results
 
-- Typical improvement: 15-30% MAD reduction
+- Typical improvement: 13-20% MAD reduction (validated by simulation)
+- BO/PM/Arch: largest improvement (strategic roles undervalued by Git signals)
+- Dev/DevSecOps: minimal change needed (Git signals already accurate)
 - After 50 experiments: heuristic closely matches team's actual allocation patterns
 - Diminishing returns after ~30 experiments for most teams
+
+## Simulation & Reproduction
+
+Full simulation with 2 PIs, 10 iterations, 7 team members, 510 commits:
+- Repository: [technomaton/edpa-simulation](https://github.com/technomaton/edpa-simulation)
+- Run: `python scripts/simulate.py --pi all --seed 42`
+- Calibration: `python scripts/calibrate_roles.py` (8 scenarios, 569 pairs)
