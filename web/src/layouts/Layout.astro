@@ -27,9 +27,24 @@ const { title, description = 'EDPA v1.0.0 — Evidence-Driven Proportional Alloc
     <slot />
   </main>
   <Footer />
+  <button class="back-to-top" aria-label="Back to top">&#8593;</button>
   <script>
     import { inject } from '@vercel/analytics';
     inject();
+  </script>
+  <script>
+    function initBackToTop() {
+      const btn = document.querySelector('.back-to-top');
+      if (!btn) return;
+      window.addEventListener('scroll', () => {
+        btn.classList.toggle('visible', window.scrollY > 400);
+      }, { passive: true });
+      btn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    }
+    document.addEventListener('DOMContentLoaded', initBackToTop);
+    document.addEventListener('astro:page-load', initBackToTop);
   </script>
 </body>
 </html>

@@ -608,7 +608,7 @@ const perPersonTests = categories
 const globalTests = totalTests - perPersonTests;
 const totalChecks = (perPersonTests * teamSize) + globalTests;
 ---
-<Layout title="Evaluace a testy">
+<Layout title="Evaluace a testy" description="302 verifikačních kontrol EDPA — invarianty, evidence detection, CW heuristika, edge cases, governance audit.">
 <div class="container section evaluation-page">
 
   <div class="page-header">
@@ -644,13 +644,24 @@ const totalChecks = (perPersonTests * teamSize) + globalTests;
 
     <!-- Category overview -->
     <div class="category-overview">
+      <button type="button" class="category-pill category-pill-active" data-filter="all">
+        <span class="pill-icon">*</span>
+        <span class="pill-name">Vše</span>
+        <span class="pill-count pill-count-ac">{totalTests}</span>
+      </button>
       {categories.map((cat) => (
-        <a href={`#${cat.id}`} class="category-pill">
+        <button type="button" class="category-pill" data-filter={cat.id}>
           <span class="pill-icon">{cat.icon}</span>
           <span class="pill-name">{cat.title}</span>
           <span class={`pill-count pill-count-${cat.color}`}>{perPersonCategories.includes(cat.id) ? cat.tests.length * teamSize : cat.tests.length}</span>
-        </a>
+        </button>
       ))}
+    </div>
+
+    <!-- Search bar -->
+    <div class="search-bar">
+      <input type="text" id="testSearch" placeholder="Hledat test..." class="search-input" />
+      <span class="search-count" id="searchCount"></span>
     </div>
   </div>
 
@@ -658,7 +669,7 @@ const totalChecks = (perPersonTests * teamSize) + globalTests;
        TEST CATEGORIES
        ============================================================ -->
   {categories.map((cat, catIndex) => (
-    <section id={cat.id}>
+    <section id={cat.id} data-category={cat.id} class="test-category-section">
       <div class="category-header">
         <div class="category-title-row">
           <span class="category-icon">{cat.icon}</span>
@@ -680,7 +691,7 @@ const totalChecks = (perPersonTests * teamSize) + globalTests;
 
       <div class="tests-grid">
         {cat.tests.map((test, i) => (
-          <details class={`card test-card ${cat.cardClass}`} open={i < cat.expandedCount ? true : undefined}>
+          <details class={`card test-card ${cat.cardClass}`} data-category={cat.id} data-testname={test.name} data-testdesc={test.description} open={i < cat.expandedCount ? true : undefined}>
             <summary class="test-header">
               <span class="test-index">{String((i + 1)).padStart(2, '0')}</span>
               <code class="test-name">{test.name}</code>
@@ -1320,6 +1331,60 @@ Platí pro každou osobu. Vždy. Bez výjimky.</div>
     border-top: 2px solid var(--bd);
   }
 
+  /* ---- Search bar ---- */
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+  }
+  .search-input {
+    flex: 1;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    padding: 10px 16px;
+    color: var(--t1);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus {
+    border-color: var(--ac);
+  }
+  .search-input::placeholder {
+    color: var(--t3);
+  }
+  .search-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--t3);
+    white-space: nowrap;
+  }
+
+  /* ---- Category pill as button ---- */
+  button.category-pill {
+    font: inherit;
+    cursor: pointer;
+  }
+  .category-pill-active {
+    background: var(--ac) !important;
+    border-color: var(--ac) !important;
+    color: var(--s1) !important;
+  }
+  .category-pill-active .pill-count {
+    color: var(--s1) !important;
+  }
+  .category-pill-active .pill-icon {
+    color: var(--s1) !important;
+  }
+
+  /* ---- Hidden utility ---- */
+  .hidden {
+    display: none !important;
+  }
+
   @media (max-width: 768px) {
     .page-header h1 {
       font-size: 18px;
@@ -1343,3 +1408,72 @@ Platí pro každou osobu. Vždy. Bez výjimky.</div>
     }
   }
 </style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('testSearch') as HTMLInputElement;
+    const searchCount = document.getElementById('searchCount') as HTMLSpanElement;
+    const pills = document.querySelectorAll<HTMLButtonElement>('.category-pill[data-filter]');
+    const allCards = document.querySelectorAll<HTMLDetailsElement>('details.test-card');
+    const allSections = document.querySelectorAll<HTMLElement>('section.test-category-section');
+    const totalTests = allCards.length;
+
+    let activeCategory = 'all';
+
+    function applyFilters() {
+      const query = searchInput.value.toLowerCase().trim();
+      let visibleCount = 0;
+
+      allCards.forEach((card) => {
+        const cardCategory = card.getAttribute('data-category') || '';
+        const testName = (card.getAttribute('data-testname') || '').toLowerCase();
+        const testDesc = (card.getAttribute('data-testdesc') || '').toLowerCase();
+
+        const matchesCategory = activeCategory === 'all' || cardCategory === activeCategory;
+        const matchesSearch = !query || testName.includes(query) || testDesc.includes(query);
+
+        if (matchesCategory && matchesSearch) {
+          card.classList.remove('hidden');
+          visibleCount++;
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+
+      // Hide sections where all tests are hidden
+      allSections.forEach((section) => {
+        const sectionId = section.getAttribute('data-category') || '';
+        const visibleCards = section.querySelectorAll('details.test-card:not(.hidden)');
+        if (visibleCards.length === 0) {
+          section.classList.add('hidden');
+        } else {
+          section.classList.remove('hidden');
+        }
+      });
+
+      // Update count display
+      if (query || activeCategory !== 'all') {
+        searchCount.textContent = `${visibleCount} z ${totalTests}`;
+      } else {
+        searchCount.textContent = '';
+      }
+    }
+
+    // Search input handler
+    searchInput.addEventListener('input', () => {
+      applyFilters();
+    });
+
+    // Category pill click handler
+    pills.forEach((pill) => {
+      pill.addEventListener('click', () => {
+        // Update active state
+        pills.forEach((p) => p.classList.remove('category-pill-active'));
+        pill.classList.add('category-pill-active');
+
+        activeCategory = pill.getAttribute('data-filter') || 'all';
+        applyFilters();
+      });
+    });
+  });
+</script>

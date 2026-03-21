@@ -26,7 +26,7 @@ const velocityData = iterations.map(it => {
 });
 ---
 
-<Layout title="Dashboard — kashealth" lang="en">
+<Layout title="Dashboard — kashealth" description="EDPA dashboard for kashealth.cz — real case study of Medical Platform project (OP TAK, ČVUT FBMI + Medicalc)." lang="en">
   <div class="container" style="padding-top: 32px; padding-bottom: 40px;">
     <!-- Demo version switcher -->
     <div style="display: flex; gap: 8px; margin-bottom: 16px;">
@@ -34,44 +34,44 @@ const velocityData = iterations.map(it => {
       <a href="/en/dashboard/kashealth/" class="btn-primary btn" style="font-size: 12px;">kashealth.cz — Case study</a>
     </div>
     <!-- Header bar -->
-    <div class="dash-header card" style="margin-bottom: 20px; border-left: 3px solid var(--ac);">
+    <div class="dash-header card mb-20" style="border-left: 3px solid var(--ac);">
       <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <span style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; background: linear-gradient(135deg, var(--ac), var(--cy)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">kashealth.cz</span>
+        <span class="dash-title" style="background: linear-gradient(135deg, var(--ac), var(--cy)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">kashealth.cz</span>
         <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--t1);">{project.name}</span>
         <span class="badge badge-blue">{config.pi}</span>
         {activeIteration && <span class="badge badge-green">{activeIteration.name} ({activeIteration.dates})</span>}
         <div class="mode-toggle" style="margin-left: auto;">
-          <span class="badge badge-yellow" style="cursor: pointer;" id="modeLabel">Operational (Simple): JS x CW</span>
+          <span class="badge badge-yellow" style="cursor: pointer;" id="modeLabel">Operational (Simple): JS × CW</span>
         </div>
       </div>
-      <div style="font-size: 11px; color: var(--t3); margin-top: 6px;">{project.program} | {project.organization} | {project.registration} | EDPA v1.0.0</div>
+      <div class="dash-meta" style="margin-top: 6px;">{project.program} | {project.organization} | {project.registration} | EDPA v1.0.0</div>
     </div>
 
     <!-- KPI row -->
-    <div class="grid grid-5" style="margin-bottom: 20px;">
-      <div class="card green" style="text-align: center;">
+    <div class="grid grid-5 mb-20">
+      <div class="card green text-center">
         <div class="tag">Stories Done</div>
-        <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: var(--gn);">{storiesDone.length}</div>
-        <div style="font-size: 11px; color: var(--t2);">of {stories.length} ({storiesIP.length} IP, {storiesPlanned.length} Planned)</div>
+        <div class="kpi-value" style="color: var(--gn);">{storiesDone.length}</div>
+        <div class="kpi-sub">of {stories.length} ({storiesIP.length} IP, {storiesPlanned.length} Planned)</div>
       </div>
-      <div class="card cyan" style="text-align: center;">
+      <div class="card cyan text-center">
         <div class="tag">Features</div>
-        <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: var(--cy);">{featuresDone.length}/{features.length}</div>
-        <div style="font-size: 11px; color: var(--t2);">{features.filter(f => f.status === 'Active').length} Active</div>
+        <div class="kpi-value" style="color: var(--cy);">{featuresDone.length}/{features.length}</div>
+        <div class="kpi-sub">{features.filter(f => f.status === 'Active').length} Active</div>
       </div>
-      <div class="card accent" style="text-align: center;">
+      <div class="card accent text-center">
         <div class="tag">Team</div>
-        <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: var(--ac2);">{people.length}</div>
-        <div style="font-size: 11px; color: var(--t2);">{totalFte.toFixed(1)} FTE | {totalCapacity}h/iter</div>
+        <div class="kpi-value" style="color: var(--ac2);">{people.length}</div>
+        <div class="kpi-sub">{totalFte.toFixed(1)} FTE | {totalCapacity}h/iter</div>
       </div>
-      <div class="card yellow" style="text-align: center;">
+      <div class="card yellow text-center">
         <div class="tag">SP Delivered</div>
-        <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; color: var(--yl);">{spDone}</div>
-        <div style="font-size: 11px; color: var(--t2);">{closedIterations.length} closed iterations</div>
+        <div class="kpi-value" style="color: var(--yl);">{spDone}</div>
+        <div class="kpi-sub">{closedIterations.length} closed iterations</div>
       </div>
-      <div class="card orange" style="text-align: center;">
+      <div class="card orange text-center">
         <div class="tag">Mode</div>
-        <div id="modeDisplay" style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: var(--or);">JS x CW</div>
+        <div id="modeDisplay" class="kpi-value" style="font-size: 14px; color: var(--or);">JS x CW</div>
         <div style="margin-top: 6px;">
           <button class="btn btn-secondary" id="toggleMode" style="font-size: 10px; padding: 4px 10px;">Toggle</button>
         </div>
@@ -79,7 +79,7 @@ const velocityData = iterations.map(it => {
     </div>
 
     <!-- Charts row -->
-    <div class="grid grid-2" style="margin-bottom: 20px;">
+    <div class="grid grid-2 mb-20">
       <div class="card">
         <div class="tag">Velocity — SP per Iteration</div>
         <div style="position: relative; height: 220px;">
@@ -97,23 +97,25 @@ const velocityData = iterations.map(it => {
     <!-- Iteration table -->
     <div class="card" style="margin-bottom: 24px;">
       <div class="tag">Iterations in {config.pi}</div>
-      <table>
-        <thead>
-          <tr><th>Iteration</th><th>Period</th><th>Status</th><th>Stories Done</th><th>In Progress</th><th>SP Done</th></tr>
-        </thead>
-        <tbody>
-          {velocityData.map(v => (
-            <tr>
-              <td style="font-weight: 500;">{v.name}</td>
-              <td>{v.dates}</td>
-              <td><span class={`badge ${v.status === 'closed' ? 'badge-green' : v.status === 'active' ? 'badge-yellow' : 'badge-red'}`}>{v.status}</span></td>
-              <td style="color: var(--gn);">{v.done}</td>
-              <td style="color: var(--yl);">{v.inProgress}</td>
-              <td>{v.sp}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Iteration</th><th>Period</th><th>Status</th><th>Stories Done</th><th>In Progress</th><th>SP Done</th></tr>
+          </thead>
+          <tbody>
+            {velocityData.map(v => (
+              <tr>
+                <td style="font-weight: 500;">{v.name}</td>
+                <td>{v.dates}</td>
+                <td><span class={`badge ${v.status === 'closed' ? 'badge-green' : v.status === 'active' ? 'badge-yellow' : 'badge-red'}`}>{v.status}</span></td>
+                <td style="color: var(--gn);">{v.done}</td>
+                <td style="color: var(--yl);">{v.inProgress}</td>
+                <td>{v.sp}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Per-Person EDPA Calculator -->
@@ -223,7 +225,7 @@ const velocityData = iterations.map(it => {
       toggleBtn.addEventListener('click', () => {
         mode = mode === 'simple' ? 'full' : 'simple';
         if (modeDisplay) modeDisplay.textContent = mode === 'full' ? 'JS x CW x RS' : 'JS x CW';
-        if (modeLabel) modeLabel.textContent = mode === 'full' ? 'Audit (Full): JS x CW x RS' : 'Operational (Simple): JS x CW';
+        if (modeLabel) modeLabel.textContent = mode === 'full' ? 'Audit (Full): JS × CW × RS' : 'Operational (Simple): JS × CW';
       });
     }
 
@@ -409,4 +411,47 @@ const velocityData = iterations.map(it => {
     font-size: 11px;
   }
   select:focus { border-color: var(--ac); outline: none; }
+
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -12px;
+    padding: 0 12px;
+  }
+
+  .dash-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--t1);
+  }
+
+  .kpi-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  .dash-meta {
+    font-size: 11px;
+    color: var(--t3);
+  }
+
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--t2);
+  }
+
+  .text-center {
+    text-align: center;
+  }
+
+  .mb-20 {
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 768px) {
+    .grid-5 { grid-template-columns: repeat(2, 1fr) !important; }
+    .grid-2 { grid-template-columns: 1fr !important; }
+  }
 </style>

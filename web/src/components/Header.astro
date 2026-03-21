@@ -19,13 +19,13 @@ const switchPath = isEn
   ? currentPath.replace(/^\/en(\/|$)/, '/')
   : `/en${currentPath}`;
 ---
-<header class="site-header">
+<header class="site-header" role="banner">
   <div class="container header-inner">
     <a href={`${prefix}/`} class="logo">
       <span class="logo-text">EDPA</span>
       <span class="logo-version">v1.0.0</span>
     </a>
-    <nav class="main-nav">
+    <nav class="main-nav" aria-label="Main navigation">
       {links.map(link => (
         <a
           href={link.href}
@@ -36,10 +36,45 @@ const switchPath = isEn
       ))}
     </nav>
     <div class="lang-switch">
-      <a href={switchPath} class="lang-link">{isEn ? 'CS' : 'EN'}</a>
+      <a href={switchPath} class="lang-link" aria-label="Switch language">{isEn ? 'CS' : 'EN'}</a>
+    </div>
+    <button class="hamburger" aria-label="Toggle menu" aria-expanded="false">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+  </div>
+  <div class="mobile-menu" aria-label="Mobile navigation">
+    {links.map(link => (
+      <a
+        href={link.href}
+        class:list={['mobile-nav-link', { active: currentPath === link.href || (link.href !== `${prefix}/` && currentPath.startsWith(link.href)) }]}
+      >
+        {link.label}
+      </a>
+    ))}
+    <div class="mobile-lang-switch">
+      <a href={switchPath} class="lang-link" aria-label="Switch language">{isEn ? 'CS' : 'EN'}</a>
     </div>
   </div>
 </header>
+
+<script>
+  document.addEventListener('astro:page-load', initHamburger);
+  document.addEventListener('DOMContentLoaded', initHamburger);
+
+  function initHamburger() {
+    const btn = document.querySelector('.hamburger');
+    const menu = document.querySelector('.mobile-menu');
+    if (!btn || !menu) return;
+
+    btn.addEventListener('click', () => {
+      const isOpen = menu.classList.toggle('open');
+      btn.classList.toggle('open', isOpen);
+      btn.setAttribute('aria-expanded', String(isOpen));
+    });
+  }
+</script>
 
 <style>
   .site-header {
@@ -49,13 +84,12 @@ const switchPath = isEn
     background: rgba(8, 10, 16, 0.85);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--bd);
-    height: 56px;
   }
   .header-inner {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 100%;
+    height: 56px;
   }
   .logo {
     display: flex;
@@ -112,7 +146,72 @@ const switchPath = isEn
     color: var(--ac2);
     border-color: var(--ac);
   }
+  /* Hamburger button — hidden on desktop */
+  .hamburger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    background: none;
+    border: 1px solid var(--bd);
+    border-radius: 6px;
+    padding: 6px 7px;
+    cursor: pointer;
+    margin-left: 8px;
+  }
+  .hamburger-line {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: var(--t2);
+    border-radius: 1px;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+  .hamburger.open .hamburger-line:nth-child(1) {
+    transform: translateY(6px) rotate(45deg);
+  }
+  .hamburger.open .hamburger-line:nth-child(2) {
+    opacity: 0;
+  }
+  .hamburger.open .hamburger-line:nth-child(3) {
+    transform: translateY(-6px) rotate(-45deg);
+  }
+
+  /* Mobile dropdown menu — hidden by default */
+  .mobile-menu {
+    display: none;
+    flex-direction: column;
+    background: var(--s1);
+    border-top: 1px solid var(--bd);
+    border-bottom: 1px solid var(--bd);
+    padding: 8px 24px 12px;
+  }
+  .mobile-menu.open {
+    display: flex;
+  }
+  .mobile-nav-link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--t2);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--bd);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .mobile-nav-link:last-of-type {
+    border-bottom: none;
+  }
+  .mobile-nav-link:hover { color: var(--t1); }
+  .mobile-nav-link.active { color: var(--ac); }
+  .mobile-lang-switch {
+    padding-top: 10px;
+    border-top: 1px solid var(--bd);
+    margin-top: 4px;
+  }
+
   @media (max-width: 768px) {
     .main-nav { display: none; }
+    .lang-switch { display: none; }
+    .hamburger { display: flex; }
   }
 </style>

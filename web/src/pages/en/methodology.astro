@@ -1,34 +1,38 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 ---
-<Layout title="EDPA v1.0.0 Methodology" lang="en">
+<Layout title="EDPA v1.0.0 Methodology" description="Complete EDPA v1.0.0 methodology — evidence-driven proportional allocation, 13 sections from model to implementation." lang="en">
 <div class="container section methodology-page">
 
   <div class="page-header">
     <div class="tag">Methodology</div>
     <h1>EDPA — Evidence-Driven Proportional Allocation</h1>
     <p class="subtitle">Deriving capacity from delivery evidence</p>
-    <p class="meta">Version 2.2 &middot; March 2026 &middot; Jaroslav Urbanek, Lead Architect</p>
+    <p class="meta">Version 1.0.0 &middot; March 2026 &middot; Jaroslav Urbanek, Lead Architect</p>
   </div>
 
-  <nav class="toc card accent">
+  <div class="methodology-layout">
+
+  <aside class="sidebar-toc" id="sidebarToc">
     <div class="toc-title">Contents</div>
     <ol class="toc-list">
-      <li><a href="#summary">Summary</a></li>
-      <li><a href="#terminology">Terminology</a></li>
-      <li><a href="#architecture">Model architecture</a></li>
-      <li><a href="#hierarchy">Work item hierarchy</a></li>
-      <li><a href="#model">EDPA Model</a></li>
-      <li><a href="#dual-view">Dual-view</a></li>
-      <li><a href="#cadence">Cadence</a></li>
-      <li><a href="#learning-loop">Learning loop</a></li>
-      <li><a href="#github-implementation">GitHub implementation</a></li>
-      <li><a href="#reports">Reports and audit</a></li>
-      <li><a href="#assumptions">Assumptions and risks</a></li>
-      <li><a href="#comparison">Comparison</a></li>
-      <li><a href="#implementation-plan">Implementation plan</a></li>
+      <li><a href="#summary" class="toc-link" data-section="summary">Summary</a></li>
+      <li><a href="#terminology" class="toc-link" data-section="terminology">Terminology</a></li>
+      <li><a href="#architecture" class="toc-link" data-section="architecture">Model architecture</a></li>
+      <li><a href="#hierarchy" class="toc-link" data-section="hierarchy">Work item hierarchy</a></li>
+      <li><a href="#model" class="toc-link" data-section="model">EDPA Model</a></li>
+      <li><a href="#dual-view" class="toc-link" data-section="dual-view">Dual-view</a></li>
+      <li><a href="#cadence" class="toc-link" data-section="cadence">Cadence</a></li>
+      <li><a href="#learning-loop" class="toc-link" data-section="learning-loop">Learning loop</a></li>
+      <li><a href="#github-implementation" class="toc-link" data-section="github-implementation">GitHub implementation</a></li>
+      <li><a href="#reports" class="toc-link" data-section="reports">Reports and audit</a></li>
+      <li><a href="#assumptions" class="toc-link" data-section="assumptions">Assumptions and risks</a></li>
+      <li><a href="#comparison" class="toc-link" data-section="comparison">Comparison</a></li>
+      <li><a href="#implementation-plan" class="toc-link" data-section="implementation-plan">Implementation plan</a></li>
     </ol>
-  </nav>
+  </aside>
+
+  <div class="methodology-content">
 
   <!-- 1. Summary -->
   <section id="summary">
@@ -450,7 +454,29 @@ feature/F-102-anon-engine</div>
     </div>
   </section>
 
+  </div><!-- /methodology-content -->
+  </div><!-- /methodology-layout -->
 </div>
+
+<script>
+  // Scroll-spy: highlight active TOC link based on scroll position
+  const links = document.querySelectorAll('.toc-link');
+  const sections = document.querySelectorAll('section[id]');
+
+  function updateActive() {
+    let current = '';
+    for (const section of sections) {
+      const top = section.getBoundingClientRect().top;
+      if (top <= 100) current = section.id;
+    }
+    links.forEach(link => {
+      link.classList.toggle('active', link.dataset.section === current);
+    });
+  }
+
+  window.addEventListener('scroll', updateActive, { passive: true });
+  updateActive();
+</script>
 </Layout>
 
 <style>
@@ -483,29 +509,61 @@ feature/F-102-anon-engine</div>
     margin-top: 6px;
   }
 
-  .toc {
-    margin-bottom: 48px;
+  .methodology-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+  .sidebar-toc {
+    position: sticky;
+    top: 72px;
+    max-height: calc(100vh - 88px);
+    overflow-y: auto;
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    padding: 20px 16px;
   }
   .toc-title {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     color: var(--t3);
-    margin-bottom: 12px;
+    margin-bottom: 14px;
   }
   .toc-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px 24px;
-    padding-left: 20px;
-    font-size: 13px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
   }
-  .toc-list a {
-    color: var(--t2);
+  .toc-list li {
+    margin-bottom: 0;
   }
-  .toc-list a:hover {
+  .toc-link {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--t3);
+    padding: 5px 10px;
+    border-left: 2px solid transparent;
+    border-radius: 0 4px 4px 0;
+    transition: all 0.15s;
+    text-decoration: none;
+    line-height: 1.4;
+  }
+  .toc-link:hover {
+    color: var(--t1);
+    background: var(--s2);
+  }
+  .toc-link.active {
     color: var(--ac2);
+    border-left-color: var(--ac);
+    background: rgba(99, 102, 241, 0.06);
+  }
+  .methodology-content {
+    min-width: 0;
   }
 
   section {
@@ -556,9 +614,13 @@ feature/F-102-anon-engine</div>
     margin-bottom: 6px;
   }
 
-  @media (max-width: 768px) {
-    .toc-list {
+  @media (max-width: 900px) {
+    .methodology-layout {
       grid-template-columns: 1fr;
+    }
+    .sidebar-toc {
+      position: static;
+      max-height: none;
     }
     .page-header h1 {
       font-size: 18px;
