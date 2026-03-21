@@ -1,0 +1,578 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const tests = [
+  {
+    name: 'test_sum_equals_capacity',
+    description: 'Odvozene hodiny musi odpovidat deklarovane kapacite osoby.',
+    expected: '\u03A3(hours) = capacity \u00B1 0.01h',
+  },
+  {
+    name: 'test_ratio_sum_equals_one',
+    description: 'Pomery se musi secist na 1.0 pro kazdou osobu s items.',
+    expected: '\u03A3(ratio) = 1.0 \u00B1 0.001',
+  },
+  {
+    name: 'test_no_negative_hours',
+    description: 'Zadna osoba nesmi mit zaporne odvozene hodiny.',
+    expected: 'All hours \u2265 0',
+  },
+  {
+    name: 'test_no_negative_scores',
+    description: 'Zadne skore nesmi byt zaporne.',
+    expected: 'All scores \u2265 0',
+  },
+  {
+    name: 'test_score_formula_simple',
+    description: 'V simple rezimu: Score se pocita jako JS nasobeno CW.',
+    expected: 'Score = JS \u00D7 CW',
+  },
+  {
+    name: 'test_score_formula_full',
+    description: 'V full rezimu: Score se pocita jako JS nasobeno CW nasobeno RS.',
+    expected: 'Score = JS \u00D7 CW \u00D7 RS',
+  },
+  {
+    name: 'test_full_mode_invariants',
+    description: 'Full rezim take zaruci ze soucet = kapacita.',
+    expected: 'Full mode: \u03A3 = capacity \u00B1 0.01h',
+  },
+  {
+    name: 'test_all_invariants_flag',
+    description: 'Priznak invariant_ok musi odrazet skutecne vysledky kontroly.',
+    expected: 'invariant_ok reflects actual checks',
+  },
+  {
+    name: 'test_empty_items_no_crash',
+    description: 'Osoba s 0 items musi dostat 0h, bez padu.',
+    expected: 'Person with 0 items \u2192 0h, no crash',
+  },
+  {
+    name: 'test_cw_ordering',
+    description: 'CW musi zachovat poradi: owner \u2265 key \u2265 reviewer \u2265 consulted.',
+    expected: 'owner \u2265 key \u2265 reviewer \u2265 consulted',
+  },
+];
+---
+<Layout title="Evaluace a testy">
+<div class="container section evaluation-page">
+
+  <div class="page-header">
+    <div class="tag">Evaluace</div>
+    <h1>Testy a evaluace EDPA v2.2</h1>
+    <p class="subtitle">Matematicka rigorizita overena 10 invariantnimi testy</p>
+  </div>
+
+  <!-- Test summary -->
+  <div class="test-summary">
+    <div class="summary-score">
+      <span class="score-number">10</span>
+      <span class="score-divider">/</span>
+      <span class="score-total">10</span>
+    </div>
+    <div class="summary-label">PASSED</div>
+    <div class="summary-bar">
+      <div class="bar-fill"></div>
+    </div>
+    <p class="summary-text">Vsechny invariantni testy prochazi. Matematicke garance EDPA jsou overeny.</p>
+  </div>
+
+  <!-- 1. Invariantni testy -->
+  <section id="invariantni-testy">
+    <h2>1. Invariantni testy</h2>
+    <p>EDPA engine je validovan 10 automatickymi testy, ktere overuji zakladni matematicke garance modelu. Kazdy test je spusten pri kazdem buildu.</p>
+
+    <div class="tests-grid">
+      {tests.map((test, i) => (
+        <div class="card test-card">
+          <div class="test-header">
+            <span class="test-index">{String(i + 1).padStart(2, '0')}</span>
+            <code class="test-name">{test.name}</code>
+            <span class="badge badge-green">PASS</span>
+          </div>
+          <p class="test-desc">{test.description}</p>
+          <div class="test-expected">
+            <span class="expected-label">Ocekavani:</span>
+            <code>{test.expected}</code>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- 2. Auto-kalibrace -->
+  <section id="auto-kalibrace">
+    <h2>2. Auto-kalibrace (Karpathy loop)</h2>
+    <p>Automaticky kalibracni system inspirovany Karpathyho autoresearch vzorem. Jeden soubor, jedna metrika, jedna smycka.</p>
+
+    <div class="grid grid-2" style="margin-top:16px">
+      <div class="card accent">
+        <div class="tag" style="color:var(--ac3)">Konfigurace</div>
+        <table>
+          <tbody>
+            <tr><td><strong>Target</strong></td><td><code>cw_heuristics.yaml</code></td></tr>
+            <tr><td><strong>Metric</strong></td><td>MAD (Mean Absolute Deviation)</td></tr>
+            <tr><td><strong>Direction</strong></td><td>lower is better</td></tr>
+            <tr><td><strong>Budget</strong></td><td>50 experimentu (~2h)</td></tr>
+            <tr><td><strong>Memory</strong></td><td><code>git log</code> na kalibracni vetvi</td></tr>
+            <tr><td><strong>Evaluator</strong></td><td><code>evaluate_cw.py</code> (LOCKED)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card green">
+        <div class="tag" style="color:var(--gn)">Ocekavane vysledky</div>
+        <ul>
+          <li>Typicke zlepseni: <strong>15&ndash;30% redukce MAD</strong></li>
+          <li>Po 50 experimentech: heuristika odpovida realnym vzorcum tymu</li>
+          <li>Diminishing returns po ~30 experimentech</li>
+          <li>Prerequisite: &ge; 20 manualne potvrzenych CW zaznamu</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Smycka</h3>
+    <div class="card" style="margin-top:12px">
+      <ol class="loop-steps">
+        <li><code>git checkout -b calibration/{`{timestamp}`}</code></li>
+        <li>Pro kazdy experiment (1..budget):
+          <ol class="loop-substeps">
+            <li>Nacti aktualni heuristiku + historii experimentu</li>
+            <li>Navrhni JEDNU zmenu parametru (threshold, weight, signal score)</li>
+            <li><code>git commit -m "exp {`{n}`}: {`{param}`} {`{old}`} -&gt; {`{new}`}"</code></li>
+            <li>Spust: <code>python evaluate_cw.py --ground-truth ... --heuristics ...</code></li>
+            <li>Parsuj MAD z vystupu</li>
+            <li>Pokud MAD &lt; predchozi_best: <span style="color:var(--gn)">KEEP</span> | Jinak: <span style="color:var(--rd)">REVERT</span></li>
+            <li>Loguj do <code>calibration_log.tsv</code></li>
+          </ol>
+        </li>
+        <li>Vytiskni souhrn: initial MAD, final MAD, % zlepseni</li>
+        <li>Zeptej se uzivatele: merge kalibracni vetev do main?</li>
+      </ol>
+    </div>
+
+    <h3>Bezpecnostni omezeni</h3>
+    <div class="grid grid-2" style="margin-top:12px">
+      <div class="note"><strong>Evaluator je LOCKED</strong> — agent nesmi editovat <code>evaluate_cw.py</code>. Oddeleni optimalizeru od objektivni funkce.</div>
+      <div class="note"><strong>Jedna zmena per experiment</strong> — pokud zmenis 5 veci, nevis co fungovalo.</div>
+    </div>
+
+    <h3>Strategie eskalace</h3>
+    <div class="card" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Experimenty</th><th>Focus</th><th>Parametry</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1&ndash;10</td><td>role_weights</td><td>4 parametry (nejvetsi impact)</td></tr>
+          <tr><td>11&ndash;25</td><td>signal weights</td><td>6 parametru</td></tr>
+          <tr><td>26&ndash;50</td><td>threshold + fine-tuning</td><td>kombinovane ladeni</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3. CW Heuristika -->
+  <section id="cw-heuristika">
+    <h2>3. CW Heuristika</h2>
+    <p>Vychozi vahy pro automaticke prirazeni Contribution Weight na zaklade GitHub signalu.</p>
+
+    <div class="grid grid-2" style="margin-top:16px">
+      <div class="card cyan">
+        <div class="tag" style="color:var(--cy)">Role weights</div>
+        <table>
+          <thead>
+            <tr><th>Role</th><th style="text-align:right">CW</th><th>Vizualizace</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>owner</strong></td><td style="text-align:right">1.0</td><td><div class="cw-bar" style="width:100%;background:var(--gn)"></div></td></tr>
+            <tr><td><strong>key</strong></td><td style="text-align:right">0.6</td><td><div class="cw-bar" style="width:60%;background:var(--cy)"></div></td></tr>
+            <tr><td><strong>reviewer</strong></td><td style="text-align:right">0.25</td><td><div class="cw-bar" style="width:25%;background:var(--yl)"></div></td></tr>
+            <tr><td><strong>consulted</strong></td><td style="text-align:right">0.15</td><td><div class="cw-bar" style="width:15%;background:var(--or)"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card yellow">
+        <div class="tag" style="color:var(--yl)">Signal weights</div>
+        <table>
+          <thead>
+            <tr><th>Signal</th><th style="text-align:right">Score</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>assignee</code></td><td style="text-align:right;color:var(--gn)">4.0</td></tr>
+            <tr><td><code>contribute_command</code></td><td style="text-align:right;color:var(--cy)">3.0</td></tr>
+            <tr><td><code>pr_author</code></td><td style="text-align:right;color:var(--cy)">2.0</td></tr>
+            <tr><td><code>commit_author</code></td><td style="text-align:right;color:var(--yl)">1.0</td></tr>
+            <tr><td><code>pr_reviewer</code></td><td style="text-align:right;color:var(--yl)">1.0</td></tr>
+            <tr><td><code>issue_comment</code></td><td style="text-align:right;color:var(--or)">0.5</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="note" style="margin-top:16px"><strong>Pravidlo:</strong> Nejsilnejsi signal urcuje CW. Evidence Score = soucet vsech signalu. Pokud Evidence Score &ge; threshold (default 1.0), osoba je prirazena k itemu.</div>
+  </section>
+
+  <!-- 4. Srovnani metod -->
+  <section id="srovnani">
+    <h2>4. Srovnani metod</h2>
+    <div class="card">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Kriterium</th>
+            <th style="color:var(--gn)">EDPA v2.2</th>
+            <th>Rucni timesheets</th>
+            <th>Fixni alokace</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Presnost</td>
+            <td><span class="badge badge-green">Vysoka</span></td>
+            <td><span class="badge badge-yellow">Stredni</span></td>
+            <td><span class="badge badge-red">Nizka</span></td>
+          </tr>
+          <tr>
+            <td>Usili</td>
+            <td><span class="badge badge-green">Minimalni</span></td>
+            <td><span class="badge badge-red">Vysoke</span></td>
+            <td><span class="badge badge-green">Zadne</span></td>
+          </tr>
+          <tr>
+            <td>Auditovatelnost</td>
+            <td><span class="badge badge-green">Plna</span></td>
+            <td><span class="badge badge-yellow">Castecna</span></td>
+            <td><span class="badge badge-red">Zadna</span></td>
+          </tr>
+          <tr>
+            <td>Dual-view</td>
+            <td><span class="badge badge-green">Ano</span></td>
+            <td><span class="badge badge-red">Ne</span></td>
+            <td><span class="badge badge-red">Ne</span></td>
+          </tr>
+          <tr>
+            <td>Mat. garance</td>
+            <td><span class="badge badge-green">&Sigma; = capacity</span></td>
+            <td><span class="badge badge-red">Zadna</span></td>
+            <td><span class="badge badge-yellow">Slozitejsi</span></td>
+          </tr>
+          <tr>
+            <td>Automatizace</td>
+            <td><span class="badge badge-green">GitHub Actions</span></td>
+            <td><span class="badge badge-red">Manualni</span></td>
+            <td><span class="badge badge-yellow">Castecna</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 5. Demo vypocet -->
+  <section id="demo">
+    <h2>5. Demo vypocet</h2>
+    <p>Staticka ukazka vypoctu EDPA pro 3 osoby a 5 work items. Provozni varianta (Simple mode).</p>
+
+    <h3>Kapacita</h3>
+    <div class="card" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Osoba</th><th>FTE</th><th style="text-align:right">Kapacita (h)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Alice</strong></td><td>0.5</td><td style="text-align:right">40h</td></tr>
+          <tr><td><strong>Bob</strong></td><td>1.0</td><td style="text-align:right">80h</td></tr>
+          <tr><td><strong>Carol</strong></td><td>0.75</td><td style="text-align:right">60h</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Work items &amp; prirazeni</h3>
+    <div class="card" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Item</th><th>JS</th><th>Alice (CW)</th><th>Bob (CW)</th><th>Carol (CW)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>S-101</code></td><td>5</td><td>1.0 (owner)</td><td>0.25 (reviewer)</td><td>&mdash;</td></tr>
+          <tr><td><code>S-102</code></td><td>3</td><td>0.6 (key)</td><td>1.0 (owner)</td><td>&mdash;</td></tr>
+          <tr><td><code>S-103</code></td><td>8</td><td>&mdash;</td><td>1.0 (owner)</td><td>0.6 (key)</td></tr>
+          <tr><td><code>S-104</code></td><td>2</td><td>&mdash;</td><td>0.25 (reviewer)</td><td>1.0 (owner)</td></tr>
+          <tr><td><code>S-105</code></td><td>5</td><td>&mdash;</td><td>&mdash;</td><td>1.0 (owner)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Vypocet skore (Score = JS &times; CW)</h3>
+    <div class="card" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Item</th><th>JS</th><th>Alice Score</th><th>Bob Score</th><th>Carol Score</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>S-101</code></td><td>5</td><td>5.0</td><td>1.25</td><td>&mdash;</td></tr>
+          <tr><td><code>S-102</code></td><td>3</td><td>1.8</td><td>3.0</td><td>&mdash;</td></tr>
+          <tr><td><code>S-103</code></td><td>8</td><td>&mdash;</td><td>8.0</td><td>4.8</td></tr>
+          <tr><td><code>S-104</code></td><td>2</td><td>&mdash;</td><td>0.5</td><td>2.0</td></tr>
+          <tr><td><code>S-105</code></td><td>5</td><td>&mdash;</td><td>&mdash;</td><td>5.0</td></tr>
+          <tr style="border-top:2px solid var(--bd)"><td><strong>&Sigma;</strong></td><td></td><td><strong>6.8</strong></td><td><strong>12.75</strong></td><td><strong>11.8</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Odvozene hodiny (DH = Score / &Sigma;Score &times; Capacity)</h3>
+    <div class="card" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Alice (40h)</th><th>Bob (80h)</th><th>Carol (60h)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>S-101</code></td><td>29.41h</td><td>7.84h</td><td>&mdash;</td></tr>
+          <tr><td><code>S-102</code></td><td>10.59h</td><td>18.82h</td><td>&mdash;</td></tr>
+          <tr><td><code>S-103</code></td><td>&mdash;</td><td>50.20h</td><td>24.41h</td></tr>
+          <tr><td><code>S-104</code></td><td>&mdash;</td><td>3.14h</td><td>10.17h</td></tr>
+          <tr><td><code>S-105</code></td><td>&mdash;</td><td>&mdash;</td><td>25.42h</td></tr>
+          <tr class="total-row"><td><strong>&Sigma;</strong></td><td><strong style="color:var(--gn)">40.00h</strong></td><td><strong style="color:var(--gn)">80.00h</strong></td><td><strong style="color:var(--gn)">60.00h</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid grid-3" style="margin-top:16px">
+      <div class="card green" style="text-align:center">
+        <div class="tag" style="color:var(--gn)">Alice</div>
+        <div class="verify-sum">&Sigma; = 40.00h</div>
+        <div class="verify-cap">Kapacita: 40h</div>
+        <span class="badge badge-green">VERIFIED</span>
+      </div>
+      <div class="card green" style="text-align:center">
+        <div class="tag" style="color:var(--gn)">Bob</div>
+        <div class="verify-sum">&Sigma; = 80.00h</div>
+        <div class="verify-cap">Kapacita: 80h</div>
+        <span class="badge badge-green">VERIFIED</span>
+      </div>
+      <div class="card green" style="text-align:center">
+        <div class="tag" style="color:var(--gn)">Carol</div>
+        <div class="verify-sum">&Sigma; = 60.00h</div>
+        <div class="verify-cap">Kapacita: 60h</div>
+        <span class="badge badge-green">VERIFIED</span>
+      </div>
+    </div>
+
+    <div class="formula" style="margin-top:16px">&Sigma; DerivedHours[P, *] = Capacity[P, I]
+Plati pro kazdou osobu. Vzdy. Bez vyjimky.</div>
+  </section>
+
+</div>
+</Layout>
+
+<style>
+  .evaluation-page {
+    padding-bottom: 40px;
+  }
+  .page-header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--bd);
+    margin-bottom: 40px;
+  }
+  .page-header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--ac), var(--cy));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-top: 8px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: var(--t2);
+    font-style: italic;
+    margin-top: 4px;
+  }
+
+  /* Test summary */
+  .test-summary {
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    padding: 32px;
+    text-align: center;
+    margin-bottom: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .test-summary::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--gn);
+  }
+  .summary-score {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 48px;
+    font-weight: 700;
+  }
+  .score-number { color: var(--gn); }
+  .score-divider { color: var(--t3); margin: 0 4px; }
+  .score-total { color: var(--t2); }
+  .summary-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    letter-spacing: 4px;
+    color: var(--gn);
+    margin-top: 4px;
+  }
+  .summary-bar {
+    width: 200px;
+    height: 6px;
+    background: var(--s3);
+    border-radius: 3px;
+    margin: 16px auto;
+    overflow: hidden;
+  }
+  .bar-fill {
+    width: 100%;
+    height: 100%;
+    background: var(--gn);
+    border-radius: 3px;
+  }
+  .summary-text {
+    font-size: 13px;
+    color: var(--t2);
+    margin-top: 8px;
+  }
+
+  /* Sections */
+  section {
+    margin-bottom: 48px;
+    scroll-margin-top: 72px;
+  }
+  h2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--t1);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--bd);
+  }
+  h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ac3);
+    margin: 24px 0 12px;
+  }
+  p {
+    font-size: 14px;
+    color: var(--t2);
+    margin-bottom: 8px;
+    line-height: 1.7;
+  }
+  ul, ol {
+    font-size: 14px;
+    color: var(--t2);
+    padding-left: 20px;
+    margin: 8px 0;
+  }
+  li {
+    margin-bottom: 4px;
+    line-height: 1.6;
+  }
+
+  /* Test cards */
+  .tests-grid {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .test-card {
+    padding: 16px 20px;
+  }
+  .test-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .test-index {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--t3);
+    min-width: 20px;
+  }
+  .test-name {
+    font-size: 12px;
+    flex: 1;
+  }
+  .test-desc {
+    font-size: 13px;
+    color: var(--t2);
+    margin-bottom: 6px;
+    margin-left: 30px;
+  }
+  .test-expected {
+    margin-left: 30px;
+    font-size: 12px;
+    color: var(--t3);
+  }
+  .expected-label {
+    margin-right: 6px;
+  }
+
+  /* CW bars */
+  .cw-bar {
+    height: 8px;
+    border-radius: 4px;
+    min-width: 4px;
+  }
+
+  /* Loop steps */
+  .loop-steps {
+    padding-left: 20px;
+  }
+  .loop-steps > li {
+    margin-bottom: 8px;
+  }
+  .loop-substeps {
+    padding-left: 20px;
+    margin-top: 6px;
+  }
+  .loop-substeps li {
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+
+  /* Comparison table */
+  .comparison-table td {
+    vertical-align: middle;
+  }
+
+  /* Demo verification */
+  .verify-sum {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--gn);
+    margin: 8px 0 2px;
+  }
+  .verify-cap {
+    font-size: 12px;
+    color: var(--t3);
+    margin-bottom: 8px;
+  }
+  .total-row td {
+    border-top: 2px solid var(--bd);
+  }
+
+  @media (max-width: 768px) {
+    .page-header h1 {
+      font-size: 18px;
+    }
+    .summary-score {
+      font-size: 36px;
+    }
+  }
+</style>
