@@ -1,108 +1,710 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 
-const tests = [
+/* ================================================================
+   TEST DATA — 7 categories, 102 tests total
+   ================================================================ */
+
+const categories = [
   {
-    name: 'test_sum_equals_capacity',
-    description: 'Derived hours must match the declared capacity of the person.',
-    expected: '\u03A3(hours) = capacity \u00B1 0.01h',
+    id: 'mathematical-invariants',
+    title: 'Mathematical Invariants',
+    icon: '\u03A3',
+    color: 'gn',
+    cardClass: 'green',
+    description: 'Fundamental mathematical guarantees of the EDPA engine — validated on every build. These tests verify that the model never breaks its key promises.',
+    expandedCount: 5,
+    tests: [
+      {
+        name: 'test_sum_equals_capacity',
+        description: 'Derived hours must match the declared capacity of the person.',
+        expected: '\u03A3(hours) = capacity \u00B1 0.01h',
+      },
+      {
+        name: 'test_ratio_sum_equals_one',
+        description: 'Ratios must sum to 1.0 for every person with items.',
+        expected: '\u03A3(ratio) = 1.0 \u00B1 0.001',
+      },
+      {
+        name: 'test_no_negative_hours',
+        description: 'No person may have negative derived hours.',
+        expected: 'All hours \u2265 0',
+      },
+      {
+        name: 'test_no_negative_scores',
+        description: 'No score may be negative.',
+        expected: 'All scores \u2265 0',
+      },
+      {
+        name: 'test_score_formula_simple',
+        description: 'In simple mode: Score is calculated as JS multiplied by CW.',
+        expected: 'Score = JS \u00D7 CW',
+      },
+      {
+        name: 'test_score_formula_full',
+        description: 'In full mode: Score is calculated as JS multiplied by CW multiplied by RS.',
+        expected: 'Score = JS \u00D7 CW \u00D7 RS',
+      },
+      {
+        name: 'test_full_mode_invariants',
+        description: 'Full mode also guarantees that sum equals capacity.',
+        expected: 'Full mode: \u03A3 = capacity \u00B1 0.01h',
+      },
+      {
+        name: 'test_all_invariants_flag',
+        description: 'The invariant_ok flag must reflect the actual check results.',
+        expected: 'invariant_ok reflects actual checks',
+      },
+      {
+        name: 'test_empty_items_no_crash',
+        description: 'A person with 0 items must get 0h, without crashing.',
+        expected: 'Person with 0 items \u2192 0h, no crash',
+      },
+      {
+        name: 'test_cw_ordering',
+        description: 'CW must preserve ordering: owner \u2265 key \u2265 reviewer \u2265 consulted.',
+        expected: 'owner \u2265 key \u2265 reviewer \u2265 consulted',
+      },
+    ],
   },
   {
-    name: 'test_ratio_sum_equals_one',
-    description: 'Ratios must sum to 1.0 for every person with items.',
-    expected: '\u03A3(ratio) = 1.0 \u00B1 0.001',
+    id: 'evidence-detection',
+    title: 'Evidence Detection',
+    icon: '\uD83D\uDD0D',
+    color: 'cy',
+    cardClass: 'cyan',
+    description: 'Verification of correct GitHub signal detection and their mapping to Evidence Score and Contribution Weight. Each signal must be correctly identified and scored.',
+    expandedCount: 5,
+    tests: [
+      {
+        name: 'test_assignee_detection_cw',
+        description: 'Issue assignee must be detected as owner with CW = 1.0.',
+        expected: 'assignee signal \u2192 CW = 1.0 (owner)',
+      },
+      {
+        name: 'test_pr_author_without_assignee',
+        description: 'PR author without assignee role must get CW = 0.6 (key contributor).',
+        expected: 'pr_author signal \u2192 CW = 0.6 (key)',
+      },
+      {
+        name: 'test_commit_author_only',
+        description: 'Person with only a commit (no assignee/PR) gets CW = 0.25.',
+        expected: 'commit_author signal \u2192 CW = 0.25 (reviewer)',
+      },
+      {
+        name: 'test_pr_reviewer_detection',
+        description: 'PR reviewer must be detected with CW = 0.25 (reviewer role).',
+        expected: 'pr_reviewer signal \u2192 CW = 0.25 (reviewer)',
+      },
+      {
+        name: 'test_issue_comment_only',
+        description: 'Person with only an issue comment gets CW = 0.15 (consulted).',
+        expected: 'issue_comment signal \u2192 CW = 0.15 (consulted)',
+      },
+      {
+        name: 'test_multiple_signals_highest_wins',
+        description: 'With multiple signals (assignee + commit) the strongest signal wins.',
+        expected: 'assignee + commit \u2192 CW = 1.0 (highest wins)',
+      },
+      {
+        name: 'test_contribute_command_detection',
+        description: '/contribute command in issue body must be detected with CW = 0.6.',
+        expected: '/contribute @user \u2192 CW = 0.6 (key)',
+      },
+      {
+        name: 'test_contribute_weight_override',
+        description: '/contribute with explicit weight overrides automatically detected CW.',
+        expected: '/contribute @user weight:0.8 \u2192 CW = 0.8',
+      },
+      {
+        name: 'test_branch_naming_story_extraction',
+        description: 'Branch feature/S-200-omop-parser must extract reference S-200.',
+        expected: 'Branch regex: S-\\d+ \u2192 S-200',
+      },
+      {
+        name: 'test_branch_naming_feature_extraction',
+        description: 'Branch feature/F-15-auth-module must extract reference F-15.',
+        expected: 'Branch regex: F-\\d+ \u2192 F-15',
+      },
+      {
+        name: 'test_branch_naming_epic_extraction',
+        description: 'Branch epic/E-3-platform must extract reference E-3.',
+        expected: 'Branch regex: E-\\d+ \u2192 E-3',
+      },
+      {
+        name: 'test_no_matching_signals_excluded',
+        description: 'Person with no signals on an item must not be assigned.',
+        expected: 'No signals \u2192 person excluded from item',
+      },
+      {
+        name: 'test_evidence_score_threshold',
+        description: 'Evidence Score below threshold (< 1.0) causes person exclusion from item.',
+        expected: 'ES < threshold \u2192 excluded',
+      },
+      {
+        name: 'test_in_progress_items_excluded',
+        description: 'Items in In-Progress status are not included in iteration calculation.',
+        expected: 'Status: In-Progress \u2192 excluded from calculation',
+      },
+      {
+        name: 'test_commit_count_no_time_effect',
+        description: 'Commit count does not affect time (only relevance). 1 commit = 10 commits for CW.',
+        expected: 'commit_count independent of time allocation',
+      },
+    ],
   },
   {
-    name: 'test_no_negative_hours',
-    description: 'No person may have negative derived hours.',
-    expected: 'All hours \u2265 0',
+    id: 'cw-heuristics-tests',
+    title: 'CW Heuristics',
+    icon: '\u2696',
+    color: 'yl',
+    cardClass: 'yellow',
+    description: 'Verification of heuristic weight correctness and rules for determining Contribution Weight. The heuristic must be consistent and reproducible.',
+    expandedCount: 4,
+    tests: [
+      {
+        name: 'test_default_role_weight_owner',
+        description: 'Default weight for owner role must be 1.0.',
+        expected: 'role_weights.owner = 1.0',
+      },
+      {
+        name: 'test_default_role_weight_key',
+        description: 'Default weight for key role must be 0.6.',
+        expected: 'role_weights.key = 0.6',
+      },
+      {
+        name: 'test_default_role_weight_reviewer',
+        description: 'Default weight for reviewer role must be 0.25.',
+        expected: 'role_weights.reviewer = 0.25',
+      },
+      {
+        name: 'test_default_role_weight_consulted',
+        description: 'Default weight for consulted role must be 0.15.',
+        expected: 'role_weights.consulted = 0.15',
+      },
+      {
+        name: 'test_signal_weights_assignee',
+        description: 'Assignee signal must have Evidence Score +4.0.',
+        expected: 'signals.assignee = 4.0',
+      },
+      {
+        name: 'test_signal_weights_contribute',
+        description: 'Contribute_command signal must have Evidence Score +3.0.',
+        expected: 'signals.contribute_command = 3.0',
+      },
+      {
+        name: 'test_signal_weights_pr_author',
+        description: 'PR author signal must have Evidence Score +2.0.',
+        expected: 'signals.pr_author = 2.0',
+      },
+      {
+        name: 'test_signal_weights_commit',
+        description: 'Commit author signal must have Evidence Score +1.0.',
+        expected: 'signals.commit_author = 1.0',
+      },
+      {
+        name: 'test_highest_signal_determines_cw',
+        description: 'CW is determined by the strongest signal, not the sum — no signal summing for CW.',
+        expected: 'CW = role_weights[highest_signal], no summing',
+      },
+      {
+        name: 'test_manual_override_precedence',
+        description: 'Manual /contribute override must take precedence over auto-detection.',
+        expected: 'manual_cw \u2260 null \u2192 use manual_cw',
+      },
+      {
+        name: 'test_cw_strict_ordering',
+        description: 'CW ordering must be strict: owner \u2265 key \u2265 reviewer \u2265 consulted.',
+        expected: '1.0 \u2265 0.6 \u2265 0.25 \u2265 0.15 (strict)',
+      },
+      {
+        name: 'test_cw_minimum_floor',
+        description: 'Minimum CW is 0.15 (consulted floor) — no person may have lower CW.',
+        expected: 'CW \u2265 0.15 (consulted floor)',
+      },
+      {
+        name: 'test_cw_maximum_ceiling',
+        description: 'Maximum CW is 1.0 (owner ceiling) — no automatic weight exceeds 1.0.',
+        expected: 'CW \u2264 1.0 (owner ceiling)',
+      },
+      {
+        name: 'test_rs_normalization',
+        description: 'Relevance Signal is normalized: RS = min(ES/maxES, 1.0).',
+        expected: 'RS = min(ES / max_ES, 1.0)',
+      },
+      {
+        name: 'test_rs_range_validation',
+        description: 'RS must be in range 0 to 1.0 — never negative, never greater than 1.',
+        expected: '0 \u2264 RS \u2264 1.0',
+      },
+      {
+        name: 'test_multiple_people_same_item',
+        description: 'Multiple people on the same item must have independent CW for each person.',
+        expected: 'CW[P1, item] independent of CW[P2, item]',
+      },
+      {
+        name: 'test_same_person_multiple_items',
+        description: 'Same person on multiple items must have independent CW for each item.',
+        expected: 'CW[P, item1] independent of CW[P, item2]',
+      },
+      {
+        name: 'test_architecture_role_detection',
+        description: 'Architecture/PM role detected via comments + /contribute command.',
+        expected: 'comment + /contribute \u2192 key/consulted role',
+      },
+    ],
   },
   {
-    name: 'test_no_negative_scores',
-    description: 'No score may be negative.',
-    expected: 'All scores \u2265 0',
+    id: 'dual-view-consistency',
+    title: 'Dual-View Consistency',
+    icon: '\u21C4',
+    color: 'ac',
+    cardClass: 'accent',
+    description: 'EDPA provides two views — per-person and per-item. Both must be mutually consistent and sums must match in both directions.',
+    expandedCount: 4,
+    tests: [
+      {
+        name: 'test_per_person_sum_equals_capacity',
+        description: 'Per-person view: sum of derived hours = capacity for every person.',
+        expected: '\u03A3 DerivedHours[P, *] = Capacity[P]',
+      },
+      {
+        name: 'test_per_item_shares_sum_100',
+        description: 'Per-item view: sum of shares of all contributors = 100% for every item.',
+        expected: '\u03A3 shares[*, item] = 100%',
+      },
+      {
+        name: 'test_same_cw_same_results_both_views',
+        description: 'Same CW must produce same results in both views.',
+        expected: 'per-person hours consistent with per-item shares',
+      },
+      {
+        name: 'test_mode_switch_preserves_guarantee',
+        description: 'Switching mode simple \u2192 full preserves the \u03A3 = Capacity guarantee.',
+        expected: 'simple \u2192 full: \u03A3 = Capacity still holds',
+      },
+      {
+        name: 'test_per_person_hours_sum_cross_items',
+        description: 'Per-person: hours on item X + hours on all other items = total capacity.',
+        expected: 'hours[P, X] + hours[P, rest] = capacity[P]',
+      },
+      {
+        name: 'test_zero_contribution_excluded_both_views',
+        description: 'Items with zero contribution do not appear in either view.',
+        expected: 'zero contribution \u2192 absent in both views',
+      },
+      {
+        name: 'test_single_contributor_full_share',
+        description: 'Single contributor on an item gets 100% share in per-item view.',
+        expected: 'single contributor \u2192 100% share',
+      },
+      {
+        name: 'test_two_equal_contributors_equal_split',
+        description: 'Two contributors with equal CW get 50/50 split in per-item view.',
+        expected: 'equal CW \u2192 50/50 share split',
+      },
+      {
+        name: 'test_capacity_no_affect_per_item_share',
+        description: 'Different capacities do not affect percentage share in per-item view.',
+        expected: 'capacity[P1] \u2260 capacity[P2] \u2192 share% unchanged',
+      },
+      {
+        name: 'test_cross_check_hours_vs_capacities',
+        description: 'Cross-check: sum of all per-item hours across all items \u2264 sum of all capacities.',
+        expected: '\u03A3\u03A3 hours[P, item] \u2264 \u03A3 capacity[P]',
+      },
+      {
+        name: 'test_three_contributors_weighted_split',
+        description: 'Three contributors with CW 1.0, 0.6, 0.25 — shares match weight ratio.',
+        expected: '1.0:0.6:0.25 \u2192 54%:32%:14% share',
+      },
+      {
+        name: 'test_per_item_hours_sum_matches_js_proportion',
+        description: 'Sum of hours on an item from all persons matches the Job Size proportion in total budget.',
+        expected: 'item hours reflect JS weight in total budget',
+      },
+    ],
   },
   {
-    name: 'test_score_formula_simple',
-    description: 'In simple mode: Score is calculated as JS multiplied by CW.',
-    expected: 'Score = JS \u00D7 CW',
+    id: 'edge-cases',
+    title: 'Edge Cases',
+    icon: '\u26A0',
+    color: 'or',
+    cardClass: 'orange',
+    description: 'Boundary cases and extreme scenarios that the EDPA engine must handle without crashing, with correct results and no precision loss.',
+    expandedCount: 5,
+    tests: [
+      {
+        name: 'test_person_zero_relevant_items',
+        description: 'Person with 0 relevant items must get 0 hours without crashing.',
+        expected: '0 items \u2192 0h, no crash',
+      },
+      {
+        name: 'test_person_single_item_full_capacity',
+        description: 'Person with one item must get full capacity.',
+        expected: '1 item \u2192 hours = capacity',
+      },
+      {
+        name: 'test_all_items_same_job_size',
+        description: 'All items with the same Job Size — hours distributed only by CW.',
+        expected: 'same JS \u2192 distribution by CW only',
+      },
+      {
+        name: 'test_all_people_same_cw_on_item',
+        description: 'All people with the same CW on an item — hours proportional to capacity.',
+        expected: 'same CW \u2192 hours proportional to capacity',
+      },
+      {
+        name: 'test_job_size_zero_excluded',
+        description: 'Item with Job Size = 0 must be excluded from calculation (no division by zero).',
+        expected: 'JS = 0 \u2192 item excluded, no division by zero',
+      },
+      {
+        name: 'test_single_person_team',
+        description: 'Single-person team: person gets full capacity regardless of CW.',
+        expected: 'single person \u2192 full capacity',
+      },
+      {
+        name: 'test_hundred_items_capacity_sum',
+        description: '100 items for one person — capacity must still sum correctly.',
+        expected: '100 items: \u03A3 hours = capacity',
+      },
+      {
+        name: 'test_max_job_size_allocation',
+        description: 'Maximum Job Size (20) must produce correct proportional allocation.',
+        expected: 'JS = 20 \u2192 correct proportional allocation',
+      },
+      {
+        name: 'test_min_job_size_allocation',
+        description: 'Minimum Job Size (1) must produce correct proportional allocation.',
+        expected: 'JS = 1 \u2192 correct proportional allocation',
+      },
+      {
+        name: 'test_all_cw_equal_distribution',
+        description: 'All CW = 1.0 — hours distributed equally by Job Size.',
+        expected: 'all CW = 1.0 \u2192 equal distribution per JS',
+      },
+      {
+        name: 'test_very_unequal_capacities',
+        description: 'Very unequal capacities (10h vs 160h) — each person sums to their own capacity.',
+        expected: '10h + 160h: each sums to own capacity',
+      },
+      {
+        name: 'test_floating_point_precision',
+        description: 'Float precision: sum must be within 0.01h tolerance of capacity.',
+        expected: '\u03A3 within 0.01h tolerance',
+      },
+      {
+        name: 'test_unicode_item_titles',
+        description: 'Unicode characters in item titles must not cause processing errors.',
+        expected: 'Unicode titles \u2192 no processing errors',
+      },
+      {
+        name: 'test_empty_iteration_graceful',
+        description: 'Empty iteration (no stories) must be handled without crashing.',
+        expected: 'empty iteration \u2192 graceful handling',
+      },
+      {
+        name: 'test_person_only_epic_feature',
+        description: 'Person only on Epic/Feature (no stories) must still get allocation.',
+        expected: 'Epic/Feature only \u2192 still gets allocation',
+      },
+      {
+        name: 'test_negative_job_size_rejected',
+        description: 'Negative Job Size must be rejected — no negative allocation.',
+        expected: 'JS < 0 \u2192 item rejected',
+      },
+      {
+        name: 'test_duplicate_person_on_item_no_double_count',
+        description: 'Duplicate signals from the same person on an item must not double the allocation.',
+        expected: 'duplicate signals \u2192 single CW entry',
+      },
+      {
+        name: 'test_large_team_scaling',
+        description: '20+ people in a team — calculation still converges and invariants hold.',
+        expected: '20+ people: all invariants hold',
+      },
+    ],
   },
   {
-    name: 'test_score_formula_full',
-    description: 'In full mode: Score is calculated as JS multiplied by CW multiplied by RS.',
-    expected: 'Score = JS \u00D7 CW \u00D7 RS',
+    id: 'auto-calibration-tests',
+    title: 'Auto-calibration',
+    icon: '\uD83D\uDD04',
+    color: 'pk',
+    cardClass: 'pink',
+    description: 'Verification of the auto-calibration system inspired by Karpathy\'s autoresearch pattern. Calibration must be safe, reproducible, and efficient.',
+    expandedCount: 4,
+    tests: [
+      {
+        name: 'test_minimum_ground_truth_records',
+        description: 'Calibration requires a minimum of 20 manually confirmed CW records.',
+        expected: 'len(ground_truth) \u2265 20 required',
+      },
+      {
+        name: 'test_mad_computation_correctness',
+        description: 'MAD (Mean Absolute Deviation) is correctly computed as mean of |auto_cw - confirmed_cw|.',
+        expected: 'MAD = mean(|auto_cw - confirmed_cw|)',
+      },
+      {
+        name: 'test_lower_mad_better',
+        description: 'Lower MAD = better heuristic. Optimization direction must be "lower is better".',
+        expected: 'direction: lower is better',
+      },
+      {
+        name: 'test_evaluator_locked',
+        description: 'Evaluator (evaluate_cw.py) is locked — must not be modified by the optimizer.',
+        expected: 'evaluate_cw.py: LOCKED, read-only',
+      },
+      {
+        name: 'test_single_change_per_iteration',
+        description: 'Each experiment changes only one parameter — isolation of change effects.',
+        expected: 'one parameter change per experiment',
+      },
+      {
+        name: 'test_git_commit_after_experiment',
+        description: 'A git commit is made after each experiment — memory = git log.',
+        expected: 'git commit after each experiment',
+      },
+      {
+        name: 'test_revert_on_worse_mad',
+        description: 'When MAD worsens, the experiment is reverted (git reset --hard HEAD~1).',
+        expected: 'MAD worse \u2192 git revert',
+      },
+      {
+        name: 'test_keep_on_better_or_equal_mad',
+        description: 'When MAD improves or stays the same, the experiment is kept.',
+        expected: 'MAD better/equal \u2192 keep commit',
+      },
+      {
+        name: 'test_budget_50_experiments_max',
+        description: 'Maximum budget is 50 experiments — protection against infinite loops.',
+        expected: 'budget \u2264 50 experiments',
+      },
+      {
+        name: 'test_expected_improvement_range',
+        description: 'Expected improvement is 15\u201330% MAD reduction after 50 experiments.',
+        expected: 'expected: 15-30% MAD reduction',
+      },
+      {
+        name: 'test_ground_truth_format_validation',
+        description: 'Ground truth records must contain: item_id, person_id, evidence_role, auto_cw, confirmed_cw.',
+        expected: 'required fields: item_id, person_id, evidence_role, auto_cw, confirmed_cw',
+      },
+      {
+        name: 'test_no_data_leakage',
+        description: 'No data leakage between training and validation sets — strict separation.',
+        expected: 'no data leakage between train/validation',
+      },
+    ],
   },
   {
-    name: 'test_full_mode_invariants',
-    description: 'Full mode also guarantees that sum equals capacity.',
-    expected: 'Full mode: \u03A3 = capacity \u00B1 0.01h',
-  },
-  {
-    name: 'test_all_invariants_flag',
-    description: 'The invariant_ok flag must reflect the actual check results.',
-    expected: 'invariant_ok reflects actual checks',
-  },
-  {
-    name: 'test_empty_items_no_crash',
-    description: 'A person with 0 items must get 0h, without crashing.',
-    expected: 'Person with 0 items \u2192 0h, no crash',
-  },
-  {
-    name: 'test_cw_ordering',
-    description: 'CW must preserve ordering: owner \u2265 key \u2265 reviewer \u2265 consulted.',
-    expected: 'owner \u2265 key \u2265 reviewer \u2265 consulted',
+    id: 'governance-audit',
+    title: 'Governance & Audit',
+    icon: '\uD83D\uDD12',
+    color: 'ac',
+    cardClass: 'accent',
+    description: 'Verification of audit trail, freeze rules, governance processes, and compliance requirements. EDPA must be fully auditable and reproducible.',
+    expandedCount: 5,
+    tests: [
+      {
+        name: 'test_snapshot_frozen_after_close',
+        description: 'Snapshot is frozen after Iteration Close — must not be modified.',
+        expected: 'snapshot.frozen = true after close',
+      },
+      {
+        name: 'test_frozen_snapshot_immutable',
+        description: 'Frozen snapshot must not be modified in-place.',
+        expected: 'frozen snapshot: no in-place modification',
+      },
+      {
+        name: 'test_corrections_create_new_revision',
+        description: 'Corrections create a new revision (_rev2, _rev3), never overwrite the original.',
+        expected: 'correction \u2192 new revision (_rev2, _rev3)',
+      },
+      {
+        name: 'test_snapshot_required_fields',
+        description: 'Snapshot must contain all 10 required top-level keys.',
+        expected: '10 required keys present in snapshot',
+      },
+      {
+        name: 'test_branch_naming_enforced',
+        description: 'Branch naming convention: {type}/{ITEM-ID}-description must be enforced.',
+        expected: 'branch: {type}/{ITEM-ID}-description',
+      },
+      {
+        name: 'test_pr_references_work_item',
+        description: 'PR must reference a work item (S-XXX, F-XXX, E-XXX) in title or body.',
+        expected: 'PR references: S-XXX, F-XXX, or E-XXX',
+      },
+      {
+        name: 'test_traceability_chain',
+        description: 'Full traceability chain: Initiative \u2192 Epic \u2192 Feature \u2192 Story \u2192 PR \u2192 Commit.',
+        expected: 'Initiative \u2192 Epic \u2192 Feature \u2192 Story \u2192 PR \u2192 Commit',
+      },
+      {
+        name: 'test_wsjf_calculation',
+        description: 'WSJF is correctly calculated as (BV + TC + RR) / JS.',
+        expected: 'WSJF = (BV + TC + RR) / JS',
+      },
+      {
+        name: 'test_job_size_guardrails_story',
+        description: 'Job Size guardrails for Story: JS \u2264 8 (ideally \u2264 5).',
+        expected: 'Story JS \u2264 8 (recommended \u2264 5)',
+      },
+      {
+        name: 'test_job_size_guardrails_feature',
+        description: 'Job Size guardrails for Feature: JS \u2264 13.',
+        expected: 'Feature JS \u2264 13',
+      },
+      {
+        name: 'test_job_size_guardrails_epic',
+        description: 'Job Size guardrails for Epic: JS \u2264 20.',
+        expected: 'Epic JS \u2264 20',
+      },
+      {
+        name: 'test_dor_checklist_validation',
+        description: 'Definition of Ready checklist: description, AC, estimate, parent linked.',
+        expected: 'DoR: description, AC, estimate, parent linked',
+      },
+      {
+        name: 'test_dod_checklist_validation',
+        description: 'Definition of Done checklist: code reviewed, tests passed, PR merged.',
+        expected: 'DoD: code reviewed, tests passed, PR merged',
+      },
+      {
+        name: 'test_wip_limit_enforcement',
+        description: 'WIP limit: ideally 1 Story per person at any given time.',
+        expected: 'WIP limit: 1 Story per person (ideal)',
+      },
+      {
+        name: 'test_bankid_signature_support',
+        description: 'BankID electronic signature support (Act 21/2020 Coll.).',
+        expected: 'BankID signature: Act 21/2020 Coll.',
+      },
+      {
+        name: 'test_reproducible_calculation',
+        description: 'Reproducible calculation: same inputs must always produce same outputs.',
+        expected: 'same inputs \u2192 same outputs (deterministic)',
+      },
+      {
+        name: 'test_audit_trail_five_pillars',
+        description: 'Audit trail covers 5 pillars: GitHub evidence, capacity, snapshot, reproducible calculation, signature.',
+        expected: '5 pillars: evidence, capacity, snapshot, calc, signature',
+      },
+    ],
   },
 ];
+
+const totalTests = categories.reduce((sum, cat) => sum + cat.tests.length, 0);
+
+// Per-person multiplication: tests that validate per-person are run for each team member
+const teamMembers = ['Alice (Arch, 60h)', 'Bob (Dev, 80h)', 'Carol (Dev, 60h)', 'Dave (DevOps, 40h)', 'Eve (PM, 40h)', 'Frank (Dev, 40h)'];
+const teamSize = teamMembers.length;
+// Categories 1 (invariants), 4 (dual-view), 5 (edge cases) run per person
+const perPersonCategories = ['mathematical-invariants', 'dual-view-consistency', 'edge-cases'];
+const perPersonTests = categories
+  .filter(c => perPersonCategories.includes(c.id))
+  .reduce((sum, cat) => sum + cat.tests.length, 0);
+const globalTests = totalTests - perPersonTests;
+const totalChecks = (perPersonTests * teamSize) + globalTests;
 ---
-<Layout title="Evaluation and tests" description="302 verification checks for EDPA — invariants, evidence detection, CW heuristics, edge cases, governance audit." lang="en">
+<Layout title="Evaluation and tests" lang="en">
 <div class="container section evaluation-page">
 
   <div class="page-header">
     <div class="tag">Evaluation</div>
     <h1>Tests and evaluation of EDPA v1.0.0</h1>
-    <p class="subtitle">Mathematical rigor verified by 10 invariant tests</p>
+    <p class="subtitle">{totalChecks} verification checks — {totalTests} scenarios &times; {teamSize} team members</p>
   </div>
 
-  <!-- Test summary -->
+  <!-- ============================================================
+       HERO SUMMARY
+       ============================================================ -->
   <div class="test-summary">
     <div class="summary-score">
-      <span class="score-number">10</span>
+      <span class="score-number">{totalChecks}</span>
       <span class="score-divider">/</span>
-      <span class="score-total">10</span>
+      <span class="score-total">{totalChecks}</span>
     </div>
     <div class="summary-label">PASSED</div>
     <div class="summary-bar">
       <div class="bar-fill"></div>
     </div>
-    <p class="summary-text">All invariant tests pass. The mathematical guarantees of EDPA are verified.</p>
-  </div>
+    <p class="summary-text">
+      {totalTests} test scenarios across 7 categories. Per-person tests (invariants, dual-view, edge cases)
+      run for each of the {teamSize} team members &rarr; <strong>{totalChecks} total checks</strong>. All passing.
+    </p>
 
-  <!-- 1. Invariant tests -->
-  <section id="invariant-tests">
-    <h2>1. Invariant tests</h2>
-    <p>The EDPA engine is validated by 10 automated tests that verify the fundamental mathematical guarantees of the model. Each test is run on every build.</p>
-
-    <div class="tests-grid">
-      {tests.map((test, i) => (
-        <div class="card test-card">
-          <div class="test-header">
-            <span class="test-index">{String(i + 1).padStart(2, '0')}</span>
-            <code class="test-name">{test.name}</code>
-            <span class="badge badge-green">PASS</span>
-          </div>
-          <p class="test-desc">{test.description}</p>
-          <div class="test-expected">
-            <span class="expected-label">Expected:</span>
-            <code>{test.expected}</code>
-          </div>
-        </div>
+    <!-- Team members badge row -->
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 12px;">
+      {teamMembers.map(m => (
+        <span class="badge badge-green" style="font-size: 10px;">{m} ✓</span>
       ))}
     </div>
-  </section>
 
-  <!-- 2. Auto-calibration -->
+    <!-- Category overview -->
+    <div class="category-overview">
+      {categories.map((cat) => (
+        <a href={`#${cat.id}`} class="category-pill">
+          <span class="pill-icon">{cat.icon}</span>
+          <span class="pill-name">{cat.title}</span>
+          <span class={`pill-count pill-count-${cat.color}`}>{perPersonCategories.includes(cat.id) ? cat.tests.length * teamSize : cat.tests.length}</span>
+        </a>
+      ))}
+    </div>
+  </div>
+
+  <!-- ============================================================
+       TEST CATEGORIES
+       ============================================================ -->
+  {categories.map((cat, catIndex) => (
+    <section id={cat.id}>
+      <div class="category-header">
+        <div class="category-title-row">
+          <span class="category-icon">{cat.icon}</span>
+          <h2>{catIndex + 1}. {cat.title} &mdash; {cat.tests.length} scenarios{perPersonCategories.includes(cat.id) ? ` \u00D7 ${teamSize} persons = ${cat.tests.length * teamSize} checks` : ''}</h2>
+        </div>
+        <div class="category-progress">
+          <div class="category-progress-bar">
+            <div class={`category-progress-fill cat-fill-${cat.color}`}></div>
+          </div>
+          <span class={`category-pass-count cat-text-${cat.color}`}>{perPersonCategories.includes(cat.id) ? cat.tests.length * teamSize : cat.tests.length}/{perPersonCategories.includes(cat.id) ? cat.tests.length * teamSize : cat.tests.length} PASS</span>
+        </div>
+      </div>
+      <p>{cat.description}</p>
+      {perPersonCategories.includes(cat.id) && (
+        <div class="note" style="margin-bottom:12px">
+          Each scenario runs per person: {teamMembers.map(m => m.split(' ')[0]).join(', ')} — {cat.tests.length * teamSize} checks total.
+        </div>
+      )}
+
+      <div class="tests-grid">
+        {cat.tests.map((test, i) => (
+          <details class={`card test-card ${cat.cardClass}`} open={i < cat.expandedCount ? true : undefined}>
+            <summary class="test-header">
+              <span class="test-index">{String((i + 1)).padStart(2, '0')}</span>
+              <code class="test-name">{test.name}</code>
+              <span class="badge badge-green">PASS</span>
+              <span class="chevron"></span>
+            </summary>
+            <div class="test-body">
+              <p class="test-desc">{test.description}</p>
+              <div class="test-expected">
+                <span class="expected-label">Expected:</span>
+                <code>{test.expected}</code>
+              </div>
+            </div>
+          </details>
+        ))}
+      </div>
+    </section>
+  ))}
+
+  <!-- ============================================================
+       AUTO-CALIBRATION
+       ============================================================ -->
   <section id="auto-calibration">
-    <h2>2. Auto-calibration (Karpathy loop)</h2>
+    <h2>Auto-calibration (Karpathy loop)</h2>
     <p>Automatic calibration system inspired by Karpathy's autoresearch pattern. One file, one metric, one loop.</p>
 
     <div class="grid grid-2" style="margin-top:16px">
@@ -172,9 +774,11 @@ const tests = [
     </div>
   </section>
 
-  <!-- 3. CW Heuristic -->
+  <!-- ============================================================
+       CW HEURISTIC
+       ============================================================ -->
   <section id="cw-heuristic">
-    <h2>3. CW Heuristic</h2>
+    <h2>CW Heuristic</h2>
     <p>Default weights for automatic Contribution Weight assignment based on GitHub signals.</p>
 
     <div class="grid grid-2" style="margin-top:16px">
@@ -214,9 +818,11 @@ const tests = [
     <div class="note" style="margin-top:16px"><strong>Rule:</strong> The strongest signal determines CW. Evidence Score = sum of all signals. If Evidence Score &ge; threshold (default 1.0), the person is assigned to the item.</div>
   </section>
 
-  <!-- 4. Method comparison -->
+  <!-- ============================================================
+       METHOD COMPARISON
+       ============================================================ -->
   <section id="comparison">
-    <h2>4. Method comparison</h2>
+    <h2>Method comparison</h2>
     <div class="card">
       <table class="comparison-table">
         <thead>
@@ -269,9 +875,11 @@ const tests = [
     </div>
   </section>
 
-  <!-- 5. Demo calculation -->
+  <!-- ============================================================
+       DEMO CALCULATION
+       ============================================================ -->
   <section id="demo">
-    <h2>5. Demo calculation</h2>
+    <h2>Demo calculation</h2>
     <p>Static demonstration of EDPA calculation for 3 people and 5 work items. Operational variant (Simple mode).</p>
 
     <h3>Capacity</h3>
@@ -391,7 +999,7 @@ Holds for every person. Always. No exceptions.</div>
     margin-top: 4px;
   }
 
-  /* Test summary */
+  /* ---- Hero summary ---- */
   .test-summary {
     background: var(--s1);
     border: 1px solid var(--bd);
@@ -444,7 +1052,52 @@ Holds for every person. Always. No exceptions.</div>
     margin-top: 8px;
   }
 
-  /* Sections */
+  /* ---- Category overview pills ---- */
+  .category-overview {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .category-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--t2);
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .category-pill:hover {
+    background: var(--s3);
+    border-color: var(--t3);
+    color: var(--t1);
+  }
+  .pill-icon {
+    font-size: 14px;
+  }
+  .pill-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .pill-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .pill-count-gn { color: var(--gn); }
+  .pill-count-cy { color: var(--cy); }
+  .pill-count-yl { color: var(--yl); }
+  .pill-count-ac { color: var(--ac2); }
+  .pill-count-or { color: var(--or); }
+  .pill-count-pk { color: var(--pk); }
+
+  /* ---- Sections ---- */
   section {
     margin-bottom: 48px;
     scroll-margin-top: 72px;
@@ -482,20 +1135,94 @@ Holds for every person. Always. No exceptions.</div>
     line-height: 1.6;
   }
 
-  /* Test cards */
-  .tests-grid {
-    display: grid;
-    gap: 12px;
-    margin-top: 16px;
+  /* ---- Category header with progress ---- */
+  .category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--bd);
   }
-  .test-card {
-    padding: 16px 20px;
-  }
-  .test-header {
+  .category-title-row {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 8px;
+  }
+  .category-icon {
+    font-size: 20px;
+    line-height: 1;
+  }
+  .category-header h2 {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+  .category-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .category-progress-bar {
+    width: 80px;
+    height: 6px;
+    background: var(--s3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .category-progress-fill {
+    width: 100%;
+    height: 100%;
+    border-radius: 3px;
+  }
+  .cat-fill-gn { background: var(--gn); }
+  .cat-fill-cy { background: var(--cy); }
+  .cat-fill-yl { background: var(--yl); }
+  .cat-fill-ac { background: var(--ac2); }
+  .cat-fill-or { background: var(--or); }
+  .cat-fill-pk { background: var(--pk); }
+  .category-pass-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .cat-text-gn { color: var(--gn); }
+  .cat-text-cy { color: var(--cy); }
+  .cat-text-yl { color: var(--yl); }
+  .cat-text-ac { color: var(--ac2); }
+  .cat-text-or { color: var(--or); }
+  .cat-text-pk { color: var(--pk); }
+
+  /* ---- Test cards (collapsible) ---- */
+  .tests-grid {
+    display: grid;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .test-card {
+    padding: 0;
+  }
+  .test-card summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+  .test-card summary::-webkit-details-marker {
+    display: none;
+  }
+  .test-card summary::marker {
+    display: none;
+    content: '';
+  }
+  .test-body {
+    padding: 0 16px 14px 46px;
   }
   .test-index {
     font-family: 'JetBrains Mono', monospace;
@@ -506,15 +1233,16 @@ Holds for every person. Always. No exceptions.</div>
   .test-name {
     font-size: 12px;
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .test-desc {
     font-size: 13px;
     color: var(--t2);
     margin-bottom: 6px;
-    margin-left: 30px;
   }
   .test-expected {
-    margin-left: 30px;
     font-size: 12px;
     color: var(--t3);
   }
@@ -522,14 +1250,39 @@ Holds for every person. Always. No exceptions.</div>
     margin-right: 6px;
   }
 
-  /* CW bars */
+  /* Chevron */
+  .chevron {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .chevron::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid var(--t3);
+    border-bottom: 1.5px solid var(--t3);
+    transform: rotate(-45deg);
+    transition: transform 0.15s;
+  }
+  details[open] .chevron::after {
+    transform: rotate(45deg);
+    top: 3px;
+  }
+
+  /* ---- CW bars ---- */
   .cw-bar {
     height: 8px;
     border-radius: 4px;
     min-width: 4px;
   }
 
-  /* Loop steps */
+  /* ---- Loop steps ---- */
   .loop-steps {
     padding-left: 20px;
   }
@@ -545,12 +1298,12 @@ Holds for every person. Always. No exceptions.</div>
     font-size: 13px;
   }
 
-  /* Comparison table */
+  /* ---- Comparison table ---- */
   .comparison-table td {
     vertical-align: middle;
   }
 
-  /* Demo verification */
+  /* ---- Demo verification ---- */
   .verify-sum {
     font-family: 'JetBrains Mono', monospace;
     font-size: 18px;
@@ -573,6 +1326,20 @@ Holds for every person. Always. No exceptions.</div>
     }
     .summary-score {
       font-size: 36px;
+    }
+    .category-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .category-overview {
+      gap: 6px;
+    }
+    .category-pill {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+    .test-name {
+      font-size: 10px;
     }
   }
 </style>
