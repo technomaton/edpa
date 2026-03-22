@@ -1,0 +1,66 @@
+# Iteration PI-2026-1.1 -- Plan & Results
+# Closed iteration: 1.4.--14.4.2026
+
+iteration:
+  id: PI-2026-1.1
+  pi: PI-2026-1
+  dates: "1.4.--14.4.2026"
+  status: closed
+  cadence: "2/10"  # 2-week iteration, 10-week PI
+
+planning:
+  capacity: 380  # team total hours
+  planning_factor: 0.80
+  planned_sp: 24
+  stories:
+    - S-200  # OMOP parser impl. (8 SP)
+    - S-201  # Unit testy OMOP (5 SP)
+    - S-202  # OMOP validace schemat (3 SP)
+    - S-203  # Upload endpoint (5 SP)
+    - S-204  # Upload UI komponenta (3 SP)
+
+delivery:
+  delivered_sp: 24
+  predictability: "100%"
+  velocity: 24
+  spillover: []
+  unplanned: []
+  notes: "Prvni iterace PI -- plny delivery. OMOP parser a Upload API zakladni funkcnost hotova."
+
+stories_detail:
+  - id: S-200
+    title: "OMOP parser impl."
+    js: 8
+    status: Done
+    feature: F-100
+    assignee: turyna
+  - id: S-201
+    title: "Unit testy OMOP"
+    js: 5
+    status: Done
+    feature: F-100
+    assignee: turyna
+  - id: S-202
+    title: "OMOP validace schemat"
+    js: 3
+    status: Done
+    feature: F-100
+    assignee: tuma
+  - id: S-203
+    title: "Upload endpoint"
+    js: 5
+    status: Done
+    feature: F-101
+    assignee: tuma
+  - id: S-204
+    title: "Upload UI komponenta"
+    js: 3
+    status: Done
+    feature: F-101
+    assignee: matousek
+
+edpa:
+  mode: simple
+  results_file: reports/iteration-PI-2026-1.1/edpa_results.json
+  snapshot_file: snapshots/iteration-PI-2026-1.1.json
+  invariants_passed: true

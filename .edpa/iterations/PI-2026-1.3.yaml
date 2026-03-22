@@ -1,0 +1,80 @@
+# Iteration PI-2026-1.3 -- Plan & Results
+# Closed iteration: 29.4.--12.5.2026
+
+iteration:
+  id: PI-2026-1.3
+  pi: PI-2026-1
+  dates: "29.4.--12.5.2026"
+  status: closed
+  cadence: "2/10"  # 2-week iteration, 10-week PI
+
+planning:
+  capacity: 380  # team total hours
+  planning_factor: 0.80
+  planned_sp: 32
+  stories:
+    - S-211  # Katalog search (3 SP)
+    - S-212  # Objednavka workflow (5 SP)
+    - S-213  # Objednavka notifikace (3 SP)
+    - S-214  # FHIR parser (5 SP)
+    - S-215  # FHIR mapping (8 SP)
+    - S-216  # CI/CD pipeline (5 SP)
+    - S-217  # Security scan setup (3 SP)
+
+delivery:
+  delivered_sp: 32
+  predictability: "100%"
+  velocity: 32
+  spillover: []
+  unplanned: []
+  notes: "Treti iterace -- objednavkovy system, FHIR bridge a CI/CD. Nejvyssi velocity v PI."
+
+stories_detail:
+  - id: S-211
+    title: "Katalog search"
+    js: 3
+    status: Done
+    feature: F-110
+    assignee: matousek
+  - id: S-212
+    title: "Objednavka workflow"
+    js: 5
+    status: Done
+    feature: F-111
+    assignee: d1
+  - id: S-213
+    title: "Objednavka notifikace"
+    js: 3
+    status: Done
+    feature: F-111
+    assignee: d2
+  - id: S-214
+    title: "FHIR parser"
+    js: 5
+    status: Done
+    feature: F-120
+    assignee: tuma
+  - id: S-215
+    title: "FHIR mapping"
+    js: 8
+    status: Done
+    feature: F-120
+    assignee: do
+  - id: S-216
+    title: "CI/CD pipeline"
+    js: 5
+    status: Done
+    feature: F-101
+    assignee: tuma
+  - id: S-217
+    title: "Security scan setup"
+    js: 3
+    status: Done
+    feature: F-120
+    assignee: tuma
+
+edpa:
+  mode: simple
+  results_file: reports/iteration-PI-2026-1.3/edpa_results.json
+  snapshot_file: snapshots/iteration-PI-2026-1.3.json
+  invariants_passed: true

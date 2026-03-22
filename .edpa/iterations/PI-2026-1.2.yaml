@@ -1,0 +1,73 @@
+# Iteration PI-2026-1.2 -- Plan & Results
+# Closed iteration: 15.4.--28.4.2026
+
+iteration:
+  id: PI-2026-1.2
+  pi: PI-2026-1
+  dates: "15.4.--28.4.2026"
+  status: closed
+  cadence: "2/10"  # 2-week iteration, 10-week PI
+
+planning:
+  capacity: 380  # team total hours
+  planning_factor: 0.80
+  planned_sp: 28
+  stories:
+    - S-205  # Upload testy (2 SP)
+    - S-206  # Anon pipeline MVP (8 SP)
+    - S-207  # K-anonymity algoritmus (5 SP)
+    - S-208  # Anonymizace testy (3 SP)
+    - S-209  # Katalog UI (5 SP)
+    - S-210  # Katalog API (5 SP)
+
+delivery:
+  delivered_sp: 28
+  predictability: "100%"
+  velocity: 28
+  spillover: []
+  unplanned: []
+  notes: "Druha iterace -- anonymizacni engine MVP a katalog datasetu zakladni UI/API."
+
+stories_detail:
+  - id: S-205
+    title: "Upload testy"
+    js: 2
+    status: Done
+    feature: F-101
+    assignee: d1
+  - id: S-206
+    title: "Anon pipeline MVP"
+    js: 8
+    status: Done
+    feature: F-102
+    assignee: urbanek
+  - id: S-207
+    title: "K-anonymity algoritmus"
+    js: 5
+    status: Done
+    feature: F-102
+    assignee: turyna
+  - id: S-208
+    title: "Anonymizace testy"
+    js: 3
+    status: Done
+    feature: F-102
+    assignee: d1
+  - id: S-209
+    title: "Katalog UI"
+    js: 5
+    status: Done
+    feature: F-110
+    assignee: matousek
+  - id: S-210
+    title: "Katalog API"
+    js: 5
+    status: Done
+    feature: F-110
+    assignee: d2
+
+edpa:
+  mode: simple
+  results_file: reports/iteration-PI-2026-1.2/edpa_results.json
+  snapshot_file: snapshots/iteration-PI-2026-1.2.json
+  invariants_passed: true

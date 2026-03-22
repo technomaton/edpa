@@ -1,0 +1,66 @@
+# EDPA Git-native configuration
+# Links to EDPA configuration files and Git-native settings
+
+# References to existing EDPA config templates
+templates:
+  capacity: config/capacity.yaml.tmpl
+  heuristics: config/cw_heuristics.yaml.tmpl
+  project: config/project.yaml.tmpl
+
+# Git-native backlog paths
+backlog_file: .edpa/backlog.yaml
+iterations_dir: .edpa/iterations/
+
+# PI configuration
+pi:
+  current: PI-2026-1
+  year: 2026
+  num: 1
+  iteration_weeks: 2
+  pi_weeks: 10
+  iterations:
+    - id: PI-2026-1.1
+      dates: "1.4.--14.4.2026"
+      status: closed
+    - id: PI-2026-1.2
+      dates: "15.4.--28.4.2026"
+      status: closed
+    - id: PI-2026-1.3
+      dates: "29.4.--12.5.2026"
+      status: closed
+    - id: PI-2026-1.4
+      dates: "13.5.--26.5.2026"
+      status: active
+    - id: PI-2026-1.5
+      dates: "27.5.--9.6.2026"
+      status: planned
+      type: IP  # Innovation & Planning
+
+# Evidence sources (Git-native -- no GitHub API needed)
+evidence:
+  sources:
+    - type: git_commits
+      pattern: "feat|fix|refactor|test|docs"
+    - type: branch_naming
+      pattern: "{type}/{ITEM_ID}-{description}"
+    - type: yaml_changes
+      file: .edpa/backlog.yaml
+      field: assignee
+    - type: yaml_changes
+      file: .edpa/backlog.yaml
+      field: status
+
+# CW heuristic calibration (Monte Carlo matrix reference)
+cw_roles:
+  owner: 1.0
+  key: 0.6
+  reviewer: 0.30
+  consulted: 0.20
+  informed: 0.05
+
+# Validation rules
+validation:
+  max_story_js: 8
+  require_assignee: true
+  require_iteration: true
+  require_parent: true
