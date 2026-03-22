@@ -37,6 +37,26 @@ for each person P:
       add (P, item, CW, evidence_score) to relevant_items
 ```
 
+## All commits are delivery evidence
+
+EDPA measures **contribution to project delivery**, not "lines of code".
+
+| Activity | Evidence? | Why |
+|----------|-----------|-----|
+| Dev commits code (`src/`) | **YES** | Implementation work |
+| PM updates backlog (`.edpa/`) | **YES** | Planning, prioritization, specification |
+| Arch edits config (`config/`) | **YES** | Architecture decisions, configuration |
+| BO comments on Epic | **YES** | Strategic direction, business decisions |
+| QA writes tests (`tests/`) | **YES** | Quality assurance |
+
+Analytical and preparatory work (planning, specification, prioritization) is the
+**majority of project work** — not development itself. A PM who spends 4 hours
+defining acceptance criteria and updating the backlog contributes as much as a
+Dev who spends 4 hours coding.
+
+The CW matrix per role ensures correct proportions — not by filtering commits,
+but by **weighting each role's contribution appropriately** (Monte Carlo calibrated).
+
 ## Branch naming → item detection
 
 PR branch `feature/S-200-omop-parser` → extract `S-200` → match to issue.

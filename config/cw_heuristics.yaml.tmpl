@@ -116,6 +116,30 @@ rules:
   - "Manuální override (/contribute) má přednost před auto-detekcí"
   - "Počet commitů se NEPŘEVÁDÍ na čas — jen signalizuje relevanci"
   - "In Progress items se vylučují z EDPA výpočtu"
+  - "VŠECHNY commity jsou delivery evidence — včetně governance (.edpa/, config/)"
+
+# ─────────────────────────────────────────────────────────────────────
+# PRINCIP: PRÁCE = PRÁCE, NEZÁVISÍ NA TYPU SOUBORU
+# ─────────────────────────────────────────────────────────────────────
+# EDPA neměří "vývoj kódu" — měří příspěvek k dodávce projektu.
+#
+# PM, který upravuje backlog, plánuje iteraci a definuje AC,
+# PRACUJE na projektu stejně jako Dev, který kóduje.
+#
+# Analytická a přípravná fáze (plánování, specifikace, prioritizace)
+# je většina práce — ne vývoj samotný.
+#
+# Proto:
+#   Commit na .edpa/backlog.yaml  = práce na projektu ✓
+#   Commit na src/parser.py       = práce na projektu ✓
+#   Commit na config/capacity.yaml = práce na projektu ✓
+#
+# CW matice per role zajistí správný poměr:
+#   PM commit na backlog  → CW dle role_overrides (PM consulted=0.20)
+#   Dev commit na src/    → CW dle role_overrides (Dev owner=1.00)
+#
+# Díky tomu jsou BO, PM a Arch na stejné úrovni jako Dev —
+# jejich příspěvek se měří stejným principem, jen s jinými vahami.
 
 # ─────────────────────────────────────────────────────────────────────
 # KALIBRACE — METADATA
