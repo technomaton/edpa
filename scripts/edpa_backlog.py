@@ -26,7 +26,7 @@ except ImportError:
     sys.exit(1)
 
 
-# ── ANSI Colors (EDPA palette) ──────────────────────────────────────────────
+# -- ANSI Colors (EDPA palette) -----------------------------------------------
 
 class C:
     """ANSI color codes matching EDPA design palette."""
@@ -59,17 +59,17 @@ def bold(text):
     return f"{C.BOLD}{text}{C.RESET}"
 
 
-# ── Box-drawing characters ──────────────────────────────────────────────────
+# -- Box-drawing characters ----------------------------------------------------
 
 PIPE   = "\u2502"   # |
 TEE    = "\u251c"   # |-
 ELBOW  = "\u2514"   # L
 DASH   = "\u2500"   # -
 DOT    = "\u2022"   # bullet
-ARROW  = "\u2192"   # →
+ARROW  = "\u2192"   # ->
 
 
-# ── Data Loading ────────────────────────────────────────────────────────────
+# -- Data Loading --------------------------------------------------------------
 
 def find_repo_root():
     """Walk up from CWD to find the repo root (contains .edpa/)."""
@@ -107,28 +107,49 @@ def load_config(root):
         return yaml.safe_load(f)
 
 
-# ── Utility: collect all items flat ─────────────────────────────────────────
+# -- Utility: collect all items flat -------------------------------------------
+
+TYPE_TO_LEVEL = {
+    "Initiative": "Initiative",
+    "Epic": "Epic",
+    "Feature": "Feature",
+    "Story": "Story",
+}
+
 
 def collect_items(backlog):
-    """Collect all items into a flat list with level annotation."""
+    """Collect all items into a flat list with level annotation.
+
+    Works with the new flat 'items' structure. Each item has a 'type' field
+    (Initiative, Epic, Feature, Story) and a 'parent' reference.
+    """
     items = []
-    for init in backlog.get("initiatives", []):
-        items.append({"level": "Initiative", **init})
-        for epic in init.get("epics", []):
-            items.append({"level": "Epic", "parent": init["id"], **epic})
-            for feat in epic.get("features", []):
-                items.append({"level": "Feature", "parent": epic["id"], **feat})
-                for story in feat.get("stories", []):
-                    items.append({"level": "Story", "parent": feat["id"], **story})
+    for item in backlog.get("items", []):
+        entry = dict(item)
+        entry["level"] = TYPE_TO_LEVEL.get(item.get("type", ""), item.get("type", ""))
+        items.append(entry)
     return items
 
 
 def find_item(backlog, item_id):
-    """Find a single item by ID."""
-    for item in collect_items(backlog):
+    """Find a single item by ID in the flat items list."""
+    for item in backlog.get("items", []):
         if item.get("id") == item_id:
-            return item
+            entry = dict(item)
+            entry["level"] = TYPE_TO_LEVEL.get(item.get("type", ""), item.get("type", ""))
+            return entry
     return None
+
+
+def get_children(backlog, parent_id):
+    """Find all direct children of a given parent ID."""
+    children = []
+    for item in backlog.get("items", []):
+        if item.get("parent") == parent_id:
+            entry = dict(item)
+            entry["level"] = TYPE_TO_LEVEL.get(item.get("type", ""), item.get("type", ""))
+            children.append(entry)
+    return children
 
 
 def status_badge(status):
@@ -169,10 +190,10 @@ def wsjf_score(item):
     return round((bv + tc + rr) / js, 2)
 
 
-# ── Commands ────────────────────────────────────────────────────────────────
+# -- Commands ------------------------------------------------------------------
 
 def cmd_tree(backlog, args):
-    """Display the work item hierarchy as a tree."""
+    """Display the work item hierarchy as a tree, built from parent references."""
     level_filter = getattr(args, "level", None)
     iter_filter = getattr(args, "iteration", None)
 
@@ -181,12 +202,13 @@ def cmd_tree(backlog, args):
     print(color(f"  {backlog['project']['name']}", C.MUTED))
     print()
 
-    for init in backlog.get("initiatives", []):
-        if level_filter and level_filter not in ("init", "initiative"):
-            pass  # still show initiative as root context
+    # Get all initiatives (items with no parent / parent=null)
+    initiatives = [i for i in backlog.get("items", []) if i.get("type") == "Initiative"]
+
+    for init in initiatives:
         print(f"  {color(DOT, C.INIT)} {color(bold(init['id']), C.INIT)} {color(init['title'], C.INIT)}  {status_badge(init.get('status'))}")
 
-        epics = init.get("epics", [])
+        epics = get_children(backlog, init["id"])
         for ei, epic in enumerate(epics):
             is_last_epic = ei == len(epics) - 1
             econ = ELBOW if is_last_epic else TEE
@@ -202,7 +224,7 @@ def cmd_tree(backlog, args):
             if level_filter in ("epic", "epics"):
                 continue
 
-            features = epic.get("features", [])
+            features = get_children(backlog, epic["id"])
             for fi, feat in enumerate(features):
                 is_last_feat = fi == len(features) - 1
                 fcon = ELBOW if is_last_feat else TEE
@@ -218,7 +240,7 @@ def cmd_tree(backlog, args):
                 if level_filter in ("feature", "features"):
                     continue
 
-                stories = feat.get("stories", [])
+                stories = get_children(backlog, feat["id"])
                 # Apply iteration filter if provided
                 if iter_filter:
                     stories = [s for s in stories if s.get("iteration") == iter_filter]
@@ -358,30 +380,35 @@ def cmd_show(backlog, args):
             rs_str = f"  rs={rs}" if rs else ""
             print(f"    {DOT} {person:12s}  role={role:12s}  cw={cw}{rs_str}")
 
-    # Child items (for epics -> features, features -> stories)
-    if item.get("features"):
+    # Child items -- find children via parent references
+    children = get_children(backlog, item_id)
+    child_epics = [c for c in children if c.get("type") == "Epic"]
+    child_features = [c for c in children if c.get("type") == "Feature"]
+    child_stories = [c for c in children if c.get("type") == "Story"]
+
+    if child_epics:
+        print()
+        print(f"  {bold('Epics:')}")
+        for e in child_epics:
+            w = e.get("wsjf", wsjf_score(e))
+            print(f"    {TEE}{DASH}{DASH} {color(e['id'], C.EPIC)} {e['title']}  "
+                  f"{status_badge(e.get('status'))}  WSJF={w}")
+
+    if child_features:
         print()
         print(f"  {bold('Features:')}")
-        for f in item["features"]:
+        for f in child_features:
             w = f.get("wsjf", wsjf_score(f))
             print(f"    {TEE}{DASH}{DASH} {color(f['id'], C.FEAT)} {f['title']}  "
                   f"{status_badge(f.get('status'))}  WSJF={w}")
 
-    if item.get("stories"):
+    if child_stories:
         print()
         print(f"  {bold('Stories:')}")
-        for s in item["stories"]:
+        for s in child_stories:
             print(f"    {TEE}{DASH}{DASH} {color(s['id'], C.STORY)} {s['title']}  "
                   f"{status_badge(s.get('status'))}  JS={s.get('js',0)}  "
                   f"@{s.get('iteration','?')}")
-
-    if item.get("epics"):
-        print()
-        print(f"  {bold('Epics:')}")
-        for e in item["epics"]:
-            w = e.get("wsjf", wsjf_score(e))
-            print(f"    {TEE}{DASH}{DASH} {color(e['id'], C.EPIC)} {e['title']}  "
-                  f"{status_badge(e.get('status'))}  WSJF={w}")
 
     print()
 
@@ -560,6 +587,9 @@ def cmd_validate(backlog, args):
     errors = []
     warnings = []
 
+    # Build a set of all IDs for parent reference validation
+    all_ids = {i.get("id") for i in items if i.get("id")}
+
     print()
     print(bold(color("  EDPA Backlog Validation", C.HEADER)))
     print()
@@ -580,10 +610,15 @@ def cmd_validate(backlog, args):
         if js and js > 8:
             warnings.append(f"{s['id']} ({s.get('title','')}): JS={js} exceeds recommended max of 8")
 
-    # 4. All stories must have parent
-    for s in stories:
-        if not s.get("parent"):
-            errors.append(f"{s['id']} ({s.get('title','')}): missing parent feature")
+    # 4. All non-Initiative items must have a valid parent reference
+    for item in items:
+        if item.get("level") == "Initiative":
+            continue
+        parent = item.get("parent")
+        if not parent:
+            errors.append(f"{item['id']} ({item.get('title','')}): missing parent reference")
+        elif parent not in all_ids:
+            errors.append(f"{item['id']} ({item.get('title','')}): parent '{parent}' does not exist")
 
     # 5. All stories should have iteration
     for s in stories:
@@ -614,16 +649,22 @@ def cmd_validate(backlog, args):
             if cw < 0 or cw > 1.5:
                 warnings.append(f"{s['id']}: contributor {c.get('person','?')} has unusual cw={cw}")
 
+    # 9. Validate type field exists on all items
+    for item in items:
+        if not item.get("type"):
+            errors.append(f"{item.get('id', '?')}: missing 'type' field")
+
     # Print results
     checks = [
         ("Story assignees present", not any("missing assignee" in e for e in errors)),
         ("Story JS values present", not any("missing JS" in e for e in errors)),
         ("Story JS <= 8", not any("exceeds recommended" in w for w in warnings)),
-        ("Parent references valid", not any("missing parent" in e for e in errors)),
+        ("Parent references valid", not any("parent" in e.lower() for e in errors)),
         ("Iteration assignments", not any("missing iteration" in w for w in warnings)),
         ("WSJF consistency", not any("stored WSJF" in w for w in warnings)),
         ("No duplicate IDs", not any("Duplicate ID" in e for e in errors)),
         ("CW values valid", not any("unusual cw" in w for w in warnings)),
+        ("Type fields present", not any("missing 'type'" in e for e in errors)),
     ]
 
     for label, passed in checks:
@@ -663,7 +704,7 @@ def cmd_validate(backlog, args):
     return len(errors)
 
 
-# ── Main ────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(

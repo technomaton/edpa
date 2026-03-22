@@ -175,55 +175,32 @@ def load_sync_config(root):
 # -- Backlog Helpers -----------------------------------------------------------
 
 def collect_items_flat(backlog):
-    """Collect all items into a flat dict keyed by ID."""
+    """Collect all items into a flat dict keyed by ID.
+
+    Works with the flat 'items' list structure where each item has
+    a 'type' field and 'parent' reference.
+    """
     items = {}
-    for init in backlog.get("initiatives", []):
-        items[init["id"]] = {
-            "level": "Initiative",
-            "title": init.get("title", ""),
-            "status": init.get("status", ""),
-            "owner": init.get("owner", ""),
+    for item in backlog.get("items", []):
+        item_id = item.get("id")
+        if not item_id:
+            continue
+        entry = {
+            "level": item.get("type", ""),
+            "title": item.get("title", ""),
+            "status": item.get("status", ""),
+            "parent": item.get("parent") or "",
+            "owner": item.get("owner", ""),
+            "assignee": item.get("assignee", ""),
+            "iteration": item.get("iteration", ""),
+            "js": item.get("js", 0),
+            "bv": item.get("bv", 0),
+            "tc": item.get("tc", 0),
+            "rr": item.get("rr", 0),
+            "wsjf": item.get("wsjf", 0),
+            "type": item.get("epic_type", ""),
         }
-        for epic in init.get("epics", []):
-            items[epic["id"]] = {
-                "level": "Epic",
-                "parent": init["id"],
-                "title": epic.get("title", ""),
-                "status": epic.get("status", ""),
-                "owner": epic.get("owner", ""),
-                "js": epic.get("js", 0),
-                "bv": epic.get("bv", 0),
-                "tc": epic.get("tc", 0),
-                "rr": epic.get("rr", 0),
-                "wsjf": epic.get("wsjf", 0),
-                "type": epic.get("type", ""),
-            }
-            for feat in epic.get("features", []):
-                items[feat["id"]] = {
-                    "level": "Feature",
-                    "parent": epic["id"],
-                    "title": feat.get("title", ""),
-                    "status": feat.get("status", ""),
-                    "owner": feat.get("owner", ""),
-                    "js": feat.get("js", 0),
-                    "bv": feat.get("bv", 0),
-                    "tc": feat.get("tc", 0),
-                    "rr": feat.get("rr", 0),
-                    "wsjf": feat.get("wsjf", 0),
-                }
-                for story in feat.get("stories", []):
-                    items[story["id"]] = {
-                        "level": "Story",
-                        "parent": feat["id"],
-                        "title": story.get("title", ""),
-                        "status": story.get("status", ""),
-                        "assignee": story.get("assignee", ""),
-                        "iteration": story.get("iteration", ""),
-                        "js": story.get("js", 0),
-                        "bv": story.get("bv", 0),
-                        "tc": story.get("tc", 0),
-                        "rr": story.get("rr", 0),
-                    }
+        items[item_id] = entry
     return items
 
 
@@ -520,8 +497,12 @@ def apply_remote_changes_to_backlog(backlog, changes):
     """
     Apply remote (GitHub) changes into the backlog data structure.
     Returns (updated_backlog, applied_count).
+
+    Works with the flat 'items' list -- finds items by ID and updates fields directly.
     """
     applied = 0
+    updatable_fields = {"status", "js", "bv", "tc", "rr", "wsjf", "owner",
+                        "assignee", "iteration", "title"}
 
     for change in changes:
         if change["action"] != "field_changed":
@@ -531,32 +512,12 @@ def apply_remote_changes_to_backlog(backlog, changes):
         field = change["field"]
         new_value = change["remote_val"]
 
-        # Walk the hierarchy to find and update the item
-        for init in backlog.get("initiatives", []):
-            if init["id"] == item_id:
-                if field in init:
-                    init[field] = new_value
+        for item in backlog.get("items", []):
+            if item["id"] == item_id:
+                if field in item or field in updatable_fields:
+                    item[field] = new_value
                     applied += 1
                 break
-            for epic in init.get("epics", []):
-                if epic["id"] == item_id:
-                    if field in epic or field in ("status", "js", "bv", "tc", "rr", "wsjf", "owner"):
-                        epic[field] = new_value
-                        applied += 1
-                    break
-                for feat in epic.get("features", []):
-                    if feat["id"] == item_id:
-                        if field in feat or field in ("status", "js", "bv", "tc", "rr", "wsjf", "owner"):
-                            feat[field] = new_value
-                            applied += 1
-                        break
-                    for story in feat.get("stories", []):
-                        if story["id"] == item_id:
-                            if field in story or field in ("status", "js", "bv", "tc", "rr",
-                                                           "assignee", "iteration"):
-                                story[field] = new_value
-                                applied += 1
-                            break
 
     return backlog, applied
 

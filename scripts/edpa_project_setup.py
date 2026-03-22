@@ -114,38 +114,25 @@ def main():
     with open(backlog_path) as f:
         backlog = yaml.safe_load(f)
 
-    # Flatten items
+    # Collect items from flat structure
     items = []
-    for init in backlog.get("initiatives", []):
-        items.append({"id": init["id"], "title": init["title"], "level": "Initiative",
-                       "js": 0, "bv": 0, "tc": 0, "rr": 0, "wsjf": 0,
-                       "status": init.get("status", "Active"),
-                       "type": init.get("type", "")})
-        for epic in init.get("epics", []):
-            items.append({"id": epic["id"], "title": epic["title"], "level": "Epic",
-                           "js": epic.get("js", 0), "bv": epic.get("bv", 0),
-                           "tc": epic.get("tc", 0), "rr": epic.get("rr", 0),
-                           "wsjf": epic.get("wsjf", 0),
-                           "status": epic.get("status", "Active"),
-                           "owner": epic.get("owner", ""),
-                           "type": epic.get("type", "")})
-            for feat in epic.get("features", []):
-                items.append({"id": feat["id"], "title": feat["title"], "level": "Feature",
-                               "js": feat.get("js", 0), "bv": feat.get("bv", 0),
-                               "tc": feat.get("tc", 0), "rr": feat.get("rr", 0),
-                               "wsjf": feat.get("wsjf", 0),
-                               "status": feat.get("status", "Active"),
-                               "owner": feat.get("owner", ""),
-                               "type": feat.get("type", "")})
-                for story in feat.get("stories", []):
-                    items.append({"id": story["id"], "title": story["title"], "level": "Story",
-                                   "js": story.get("js", 0), "bv": story.get("bv", 0),
-                                   "tc": story.get("tc", 0), "rr": story.get("rr", 0),
-                                   "wsjf": 0,
-                                   "status": story.get("status", "Planned"),
-                                   "assignee": story.get("assignee", ""),
-                                   "iteration": story.get("iteration", ""),
-                                   "type": story.get("type", "")})
+    for item in backlog.get("items", []):
+        entry = {
+            "id": item["id"],
+            "title": item.get("title", ""),
+            "level": item.get("type", ""),
+            "js": item.get("js", 0),
+            "bv": item.get("bv", 0),
+            "tc": item.get("tc", 0),
+            "rr": item.get("rr", 0),
+            "wsjf": item.get("wsjf", 0),
+            "status": item.get("status", "Active"),
+            "owner": item.get("owner", ""),
+            "assignee": item.get("assignee", ""),
+            "iteration": item.get("iteration", ""),
+            "type": item.get("epic_type", ""),
+        }
+        items.append(entry)
 
     print(f"\n  {C.BOLD}Backlog: {len(items)} items{C.RESET}")
     for level in ["Initiative", "Epic", "Feature", "Story"]:
