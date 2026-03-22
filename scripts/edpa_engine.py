@@ -57,8 +57,15 @@ def detect_evidence(people, items, iteration_id):
     """
     Detect contribution evidence from GitHub data.
 
+    Governance-only commits (.edpa/, config/, snapshots/, reports/) are excluded
+    from evidence detection. Only delivery commits (code, tests, docs) count.
+
     Returns: dict of {(person_id, item_id): {"signals": [...], "evidence_score": float, "cw": float}}
     """
+    # Paths that are governance metadata, NOT delivery evidence.
+    # Commits touching ONLY these paths do not generate CW.
+    GOVERNANCE_PATHS = {".edpa/", "config/", "snapshots/", "reports/", "signed/"}
+
     evidence = {}
 
     for item in items:
@@ -88,8 +95,10 @@ def detect_evidence(people, items, iteration_id):
                 score += 2.0
                 signals.append("pr_author")
 
-            # Check commit author
-            if item.get("commit_authors") and pid in item["commit_authors"]:
+            # Check commit author (exclude governance-only commits)
+            commit_authors = item.get("commit_authors", [])
+            governance_only_authors = set(item.get("governance_only_authors", []))
+            if commit_authors and pid in commit_authors and pid not in governance_only_authors:
                 score += 1.0
                 signals.append("commit_author")
 

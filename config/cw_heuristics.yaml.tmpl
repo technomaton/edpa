@@ -116,6 +116,29 @@ rules:
   - "Manuální override (/contribute) má přednost před auto-detekcí"
   - "Počet commitů se NEPŘEVÁDÍ na čas — jen signalizuje relevanci"
   - "In Progress items se vylučují z EDPA výpočtu"
+  - "Governance commity (.edpa/, config/, snapshots/, reports/) NEJSOU delivery evidence"
+
+# ─────────────────────────────────────────────────────────────────────
+# GOVERNANCE vs DELIVERY EVIDENCE
+# ─────────────────────────────────────────────────────────────────────
+# Commity na těchto cestách se NEPOČÍTAJÍ jako delivery evidence:
+#   .edpa/       — backlog.yaml, sync, changelog (governance metadata)
+#   config/      — capacity, heuristics, project config
+#   snapshots/   — frozen EDPA snapshots (auto-generated)
+#   reports/     — výkazy a reporty (auto-generated)
+#   signed/      — BankID podpisy
+#
+# Důvod: PM změní status Epicu v backlog.yaml → commit. Ale to je
+# administrativa, ne práce na deliverable. Bez filtru by PM dostal
+# CW za "commit na Epic" stejně jako Dev za "implementaci Story".
+#
+# Delivery evidence = commity na src/, tests/, docs/, scripts/ atd.
+governance_excluded_paths:
+  - ".edpa/"
+  - "config/"
+  - "snapshots/"
+  - "reports/"
+  - "signed/"
 
 # ─────────────────────────────────────────────────────────────────────
 # KALIBRACE — METADATA

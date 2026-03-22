@@ -37,6 +37,28 @@ for each person P:
       add (P, item, CW, evidence_score) to relevant_items
 ```
 
+## Governance vs Delivery Evidence
+
+Commits on governance paths are **excluded** from evidence detection:
+
+| Path | Content | Evidence? |
+|------|---------|-----------|
+| `src/`, `tests/`, `docs/` | Source code, tests, documentation | **YES** — delivery evidence |
+| `.edpa/` | Backlog YAML, sync state, changelog | **NO** — governance metadata |
+| `config/` | Capacity, heuristics, project config | **NO** — configuration |
+| `snapshots/`, `reports/` | Frozen snapshots, generated reports | **NO** — auto-generated output |
+| `signed/` | BankID signatures | **NO** — audit artifacts |
+
+**Why:** When PM changes an Epic's status in `backlog.yaml` and commits,
+that's administration — not work on the deliverable. Without this filter,
+PM would get commit-based CW (0.25) for a governance change, inflating
+their hours on that Epic.
+
+The `governance_only_authors` field on each item tracks people who
+committed **only** to governance paths for that item. They are excluded
+from `commit_author` evidence but can still have evidence via assignee,
+PR review, /contribute, or comments.
+
 ## Branch naming → item detection
 
 PR branch `feature/S-200-omop-parser` → extract `S-200` → match to issue.
