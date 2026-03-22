@@ -133,7 +133,11 @@ Two complementary views from the same data:
 │   └── project.yaml.tmpl      # Project metadata
 ├── scripts/
 │   ├── edpa_engine.py         # Standalone Python EDPA engine
-│   └── evaluate_cw.py         # CW evaluator for auto-calibration (LOCKED)
+│   ├── evaluate_cw.py         # CW evaluator for auto-calibration (LOCKED)
+│   ├── edpa_issue_types.py    # GitHub Issue Types management (list, setup, assign, migrate)
+│   ├── edpa_project_setup.py  # Automated GitHub Project initialization
+│   ├── edpa_sync.py           # GitHub Projects ↔ Git bidirectional sync
+│   └── edpa_backlog.py        # Git-native backlog CLI (tree, wsjf, validate)
 ├── docs/                      # Full methodology documentation
 ├── examples/                  # Worked examples and sample data
 ├── claude-code/               # Claude Code skills and commands
