@@ -66,6 +66,7 @@ TEE    = "\u251c"   # |-
 ELBOW  = "\u2514"   # L
 DASH   = "\u2500"   # -
 DOT    = "\u2022"   # bullet
+ARROW  = "\u2192"   # →
 
 
 # ── Data Loading ────────────────────────────────────────────────────────────
@@ -286,8 +287,60 @@ def cmd_show(backlog, args):
         print(f"    Risk Reduction (RR):     {rr}")
         print(f"    WSJF:                    {color(str(w), C.HEADER)}")
 
-    # Hypothesis (epic level)
-    if item.get("hypothesis"):
+    # Epic Hypothesis Statement (SAFe 6)
+    eh = item.get("epic_hypothesis")
+    if eh:
+        print()
+        print(f"  {bold('Epic Hypothesis Statement:')}")
+        print(f"    {bold('For')}     {eh.get('for', '')}")
+        print(f"    {bold('Who')}     {eh.get('who', '')}")
+        print(f"    {bold('The')}     {color(eh.get('the', ''), lc)}")
+        print(f"    {bold('Is a')}    {eh.get('is_a', '')}")
+        print(f"    {bold('That')}    {eh.get('that', '')}")
+        print(f"    {bold('Unlike')}  {eh.get('unlike', '')}")
+        print(f"    {bold('Our')}     {eh.get('our_solution', '')}")
+
+        bh = eh.get("benefit_hypothesis", {})
+        if bh:
+            print()
+            print(f"  {bold('Benefit Hypothesis:')}")
+            print(f"    {color(bh.get('metric',''), C.FEAT)}: {bh.get('baseline','')} {ARROW} {color(bh.get('target',''), C.DONE)}")
+            print(f"    Timeframe: {bh.get('timeframe', '')}")
+
+        li = eh.get("leading_indicators", [])
+        if li:
+            print()
+            print(f"  {bold('Leading Indicators:')}")
+            for ind in li:
+                print(f"    {color(DOT, C.DONE)} {ind}")
+
+        la = eh.get("lagging_indicators", [])
+        if la:
+            print(f"  {bold('Lagging Indicators:')}")
+            for ind in la:
+                print(f"    {color(DOT, C.FEAT)} {ind}")
+
+        kc = eh.get("kill_criteria", [])
+        if kc:
+            print()
+            print(f"  {bold('Kill Criteria:')}")
+            for k in kc:
+                print(f"    {color(DOT, C.ERR)} {k}")
+
+        lbc = eh.get("lean_business_case", {})
+        if lbc:
+            print()
+            print(f"  {bold('Lean Business Case:')}")
+            print(f"    Problem:     {lbc.get('problem', '')}")
+            print(f"    Opportunity: {lbc.get('opportunity', '')}")
+            print(f"    MVP:         {color(lbc.get('mvp', ''), C.DONE)}")
+            opts = lbc.get("options_considered", [])
+            if opts:
+                print(f"    Options:")
+                for o in opts:
+                    print(f"      {DOT} {o}")
+
+    elif item.get("hypothesis"):
         print()
         print(f"  {bold('Hypothesis:')}")
         print(f"    {color(item['hypothesis'], C.MUTED)}")

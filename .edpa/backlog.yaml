@@ -74,7 +74,7 @@ initiatives:
       # Epic E-10: Anonymizacni modul
       # WSJF = (bv + tc + rr) / js = (13 + 8 + 8) / 13 = 2.23
       - id: E-10
-        title: "Anonymizacni modul"
+        title: "Anonymizační modul"
         type: Business
         js: 13
         bv: 13
@@ -83,7 +83,37 @@ initiatives:
         wsjf: 2.23
         status: Active
         owner: urbanek
-        hypothesis: "For healthcare data providers who need GDPR-compliant anonymization, this module will provide automated de-identification of clinical datasets using k-anonymity and differential privacy, so that research data sharing becomes legally safe and operationally efficient."
+        epic_hypothesis:
+          for: "poskytovatele zdravotnických dat (nemocnice, výzkumné instituce)"
+          who: "potřebují sdílet klinická data pro výzkum, ale nemohou kvůli GDPR"
+          the: "Anonymizační modul"
+          is_a: "Business Epic"
+          that: "automaticky de-identifikuje klinické datasety pomocí k-anonymity a diferenciálního soukromí"
+          unlike: "manuální anonymizace v Excelu (pomalá, chybová, neauditovatelná)"
+          our_solution: "poskytuje pipeline s prokazatelnou garancí soukromí, auditním trail a API integracemi"
+          benefit_hypothesis:
+            metric: "čas na anonymizaci datasetu"
+            baseline: "2-5 dní manuální práce"
+            target: "< 15 minut automaticky"
+            timeframe: "do konce PI-2026-2"
+          leading_indicators:
+            - "pipeline zpracuje 1000 záznamů bez chyby"
+            - "k-anonymity validátor potvrdí k≥5"
+          lagging_indicators:
+            - "3 datasety anonymizovány a sdíleny pro výzkum"
+            - "0 GDPR incidentů"
+          kill_criteria:
+            - "k-anonymity nedosažitelná pro >50% datasetů"
+            - "latence >1h pro dataset 10K záznamů"
+            - "právní posudek identifikuje neřešitelné GDPR riziko"
+          lean_business_case:
+            problem: "Nemocnice mají cenná data, ale nemohou je sdílet kvůli GDPR"
+            opportunity: "EU regulace podporuje secondary use of health data (EHDS)"
+            mvp: "Pipeline pro anonymizaci OMOP CDM datasetů s k-anonymity garancí"
+            options_considered:
+              - "Buy: komerční řešení (ARX, Privitar) — drahé, vendor lock-in"
+              - "Build: vlastní pipeline — kontrola, integrace s platformou"
+              - "Do nothing: bez anonymizace žádné datové produkty"
         contributions:
           - person: urbanek
             role: architect
@@ -433,7 +463,7 @@ initiatives:
       # Epic E-11: Datovy e-shop API
       # WSJF = (8 + 13 + 5) / 8 = 3.25
       - id: E-11
-        title: "Datovy e-shop API"
+        title: "Datový e-shop API"
         type: Business
         js: 8
         bv: 8
@@ -442,7 +472,37 @@ initiatives:
         wsjf: 3.25
         status: Active
         owner: pm
-        hypothesis: "For data consumers who want to purchase anonymized datasets, this API-driven marketplace will provide catalog browsing, ordering, and secure data delivery, so that data monetization becomes self-service and scalable."
+        epic_hypothesis:
+          for: "výzkumníky a datové analytiky"
+          who: "chtějí nakupovat anonymizované zdravotnické datasety"
+          the: "Datový e-shop API"
+          is_a: "Business Epic"
+          that: "poskytne katalog, objednávkový systém a bezpečné doručení dat přes API"
+          unlike: "ad-hoc žádosti emailem (týdny čekání, bez standardizace)"
+          our_solution: "self-service marketplace s okamžitým přístupem k anonymizovaným datům"
+          benefit_hypothesis:
+            metric: "čas od objednávky po doručení datasetu"
+            baseline: "2-4 týdny (manuální proces)"
+            target: "< 24 hodin (automatický pipeline)"
+            timeframe: "do konce PI-2026-2"
+          leading_indicators:
+            - "katalog obsahuje ≥10 datasetů"
+            - "první objednávka zpracována automaticky"
+          lagging_indicators:
+            - "5+ externích zákazníků za první kvartál"
+            - "NPS zákaznické spokojenosti ≥ 40"
+          kill_criteria:
+            - "regulátor zakáže prodej anonymizovaných dat"
+            - "žádný zákazník do 3 měsíců od launche"
+            - "náklady na provoz > 2× revenue"
+          lean_business_case:
+            problem: "Cenná zdravotnická data leží nevyužitá"
+            opportunity: "EHDS otevírá trh pro secondary use dat v EU"
+            mvp: "Katalog s 5 datasety, objednávka + platba, API delivery"
+            options_considered:
+              - "Marketplace platforma (AWS Data Exchange) — omezení na formáty"
+              - "Vlastní e-shop — plná kontrola, integrace s anonymizací"
+              - "Do nothing — data zůstanou nevyužitá"
         contributions:
           - person: urbanek
             role: architect
@@ -657,7 +717,37 @@ initiatives:
         wsjf: 4.60
         status: Active
         owner: tuma
-        hypothesis: "For the technical platform that needs interoperability with healthcare standards, OMOP CDM integration with FHIR bridge enables seamless data exchange with hospital systems, so that the platform can ingest real-world clinical data at scale."
+        epic_hypothesis:
+          for: "technickou platformu a vývojáře"
+          who: "potřebují interoperabilitu se zdravotnickými standardy (OMOP, FHIR)"
+          the: "OMOP CDM integrace s FHIR bridge"
+          is_a: "Enabler Epic"
+          that: "umožní bezproblémovou výměnu dat s nemocničními systémy"
+          unlike: "custom ETL scripty per nemocnice (neudržitelné, neškálovatelné)"
+          our_solution: "standardizovaný OMOP CDM s FHIR bridge pro automatický ingest"
+          benefit_hypothesis:
+            metric: "počet napojených nemocničních systémů"
+            baseline: "0 (žádná integrace)"
+            target: "3+ nemocnice napojeny přes FHIR"
+            timeframe: "do konce PI-2026-3"
+          leading_indicators:
+            - "OMOP schéma migrováno a validováno"
+            - "FHIR parser zpracuje reálná data z 1 nemocnice"
+          lagging_indicators:
+            - "3 nemocnice aktivně posílají data"
+            - "< 1% chybovost při importu"
+          kill_criteria:
+            - "FHIR standard se změní zásadně (breaking change)"
+            - "žádná nemocnice neposkytne testovací data do 6 měsíců"
+            - "OMOP licence se změní na komerční"
+          lean_business_case:
+            problem: "Každá nemocnice má jiný formát dat, custom integrace neškálují"
+            opportunity: "OMOP CDM je de-facto standard, FHIR je povinný v EU od 2025"
+            mvp: "OMOP schéma + FHIR parser + 1 nemocniční napojení"
+            options_considered:
+              - "OMOP + FHIR (standard) — budoucnostní, interoperabilní"
+              - "Proprietary ETL — rychlejší start, ale vendor lock-in"
+              - "Do nothing — platforma bez reálných dat"
         contributions:
           - person: urbanek
             role: architect
