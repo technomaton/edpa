@@ -28,8 +28,25 @@ PROFILE = Path.home() / ".edpa" / "playwright-profile"
 async def wait_for_login(page, timeout=300):
     """Wait until user is logged in (max timeout seconds)."""
     for _ in range(timeout):
-        if await page.locator('img.avatar-user, [data-login]').count() > 0:
-            return True
+        try:
+            # page might navigate during login — catch context destruction
+            await page.wait_for_load_state("domcontentloaded", timeout=2000)
+            url = page.url
+            # After login, GitHub redirects to dashboard or previous page
+            if "github.com/login" not in url and "github.com/session" not in url:
+                # Check for any sign of being logged in
+                try:
+                    count = await page.locator('img.avatar-user, [data-login], .Header-link--profile').count()
+                    if count > 0:
+                        return True
+                except:
+                    pass
+                # If we're on github.com but not login page, probably logged in
+                if "github.com" in url and "/login" not in url:
+                    await page.wait_for_timeout(2000)
+                    return True
+        except:
+            pass
         await page.wait_for_timeout(1000)
     return False
 
