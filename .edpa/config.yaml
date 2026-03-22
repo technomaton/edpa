@@ -64,3 +64,18 @@ validation:
   require_assignee: true
   require_iteration: true
   require_parent: true
+
+# Bidirectional sync: GitHub Projects <-> backlog.yaml
+sync:
+  github_org: "technomaton"
+  github_project_number: 1
+  sync_interval: "15m"
+  auto_commit: true
+  fields_mapping:
+    js: "Job Size"
+    bv: "Business Value"
+    tc: "Time Criticality"
+    rr: "Risk Reduction"
+    wsjf: "WSJF Score"
+    iteration: "Iteration"
+    team: "Team"

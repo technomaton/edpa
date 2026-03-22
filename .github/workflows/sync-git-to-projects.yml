@@ -1,0 +1,31 @@
+name: Sync Git -> GitHub Projects
+
+on:
+  push:
+    paths:
+      - '.edpa/backlog.yaml'
+
+permissions:
+  contents: read
+  projects: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Skip if the push was from the sync bot (prevent loops)
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit for diff
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pyyaml
+
+      - name: Sync Git to Projects
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/edpa_sync.py push
