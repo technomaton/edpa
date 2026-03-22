@@ -21,8 +21,25 @@ except ImportError:
     print("Install: pip install playwright && playwright install chromium")
     sys.exit(1)
 
-URL = "https://github.com/orgs/technomaton/projects/4"
 PROFILE = Path.home() / ".edpa" / "playwright-profile"
+
+
+def get_project_url():
+    """Build project URL from .edpa/config.yaml."""
+    config_path = Path(".edpa/config.yaml")
+    if config_path.exists():
+        try:
+            import yaml
+            with open(config_path) as f:
+                config = yaml.safe_load(f)
+            sync = config.get("sync", {})
+            org = sync.get("github_org", "")
+            num = sync.get("github_project_number", "")
+            if org and num:
+                return f"https://github.com/orgs/{org}/projects/{num}"
+        except Exception:
+            pass
+    return None
 
 
 async def wait_for_login(page, timeout=300):
@@ -121,7 +138,7 @@ async def create_view(page, name, filter_text=""):
     return True
 
 
-async def main():
+async def main(project_url: str):
     PROFILE.mkdir(parents=True, exist_ok=True)
 
     async with async_playwright() as p:
@@ -149,8 +166,8 @@ async def main():
                 return
 
         print("  ✓ Logged in")
-        print(f"  Loading project: {URL}")
-        await page.goto(URL)
+        print(f"  Loading project: {project_url}")
+        await page.goto(project_url)
         await page.wait_for_load_state("networkidle")
         await page.wait_for_timeout(3000)
 
@@ -204,4 +221,15 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import argparse
+    parser = argparse.ArgumentParser(description="EDPA Project Views — Playwright automation")
+    parser.add_argument("--url", default=None, help="Project URL (default: from .edpa/config.yaml)")
+    args = parser.parse_args()
+
+    url = args.url or get_project_url()
+    if not url:
+        print("  Error: No project URL. Pass --url or configure .edpa/config.yaml")
+        print("  Example: python scripts/create_project_views.py --url https://github.com/orgs/ORG/projects/N")
+        sys.exit(1)
+
+    asyncio.run(main(url))
