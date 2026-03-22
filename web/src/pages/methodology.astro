@@ -322,14 +322,30 @@ Accuracy = Actual / Planned &times; 100 %</div>
   <section id="github-implementace">
     <h2>9. Implementace v GitHub</h2>
 
-    <h3>9.1 Custom fields</h3>
+    <h3>9.1 Native Issue Types &amp; custom fields</h3>
+    <p>Issue Types jsou <strong>nativní funkce GitHubu</strong> na úrovni organizace (ne labels, ne custom fields). Spravují se přes <code>edpa_issue_types.py setup</code>. Filtrování: <code>type:Epic</code>, <code>type:Story</code> atd.</p>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Field</th><th>Typ</th><th>Hodnoty</th></tr>
+          <tr><th>Issue Type</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td>Issue Type</td><td>Issue type</td><td>Initiative, Epic, Feature, Story, Task, Bug</td></tr>
+          <tr><td>Initiative</td><td>Business case, investiční záměr</td></tr>
+          <tr><td>Epic</td><td>Strategický cíl, 6-9 měsíců</td></tr>
+          <tr><td>Feature</td><td>Musí se vejít do Planning Intervalu</td></tr>
+          <tr><td>Story</td><td>Dodáváno v iteraci</td></tr>
+          <tr><td>Defect</td><td>Defekt v existující funkcionalitě</td></tr>
+          <tr><td>Task</td><td>Technická práce</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><strong>Enabler</strong> je label klasifikace (Business vs Enabler), ne Issue Type. Epic může mít label &bdquo;Enabler&ldquo; pro označení Enabler Epicu (SAFe).</div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <table>
+        <thead>
+          <tr><th>Custom field</th><th>Typ</th><th>Hodnoty</th></tr>
+        </thead>
+        <tbody>
           <tr><td>Job Size</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
           <tr><td>BV / TC / RR</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
           <tr><td>WSJF Score</td><td>Number</td><td>Auto (Action)</td></tr>

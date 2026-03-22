@@ -64,11 +64,11 @@ python scripts/edpa_project_setup.py \
 
 | Krok | Akce | Detail |
 |------|------|--------|
-| **[1]** | Vytvoří labels | Initiative (pink), Epic (indigo), Feature (cyan), Story (green), Bug (red), Enabler (yellow) |
+| **[1]** | Ověří Issue Types | Native GitHub Issue Types (org-level): Initiative, Epic, Feature, Story, Defect, Task — vytvořeny přes `edpa_issue_types.py setup` |
 | **[2]** | Vytvoří GitHub Project | Projects v2 na org úrovni |
 | **[3]** | Vytvoří custom fields | Job Size, Business Value, Time Criticality, Risk Reduction, WSJF Score (NUMBER), Issue Type, Team (SINGLE_SELECT) |
 | **[4]** | Linkuje projekt k repo | Projekt viditelný v repo Projects tabu |
-| **[5]** | Vytvoří issues | Ze `.edpa/backlog.yaml`, s labels podle úrovně (Epic, Feature, Story) |
+| **[5]** | Vytvoří issues | Ze `.edpa/backlog.yaml`, s Issue Types podle úrovně (Epic, Feature, Story) |
 | **[6]** | Nastaví field values | JS, BV, TC, RR, WSJF, Issue Type, Status na všech project items |
 | **[7]** | Aktualizuje config | `.edpa/config.yaml` — uloží project number a ID pro sync |
 

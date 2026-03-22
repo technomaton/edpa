@@ -285,7 +285,13 @@ def gh_update_project_item(sync_config, item_id, project_id, field_id, value):
 
 
 def parse_gh_item_type(item):
-    """Determine EDPA item type from GitHub labels or title prefix."""
+    """Determine EDPA item type from GitHub Issue Type, labels, or title prefix."""
+    # 1. Check native Issue Type (preferred)
+    issue_type = item.get("issueType", {})
+    if isinstance(issue_type, dict) and issue_type.get("name"):
+        return issue_type["name"]
+
+    # 2. Fallback to labels (backward compat)
     labels = []
     if isinstance(item.get("labels"), list):
         labels = [l.lower() if isinstance(l, str) else l.get("name", "").lower()
@@ -293,9 +299,6 @@ def parse_gh_item_type(item):
     elif isinstance(item.get("labels"), str):
         labels = [item["labels"].lower()]
 
-    title = item.get("title", "")
-
-    # Check labels first
     for label in labels:
         if "initiative" in label:
             return "Initiative"
@@ -306,7 +309,8 @@ def parse_gh_item_type(item):
         if "story" in label:
             return "Story"
 
-    # Fall back to title prefix (I-, E-, F-, S-)
+    # 3. Fallback to title prefix (I-, E-, F-, S-)
+    title = item.get("title", "")
     if title.startswith("I-") or "initiative" in title.lower():
         return "Initiative"
     if title.startswith("E-") or "epic" in title.lower():
@@ -421,6 +425,7 @@ def generate_mock_gh_data(backlog, fields_mapping=None):
             "id": f"PVTI_mock_{item_id}",
             "title": f"{item_id}: {item['title']}",
             "status": item.get("status", ""),
+            "issueType": {"name": item["level"].capitalize()},
             "labels": [item["level"].lower()],
         }
 

@@ -3,9 +3,10 @@
 EDPA GitHub Project Setup — Automated initialization of GitHub Projects v2.
 
 Creates a fully configured GitHub Project with:
-- Custom fields (Job Size, BV, TC, RR, WSJF Score, Issue Type, Team)
+- Custom fields (Job Size, BV, TC, RR, WSJF Score, Team)
 - Issues for all backlog items (from .edpa/backlog.yaml)
-- Labels (Initiative, Epic, Feature, Story)
+- Native Issue Types assigned via GraphQL (Initiative, Epic, Feature, Story)
+- Enabler label for technical work items
 - Field values set on all project items
 - Project linked to repository
 
@@ -118,21 +119,24 @@ def main():
     for init in backlog.get("initiatives", []):
         items.append({"id": init["id"], "title": init["title"], "level": "Initiative",
                        "js": 0, "bv": 0, "tc": 0, "rr": 0, "wsjf": 0,
-                       "status": init.get("status", "Active")})
+                       "status": init.get("status", "Active"),
+                       "type": init.get("type", "")})
         for epic in init.get("epics", []):
             items.append({"id": epic["id"], "title": epic["title"], "level": "Epic",
                            "js": epic.get("js", 0), "bv": epic.get("bv", 0),
                            "tc": epic.get("tc", 0), "rr": epic.get("rr", 0),
                            "wsjf": epic.get("wsjf", 0),
                            "status": epic.get("status", "Active"),
-                           "owner": epic.get("owner", "")})
+                           "owner": epic.get("owner", ""),
+                           "type": epic.get("type", "")})
             for feat in epic.get("features", []):
                 items.append({"id": feat["id"], "title": feat["title"], "level": "Feature",
                                "js": feat.get("js", 0), "bv": feat.get("bv", 0),
                                "tc": feat.get("tc", 0), "rr": feat.get("rr", 0),
                                "wsjf": feat.get("wsjf", 0),
                                "status": feat.get("status", "Active"),
-                               "owner": feat.get("owner", "")})
+                               "owner": feat.get("owner", ""),
+                               "type": feat.get("type", "")})
                 for story in feat.get("stories", []):
                     items.append({"id": story["id"], "title": story["title"], "level": "Story",
                                    "js": story.get("js", 0), "bv": story.get("bv", 0),
@@ -140,7 +144,8 @@ def main():
                                    "wsjf": 0,
                                    "status": story.get("status", "Planned"),
                                    "assignee": story.get("assignee", ""),
-                                   "iteration": story.get("iteration", "")})
+                                   "iteration": story.get("iteration", ""),
+                                   "type": story.get("type", "")})
 
     print(f"\n  {C.BOLD}Backlog: {len(items)} items{C.RESET}")
     for level in ["Initiative", "Epic", "Feature", "Story"]:
@@ -157,11 +162,6 @@ def main():
     # ═══════════════════════════════════════════════════════════
     step(1, "Creating labels")
     labels = {
-        "Initiative": ("f472b6", "Business case, investment"),
-        "Epic": ("6366f1", "Strategic goal, 6-9 months"),
-        "Feature": ("22d3ee", "Must fit in Planning Interval"),
-        "Story": ("34d399", "Delivered in Iteration"),
-        "Bug": ("f87171", "Defect in existing functionality"),
         "Enabler": ("fbbf24", "Technical work without direct business value"),
     }
     for name, (color, desc) in labels.items():
@@ -206,11 +206,6 @@ def main():
         ok(f"{name} (NUMBER)")
 
     run(f'gh project field-create {project_num} --owner {args.org} '
-        f'--name "Issue Type" --data-type SINGLE_SELECT '
-        f'--single-select-options "Initiative,Epic,Feature,Story,Task,Bug"')
-    ok("Issue Type (SINGLE_SELECT)")
-
-    run(f'gh project field-create {project_num} --owner {args.org} '
         f'--name "Team" --data-type SINGLE_SELECT '
         f'--single-select-options "Core,Platform,Management"')
     ok("Team (SINGLE_SELECT)")
@@ -234,9 +229,32 @@ def main():
     ok(f"Linked to {full_repo}")
 
     # ═══════════════════════════════════════════════════════════
-    # STEP 5: Create issues
+    # STEP 5: Query native Issue Type IDs from organization
     # ═══════════════════════════════════════════════════════════
-    step(5, f"Creating {len(items)} issues")
+    step(5, "Querying organization Issue Type IDs")
+    issue_type_ids = {}
+    type_query = f'{{ organization(login: "{args.org}") {{ issueTypes(first: 20) {{ nodes {{ id name }} }} }} }}'
+    type_result = gh_graphql(type_query)
+    if type_result and type_result.get("data"):
+        for t in type_result["data"]["organization"]["issueTypes"]["nodes"]:
+            issue_type_ids[t["name"]] = t["id"]
+        ok(f"Found {len(issue_type_ids)} issue types: {', '.join(issue_type_ids.keys())}")
+    else:
+        fail("Could not query issue types — falling back to hardcoded IDs")
+        issue_type_ids = {
+            "Initiative": "IT_kwDOAP4s484B6aj2",
+            "Epic": "IT_kwDOAP4s484B6aj3",
+            "Feature": "IT_kwDOAP4s484AIZaE",
+            "Story": "IT_kwDOAP4s484B6aj4",
+            "Defect": "IT_kwDOAP4s484AIZaC",
+            "Task": "IT_kwDOAP4s484AIZZ_",
+        }
+        info(f"Using {len(issue_type_ids)} hardcoded issue type IDs")
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 6: Create issues
+    # ═══════════════════════════════════════════════════════════
+    step(6, f"Creating {len(items)} issues")
     issue_map = {}  # item_id → (issue_number, project_item_id)
 
     for item in items:
@@ -251,13 +269,35 @@ def main():
         if item.get("iteration"): body_parts.append(f"iteration={item['iteration']}")
         body = ", ".join(body_parts)
 
-        label = item["level"]
+        # Add Enabler label only for items with type: Enabler in backlog
+        label_flag = ""
+        if item.get("type") == "Enabler":
+            label_flag = ' --label "Enabler"'
+
         result = run(f'gh issue create --repo {full_repo} --title "{title}" '
-                     f'--body "{body}" --label "{label}"')
+                     f'--body "{body}"{label_flag}')
         if result:
             issue_url = result.strip()
             issue_num = issue_url.split("/")[-1]
             ok(f"{title} → #{issue_num}")
+
+            # Assign native Issue Type via GraphQL
+            type_id = issue_type_ids.get(item["level"])
+            if type_id:
+                node_query = (
+                    f'{{ repository(owner: "{args.org}", name: "{args.repo}") '
+                    f'{{ issue(number: {issue_num}) {{ id }} }} }}'
+                )
+                node_result = gh_graphql(node_query)
+                if node_result and node_result.get("data"):
+                    issue_node_id = node_result["data"]["repository"]["issue"]["id"]
+                    mutation = (
+                        f'mutation {{ updateIssueIssueType(input: '
+                        f'{{ issueId: "{issue_node_id}", issueTypeId: "{type_id}" }}) '
+                        f'{{ issue {{ id }} }} }}'
+                    )
+                    gh_graphql(mutation)
+                    info(f"  Issue type → {item['level']}")
 
             # Add to project
             add_result = run(f'gh project item-add {project_num} --owner {args.org} '
@@ -274,9 +314,9 @@ def main():
             fail(f"Failed: {title}")
 
     # ═══════════════════════════════════════════════════════════
-    # STEP 6: Set custom field values
+    # STEP 7: Set custom field values
     # ═══════════════════════════════════════════════════════════
-    step(6, "Setting custom field values on project items")
+    step(7, "Setting custom field values on project items")
 
     status_map = {
         "Done": option_ids.get("Status:Done"),
@@ -284,12 +324,6 @@ def main():
         "Active": option_ids.get("Status:In Progress"),
         "Planned": option_ids.get("Status:Todo"),
         "Todo": option_ids.get("Status:Todo"),
-    }
-    type_map = {
-        "Initiative": option_ids.get("Issue Type:Initiative"),
-        "Epic": option_ids.get("Issue Type:Epic"),
-        "Feature": option_ids.get("Issue Type:Feature"),
-        "Story": option_ids.get("Issue Type:Story"),
     }
 
     set_count = 0
@@ -314,11 +348,6 @@ def main():
             run(cmd)
             set_count += 1
 
-        # Set Issue Type
-        type_opt = type_map.get(item["level"])
-        if type_opt:
-            set_field("Issue Type", option_id=type_opt)
-
         # Set Status
         status_opt = status_map.get(item["status"])
         if status_opt:
@@ -339,9 +368,9 @@ def main():
     ok(f"{set_count} field values set")
 
     # ═══════════════════════════════════════════════════════════
-    # STEP 7: Update config
+    # STEP 8: Update config
     # ═══════════════════════════════════════════════════════════
-    step(7, "Updating .edpa/config.yaml")
+    step(8, "Updating .edpa/config.yaml")
     config_path = Path(".edpa/config.yaml")
     if config_path.exists():
         with open(config_path) as f:
@@ -366,7 +395,7 @@ def main():
     print(f"\n  {C.YELLOW}{C.BOLD}Manual step required:{C.RESET}")
     print(f"  GitHub Projects v2 API does not support view column configuration.")
     print(f"  Open the project in browser and click '+' in the table header to add:")
-    print(f"    Issue Type, Job Size, Business Value, Time Criticality,")
+    print(f"    Job Size, Business Value, Time Criticality,")
     print(f"    Risk Reduction, WSJF Score, Team")
     print(f"{'═' * 70}\n")
 

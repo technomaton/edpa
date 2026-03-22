@@ -180,9 +180,9 @@ async def main():
 
         # Step 2: Create new views
         views = [
-            ("Epics", "label:Epic"),
-            ("Features", "label:Feature"),
-            ("Stories", "label:Story"),
+            ("Epics", "type:Epic"),
+            ("Features", "type:Feature"),
+            ("Stories", "type:Story"),
             ("WSJF Ranking", ""),
         ]
         for i, (name, filt) in enumerate(views, 3):

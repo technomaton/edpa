@@ -283,7 +283,7 @@ def cmd_instructions(args):
                          "WSJF Score", "Team"],
             "sort": "WSJF Score ↓",
             "group": "Status",
-            "filter": 'label:Epic',
+            "filter": 'type:Epic',
         },
         {
             "name": "Features",
@@ -293,7 +293,7 @@ def cmd_instructions(args):
                          "WSJF Score"],
             "sort": "WSJF Score ↓",
             "group": "Status",
-            "filter": 'label:Feature',
+            "filter": 'type:Feature',
         },
         {
             "name": "Stories",
@@ -301,7 +301,7 @@ def cmd_instructions(args):
             "columns": ["Title", "Status", "Assignees", "Job Size", "Team"],
             "sort": "Status",
             "group": "Status",
-            "filter": 'label:Story',
+            "filter": 'type:Story',
         },
         {
             "name": "Board",

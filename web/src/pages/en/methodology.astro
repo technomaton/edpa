@@ -322,14 +322,30 @@ Accuracy = Actual / Planned &times; 100 %</div>
   <section id="github-implementation">
     <h2>9. GitHub implementation</h2>
 
-    <h3>9.1 Custom fields</h3>
+    <h3>9.1 Native Issue Types &amp; custom fields</h3>
+    <p>Issue Types are a <strong>native GitHub feature</strong> at the organization level (not labels, not custom fields). Managed via <code>edpa_issue_types.py setup</code>. Filter syntax: <code>type:Epic</code>, <code>type:Story</code> etc.</p>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Field</th><th>Type</th><th>Values</th></tr>
+          <tr><th>Issue Type</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td>Issue Type</td><td>Issue type</td><td>Initiative, Epic, Feature, Story, Task, Bug</td></tr>
+          <tr><td>Initiative</td><td>Business case, investment proposal</td></tr>
+          <tr><td>Epic</td><td>Strategic goal, 6-9 months</td></tr>
+          <tr><td>Feature</td><td>Must fit within a Planning Interval</td></tr>
+          <tr><td>Story</td><td>Delivered within an iteration</td></tr>
+          <tr><td>Defect</td><td>Defect in existing functionality</td></tr>
+          <tr><td>Task</td><td>Technical work</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><strong>Enabler</strong> is a label classification (Business vs Enabler), not an Issue Type. An Epic can be labeled &ldquo;Enabler&rdquo; to mark it as an Enabler Epic (SAFe).</div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <table>
+        <thead>
+          <tr><th>Custom field</th><th>Type</th><th>Values</th></tr>
+        </thead>
+        <tbody>
           <tr><td>Job Size</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
           <tr><td>BV / TC / RR</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
           <tr><td>WSJF Score</td><td>Number</td><td>Auto (Action)</td></tr>

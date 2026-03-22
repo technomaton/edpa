@@ -1,12 +1,26 @@
 # GitHub Projects Setup Guide
 
+## Native Issue Types (org-level)
+
+Issue Types are a native GitHub feature, managed at the organization level (not per-project custom fields). Create them via `edpa_issue_types.py setup`:
+
+| Issue Type | Description |
+|------------|-------------|
+| Initiative | Business case, investment proposal |
+| Epic | Strategic goal, 6-9 months |
+| Feature | Must fit within a Planning Interval |
+| Story | Delivered within an iteration |
+| Defect | Defect in existing functionality |
+| Task | Technical work |
+
+> **Note:** Enabler is a **label** classification (Business vs Enabler), not an Issue Type. An Epic can be labeled "Enabler" to mark it as an Enabler Epic (SAFe).
+
 ## Required custom fields
 
 Create these on your GitHub Project:
 
 | Field | Type | Values | Purpose |
 |-------|------|--------|---------|
-| Issue Type | Single select | Initiative, Epic, Feature, Story, Task, Bug | Work item hierarchy |
 | Job Size | Number | Fibonacci: 1,2,3,5,8,13,20 | Relative size estimate |
 | Business Value | Number | Fibonacci: 1-20 | WSJF input |
 | Time Criticality | Number | Fibonacci: 1-20 | WSJF input |
@@ -26,17 +40,19 @@ These belong in the Evidence & Reporting layer, not operational metadata:
 - FTE → `config/capacity.yaml`
 - Signature status → `/snapshots/` + `/signed/`
 
-## Hierarchy via sub-issues
+## Hierarchy via sub-issues and native Issue Types
 
-GitHub sub-issues (GA April 2025) support 8 levels:
+GitHub sub-issues (GA April 2025) support 8 levels. Each level uses a **native GitHub Issue Type** (org-level, not labels):
 
 ```
-Initiative (top-level issue, Issue Type = Initiative)
-  └── Epic (sub-issue, Issue Type = Epic)
-       └── Feature (sub-issue, Issue Type = Feature)
-            └── Story (sub-issue, Issue Type = Story)
-                 └── Task (sub-issue or checklist, Issue Type = Task)
+Initiative (top-level issue, native Issue Type = Initiative)
+  └── Epic (sub-issue, native Issue Type = Epic)
+       └── Feature (sub-issue, native Issue Type = Feature)
+            └── Story (sub-issue, native Issue Type = Story)
+                 └── Task (sub-issue or checklist, native Issue Type = Task)
 ```
+
+Filter syntax: `type:Epic`, `type:Story`, etc.
 
 ## Views to create
 

@@ -79,3 +79,11 @@ sync:
     wsjf: "WSJF Score"
     iteration: "Iteration"
     team: "Team"
+  # Native GitHub Issue Types (org-level, managed via edpa_issue_types.py)
+  issue_types:
+    Initiative: "Business case, investiční záměr"
+    Epic: "Strategický cíl, 6-9 měsíců"
+    Feature: "Musí se vejít do Planning Intervalu"
+    Story: "Dodáváno v iteraci"
+    Defect: "Defekt v existující funkcionalitě"
+    Task: "Technická práce"
