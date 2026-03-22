@@ -1,0 +1,60 @@
+id: E-11
+type: Epic
+title: Datový e-shop API
+epic_type: Business
+js: 8
+bv: 8
+tc: 13
+rr: 5
+wsjf: 3.25
+status: Active
+parent: I-1
+owner: pm
+epic_hypothesis:
+  for: výzkumníky a datové analytiky
+  who: chtějí nakupovat anonymizované zdravotnické datasety
+  the: Datový e-shop API
+  is_a: Business Epic
+  that: poskytne katalog, objednávkový systém a bezpečné doručení dat přes API
+  unlike: ad-hoc žádosti emailem (týdny čekání, bez standardizace)
+  our_solution: self-service marketplace s okamžitým přístupem k anonymizovaným datům
+  benefit_hypothesis:
+    metric: čas od objednávky po doručení datasetu
+    baseline: 2-4 týdny (manuální proces)
+    target: < 24 hodin (automatický pipeline)
+    timeframe: do konce PI-2026-2
+  leading_indicators:
+  - katalog obsahuje ≥10 datasetů
+  - první objednávka zpracována automaticky
+  lagging_indicators:
+  - 5+ externích zákazníků za první kvartál
+  - NPS zákaznické spokojenosti ≥ 40
+  kill_criteria:
+  - regulátor zakáže prodej anonymizovaných dat
+  - žádný zákazník do 3 měsíců od launche
+  - náklady na provoz > 2× revenue
+  lean_business_case:
+    problem: Cenná zdravotnická data leží nevyužitá
+    opportunity: EHDS otevírá trh pro secondary use dat v EU
+    mvp: Katalog s 5 datasety, objednávka + platba, API delivery
+    options_considered:
+    - Marketplace platforma (AWS Data Exchange) — omezení na formáty
+    - Vlastní e-shop — plná kontrola, integrace s anonymizací
+    - Do nothing — data zůstanou nevyužitá
+contributions:
+- person: urbanek
+  role: architect
+  cw: 0.15
+  rs: 0.8
+- person: pm
+  role: product_owner
+  cw: 0.6
+  rs: 1.0
+- person: matousek
+  role: developer
+  cw: 0.15
+  rs: 0.6
+- person: d2
+  role: developer
+  cw: 0.1
+  rs: 0.5

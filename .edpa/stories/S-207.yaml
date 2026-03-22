@@ -1,0 +1,18 @@
+id: S-207
+type: Story
+title: K-anonymity algoritmus
+js: 5
+bv: 5
+tc: 5
+rr: 3
+status: Done
+parent: F-102
+assignee: turyna
+iteration: PI-2026-1.2
+contributors:
+- person: turyna
+  role: owner
+  cw: 1.0
+- person: urbanek
+  role: reviewer
+  cw: 0.3

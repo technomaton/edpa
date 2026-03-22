@@ -1,0 +1,62 @@
+id: E-10
+type: Epic
+title: Anonymizační modul
+epic_type: Business
+js: 13
+bv: 13
+tc: 8
+rr: 8
+wsjf: 2.23
+status: Active
+parent: I-1
+owner: urbanek
+epic_hypothesis:
+  for: poskytovatele zdravotnických dat (nemocnice, výzkumné instituce)
+  who: potřebují sdílet klinická data pro výzkum, ale nemohou kvůli GDPR
+  the: Anonymizační modul
+  is_a: Business Epic
+  that: automaticky de-identifikuje klinické datasety pomocí k-anonymity a diferenciálního
+    soukromí
+  unlike: manuální anonymizace v Excelu (pomalá, chybová, neauditovatelná)
+  our_solution: poskytuje pipeline s prokazatelnou garancí soukromí, auditním trail
+    a API integracemi
+  benefit_hypothesis:
+    metric: čas na anonymizaci datasetu
+    baseline: 2-5 dní manuální práce
+    target: < 15 minut automaticky
+    timeframe: do konce PI-2026-2
+  leading_indicators:
+  - pipeline zpracuje 1000 záznamů bez chyby
+  - k-anonymity validátor potvrdí k≥5
+  lagging_indicators:
+  - 3 datasety anonymizovány a sdíleny pro výzkum
+  - 0 GDPR incidentů
+  kill_criteria:
+  - k-anonymity nedosažitelná pro >50% datasetů
+  - latence >1h pro dataset 10K záznamů
+  - právní posudek identifikuje neřešitelné GDPR riziko
+  lean_business_case:
+    problem: Nemocnice mají cenná data, ale nemohou je sdílet kvůli GDPR
+    opportunity: EU regulace podporuje secondary use of health data (EHDS)
+    mvp: Pipeline pro anonymizaci OMOP CDM datasetů s k-anonymity garancí
+    options_considered:
+    - 'Buy: komerční řešení (ARX, Privitar) — drahé, vendor lock-in'
+    - 'Build: vlastní pipeline — kontrola, integrace s platformou'
+    - 'Do nothing: bez anonymizace žádné datové produkty'
+contributions:
+- person: urbanek
+  role: architect
+  cw: 0.2
+  rs: 1.0
+- person: pm
+  role: product_owner
+  cw: 0.6
+  rs: 1.0
+- person: turyna
+  role: developer
+  cw: 0.1
+  rs: 0.6
+- person: d1
+  role: developer
+  cw: 0.1
+  rs: 0.5

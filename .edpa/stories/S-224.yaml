@@ -1,0 +1,21 @@
+id: S-224
+type: Story
+title: Auth modul
+js: 5
+bv: 5
+tc: 5
+rr: 5
+status: In Progress
+parent: F-111
+assignee: d1
+iteration: PI-2026-1.4
+contributors:
+- person: d1
+  role: owner
+  cw: 1.0
+- person: tuma
+  role: key
+  cw: 0.6
+- person: urbanek
+  role: consulted
+  cw: 0.15

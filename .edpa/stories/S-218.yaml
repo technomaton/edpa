@@ -1,0 +1,18 @@
+id: S-218
+type: Story
+title: API dokumentace
+js: 2
+bv: 2
+tc: 1
+rr: 1
+status: Done
+parent: F-100
+assignee: urbanek
+iteration: PI-2026-1.4
+contributors:
+- person: urbanek
+  role: owner
+  cw: 1.0
+- person: tuma
+  role: consulted
+  cw: 0.15

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-EDPA Sync CLI -- Bidirectional sync between GitHub Projects and .edpa/backlog.yaml.
+EDPA Sync CLI -- Bidirectional sync between GitHub Projects and .edpa/ item files.
 
 Usage:
-    python scripts/edpa_sync.py pull          # GitHub Projects -> .edpa/backlog.yaml
-    python scripts/edpa_sync.py push          # .edpa/backlog.yaml -> GitHub Projects
+    python scripts/edpa_sync.py pull          # GitHub Projects -> .edpa/ item files
+    python scripts/edpa_sync.py push          # .edpa/ item files -> GitHub Projects
     python scripts/edpa_sync.py diff          # Show what would change (dry-run)
     python scripts/edpa_sync.py log           # Show changelog
     python scripts/edpa_sync.py conflicts     # Show unresolved conflicts
@@ -85,11 +85,11 @@ def find_repo_root():
     """Walk up from CWD to find the repo root (contains .edpa/)."""
     p = Path.cwd()
     while p != p.parent:
-        if (p / ".edpa" / "backlog.yaml").exists():
+        if (p / ".edpa").is_dir():
             return p
         p = p.parent
     fallback = Path("/Users/jurby/projects/edpa")
-    if (fallback / ".edpa" / "backlog.yaml").exists():
+    if (fallback / ".edpa").is_dir():
         return fallback
     return None
 
@@ -174,39 +174,50 @@ def load_sync_config(root):
 
 # -- Backlog Helpers -----------------------------------------------------------
 
-def collect_items_flat(backlog):
-    """Collect all items into a flat dict keyed by ID.
+TYPE_DIRS = ["initiatives", "epics", "features", "stories"]
 
-    Works with the flat 'items' list structure where each item has
-    a 'type' field and 'parent' reference.
+
+def collect_items_flat(root):
+    """Collect all items from per-file .edpa/ directories into a flat dict keyed by ID.
+
+    Reads individual YAML files from .edpa/initiatives/, .edpa/epics/,
+    .edpa/features/, and .edpa/stories/.
     """
     items = {}
-    for item in backlog.get("items", []):
-        item_id = item.get("id")
-        if not item_id:
+    edpa = root / ".edpa"
+    for type_dir in TYPE_DIRS:
+        dir_path = edpa / type_dir
+        if not dir_path.exists():
             continue
-        entry = {
-            "level": item.get("type", ""),
-            "title": item.get("title", ""),
-            "status": item.get("status", ""),
-            "parent": item.get("parent") or "",
-            "owner": item.get("owner", ""),
-            "assignee": item.get("assignee", ""),
-            "iteration": item.get("iteration", ""),
-            "js": item.get("js", 0),
-            "bv": item.get("bv", 0),
-            "tc": item.get("tc", 0),
-            "rr": item.get("rr", 0),
-            "wsjf": item.get("wsjf", 0),
-            "type": item.get("epic_type", ""),
-        }
-        items[item_id] = entry
+        for f in sorted(dir_path.glob("*.yaml")):
+            item = load_yaml(f)
+            if not item:
+                continue
+            item_id = item.get("id")
+            if not item_id:
+                continue
+            entry = {
+                "level": item.get("type", ""),
+                "title": item.get("title", ""),
+                "status": item.get("status", ""),
+                "parent": item.get("parent") or "",
+                "owner": item.get("owner", ""),
+                "assignee": item.get("assignee", ""),
+                "iteration": item.get("iteration", ""),
+                "js": item.get("js", 0),
+                "bv": item.get("bv", 0),
+                "tc": item.get("tc", 0),
+                "rr": item.get("rr", 0),
+                "wsjf": item.get("wsjf", 0),
+                "type": item.get("epic_type", ""),
+            }
+            items[item_id] = entry
     return items
 
 
-def compute_backlog_checksum(backlog):
+def compute_backlog_checksum(root):
     """Compute a deterministic checksum for the backlog content."""
-    items = collect_items_flat(backlog)
+    items = collect_items_flat(root)
     serialized = json.dumps(items, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(serialized.encode()).hexdigest()[:12]
 
@@ -385,8 +396,8 @@ def map_gh_items_to_edpa(gh_data, fields_mapping):
 
 # -- Mock Data Generator -------------------------------------------------------
 
-def generate_mock_gh_data(backlog, fields_mapping=None):
-    """Generate fake GitHub Project data from existing backlog for testing.
+def generate_mock_gh_data(root, fields_mapping=None):
+    """Generate fake GitHub Project data from existing .edpa/ item files for testing.
 
     Produces data in the same shape that `gh project item-list --format json`
     returns, using mapped field names so `map_gh_items_to_edpa` can round-trip.
@@ -394,7 +405,7 @@ def generate_mock_gh_data(backlog, fields_mapping=None):
     if fields_mapping is None:
         fields_mapping = DEFAULT_SYNC_CONFIG["fields_mapping"]
 
-    items = collect_items_flat(backlog)
+    items = collect_items_flat(root)
     gh_items = []
 
     for item_id, item in items.items():
@@ -493,12 +504,36 @@ def compute_diff(local_items, remote_items):
     return changes
 
 
-def apply_remote_changes_to_backlog(backlog, changes):
-    """
-    Apply remote (GitHub) changes into the backlog data structure.
-    Returns (updated_backlog, applied_count).
+LEVEL_TO_DIR = {
+    "Initiative": "initiatives",
+    "Epic": "epics",
+    "Feature": "features",
+    "Story": "stories",
+}
 
-    Works with the flat 'items' list -- finds items by ID and updates fields directly.
+ID_PREFIX_TO_DIR = {
+    "I": "initiatives",
+    "E": "epics",
+    "F": "features",
+    "S": "stories",
+}
+
+
+def _item_file_path(root, item_id):
+    """Resolve the .edpa/ file path for a given item ID (e.g., S-200 -> .edpa/stories/S-200.yaml)."""
+    prefix = item_id.split("-")[0] if "-" in item_id else ""
+    type_dir = ID_PREFIX_TO_DIR.get(prefix)
+    if type_dir:
+        return root / ".edpa" / type_dir / f"{item_id}.yaml"
+    return None
+
+
+def apply_remote_changes(root, changes):
+    """
+    Apply remote (GitHub) changes into individual .edpa/ item files.
+    Returns applied_count.
+
+    Finds the per-item YAML file by ID, loads it, updates the field, and writes back.
     """
     applied = 0
     updatable_fields = {"status", "js", "bv", "tc", "rr", "wsjf", "owner",
@@ -512,14 +547,20 @@ def apply_remote_changes_to_backlog(backlog, changes):
         field = change["field"]
         new_value = change["remote_val"]
 
-        for item in backlog.get("items", []):
-            if item["id"] == item_id:
-                if field in item or field in updatable_fields:
-                    item[field] = new_value
-                    applied += 1
-                break
+        item_path = _item_file_path(root, item_id)
+        if not item_path or not item_path.exists():
+            continue
 
-    return backlog, applied
+        item = load_yaml(item_path)
+        if not item:
+            continue
+
+        if field in item or field in updatable_fields:
+            item[field] = new_value
+            save_yaml(item_path, item)
+            applied += 1
+
+    return applied
 
 
 # -- Changelog Helpers ---------------------------------------------------------
@@ -569,17 +610,17 @@ def update_sync_state(root, direction, items_count, checksum):
 
 # -- Commands ------------------------------------------------------------------
 
-def cmd_pull(root, backlog, sync_config, args):
-    """Pull changes from GitHub Projects into backlog.yaml."""
+def cmd_pull(root, sync_config, args):
+    """Pull changes from GitHub Projects into .edpa/ item files."""
     print()
-    print(bold(color(f"  {SYNC_ICON} EDPA Sync: Pull (GitHub Projects {ARROW} backlog.yaml)", C.HEADER)))
+    print(bold(color(f"  {SYNC_ICON} EDPA Sync: Pull (GitHub Projects {ARROW} .edpa/ items)", C.HEADER)))
     print()
 
     # Fetch remote data
+    fields_mapping = sync_config.get("fields_mapping", DEFAULT_SYNC_CONFIG["fields_mapping"])
     if args.mock:
         print(color("  [mock] Generating simulated GitHub Project data...", C.MUTED))
-        fields_mapping = sync_config.get("fields_mapping", DEFAULT_SYNC_CONFIG["fields_mapping"])
-        gh_data = generate_mock_gh_data(backlog, fields_mapping)
+        gh_data = generate_mock_gh_data(root, fields_mapping)
     else:
         org = sync_config.get("github_org", "technomaton")
         project_num = sync_config.get("github_project_number", 1)
@@ -590,9 +631,8 @@ def cmd_pull(root, backlog, sync_config, args):
             sys.exit(1)
 
     # Map to EDPA format
-    fields_mapping = sync_config.get("fields_mapping", DEFAULT_SYNC_CONFIG["fields_mapping"])
     remote_items = map_gh_items_to_edpa(gh_data, fields_mapping)
-    local_items = collect_items_flat(backlog)
+    local_items = collect_items_flat(root)
 
     print(color(f"  Remote items: {len(remote_items)}", C.MUTED))
     print(color(f"  Local items:  {len(local_items)}", C.MUTED))
@@ -604,7 +644,7 @@ def cmd_pull(root, backlog, sync_config, args):
 
     if not field_changes:
         print(color(f"  {CHECK} No changes to apply. Backlog is up to date.", C.OK))
-        update_sync_state(root, "pull", len(local_items), compute_backlog_checksum(backlog))
+        update_sync_state(root, "pull", len(local_items), compute_backlog_checksum(root))
         print()
         return
 
@@ -623,10 +663,8 @@ def cmd_pull(root, backlog, sync_config, args):
 
     print()
 
-    # Apply changes
-    backlog, applied = apply_remote_changes_to_backlog(backlog, field_changes)
-    backlog_path = root / ".edpa" / "backlog.yaml"
-    save_yaml(backlog_path, backlog)
+    # Apply changes to individual item files
+    applied = apply_remote_changes(root, field_changes)
 
     # Log changes
     for ch in field_changes:
@@ -634,10 +672,10 @@ def cmd_pull(root, backlog, sync_config, args):
                    field=ch["field"], old=str(ch["local_val"]), new=str(ch["remote_val"]))
 
     # Update sync state
-    checksum = compute_backlog_checksum(backlog)
+    checksum = compute_backlog_checksum(root)
     update_sync_state(root, "pull", len(local_items), checksum)
 
-    print(color(f"  {CHECK} Applied {applied} changes to .edpa/backlog.yaml", C.OK))
+    print(color(f"  {CHECK} Applied {applied} changes to .edpa/ item files", C.OK))
 
     # Auto-commit if requested
     if args.commit:
@@ -646,17 +684,17 @@ def cmd_pull(root, backlog, sync_config, args):
     print()
 
 
-def cmd_push(root, backlog, sync_config, args):
-    """Push changes from backlog.yaml to GitHub Projects."""
+def cmd_push(root, sync_config, args):
+    """Push changes from .edpa/ item files to GitHub Projects."""
     print()
-    print(bold(color(f"  {SYNC_ICON} EDPA Sync: Push (backlog.yaml {ARROW} GitHub Projects)", C.HEADER)))
+    print(bold(color(f"  {SYNC_ICON} EDPA Sync: Push (.edpa/ items {ARROW} GitHub Projects)", C.HEADER)))
     print()
 
     # Fetch current remote state
     fields_mapping = sync_config.get("fields_mapping", DEFAULT_SYNC_CONFIG["fields_mapping"])
     if args.mock:
         print(color("  [mock] Generating simulated GitHub Project data...", C.MUTED))
-        gh_data = generate_mock_gh_data(backlog, fields_mapping)
+        gh_data = generate_mock_gh_data(root, fields_mapping)
     else:
         org = sync_config.get("github_org", "technomaton")
         project_num = sync_config.get("github_project_number", 1)
@@ -667,7 +705,7 @@ def cmd_push(root, backlog, sync_config, args):
             sys.exit(1)
 
     remote_items = map_gh_items_to_edpa(gh_data, fields_mapping)
-    local_items = collect_items_flat(backlog)
+    local_items = collect_items_flat(root)
 
     print(color(f"  Local items:  {len(local_items)}", C.MUTED))
     print(color(f"  Remote items: {len(remote_items)}", C.MUTED))
@@ -679,7 +717,7 @@ def cmd_push(root, backlog, sync_config, args):
 
     if not field_changes:
         print(color(f"  {CHECK} No changes to push. GitHub Project is up to date.", C.OK))
-        update_sync_state(root, "push", len(local_items), compute_backlog_checksum(backlog))
+        update_sync_state(root, "push", len(local_items), compute_backlog_checksum(root))
         print()
         return
 
@@ -722,12 +760,12 @@ def cmd_push(root, backlog, sync_config, args):
         log_change(root, "git", "field_change", ch["id"],
                    field=ch["field"], old=str(ch["local_val"]), new=str(ch["remote_val"]))
 
-    update_sync_state(root, "push", len(local_items), compute_backlog_checksum(backlog))
+    update_sync_state(root, "push", len(local_items), compute_backlog_checksum(root))
     print(color(f"  {CHECK} Pushed {pushed}/{len(field_changes)} changes to GitHub Project", C.OK))
     print()
 
 
-def cmd_diff(root, backlog, sync_config, args):
+def cmd_diff(root, sync_config, args):
     """Show what would change without applying (dry-run)."""
     print()
     print(bold(color(f"  {SYNC_ICON} EDPA Sync: Diff (dry-run)", C.HEADER)))
@@ -737,7 +775,7 @@ def cmd_diff(root, backlog, sync_config, args):
     fields_mapping = sync_config.get("fields_mapping", DEFAULT_SYNC_CONFIG["fields_mapping"])
     if args.mock:
         print(color("  [mock] Generating simulated GitHub Project data...", C.MUTED))
-        gh_data = generate_mock_gh_data(backlog, fields_mapping)
+        gh_data = generate_mock_gh_data(root, fields_mapping)
     else:
         org = sync_config.get("github_org", "technomaton")
         project_num = sync_config.get("github_project_number", 1)
@@ -748,7 +786,7 @@ def cmd_diff(root, backlog, sync_config, args):
             sys.exit(1)
 
     remote_items = map_gh_items_to_edpa(gh_data, fields_mapping)
-    local_items = collect_items_flat(backlog)
+    local_items = collect_items_flat(root)
 
     print(color(f"  Remote items: {len(remote_items)}", C.MUTED))
     print(color(f"  Local items:  {len(local_items)}", C.MUTED))
@@ -806,7 +844,7 @@ def cmd_diff(root, backlog, sync_config, args):
     print()
 
 
-def cmd_log(root, _backlog, _sync_config, args):
+def cmd_log(root, _sync_config, args):
     """Show the sync changelog."""
     print()
     print(bold(color("  EDPA Sync Changelog", C.HEADER)))
@@ -859,7 +897,7 @@ def cmd_log(root, _backlog, _sync_config, args):
     print()
 
 
-def cmd_conflicts(root, backlog, sync_config, args):
+def cmd_conflicts(root, _sync_config, args):
     """Show items changed in both sources since last sync."""
     print()
     print(bold(color(f"  {SYNC_ICON} EDPA Sync: Conflicts", C.HEADER)))
@@ -941,7 +979,7 @@ def cmd_conflicts(root, backlog, sync_config, args):
     print()
 
 
-def cmd_status(root, backlog, sync_config, args):
+def cmd_status(root, sync_config, args):
     """Show sync status overview."""
     print()
     print(bold(color(f"  {SYNC_ICON} EDPA Sync Status", C.HEADER)))
@@ -973,7 +1011,7 @@ def cmd_status(root, backlog, sync_config, args):
     print()
 
     # Current backlog stats
-    items = collect_items_flat(backlog)
+    items = collect_items_flat(root)
     levels = {}
     statuses = {}
     for item in items.values():
@@ -1003,7 +1041,7 @@ def cmd_status(root, backlog, sync_config, args):
     print(f"  {bold('Changelog:')}        {len(entries)} entries")
 
     # Current checksum vs stored
-    current_checksum = compute_backlog_checksum(backlog)
+    current_checksum = compute_backlog_checksum(root)
     if state_path.exists():
         state = load_json(state_path)
         stored = state.get("checksum", "")
@@ -1042,7 +1080,7 @@ def _git_commit(root, message):
 def main():
     parser = argparse.ArgumentParser(
         prog="edpa_sync",
-        description="EDPA bidirectional sync: GitHub Projects <-> .edpa/backlog.yaml",
+        description="EDPA bidirectional sync: GitHub Projects <-> .edpa/ item files",
     )
 
     parser.add_argument("--mock", action="store_true",
@@ -1053,14 +1091,14 @@ def main():
     sub = parser.add_subparsers(dest="command", help="Available commands")
 
     # pull
-    p_pull = sub.add_parser("pull", help="GitHub Projects -> backlog.yaml")
+    p_pull = sub.add_parser("pull", help="GitHub Projects -> .edpa/ item files")
     p_pull.add_argument("--commit", action="store_true",
                         help="Auto-commit changes after pull")
     p_pull.add_argument("--mock", action="store_true",
                         help="Use mock data instead of real GitHub API")
 
     # push
-    p_push = sub.add_parser("push", help="backlog.yaml -> GitHub Projects")
+    p_push = sub.add_parser("push", help=".edpa/ item files -> GitHub Projects")
     p_push.add_argument("--mock", action="store_true",
                         help="Use mock data instead of real GitHub API")
 
@@ -1094,10 +1132,9 @@ def main():
 
     root = find_repo_root()
     if root is None:
-        print(color("Error: Cannot find .edpa/backlog.yaml. Run from the EDPA project directory.", C.ERR))
+        print(color("Error: Cannot find .edpa/ directory. Run from the EDPA project directory.", C.ERR))
         sys.exit(1)
 
-    backlog = load_yaml(root / ".edpa" / "backlog.yaml")
     sync_config = load_sync_config(root)
 
     # Ensure changelog and sync_state files exist
@@ -1125,7 +1162,7 @@ def main():
 
     cmd_func = commands.get(args.command)
     if cmd_func:
-        cmd_func(root, backlog, sync_config, args)
+        cmd_func(root, sync_config, args)
     else:
         parser.print_help()
 

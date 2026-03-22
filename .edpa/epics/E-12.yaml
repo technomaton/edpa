@@ -1,0 +1,56 @@
+id: E-12
+type: Epic
+title: OMOP CDM integrace
+epic_type: Enabler
+js: 5
+bv: 5
+tc: 5
+rr: 13
+wsjf: 4.6
+status: Active
+parent: I-1
+owner: tuma
+epic_hypothesis:
+  for: technickou platformu a vývojáře
+  who: potřebují interoperabilitu se zdravotnickými standardy (OMOP, FHIR)
+  the: OMOP CDM integrace s FHIR bridge
+  is_a: Enabler Epic
+  that: umožní bezproblémovou výměnu dat s nemocničními systémy
+  unlike: custom ETL scripty per nemocnice (neudržitelné, neškálovatelné)
+  our_solution: standardizovaný OMOP CDM s FHIR bridge pro automatický ingest
+  benefit_hypothesis:
+    metric: počet napojených nemocničních systémů
+    baseline: 0 (žádná integrace)
+    target: 3+ nemocnice napojeny přes FHIR
+    timeframe: do konce PI-2026-3
+  leading_indicators:
+  - OMOP schéma migrováno a validováno
+  - FHIR parser zpracuje reálná data z 1 nemocnice
+  lagging_indicators:
+  - 3 nemocnice aktivně posílají data
+  - < 1% chybovost při importu
+  kill_criteria:
+  - FHIR standard se změní zásadně (breaking change)
+  - žádná nemocnice neposkytne testovací data do 6 měsíců
+  - OMOP licence se změní na komerční
+  lean_business_case:
+    problem: Každá nemocnice má jiný formát dat, custom integrace neškálují
+    opportunity: OMOP CDM je de-facto standard, FHIR je povinný v EU od 2025
+    mvp: OMOP schéma + FHIR parser + 1 nemocniční napojení
+    options_considered:
+    - OMOP + FHIR (standard) — budoucnostní, interoperabilní
+    - Proprietary ETL — rychlejší start, ale vendor lock-in
+    - Do nothing — platforma bez reálných dat
+contributions:
+- person: urbanek
+  role: architect
+  cw: 0.15
+  rs: 0.6
+- person: pm
+  role: consulted
+  cw: 0.6
+  rs: 1.0
+- person: tuma
+  role: owner
+  cw: 0.25
+  rs: 0.8

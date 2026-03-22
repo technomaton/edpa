@@ -1,0 +1,15 @@
+id: S-211
+type: Story
+title: Katalog search
+js: 3
+bv: 3
+tc: 2
+rr: 1
+status: Done
+parent: F-110
+assignee: matousek
+iteration: PI-2026-1.3
+contributors:
+- person: matousek
+  role: owner
+  cw: 1.0

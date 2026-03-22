@@ -1,0 +1,21 @@
+id: F-111
+type: Feature
+title: Objednavkovy system
+js: 5
+bv: 5
+tc: 13
+rr: 5
+wsjf: 4.6
+status: Active
+parent: E-11
+owner: d1
+contributions:
+- person: d1
+  role: owner
+  cw: 0.4
+- person: d2
+  role: key
+  cw: 0.35
+- person: pm
+  role: consulted
+  cw: 0.2

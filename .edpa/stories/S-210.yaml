@@ -1,0 +1,18 @@
+id: S-210
+type: Story
+title: Katalog API
+js: 5
+bv: 5
+tc: 5
+rr: 3
+status: Done
+parent: F-110
+assignee: d2
+iteration: PI-2026-1.2
+contributors:
+- person: d2
+  role: owner
+  cw: 1.0
+- person: matousek
+  role: consulted
+  cw: 0.25

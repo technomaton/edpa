@@ -1,0 +1,15 @@
+id: S-217
+type: Story
+title: Security scan setup
+js: 3
+bv: 3
+tc: 3
+rr: 5
+status: Done
+parent: F-120
+assignee: tuma
+iteration: PI-2026-1.3
+contributors:
+- person: tuma
+  role: owner
+  cw: 1.0

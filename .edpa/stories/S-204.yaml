@@ -1,0 +1,18 @@
+id: S-204
+type: Story
+title: Upload UI komponenta
+js: 3
+bv: 3
+tc: 3
+rr: 1
+status: Done
+parent: F-101
+assignee: matousek
+iteration: PI-2026-1.1
+contributors:
+- person: matousek
+  role: owner
+  cw: 1.0
+- person: d1
+  role: consulted
+  cw: 0.25

@@ -1,0 +1,21 @@
+id: F-120
+type: Feature
+title: FHIR bridge
+js: 8
+bv: 5
+tc: 5
+rr: 13
+wsjf: 2.88
+status: Active
+parent: E-12
+owner: tuma
+contributions:
+- person: tuma
+  role: key
+  cw: 0.4
+- person: do
+  role: owner
+  cw: 0.45
+- person: urbanek
+  role: consulted
+  cw: 0.15

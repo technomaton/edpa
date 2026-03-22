@@ -1,0 +1,18 @@
+id: S-208
+type: Story
+title: Anonymizace testy
+js: 3
+bv: 3
+tc: 3
+rr: 2
+status: Done
+parent: F-102
+assignee: d1
+iteration: PI-2026-1.2
+contributors:
+- person: d1
+  role: owner
+  cw: 1.0
+- person: turyna
+  role: consulted
+  cw: 0.25

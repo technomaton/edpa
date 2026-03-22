@@ -1,0 +1,21 @@
+id: F-110
+type: Feature
+title: Katalog datasetu
+js: 8
+bv: 8
+tc: 8
+rr: 3
+wsjf: 2.38
+status: Active
+parent: E-11
+owner: matousek
+contributions:
+- person: matousek
+  role: owner
+  cw: 0.45
+- person: d2
+  role: key
+  cw: 0.4
+- person: pm
+  role: consulted
+  cw: 0.2

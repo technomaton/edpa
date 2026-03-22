@@ -1,0 +1,21 @@
+id: S-215
+type: Story
+title: FHIR mapping
+js: 8
+bv: 5
+tc: 5
+rr: 8
+status: Done
+parent: F-120
+assignee: do
+iteration: PI-2026-1.3
+contributors:
+- person: do
+  role: owner
+  cw: 1.0
+- person: tuma
+  role: key
+  cw: 0.6
+- person: urbanek
+  role: consulted
+  cw: 0.15

@@ -1,0 +1,18 @@
+id: S-203
+type: Story
+title: Upload endpoint
+js: 5
+bv: 5
+tc: 5
+rr: 2
+status: Done
+parent: F-101
+assignee: tuma
+iteration: PI-2026-1.1
+contributors:
+- person: tuma
+  role: owner
+  cw: 1.0
+- person: matousek
+  role: key
+  cw: 0.6

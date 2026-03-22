@@ -1,0 +1,15 @@
+id: S-205
+type: Story
+title: Upload testy
+js: 2
+bv: 2
+tc: 2
+rr: 1
+status: Done
+parent: F-101
+assignee: d1
+iteration: PI-2026-1.2
+contributors:
+- person: d1
+  role: owner
+  cw: 1.0

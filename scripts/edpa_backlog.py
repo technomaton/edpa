@@ -12,6 +12,7 @@ Usage:
     python scripts/edpa_backlog.py wsjf                    # WSJF ranking
     python scripts/edpa_backlog.py wsjf --level feature
     python scripts/edpa_backlog.py validate                # Integrity check
+    python scripts/edpa_backlog.py add --type Story --parent F-100 --title "New story" --js 5 --assignee turyna
 """
 
 import argparse
@@ -69,26 +70,77 @@ DOT    = "\u2022"   # bullet
 ARROW  = "\u2192"   # ->
 
 
-# -- Data Loading --------------------------------------------------------------
+# -- Type-directory mapping ----------------------------------------------------
+
+TYPE_DIRS = {
+    "Initiative": "initiatives",
+    "Epic":       "epics",
+    "Feature":    "features",
+    "Story":      "stories",
+}
+
+PREFIX_TO_DIR = {
+    "I": "initiatives",
+    "E": "epics",
+    "F": "features",
+    "S": "stories",
+}
+
+
+# -- Data Loading (file-per-item) ----------------------------------------------
 
 def find_repo_root():
     """Walk up from CWD to find the repo root (contains .edpa/)."""
     p = Path.cwd()
     while p != p.parent:
-        if (p / ".edpa" / "backlog.yaml").exists():
+        if (p / ".edpa" / "people.yaml").exists():
             return p
         p = p.parent
     # Fallback: try the known project path
     fallback = Path("/Users/jurby/projects/edpa")
-    if (fallback / ".edpa" / "backlog.yaml").exists():
+    if (fallback / ".edpa" / "people.yaml").exists():
         return fallback
     return None
 
 
 def load_backlog(root):
-    path = root / ".edpa" / "backlog.yaml"
-    with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    """Load backlog from file-per-item directory structure.
+
+    Reads project/people metadata from people.yaml, then globs all item
+    files from initiatives/, epics/, features/, stories/ subdirectories.
+    """
+    edpa = root / ".edpa"
+
+    # Load project/people metadata
+    people_path = edpa / "people.yaml"
+    backlog = yaml.safe_load(open(people_path, encoding="utf-8")) if people_path.exists() else {}
+
+    # Load all items from type directories
+    items = []
+    for type_dir in ["initiatives", "epics", "features", "stories"]:
+        dir_path = edpa / type_dir
+        if dir_path.exists():
+            for f in sorted(dir_path.glob("*.yaml")):
+                item = yaml.safe_load(open(f, encoding="utf-8"))
+                if item:
+                    items.append(item)
+
+    backlog["items"] = items
+    return backlog
+
+
+def load_item_direct(root, item_id):
+    """Load a single item by reading its file directly (O(1) file access)."""
+    prefix = item_id.split("-")[0] if "-" in item_id else ""
+    type_dir = PREFIX_TO_DIR.get(prefix)
+    if type_dir:
+        path = root / ".edpa" / type_dir / f"{item_id}.yaml"
+        if path.exists():
+            item = yaml.safe_load(open(path, encoding="utf-8"))
+            if item:
+                item["level"] = TYPE_TO_LEVEL.get(item.get("type", ""), item.get("type", ""))
+                return item
+    return None
 
 
 def load_iteration(root, iteration_id):
@@ -120,7 +172,7 @@ TYPE_TO_LEVEL = {
 def collect_items(backlog):
     """Collect all items into a flat list with level annotation.
 
-    Works with the new flat 'items' structure. Each item has a 'type' field
+    Works with the flat 'items' structure. Each item has a 'type' field
     (Initiative, Epic, Feature, Story) and a 'parent' reference.
     """
     items = []
@@ -131,8 +183,19 @@ def collect_items(backlog):
     return items
 
 
-def find_item(backlog, item_id):
-    """Find a single item by ID in the flat items list."""
+def find_item(backlog, item_id, root=None):
+    """Find a single item by ID.
+
+    Tries direct file access first (fast path), then falls back to
+    searching the loaded items list.
+    """
+    # Fast path: direct file read
+    if root:
+        direct = load_item_direct(root, item_id)
+        if direct:
+            return direct
+
+    # Fallback: search in-memory items list
     for item in backlog.get("items", []):
         if item.get("id") == item_id:
             entry = dict(item)
@@ -188,6 +251,41 @@ def wsjf_score(item):
     tc = item.get("tc", 0)
     rr = item.get("rr", 0)
     return round((bv + tc + rr) / js, 2)
+
+
+def next_id_for_type(root, item_type):
+    """Determine the next available numeric ID for a given type.
+
+    Scans existing files in the type directory and returns the next
+    sequential ID string (e.g. 'S-227').
+    """
+    prefix_map = {
+        "Initiative": "I",
+        "Epic":       "E",
+        "Feature":    "F",
+        "Story":      "S",
+    }
+    prefix = prefix_map.get(item_type)
+    if not prefix:
+        raise ValueError(f"Unknown item type: {item_type}")
+
+    type_dir = TYPE_DIRS[item_type]
+    dir_path = root / ".edpa" / type_dir
+
+    max_num = 0
+    if dir_path.exists():
+        for f in dir_path.glob("*.yaml"):
+            stem = f.stem  # e.g. "S-226"
+            parts = stem.split("-")
+            if len(parts) == 2:
+                try:
+                    num = int(parts[1])
+                    if num > max_num:
+                        max_num = num
+                except ValueError:
+                    pass
+
+    return f"{prefix}-{max_num + 1}"
 
 
 # -- Commands ------------------------------------------------------------------
@@ -265,10 +363,10 @@ def cmd_tree(backlog, args):
     print()
 
 
-def cmd_show(backlog, args):
+def cmd_show(backlog, args, root=None):
     """Show detailed information about a single item."""
     item_id = args.item_id
-    item = find_item(backlog, item_id)
+    item = find_item(backlog, item_id, root=root)
 
     if not item:
         print(color(f"  Error: Item '{item_id}' not found.", C.ERR))
@@ -654,12 +752,34 @@ def cmd_validate(backlog, args):
         if not item.get("type"):
             errors.append(f"{item.get('id', '?')}: missing 'type' field")
 
+    # 10. Validate parent type hierarchy (Initiative > Epic > Feature > Story)
+    valid_parent_type = {
+        "Epic": "Initiative",
+        "Feature": "Epic",
+        "Story": "Feature",
+    }
+    items_by_id = {i.get("id"): i for i in items if i.get("id")}
+    for item in items:
+        if item.get("level") == "Initiative":
+            continue
+        parent_id = item.get("parent")
+        if parent_id and parent_id in items_by_id:
+            parent_item = items_by_id[parent_id]
+            expected_parent_type = valid_parent_type.get(item.get("type"))
+            actual_parent_type = parent_item.get("type")
+            if expected_parent_type and actual_parent_type != expected_parent_type:
+                errors.append(
+                    f"{item['id']} ({item.get('title','')}): parent {parent_id} is "
+                    f"{actual_parent_type}, expected {expected_parent_type}"
+                )
+
     # Print results
     checks = [
         ("Story assignees present", not any("missing assignee" in e for e in errors)),
         ("Story JS values present", not any("missing JS" in e for e in errors)),
         ("Story JS <= 8", not any("exceeds recommended" in w for w in warnings)),
         ("Parent references valid", not any("parent" in e.lower() for e in errors)),
+        ("Parent type hierarchy", not any("expected" in e.lower() for e in errors)),
         ("Iteration assignments", not any("missing iteration" in w for w in warnings)),
         ("WSJF consistency", not any("stored WSJF" in w for w in warnings)),
         ("No duplicate IDs", not any("Duplicate ID" in e for e in errors)),
@@ -704,6 +824,83 @@ def cmd_validate(backlog, args):
     return len(errors)
 
 
+def cmd_add(root, backlog, args):
+    """Add a new work item, creating a YAML file in the appropriate directory."""
+    item_type = args.type
+    parent_id = args.parent
+    title = args.title
+    js = args.js
+    assignee = getattr(args, "assignee", None)
+    status = getattr(args, "status", None) or "Planned"
+    iteration = getattr(args, "iteration", None)
+    bv = getattr(args, "bv", None)
+    tc = getattr(args, "tc", None)
+    rr = getattr(args, "rr", None)
+
+    # Validate type
+    if item_type not in TYPE_DIRS:
+        print(color(f"  Error: Invalid type '{item_type}'. Must be one of: {', '.join(TYPE_DIRS.keys())}", C.ERR))
+        sys.exit(1)
+
+    # Validate parent exists (unless Initiative)
+    if item_type != "Initiative":
+        if not parent_id:
+            print(color(f"  Error: --parent is required for type '{item_type}'.", C.ERR))
+            sys.exit(1)
+        parent_item = find_item(backlog, parent_id, root=root)
+        if not parent_item:
+            print(color(f"  Error: Parent '{parent_id}' not found.", C.ERR))
+            sys.exit(1)
+
+    # Generate next ID
+    new_id = next_id_for_type(root, item_type)
+
+    # Build item data
+    item_data = {
+        "id": new_id,
+        "type": item_type,
+        "title": title,
+        "status": status,
+        "parent": parent_id,
+    }
+
+    if js is not None:
+        item_data["js"] = js
+    if bv is not None:
+        item_data["bv"] = bv
+    if tc is not None:
+        item_data["tc"] = tc
+    if rr is not None:
+        item_data["rr"] = rr
+    if assignee:
+        item_data["assignee"] = assignee
+    if iteration:
+        item_data["iteration"] = iteration
+
+    # Compute WSJF if we have enough data
+    if js and js > 0:
+        _bv = bv or 0
+        _tc = tc or 0
+        _rr = rr or 0
+        if _bv or _tc or _rr:
+            item_data["wsjf"] = round((_bv + _tc + _rr) / js, 2)
+
+    # Ensure directory exists
+    type_dir = TYPE_DIRS[item_type]
+    dir_path = root / ".edpa" / type_dir
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    # Write YAML file
+    file_path = dir_path / f"{new_id}.yaml"
+    with open(file_path, "w", encoding="utf-8") as f:
+        yaml.dump(item_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+    print()
+    print(f"  {color('Created:', C.OK)} {color(bold(new_id), level_color(item_type))} {title}")
+    print(f"  {color('File:', C.MUTED)}    {file_path}")
+    print()
+
+
 # -- Main ----------------------------------------------------------------------
 
 def main():
@@ -735,6 +932,20 @@ def main():
     # validate
     sub.add_parser("validate", help="Validate backlog integrity")
 
+    # add
+    p_add = sub.add_parser("add", help="Add a new work item")
+    p_add.add_argument("--type", required=True, choices=["Initiative", "Epic", "Feature", "Story"],
+                       help="Item type")
+    p_add.add_argument("--parent", help="Parent item ID (required for Epic, Feature, Story)")
+    p_add.add_argument("--title", required=True, help="Item title")
+    p_add.add_argument("--js", type=int, help="Job Size")
+    p_add.add_argument("--bv", type=int, help="Business Value")
+    p_add.add_argument("--tc", type=int, help="Time Criticality")
+    p_add.add_argument("--rr", type=int, help="Risk Reduction")
+    p_add.add_argument("--assignee", help="Assignee (person ID)")
+    p_add.add_argument("--status", default="Planned", help="Status (default: Planned)")
+    p_add.add_argument("--iteration", help="Iteration ID (e.g. PI-2026-1.3)")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -743,7 +954,7 @@ def main():
 
     root = find_repo_root()
     if root is None:
-        print(color("Error: Cannot find .edpa/backlog.yaml. Run from the EDPA project directory.", C.ERR))
+        print(color("Error: Cannot find .edpa/ directory. Run from the EDPA project directory.", C.ERR))
         sys.exit(1)
 
     backlog = load_backlog(root)
@@ -751,7 +962,7 @@ def main():
     if args.command == "tree":
         cmd_tree(backlog, args)
     elif args.command == "show":
-        cmd_show(backlog, args)
+        cmd_show(backlog, args, root=root)
     elif args.command == "status":
         cmd_status(backlog, args)
     elif args.command == "wsjf":
@@ -759,6 +970,8 @@ def main():
     elif args.command == "validate":
         err_count = cmd_validate(backlog, args)
         sys.exit(1 if err_count else 0)
+    elif args.command == "add":
+        cmd_add(root, backlog, args)
 
 
 if __name__ == "__main__":

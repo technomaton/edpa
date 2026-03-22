@@ -1,0 +1,18 @@
+id: S-209
+type: Story
+title: Katalog UI
+js: 5
+bv: 5
+tc: 5
+rr: 2
+status: Done
+parent: F-110
+assignee: matousek
+iteration: PI-2026-1.2
+contributors:
+- person: matousek
+  role: owner
+  cw: 1.0
+- person: d2
+  role: key
+  cw: 0.6

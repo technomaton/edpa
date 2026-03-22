@@ -1,0 +1,18 @@
+id: S-201
+type: Story
+title: Unit testy OMOP
+js: 5
+bv: 5
+tc: 3
+rr: 2
+status: Done
+parent: F-100
+assignee: turyna
+iteration: PI-2026-1.1
+contributors:
+- person: turyna
+  role: owner
+  cw: 1.0
+- person: urbanek
+  role: reviewer
+  cw: 0.3

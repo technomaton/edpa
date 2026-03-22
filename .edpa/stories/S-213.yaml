@@ -1,0 +1,18 @@
+id: S-213
+type: Story
+title: Objednavka notifikace
+js: 3
+bv: 3
+tc: 3
+rr: 2
+status: Done
+parent: F-111
+assignee: d2
+iteration: PI-2026-1.3
+contributors:
+- person: d2
+  role: owner
+  cw: 1.0
+- person: d1
+  role: consulted
+  cw: 0.25

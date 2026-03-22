@@ -1,0 +1,21 @@
+id: F-100
+type: Feature
+title: OMOP CDM Parser
+js: 8
+bv: 8
+tc: 5
+rr: 5
+wsjf: 2.25
+status: Done
+parent: E-10
+owner: urbanek
+contributions:
+- person: urbanek
+  role: reviewer
+  cw: 0.3
+- person: tuma
+  role: key
+  cw: 0.3
+- person: turyna
+  role: owner
+  cw: 0.4

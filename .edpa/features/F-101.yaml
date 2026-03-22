@@ -1,0 +1,21 @@
+id: F-101
+type: Feature
+title: Data Upload API
+js: 5
+bv: 5
+tc: 8
+rr: 3
+wsjf: 3.2
+status: Done
+parent: E-10
+owner: tuma
+contributions:
+- person: tuma
+  role: key
+  cw: 0.35
+- person: matousek
+  role: owner
+  cw: 0.4
+- person: d1
+  role: contributor
+  cw: 0.25

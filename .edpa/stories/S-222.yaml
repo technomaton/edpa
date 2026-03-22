@@ -1,0 +1,18 @@
+id: S-222
+type: Story
+title: DB migrace scripts
+js: 3
+bv: 3
+tc: 2
+rr: 2
+status: Done
+parent: F-110
+assignee: d2
+iteration: PI-2026-1.4
+contributors:
+- person: d2
+  role: owner
+  cw: 1.0
+- person: matousek
+  role: consulted
+  cw: 0.25

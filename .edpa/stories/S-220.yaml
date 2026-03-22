@@ -1,0 +1,18 @@
+id: S-220
+type: Story
+title: Performance testy
+js: 5
+bv: 5
+tc: 3
+rr: 3
+status: Done
+parent: F-111
+assignee: d1
+iteration: PI-2026-1.4
+contributors:
+- person: d1
+  role: owner
+  cw: 1.0
+- person: tuma
+  role: consulted
+  cw: 0.25

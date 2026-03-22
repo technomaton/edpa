@@ -1,0 +1,21 @@
+id: S-219
+type: Story
+title: Architektura review
+js: 3
+bv: 3
+tc: 2
+rr: 3
+status: Done
+parent: F-102
+assignee: urbanek
+iteration: PI-2026-1.4
+contributors:
+- person: urbanek
+  role: owner
+  cw: 1.0
+- person: turyna
+  role: consulted
+  cw: 0.25
+- person: pm
+  role: consulted
+  cw: 0.2

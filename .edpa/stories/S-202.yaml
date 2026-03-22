@@ -1,0 +1,18 @@
+id: S-202
+type: Story
+title: OMOP validace schemat
+js: 3
+bv: 3
+tc: 2
+rr: 2
+status: Done
+parent: F-100
+assignee: tuma
+iteration: PI-2026-1.1
+contributors:
+- person: tuma
+  role: owner
+  cw: 1.0
+- person: turyna
+  role: consulted
+  cw: 0.25

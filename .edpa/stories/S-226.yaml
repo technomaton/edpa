@@ -1,0 +1,18 @@
+id: S-226
+type: Story
+title: Monitoring setup
+js: 3
+bv: 3
+tc: 3
+rr: 3
+status: Planned
+parent: F-120
+assignee: do
+iteration: PI-2026-1.5
+contributors:
+- person: do
+  role: owner
+  cw: 1.0
+- person: tuma
+  role: consulted
+  cw: 0.25

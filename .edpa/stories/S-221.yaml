@@ -1,0 +1,18 @@
+id: S-221
+type: Story
+title: Data validace modul
+js: 5
+bv: 5
+tc: 5
+rr: 5
+status: In Progress
+parent: F-102
+assignee: turyna
+iteration: PI-2026-1.4
+contributors:
+- person: turyna
+  role: owner
+  cw: 1.0
+- person: d1
+  role: key
+  cw: 0.6

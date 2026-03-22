@@ -1,0 +1,21 @@
+id: F-102
+type: Feature
+title: Anonymizacni engine
+js: 13
+bv: 13
+tc: 13
+rr: 8
+wsjf: 2.62
+status: Active
+parent: E-10
+owner: urbanek
+contributions:
+- person: urbanek
+  role: architect
+  cw: 0.35
+- person: turyna
+  role: owner
+  cw: 0.35
+- person: d1
+  role: key
+  cw: 0.3
