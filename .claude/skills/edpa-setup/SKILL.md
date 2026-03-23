@@ -90,7 +90,7 @@ signals:
 
 ### 5. Create GitHub Projects custom fields
 
-Read `../../docs/github-setup.md` for field definitions.
+Read `docs/github-setup.md` (from project root) for field definitions.
 Use `gh` CLI to create project and fields:
 
 ```bash

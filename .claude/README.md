@@ -26,7 +26,7 @@ The commands above invoke these skills:
 
 ## MCP Server
 
-EDPA uses the GitHub MCP server for API access. See `../.mcp.json` for configuration.
+EDPA uses the GitHub MCP server for API access. See `.mcp.json` for configuration.
 
 ## Part of TECHNOMATON Hub
 
