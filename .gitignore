@@ -20,3 +20,14 @@ Thumbs.db
 # Temporary
 *.tmp
 *.bak
+
+# Build artifacts
+web/dist/
+web/.vercel/
+*.pyc
+__pycache__/
+
+# Environment
+.env
+.env.local
+.env.production.local

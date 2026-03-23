@@ -228,16 +228,9 @@ def main():
             issue_type_ids[t["name"]] = t["id"]
         ok(f"Found {len(issue_type_ids)} issue types: {', '.join(issue_type_ids.keys())}")
     else:
-        fail("Could not query issue types — falling back to hardcoded IDs")
-        issue_type_ids = {
-            "Initiative": "IT_kwDOAP4s484B6aj2",
-            "Epic": "IT_kwDOAP4s484B6aj3",
-            "Feature": "IT_kwDOAP4s484AIZaE",
-            "Story": "IT_kwDOAP4s484B6aj4",
-            "Defect": "IT_kwDOAP4s484AIZaC",
-            "Task": "IT_kwDOAP4s484AIZZ_",
-        }
-        info(f"Using {len(issue_type_ids)} hardcoded issue type IDs")
+        fail("Could not query issue types from org. Run 'edpa_issue_types.py setup --org ORG' first.")
+        fail("Issue Type assignment will be skipped.")
+        issue_type_ids = {}
 
     # ═══════════════════════════════════════════════════════════
     # STEP 6: Create issues

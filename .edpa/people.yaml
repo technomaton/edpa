@@ -1,3 +1,4 @@
+# EXAMPLE DATA — replace with your team when deploying
 project:
   name: Medical Platform & Datovy e-shop
   registration: CZ.01.01.01/01/24_062/0007440
@@ -57,3 +58,4 @@ teams:
   planning_factor: 0.8
 - id: Medicalc
   planning_factor: 0.75
+_note: EXAMPLE DATA — replace with your team when deploying
