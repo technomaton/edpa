@@ -34,22 +34,58 @@ import Layout from '../../layouts/Layout.astro';
       <div class="wizard-step active" id="step1">
         <h2 class="step-title">Project</h2>
         <p class="step-desc">Basic information about your project.</p>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" for="projectName">Project name</label>
-            <input class="form-input" type="text" id="projectName" placeholder="Medical Platform" />
+
+        <div class="form-card">
+          <div class="form-card-title">Project</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="wizard-label" for="projectName">Project name</label>
+              <input class="wizard-input" type="text" id="projectName" placeholder="Medical Platform" />
+            </div>
+            <div class="form-group">
+              <label class="wizard-label" for="githubOrg">GitHub organization</label>
+              <input class="wizard-input" type="text" id="githubOrg" placeholder="my-org" />
+            </div>
+            <div class="form-group">
+              <label class="wizard-label" for="githubRepo">GitHub repo</label>
+              <input class="wizard-input" type="text" id="githubRepo" placeholder="my-project" />
+            </div>
+            <div class="form-group">
+              <label class="wizard-label" for="program">Program / registration <span class="form-optional">(optional)</span></label>
+              <input class="wizard-input" type="text" id="program" placeholder="OP TAK" />
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label" for="githubOrg">GitHub organization</label>
-            <input class="form-input" type="text" id="githubOrg" placeholder="my-org" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="githubRepo">GitHub repo</label>
-            <input class="form-input" type="text" id="githubRepo" placeholder="my-project" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="program">Program / registration <span class="form-optional">(optional)</span></label>
-            <input class="form-input" type="text" id="program" placeholder="OP TAK" />
+        </div>
+
+        <div class="form-card">
+          <div class="form-card-title">Cadence</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="wizard-label" for="iterLength">Iteration length</label>
+              <select class="wizard-select" id="iterLength">
+                <option value="1">1 week</option>
+                <option value="2" selected>2 weeks</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="wizard-label" for="piLength">PI length</label>
+              <input class="wizard-input" type="text" id="piLength" value="10 weeks" readonly tabindex="-1" />
+              <span class="form-hint">Auto: iterations x 5</span>
+            </div>
+            <div class="form-group">
+              <label class="wizard-label" for="deliveryIters">Delivery iterations</label>
+              <input class="wizard-input" type="number" id="deliveryIters" value="4" min="1" max="9" />
+            </div>
+            <div class="form-group">
+              <label class="wizard-label" for="ipIters">IP iterations</label>
+              <input class="wizard-input" type="text" id="ipIters" value="1" readonly tabindex="-1" />
+              <span class="form-hint">Fixed</span>
+            </div>
+            <div class="form-group">
+              <label class="wizard-label" for="fteCapacity">Capacity per 1.0 FTE</label>
+              <input class="wizard-input" type="text" id="fteCapacity" value="80h" readonly tabindex="-1" />
+              <span class="form-hint">Auto: iter_weeks x 40</span>
+            </div>
           </div>
         </div>
       </div>
@@ -59,27 +95,29 @@ import Layout from '../../layouts/Layout.astro';
         <h2 class="step-title">Team</h2>
         <p class="step-desc">Add team members and set their roles and capacities.</p>
 
-        <div class="team-table-wrap">
-          <table class="team-table" id="teamTable">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>ID</th>
-                <th>Role</th>
-                <th>FTE</th>
-                <th>Capacity (h)</th>
-                <th>Contract</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="teamBody">
-            </tbody>
-          </table>
-        </div>
+        <div class="form-card team-card">
+          <div class="team-table-wrap">
+            <table class="team-table" id="teamTable">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>FTE</th>
+                  <th>Capacity</th>
+                  <th>Contract</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="teamBody">
+              </tbody>
+            </table>
+          </div>
 
-        <div class="team-actions">
-          <button class="btn btn-secondary" id="addMemberBtn">+ Add member</button>
-          <div class="team-summary" id="teamSummary">Total: 0 members, 0.0 FTE, 0h/iteration</div>
+          <div class="team-actions">
+            <button class="btn btn-secondary" id="addMemberBtn">+ Add member</button>
+            <div class="team-summary" id="teamSummary">Total: 0 members, 0.0 FTE, 0h/iteration</div>
+          </div>
         </div>
       </div>
 
@@ -122,18 +160,27 @@ import Layout from '../../layouts/Layout.astro';
         <h2 class="step-title">Launch</h2>
         <p class="step-desc">Choose one of the paths to launch your project.</p>
 
-        <div class="grid grid-2 launch-grid">
-          <div class="card green launch-card">
+        <div class="launch-cards">
+          <div class="form-card launch-card launch-card--recommended">
             <div class="launch-badge">recommended</div>
-            <h3 class="card-heading">Path A: Claude Code</h3>
-            <p class="card-text">The fastest path. Claude Code will guide you through everything interactively.</p>
+            <h3 class="card-heading">Path A: Template repo</h3>
+            <p class="card-text">The fastest path. Create a repo from the EDPA template and paste your generated files.</p>
             <pre class="launch-pre" id="launchA"></pre>
           </div>
-          <div class="card accent launch-card">
-            <h3 class="card-heading">Path B: Manual CLI</h3>
-            <p class="card-text">Step by step manually via terminal.</p>
+          <div class="form-card launch-card">
+            <h3 class="card-heading">Path B: Claude Code</h3>
+            <p class="card-text">Claude Code will guide you through everything interactively.</p>
             <pre class="launch-pre" id="launchB"></pre>
           </div>
+          <div class="form-card launch-card">
+            <h3 class="card-heading">Path C: Manual</h3>
+            <p class="card-text">Step by step manually via terminal.</p>
+            <pre class="launch-pre" id="launchC"></pre>
+          </div>
+        </div>
+
+        <div class="form-card launch-note">
+          <p class="launch-note-text">Template repo contains <code>scripts/</code>, <code>config/</code>, <code>.edpa/</code> structure, Claude Code skills. Does not contain <code>web/</code> or <code>examples/</code>.</p>
         </div>
       </div>
 
@@ -249,86 +296,164 @@ import Layout from '../../layouts/Layout.astro';
     margin-bottom: 24px;
   }
 
-  /* Form */
-  .form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-  }
-  .form-group { display: flex; flex-direction: column; gap: 6px; }
-  .form-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--t2);
-    font-weight: 500;
-  }
-  .form-optional { color: var(--t3); font-weight: 400; }
-  .form-input, .form-select {
+  /* Form card */
+  .form-card {
     background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .form-card-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--t1);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--bd);
+  }
+
+  /* Form inputs */
+  .wizard-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--t3);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .form-optional { color: var(--t3); font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .form-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--t3);
+    margin-top: 4px;
+  }
+  .wizard-input {
+    width: 100%;
+    background: var(--s2);
     border: 1px solid var(--bd);
     border-radius: 8px;
     padding: 10px 14px;
     color: var(--t1);
-    font-family: 'DM Sans', system-ui, sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: 14px;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
   }
-  .form-input:focus, .form-select:focus {
+  .wizard-input:focus {
     border-color: var(--ac);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
   }
-  .form-input::placeholder { color: var(--t3); }
-  .form-select {
+  .wizard-input::placeholder { color: var(--t3); }
+  .wizard-input[readonly] {
+    color: var(--cy);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    cursor: default;
+  }
+  .wizard-select {
+    width: 100%;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--t1);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
     appearance: none;
     -webkit-appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a6380'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 12px center;
-    padding-right: 32px;
+    padding-right: 36px;
     cursor: pointer;
+    box-sizing: border-box;
   }
-  .form-select option {
-    background: var(--s1);
+  .wizard-select:focus {
+    border-color: var(--ac);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+  .wizard-select option {
+    background: var(--s2);
     color: var(--t1);
+  }
+  .form-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .form-grid .form-group {
+    margin-bottom: 0;
   }
 
   /* Team table */
+  .team-card { padding: 0; overflow: hidden; }
   .team-table-wrap {
     overflow-x: auto;
-    background: var(--s1);
-    border: 1px solid var(--bd);
-    border-radius: var(--r);
   }
-  .team-table { margin: 0; }
+  .team-table { margin: 0; width: 100%; }
   .team-table th {
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--t3);
     white-space: nowrap;
-    padding: 8px 10px;
+    padding: 14px 10px 10px;
+    background: var(--s2);
+    border-bottom: 1px solid var(--bd);
+    text-align: left;
+    font-weight: 500;
   }
-  .team-table td { padding: 6px 6px; }
-  .team-table .form-input,
-  .team-table .form-select {
-    padding: 7px 10px;
+  .team-table td {
+    padding: 8px 6px;
+    vertical-align: top;
+    border-bottom: 1px solid var(--bd);
+  }
+  .team-table tr:last-child td {
+    border-bottom: none;
+  }
+  .team-table .wizard-input,
+  .team-table .wizard-select {
+    padding: 8px 10px;
     font-size: 13px;
     border-radius: 6px;
     width: 100%;
     min-width: 80px;
   }
-  .team-table .form-select {
+  .team-table .wizard-select {
     min-width: 90px;
   }
+  .team-table .email-input { min-width: 180px; }
   .team-table .name-input { min-width: 130px; }
-  .team-table .id-input {
-    min-width: 100px;
-    color: var(--t3);
-    background: var(--s2);
-  }
   .team-table .cap-input {
     min-width: 70px;
     color: var(--cy);
-    background: var(--s2);
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
+  }
+  .member-id-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--t3);
+    margin-top: 3px;
+    padding-left: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .remove-btn {
     background: none;
@@ -350,9 +475,10 @@ import Layout from '../../layouts/Layout.astro';
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 16px;
+    padding: 16px 24px;
     flex-wrap: wrap;
     gap: 12px;
+    border-top: 1px solid var(--bd);
   }
   .team-summary {
     font-family: 'JetBrains Mono', monospace;
@@ -403,8 +529,16 @@ import Layout from '../../layouts/Layout.astro';
   }
 
   /* Launch */
-  .launch-grid { margin-bottom: 20px; }
+  .launch-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
   .launch-card { position: relative; }
+  .launch-card--recommended {
+    border-color: rgba(52, 211, 153, 0.3);
+  }
   .launch-badge {
     position: absolute;
     top: 12px;
@@ -432,6 +566,24 @@ import Layout from '../../layouts/Layout.astro';
     overflow-x: auto;
     white-space: pre;
   }
+  .launch-note {
+    background: var(--s2);
+    border-color: rgba(99, 102, 241, 0.2);
+  }
+  .launch-note-text {
+    font-size: 13px;
+    color: var(--t2);
+    line-height: 1.6;
+    margin: 0;
+  }
+  .launch-note-text code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--cy);
+    background: var(--s1);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
 
   /* Wizard nav */
   .wizard-nav {
@@ -452,10 +604,11 @@ import Layout from '../../layouts/Layout.astro';
   @media (max-width: 768px) {
     .hero { padding-top: 72px; padding-bottom: 24px; }
     .form-grid { grid-template-columns: 1fr; }
-    .launch-grid { grid-template-columns: 1fr; }
     .step-label { display: none; }
     .progress-steps { justify-content: space-around; }
     .team-actions { flex-direction: column; align-items: stretch; text-align: center; }
+    .form-card { padding: 16px; }
+    .team-card { padding: 0; }
   }
 </style>
 
@@ -469,7 +622,10 @@ import Layout from '../../layouts/Layout.astro';
       githubOrg: '',
       githubRepo: '',
       program: '',
-      members: [] as Array<{name: string; id: string; role: string; fte: number; capacity: number; contract: string}>
+      iterWeeks: 2,
+      deliveryIters: 4,
+      ipIters: 1,
+      members: [] as Array<{email: string; name: string; id: string; role: string; fte: number; capacity: number; contract: string}>
     };
 
     // DOM refs
@@ -488,10 +644,20 @@ import Layout from '../../layouts/Layout.astro';
     const githubRepoInput = document.getElementById('githubRepo') as HTMLInputElement;
     const programInput = document.getElementById('program') as HTMLInputElement;
 
+    // Cadence inputs
+    const iterLengthSelect = document.getElementById('iterLength') as HTMLSelectElement;
+    const piLengthInput = document.getElementById('piLength') as HTMLInputElement;
+    const deliveryItersInput = document.getElementById('deliveryIters') as HTMLInputElement;
+    const fteCapacityInput = document.getElementById('fteCapacity') as HTMLInputElement;
+
     // Bind step 1 inputs
     [projectNameInput, githubOrgInput, githubRepoInput, programInput].forEach(input => {
       if (input) input.addEventListener('input', syncProjectState);
     });
+
+    // Bind cadence inputs
+    if (iterLengthSelect) iterLengthSelect.addEventListener('change', updateCadence);
+    if (deliveryItersInput) deliveryItersInput.addEventListener('input', updateCadence);
 
     function syncProjectState() {
       state.projectName = projectNameInput?.value || '';
@@ -500,25 +666,75 @@ import Layout from '../../layouts/Layout.astro';
       state.program = programInput?.value || '';
     }
 
-    // Name to ID
-    function nameToId(name: string): string {
-      return name
-        .toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
+    function getFullCapacity(): number {
+      return state.iterWeeks * 40;
+    }
+
+    function updateCadence() {
+      state.iterWeeks = parseInt(iterLengthSelect?.value || '2');
+      state.deliveryIters = parseInt(deliveryItersInput?.value || '4');
+
+      const totalIters = state.deliveryIters + state.ipIters;
+      const piWeeks = totalIters * state.iterWeeks;
+      const fteCap = getFullCapacity();
+
+      if (piLengthInput) piLengthInput.value = `${piWeeks} weeks`;
+      if (fteCapacityInput) fteCapacityInput.value = `${fteCap}h`;
+
+      // Recalculate all member capacities
+      state.members.forEach(m => {
+        m.capacity = Math.round(m.fte * fteCap);
+      });
+      renderTeamTable();
+    }
+
+    // Email to ID
+    function emailToId(email: string): string {
+      const prefix = email.split('@')[0] || '';
+      return prefix.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+    }
+
+    function emailToIdMulti(email: string, role: string): string {
+      const prefix = email.split('@')[0] || '';
+      const clean = prefix.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      return clean + '-' + role.toLowerCase();
+    }
+
+    function emailToName(email: string): string {
+      const prefix = email.split('@')[0] || '';
+      return prefix
+        .replace(/[._-]/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    // Recompute all IDs (needed when adding/removing duplicates)
+    function recomputeAllIds() {
+      const emailCounts: Record<string, number> = {};
+      state.members.forEach(m => {
+        if (m.email) emailCounts[m.email] = (emailCounts[m.email] || 0) + 1;
+      });
+      state.members.forEach(m => {
+        if (!m.email) { m.id = ''; return; }
+        if (emailCounts[m.email] > 1) {
+          m.id = emailToIdMulti(m.email, m.role);
+        } else {
+          m.id = emailToId(m.email);
+        }
+      });
     }
 
     // Add member row
-    function addMember(name = '', role = 'Dev', fte = 1.0, contract = '') {
-      const id = name ? nameToId(name) : '';
-      const capacity = fte * 80;
-      state.members.push({ name, id, role, fte, capacity, contract });
+    function addMember(email = '', role = 'Dev', fte = 1.0, contract = '') {
+      const name = email ? emailToName(email) : '';
+      const capacity = Math.round(fte * getFullCapacity());
+      state.members.push({ email, name, id: '', role, fte, capacity, contract });
+      recomputeAllIds();
       renderTeamTable();
     }
 
     function removeMember(idx: number) {
       state.members.splice(idx, 1);
+      recomputeAllIds();
       renderTeamTable();
     }
 
@@ -528,21 +744,31 @@ import Layout from '../../layouts/Layout.astro';
       state.members.forEach((m, i) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><input class="form-input name-input" type="text" value="${escapeHtml(m.name)}" data-idx="${i}" data-field="name" placeholder="Jane Smith" /></td>
-          <td><input class="form-input id-input" type="text" value="${escapeHtml(m.id)}" data-idx="${i}" data-field="id" readonly tabindex="-1" /></td>
           <td>
-            <select class="form-select" data-idx="${i}" data-field="role">
-              ${['Arch','Dev','DevSecOps','PM','QA','BO'].map(r => `<option value="${r}" ${m.role === r ? 'selected' : ''}>${r}</option>`).join('')}
+            <input class="wizard-input email-input" type="email" value="${escapeHtml(m.email)}" data-idx="${i}" data-field="email" placeholder="jane.smith@company.com" />
+            <div class="member-id-hint">ID: ${escapeHtml(m.id) || '...'}</div>
+          </td>
+          <td><input class="wizard-input name-input" type="text" value="${escapeHtml(m.name)}" data-idx="${i}" data-field="name" placeholder="Jane Smith" /></td>
+          <td>
+            <select class="wizard-select" data-idx="${i}" data-field="role">
+              ${[
+                { v: 'Dev', l: 'Dev \u2014 Developer' },
+                { v: 'Arch', l: 'Arch \u2014 Architect' },
+                { v: 'PM', l: 'PM \u2014 Product Manager' },
+                { v: 'QA', l: 'QA \u2014 Test Engineer' },
+                { v: 'DevSecOps', l: 'DevSecOps \u2014 Security & Ops' },
+                { v: 'BO', l: 'BO \u2014 Business Owner' }
+              ].map(r => `<option value="${r.v}" ${m.role === r.v ? 'selected' : ''}>${r.l}</option>`).join('')}
             </select>
           </td>
           <td>
-            <select class="form-select" data-idx="${i}" data-field="fte">
+            <select class="wizard-select" data-idx="${i}" data-field="fte">
               ${[0.25,0.5,0.75,1.0,1.2].map(f => `<option value="${f}" ${m.fte === f ? 'selected' : ''}>${f}</option>`).join('')}
             </select>
           </td>
-          <td><input class="form-input cap-input" type="text" value="${m.capacity}" readonly tabindex="-1" /></td>
+          <td><input class="wizard-input cap-input" type="text" value="${m.capacity}h" readonly tabindex="-1" /></td>
           <td>
-            <select class="form-select" data-idx="${i}" data-field="contract">
+            <select class="wizard-select" data-idx="${i}" data-field="contract">
               <option value="" ${m.contract === '' ? 'selected' : ''}>-</option>
               ${['HPP','DPC','External'].map(c => `<option value="${c}" ${m.contract === c ? 'selected' : ''}>${c}</option>`).join('')}
             </select>
@@ -553,14 +779,31 @@ import Layout from '../../layouts/Layout.astro';
       });
 
       // Bind events
+      teamBody.querySelectorAll('input[data-field="email"]').forEach(el => {
+        el.addEventListener('input', (e) => {
+          const input = e.target as HTMLInputElement;
+          const idx = parseInt(input.dataset.idx || '0');
+          const oldEmail = state.members[idx].email;
+          state.members[idx].email = input.value;
+          // Auto-fill name if it was auto-generated from old email or empty
+          const oldAutoName = emailToName(oldEmail);
+          if (!state.members[idx].name || state.members[idx].name === oldAutoName) {
+            state.members[idx].name = emailToName(input.value);
+            const nameInput = teamBody.querySelector(`input[data-idx="${idx}"][data-field="name"]`) as HTMLInputElement;
+            if (nameInput) nameInput.value = state.members[idx].name;
+          }
+          recomputeAllIds();
+          // Update all ID hints
+          teamBody.querySelectorAll('.member-id-hint').forEach((hint, hIdx) => {
+            hint.textContent = `ID: ${state.members[hIdx]?.id || '...'}`;
+          });
+        });
+      });
       teamBody.querySelectorAll('input[data-field="name"]').forEach(el => {
         el.addEventListener('input', (e) => {
           const input = e.target as HTMLInputElement;
           const idx = parseInt(input.dataset.idx || '0');
           state.members[idx].name = input.value;
-          state.members[idx].id = nameToId(input.value);
-          const idInput = teamBody.querySelector(`input[data-idx="${idx}"][data-field="id"]`) as HTMLInputElement;
-          if (idInput) idInput.value = state.members[idx].id;
         });
       });
       teamBody.querySelectorAll('select[data-field="role"]').forEach(el => {
@@ -568,6 +811,10 @@ import Layout from '../../layouts/Layout.astro';
           const select = e.target as HTMLSelectElement;
           const idx = parseInt(select.dataset.idx || '0');
           state.members[idx].role = select.value;
+          recomputeAllIds();
+          teamBody.querySelectorAll('.member-id-hint').forEach((hint, hIdx) => {
+            hint.textContent = `ID: ${state.members[hIdx]?.id || '...'}`;
+          });
         });
       });
       teamBody.querySelectorAll('select[data-field="fte"]').forEach(el => {
@@ -575,9 +822,9 @@ import Layout from '../../layouts/Layout.astro';
           const select = e.target as HTMLSelectElement;
           const idx = parseInt(select.dataset.idx || '0');
           state.members[idx].fte = parseFloat(select.value);
-          state.members[idx].capacity = state.members[idx].fte * 80;
-          const capInput = teamBody.querySelector(`input[data-idx="${idx}"][data-field][readonly].cap-input`) as HTMLInputElement;
-          if (capInput) capInput.value = String(state.members[idx].capacity);
+          state.members[idx].capacity = Math.round(state.members[idx].fte * getFullCapacity());
+          const capInput = teamBody.querySelector(`tr:nth-child(${idx + 1}) .cap-input`) as HTMLInputElement;
+          if (capInput) capInput.value = `${state.members[idx].capacity}h`;
           updateSummary();
         });
       });
@@ -611,9 +858,10 @@ import Layout from '../../layouts/Layout.astro';
     function generatePeopleYaml(): string {
       const lines = ['# EDPA People Registry', `# Generated: ${new Date().toISOString().split('T')[0]}`, '', 'people:'];
       state.members.forEach(m => {
-        if (!m.name) return;
+        if (!m.email && !m.name) return;
         lines.push(`  - name: "${m.name}"`);
         lines.push(`    id: "${m.id}"`);
+        lines.push(`    email: "${m.email}"`);
         lines.push(`    role: ${m.role}`);
         lines.push(`    fte: ${m.fte}`);
         lines.push(`    capacity_h: ${m.capacity}`);
@@ -624,13 +872,14 @@ import Layout from '../../layouts/Layout.astro';
       });
       const totalFte = state.members.reduce((s, m) => s + m.fte, 0);
       const totalCap = state.members.reduce((s, m) => s + m.capacity, 0);
-      lines.push(`# Total: ${state.members.filter(m => m.name).length} members, ${totalFte.toFixed(1)} FTE, ${totalCap}h/iteration`);
+      lines.push(`# Total: ${state.members.filter(m => m.email || m.name).length} members, ${totalFte.toFixed(1)} FTE, ${totalCap}h/iteration`);
       return lines.join('\n');
     }
 
     function generateConfigYaml(): string {
       const org = state.githubOrg || 'my-org';
       const repo = state.githubRepo || 'my-project';
+      const fteCap = getFullCapacity();
       const lines = [
         '# EDPA Configuration',
         `# Generated: ${new Date().toISOString().split('T')[0]}`,
@@ -642,9 +891,12 @@ import Layout from '../../layouts/Layout.astro';
         `  org: "${org}"`,
         `  repo: "${repo}"`,
         '',
-        'iteration:',
-        '  length_weeks: 2',
-        '  hours_per_iteration: 80',
+        'cadence:',
+        `  iteration_weeks: ${state.iterWeeks}`,
+        `  delivery_iterations: ${state.deliveryIters}`,
+        `  ip_iterations: ${state.ipIters}`,
+        `  pi_weeks: ${(state.deliveryIters + state.ipIters) * state.iterWeeks}`,
+        `  capacity_per_fte: ${fteCap}`,
         '',
         'scoring:',
         '  contribution_weights:',
@@ -712,27 +964,25 @@ import Layout from '../../layouts/Layout.astro';
 
       const launchA = document.getElementById('launchA');
       if (launchA) {
-        launchA.textContent = `# In terminal with Claude Code:\n/edpa setup\n# Claude Code will ask you everything interactively`;
+        launchA.textContent = [
+          `gh repo create ${org}/${repo} --template technomaton/edpa --clone`,
+          `cd ${repo}`,
+          `# Paste generated files from step 3`,
+        ].join('\n');
       }
 
       const launchB = document.getElementById('launchB');
       if (launchB) {
-        launchB.textContent = [
-          `# 1. Create repo`,
+        launchB.textContent = `/edpa setup`;
+      }
+
+      const launchC = document.getElementById('launchC');
+      if (launchC) {
+        launchC.textContent = [
           `gh repo create ${org}/${repo} --clone`,
-          `cd ${repo}`,
-          ``,
-          `# 2. Copy EDPA`,
-          `# (download from github.com/technomaton/edpa)`,
-          ``,
-          `# 3. Paste generated files`,
-          `# (paste people.yaml, config.yaml from step 3)`,
-          ``,
-          `# 4. Set up Issue Types`,
-          `python scripts/edpa_issue_types.py setup --org ${org}`,
-          ``,
-          `# 5. Create GitHub Project`,
-          `python scripts/edpa_project_setup.py --org ${org} --repo ${repo}`,
+          `# Download EDPA from github.com/technomaton/edpa`,
+          `# Copy: scripts/, config/, .edpa/, .claude/, .github/`,
+          `# (skip web/ and examples/ -- not needed for a new project)`,
         ].join('\n');
       }
     }
@@ -803,7 +1053,6 @@ import Layout from '../../layouts/Layout.astro';
     });
 
     function downloadAsZip() {
-      // Simple ZIP implementation (no library)
       const files = [
         { name: 'people.yaml', content: generatePeopleYaml() },
         { name: 'config.yaml', content: generateConfigYaml() },
@@ -819,42 +1068,40 @@ import Layout from '../../layouts/Layout.astro';
         const nameBytes = encoder.encode(file.name);
         const contentBytes = encoder.encode(file.content);
 
-        // Local file header
         const localHeader = new Uint8Array(30 + nameBytes.length);
         const lv = new DataView(localHeader.buffer);
-        lv.setUint32(0, 0x04034b50, true); // signature
-        lv.setUint16(4, 20, true); // version needed
-        lv.setUint16(6, 0, true); // flags
-        lv.setUint16(8, 0, true); // compression (store)
-        lv.setUint16(10, 0, true); // mod time
-        lv.setUint16(12, 0, true); // mod date
+        lv.setUint32(0, 0x04034b50, true);
+        lv.setUint16(4, 20, true);
+        lv.setUint16(6, 0, true);
+        lv.setUint16(8, 0, true);
+        lv.setUint16(10, 0, true);
+        lv.setUint16(12, 0, true);
         lv.setUint32(14, crc32(contentBytes), true);
-        lv.setUint32(18, contentBytes.length, true); // compressed
-        lv.setUint32(22, contentBytes.length, true); // uncompressed
+        lv.setUint32(18, contentBytes.length, true);
+        lv.setUint32(22, contentBytes.length, true);
         lv.setUint16(26, nameBytes.length, true);
-        lv.setUint16(28, 0, true); // extra length
+        lv.setUint16(28, 0, true);
         localHeader.set(nameBytes, 30);
 
-        // Central directory entry
         const cdEntry = new Uint8Array(46 + nameBytes.length);
         const cv = new DataView(cdEntry.buffer);
-        cv.setUint32(0, 0x02014b50, true); // signature
-        cv.setUint16(4, 20, true); // version made by
-        cv.setUint16(6, 20, true); // version needed
-        cv.setUint16(8, 0, true); // flags
-        cv.setUint16(10, 0, true); // compression
-        cv.setUint16(12, 0, true); // mod time
-        cv.setUint16(14, 0, true); // mod date
+        cv.setUint32(0, 0x02014b50, true);
+        cv.setUint16(4, 20, true);
+        cv.setUint16(6, 20, true);
+        cv.setUint16(8, 0, true);
+        cv.setUint16(10, 0, true);
+        cv.setUint16(12, 0, true);
+        cv.setUint16(14, 0, true);
         cv.setUint32(16, crc32(contentBytes), true);
         cv.setUint32(20, contentBytes.length, true);
         cv.setUint32(24, contentBytes.length, true);
         cv.setUint16(28, nameBytes.length, true);
-        cv.setUint16(30, 0, true); // extra
-        cv.setUint16(32, 0, true); // comment
-        cv.setUint16(34, 0, true); // disk
-        cv.setUint16(36, 0, true); // internal attrs
-        cv.setUint32(38, 0, true); // external attrs
-        cv.setUint32(42, offset, true); // local header offset
+        cv.setUint16(30, 0, true);
+        cv.setUint16(32, 0, true);
+        cv.setUint16(34, 0, true);
+        cv.setUint16(36, 0, true);
+        cv.setUint32(38, 0, true);
+        cv.setUint32(42, offset, true);
         cdEntry.set(nameBytes, 46);
 
         parts.push(localHeader, contentBytes);
@@ -866,7 +1113,6 @@ import Layout from '../../layouts/Layout.astro';
       let cdSize = 0;
       centralDir.forEach(e => cdSize += e.length);
 
-      // End of central directory
       const eocd = new Uint8Array(22);
       const ev = new DataView(eocd.buffer);
       ev.setUint32(0, 0x06054b50, true);
