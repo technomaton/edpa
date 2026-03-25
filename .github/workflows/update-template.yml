@@ -1,0 +1,77 @@
+name: Update Template Repo
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'config/**'
+      - '.claude/**'
+      - '.github/workflows/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - 'requirements.txt'
+      - 'requirements-dev.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout EDPA
+        uses: actions/checkout@v4
+        with:
+          path: edpa
+
+      - name: Checkout template
+        uses: actions/checkout@v4
+        with:
+          repository: technomaton/edpa-template
+          path: template
+          token: ${{ secrets.TEMPLATE_SYNC_TOKEN }}
+
+      - name: Sync files to template
+        run: |
+          # Scripts
+          cp edpa/scripts/edpa_engine.py template/scripts/
+          cp edpa/scripts/edpa_backlog.py template/scripts/
+          cp edpa/scripts/edpa_sync.py template/scripts/
+          cp edpa/scripts/edpa_issue_types.py template/scripts/
+          cp edpa/scripts/edpa_project_setup.py template/scripts/
+          cp edpa/scripts/edpa_project_views.py template/scripts/
+          cp edpa/scripts/evaluate_cw.py template/scripts/
+
+          # Config templates
+          cp edpa/config/*.tmpl template/config/
+
+          # Claude Code
+          cp edpa/.claude/.claude-plugin/plugin.json template/.claude/.claude-plugin/
+          cp -r edpa/.claude/commands/edpa/ template/.claude/commands/edpa/
+          cp -r edpa/.claude/skills/ template/.claude/skills/
+
+          # GitHub workflows + templates
+          cp edpa/.github/workflows/branch-check.yml template/.github/workflows/
+          cp edpa/.github/workflows/iteration-close.yml template/.github/workflows/
+          cp edpa/.github/workflows/sync-*.yml template/.github/workflows/
+          cp -r edpa/.github/ISSUE_TEMPLATE/ template/.github/ISSUE_TEMPLATE/
+          cp edpa/.github/PULL_REQUEST_TEMPLATE.md template/.github/
+
+          # Requirements
+          cp edpa/requirements.txt template/
+          cp edpa/requirements-dev.txt template/
+
+      - name: Commit and push
+        working-directory: template
+        run: |
+          git config user.name "EDPA Template Sync"
+          git config user.email "edpa-sync@technomaton.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to sync"
+          else
+            VERSION=$(python3 -c "import json; print(json.load(open('.claude/.claude-plugin/plugin.json'))['version'])")
+            git commit -m "sync: update from edpa v${VERSION}"
+            git push
+          fi
