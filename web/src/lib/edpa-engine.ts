@@ -5,6 +5,9 @@ export interface Person {
   team: string;
   fte: number;
   capacity: number;
+  contract?: string;           // "HPP", "DPČ", etc.
+  evidence_scope?: string[];   // item ID patterns for this contract
+  evidence_default?: boolean;  // true = fallback for unscoped evidence
 }
 
 export interface Contribution {

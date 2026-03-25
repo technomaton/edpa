@@ -16,7 +16,7 @@ from pathlib import Path
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from edpa_engine import run_edpa, generate_demo_data
+from edpa_engine import run_edpa, generate_demo_data, detect_evidence, compute_cw
 
 
 def test_sum_equals_capacity():
@@ -156,6 +156,146 @@ def test_cw_ordering():
     assert rw["owner"] >= rw["key"] >= rw["reviewer"] >= rw["consulted"]
 
 
+def test_multi_contract_isolation():
+    """Two contracts of same person must have independent invariants."""
+    capacity = {
+        "people": [
+            {"id": "alice-arch", "name": "Alice (Arch)", "role": "Arch",
+             "fte": 0.5, "capacity_per_iteration": 40,
+             "evidence_scope": ["S-*"], "evidence_default": True},
+            {"id": "alice-pm", "name": "Alice (PM)", "role": "PM",
+             "fte": 0.25, "capacity_per_iteration": 20,
+             "evidence_scope": ["E-*", "F-*"]},
+            {"id": "bob", "name": "Bob (Dev)", "role": "Dev",
+             "fte": 1.0, "capacity_per_iteration": 80},
+            {"id": "carol", "name": "Carol (Dev)", "role": "Dev",
+             "fte": 0.75, "capacity_per_iteration": 60},
+        ]
+    }
+    heuristics = {
+        "evidence_threshold": 1.0,
+        "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15},
+        "role_overrides": {
+            "Arch": {"owner": 1.00, "key": 0.60, "reviewer": 0.30, "consulted": 0.15},
+            "PM":   {"owner": 1.00, "key": 0.60, "reviewer": 0.25, "consulted": 0.20},
+            "Dev":  {"owner": 1.00, "key": 0.60, "reviewer": 0.25, "consulted": 0.15},
+        },
+    }
+    items = [
+        {"id": "S-101", "level": "Story", "job_size": 5,
+         "assignees": [{"login": "bob"}], "body": "",
+         "pr_author": "bob", "commit_authors": ["bob"],
+         "pr_reviewers": ["alice-arch"], "commenters": []},
+        {"id": "S-102", "level": "Story", "job_size": 8,
+         "assignees": [{"login": "carol"}], "body": "",
+         "pr_author": "carol", "commit_authors": ["carol"],
+         "pr_reviewers": ["alice-arch"], "commenters": []},
+        {"id": "F-10", "level": "Feature", "job_size": 13,
+         "assignees": [{"login": "alice-pm"}], "body": "",
+         "pr_author": None, "commit_authors": [],
+         "pr_reviewers": [], "commenters": ["bob"]},
+        {"id": "E-10", "level": "Epic", "job_size": 21,
+         "assignees": [{"login": "alice-pm"}], "body": "",
+         "pr_author": None, "commit_authors": [],
+         "pr_reviewers": [], "commenters": ["carol"]},
+    ]
+
+    results = run_edpa(capacity, heuristics, items, mode="simple")
+
+    result_map = {r["id"]: r for r in results}
+
+    # alice-arch must derive exactly 40h across her items
+    arch = result_map["alice-arch"]
+    assert arch["items"], "alice-arch should have items"
+    assert abs(arch["total_derived"] - 40) < 0.01, (
+        f"alice-arch: derived {arch['total_derived']}h != 40h"
+    )
+
+    # alice-pm must derive exactly 20h across her items
+    pm = result_map["alice-pm"]
+    assert pm["items"], "alice-pm should have items"
+    assert abs(pm["total_derived"] - 20) < 0.01, (
+        f"alice-pm: derived {pm['total_derived']}h != 20h"
+    )
+
+    # Both must pass invariants independently
+    assert arch["invariant_ok"], "alice-arch invariant failed"
+    assert pm["invariant_ok"], "alice-pm invariant failed"
+
+
+def test_role_overrides_applied():
+    """role_overrides should change CW based on person.role."""
+    heuristics = {
+        "evidence_threshold": 1.0,
+        "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15},
+        "role_overrides": {
+            "Arch": {"owner": 1.00, "key": 0.60, "reviewer": 0.30, "consulted": 0.15},
+        },
+    }
+    # Simulate an evidence entry where the person is a reviewer
+    evidence_entry = {
+        "signals": ["pr_reviewer"],
+        "evidence_score": 1.0,
+        "manual_cw": None,
+    }
+
+    # With person_role="Arch", should use override: reviewer = 0.30
+    cw_arch = compute_cw(evidence_entry, heuristics, person_role="Arch")
+    assert abs(cw_arch - 0.30) < 0.001, (
+        f"Arch reviewer CW should be 0.30, got {cw_arch}"
+    )
+
+    # With person_role="Dev" (no override defined), should use generic: reviewer = 0.25
+    cw_dev = compute_cw(evidence_entry, heuristics, person_role="Dev")
+    assert abs(cw_dev - 0.25) < 0.001, (
+        f"Dev reviewer CW should be 0.25, got {cw_dev}"
+    )
+
+    # With no role, should use generic: reviewer = 0.25
+    cw_none = compute_cw(evidence_entry, heuristics, person_role=None)
+    assert abs(cw_none - 0.25) < 0.001, (
+        f"No-role reviewer CW should be 0.25, got {cw_none}"
+    )
+
+
+def test_evidence_scope_routing():
+    """evidence_scope must filter items for each contract."""
+    people = [
+        {"id": "alice-arch", "name": "Alice (Arch)", "role": "Arch",
+         "evidence_scope": ["S-*"]},
+        {"id": "alice-pm", "name": "Alice (PM)", "role": "PM",
+         "evidence_scope": ["E-*"]},
+    ]
+    items = [
+        {"id": "S-101", "level": "Story", "job_size": 5,
+         "assignees": [{"login": "alice-arch"}], "body": "",
+         "pr_author": None, "commit_authors": [],
+         "pr_reviewers": [], "commenters": []},
+        {"id": "E-10", "level": "Epic", "job_size": 21,
+         "assignees": [{"login": "alice-pm"}], "body": "",
+         "pr_author": None, "commit_authors": [],
+         "pr_reviewers": [], "commenters": []},
+    ]
+
+    evidence = detect_evidence(people, items, "test-iter")
+
+    # S-101 should produce evidence for alice-arch only
+    assert ("alice-arch", "S-101") in evidence, (
+        "S-101 should be routed to alice-arch"
+    )
+    assert ("alice-pm", "S-101") not in evidence, (
+        "S-101 should NOT be routed to alice-pm"
+    )
+
+    # E-10 should produce evidence for alice-pm only
+    assert ("alice-pm", "E-10") in evidence, (
+        "E-10 should be routed to alice-pm"
+    )
+    assert ("alice-arch", "E-10") not in evidence, (
+        "E-10 should NOT be routed to alice-arch"
+    )
+
+
 if __name__ == "__main__":
     tests = [
         test_sum_equals_capacity,
@@ -168,6 +308,9 @@ if __name__ == "__main__":
         test_all_invariants_flag,
         test_empty_items_no_crash,
         test_cw_ordering,
+        test_multi_contract_isolation,
+        test_role_overrides_applied,
+        test_evidence_scope_routing,
     ]
 
     passed = 0

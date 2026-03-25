@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.0.0 — 2026-03-25
+
+Multi-contract engine + role_overrides fix. **BREAKING CHANGE.**
+
+### Breaking Changes
+- Engine now applies `role_overrides` from `cw_heuristics.yaml` (was ignored in v1.x)
+- CW values change for non-Dev roles: Arch reviewer 0.25→0.30, PM consulted 0.15→0.20, BO consulted 0.15→0.30
+- Demo data: Alice split into alice-arch (40h) + alice-pm (20h)
+- Person interface: new optional fields (`contract`, `evidence_scope`, `evidence_default`)
+
+### Added
+- `evidence_scope` per contract — route Git signals to correct contract via fnmatch patterns
+- Multi-contract demo in `--demo` mode (Alice-Arch + Alice-PM)
+- 3 new tests: `test_multi_contract_isolation`, `test_role_overrides_applied`, `test_evidence_scope_routing`
+- `docs/migration-v2.md` — migration guide v1.x → v2.0
+- TypeScript Person interface: `contract?`, `evidence_scope?`, `evidence_default?`
+
+### Fixed
+- **CRITICAL:** `role_overrides` from Monte Carlo calibration now applied in `compute_cw()`
+  (was declared in config but ignored by engine since v1.0)
+
 ## 1.2.0 — 2026-03-25
 
 Multi-role support + production readiness audit.
