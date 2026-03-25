@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.2.0 — 2026-03-25
+
+Multi-role support + production readiness audit.
+
+### Added
+- Multi-role/multi-contract support: one person can have multiple entries with different roles, FTEs, and capacities (e.g., `urbanek-arch` + `urbanek-pm`)
+- File-per-item backlog structure (`.edpa/initiatives/`, `epics/`, `features/`, `stories/`)
+- `edpa_backlog.py add` command for creating new items from CLI
+- `requirements.txt` (pyyaml) and `requirements-dev.txt` (pytest)
+- Complete E2E playbook (`docs/playbook.md`, 1200+ lines)
+- Production readiness audit fixes (score 73→90+)
+
+### Changed
+- Backlog: monolithic `backlog.yaml` → individual YAML files per item
+- `.edpa/config.yaml`: hardcoded org → placeholder values
+- Plugin version: 2.2.0 → 1.1.0 → 1.2.0
+- Evidence principle documented: all commits are delivery evidence (no filtering)
+
+### Removed
+- `web/dist/` and `web/.vercel/` from git tracking
+- Hardcoded GitHub Issue Type ID fallback
+
+### Fixed
+- `.gitignore`: added dist/, .vercel/, .env*
+- Relative paths in Claude Code skill docs
+
 ## 1.1.0 — 2026-03-22
 
 Migration from GitHub labels to native Issue Types. Branch `v1` preserves v1.0.

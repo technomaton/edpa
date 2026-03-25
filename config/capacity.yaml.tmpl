@@ -36,6 +36,37 @@ people:
     email: "dev@example.com"
     availability: confirmed
 
+# ─────────────────────────────────────────────────────────────────────
+# MULTI-ROLE: Jeden člověk, více smluv/rolí
+# ─────────────────────────────────────────────────────────────────────
+# Pokud má člověk více smluv (např. HPP + DPČ) s různými rolemi,
+# vytvořte pro každou smlouvu samostatný záznam s unikátním ID:
+#
+#   - id: urbanek-arch           # Smlouva 1: HPP, Architekt
+#     name: "Jaroslav Urbánek"
+#     role: Arch
+#     contract: HPP
+#     fte: 1.0
+#     capacity_per_iteration: 40
+#     evidence_default: true     # Default pro Git auto-detection
+#
+#   - id: urbanek-pm             # Smlouva 2: DPČ, PM
+#     name: "Jaroslav Urbánek"
+#     role: PM
+#     contract: DPČ
+#     fte: 0.2
+#     capacity_per_iteration: 8
+#     evidence_default: false
+#
+# EDPA garance platí per záznam:
+#   Σ DerivedHours[urbanek-arch] = 40h
+#   Σ DerivedHours[urbanek-pm] = 8h
+#
+# Evidence přiřazení:
+#   V backlogu explicitně: contributors.person = "urbanek-arch"
+#   Nebo: /contribute @urbanek-pm weight:0.4 v issue komentáři
+#   Default: evidence_default=true záznam dostane nespecifikované commity
+
 # Calculated at runtime by EDPA engine:
 # total_fte: sum of people[].fte
 # total_capacity_per_iteration: sum of people[].capacity_per_iteration
