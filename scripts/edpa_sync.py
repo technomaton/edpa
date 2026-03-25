@@ -147,7 +147,7 @@ def load_jsonl(path):
 # -- Config Loading ------------------------------------------------------------
 
 DEFAULT_SYNC_CONFIG = {
-    "github_org": "technomaton",
+    "github_org": "YOUR_ORG",
     "github_project_number": 1,
     "sync_interval": "15m",
     "auto_commit": True,
@@ -229,7 +229,7 @@ SYNC_FIELDS = ["js", "bv", "tc", "rr", "wsjf", "iteration", "status"]
 
 def gh_fetch_project_items(sync_config):
     """Fetch project items via `gh project item-list`."""
-    org = sync_config.get("github_org", "technomaton")
+    org = sync_config.get("github_org", "YOUR_ORG")
     project_num = sync_config.get("github_project_number", 1)
 
     cmd = [
@@ -622,7 +622,7 @@ def cmd_pull(root, sync_config, args):
         print(color("  [mock] Generating simulated GitHub Project data...", C.MUTED))
         gh_data = generate_mock_gh_data(root, fields_mapping)
     else:
-        org = sync_config.get("github_org", "technomaton")
+        org = sync_config.get("github_org", "YOUR_ORG")
         project_num = sync_config.get("github_project_number", 1)
         print(color(f"  Fetching project items from {org}/project#{project_num}...", C.SYNC))
         gh_data = gh_fetch_project_items(sync_config)
@@ -696,7 +696,7 @@ def cmd_push(root, sync_config, args):
         print(color("  [mock] Generating simulated GitHub Project data...", C.MUTED))
         gh_data = generate_mock_gh_data(root, fields_mapping)
     else:
-        org = sync_config.get("github_org", "technomaton")
+        org = sync_config.get("github_org", "YOUR_ORG")
         project_num = sync_config.get("github_project_number", 1)
         print(color(f"  Fetching current state from {org}/project#{project_num}...", C.SYNC))
         gh_data = gh_fetch_project_items(sync_config)
@@ -777,7 +777,7 @@ def cmd_diff(root, sync_config, args):
         print(color("  [mock] Generating simulated GitHub Project data...", C.MUTED))
         gh_data = generate_mock_gh_data(root, fields_mapping)
     else:
-        org = sync_config.get("github_org", "technomaton")
+        org = sync_config.get("github_org", "YOUR_ORG")
         project_num = sync_config.get("github_project_number", 1)
         print(color(f"  Fetching project items from {org}/project#{project_num}...", C.SYNC))
         gh_data = gh_fetch_project_items(sync_config)
@@ -985,7 +985,7 @@ def cmd_status(root, sync_config, args):
     print(bold(color(f"  {SYNC_ICON} EDPA Sync Status", C.HEADER)))
     print()
 
-    org = sync_config.get("github_org", "technomaton")
+    org = sync_config.get("github_org", "YOUR_ORG")
     project_num = sync_config.get("github_project_number", 1)
 
     print(f"  {bold('Organization:')}     {org}")
