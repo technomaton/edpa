@@ -11,11 +11,22 @@ const prefix = isEn ? '/en' : '';
 const links = [
   { href: `${prefix}/`, label: 'EDPA' },
   { href: `${prefix}/dashboard/`, label: 'Dashboard' },
-  { href: `${prefix}/presentation/`, label: isEn ? 'Presentation' : 'Prezentace' },
   { href: `${prefix}/methodology/`, label: isEn ? 'Methodology' : 'Metodika' },
   { href: `${prefix}/evaluation/`, label: isEn ? 'Evaluation' : 'Evaluace' },
-  { href: `${prefix}/guide/`, label: isEn ? 'Guide' : 'Průvodce' },
 ];
+
+const dropdownLabel = isEn ? 'Get Started' : 'Začněte';
+const dropdownHref = `${prefix}/start/`;
+const dropdownItems = [
+  { href: `${prefix}/setup/`, label: 'Setup wizard' },
+  { href: `${prefix}/guide/`, label: isEn ? 'Guide' : 'Průvodce' },
+  { href: `${prefix}/presentation/`, label: isEn ? 'Presentation' : 'Prezentace' },
+  { href: `${prefix}/journey/`, label: 'Journey' },
+  { href: `${prefix}/comic/`, label: isEn ? 'Comic' : 'Komix' },
+  { href: `${prefix}/tutorial/`, label: 'Tutorial' },
+];
+
+const isDropdownActive = dropdownItems.some(item => currentPath.startsWith(item.href)) || currentPath.startsWith(dropdownHref);
 
 const switchPath = isEn
   ? currentPath.replace(/^\/en(\/|$)/, '/')
@@ -36,6 +47,19 @@ const switchPath = isEn
           {link.label}
         </a>
       ))}
+      <div class="nav-dropdown">
+        <a
+          href={dropdownHref}
+          class:list={['nav-link', 'dropdown-trigger', { active: isDropdownActive }]}
+        >
+          {dropdownLabel} &#9662;
+        </a>
+        <div class="dropdown-menu">
+          {dropdownItems.map(item => (
+            <a href={item.href} class="dropdown-item">{item.label}</a>
+          ))}
+        </div>
+      </div>
     </nav>
     <div class="lang-switch">
       <a href={switchPath} class="lang-link" aria-label="Switch language">{isEn ? 'CS' : 'EN'}</a>
@@ -54,6 +78,15 @@ const switchPath = isEn
       >
         {link.label}
       </a>
+    ))}
+    <a
+      href={dropdownHref}
+      class:list={['mobile-nav-link', 'mobile-dropdown-label', { active: isDropdownActive }]}
+    >
+      {dropdownLabel}
+    </a>
+    {dropdownItems.map(item => (
+      <a href={item.href} class="mobile-nav-link mobile-dropdown-item">{item.label}</a>
     ))}
     <div class="mobile-lang-switch">
       <a href={switchPath} class="lang-link" aria-label="Switch language">{isEn ? 'CS' : 'EN'}</a>
@@ -130,6 +163,34 @@ const switchPath = isEn
   }
   .nav-link:hover { background: var(--s2); color: var(--t1); }
   .nav-link.active { background: rgba(99, 102, 241, 0.12); color: var(--ac2); }
+
+  /* Dropdown */
+  .nav-dropdown { position: relative; }
+  .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    padding: 8px 0;
+    min-width: 200px;
+    z-index: 200;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .nav-dropdown:hover .dropdown-menu { display: block; }
+  .dropdown-item {
+    display: block;
+    padding: 8px 16px;
+    color: var(--t2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    text-decoration: none;
+    transition: background 0.1s;
+  }
+  .dropdown-item:hover { background: var(--s2); color: var(--t1); }
+
   .lang-switch {
     margin-left: 8px;
   }
@@ -205,6 +266,16 @@ const switchPath = isEn
   }
   .mobile-nav-link:hover { color: var(--t1); }
   .mobile-nav-link.active { color: var(--ac); }
+  .mobile-dropdown-label {
+    font-weight: 600;
+    color: var(--t1);
+  }
+  .mobile-dropdown-item {
+    padding-left: 16px;
+    font-size: 11px;
+    color: var(--t3);
+  }
+  .mobile-dropdown-item:hover { color: var(--t1); }
   .mobile-lang-switch {
     padding-top: 10px;
     border-top: 1px solid var(--bd);

@@ -1,0 +1,131 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Zacnete s EDPA">
+
+  <section class="hero section">
+    <div class="container hero-inner" style="text-align:center;">
+      <p class="tag">Onboarding</p>
+      <h1 class="hero-headline">Zacnete s EDPA</h1>
+      <p class="hero-subtitle">
+        Vyberte si format, ktery vam vyhovuje. Od interaktivniho wizardu
+        po animovany tutorial — kazda cesta vas dovede k prvnimu vykazu.
+      </p>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0;">
+    <div class="container">
+      <div class="grid start-grid">
+        <a href="/setup/" class="start-card">
+          <span class="start-icon">&#x1F527;</span>
+          <h2 class="start-title">Setup wizard</h2>
+          <p class="start-desc">Nakonfigurujte projekt interaktivne</p>
+          <span class="start-arrow">&rarr;</span>
+        </a>
+        <a href="/guide/" class="start-card">
+          <span class="start-icon">&#x1F4D6;</span>
+          <h2 class="start-title">Pruvodce</h2>
+          <p class="start-desc">12 kroku od nuly po vykaz</p>
+          <span class="start-arrow">&rarr;</span>
+        </a>
+        <a href="/journey/" class="start-card">
+          <span class="start-icon">&#x1F3AC;</span>
+          <h2 class="start-title">Journey</h2>
+          <p class="start-desc">15-slide pribeh EDPA</p>
+          <span class="start-arrow">&rarr;</span>
+        </a>
+        <a href="/comic/" class="start-card">
+          <span class="start-icon">&#x1F3A8;</span>
+          <h2 class="start-title">Komix</h2>
+          <p class="start-desc">Pribeh v obrazcich</p>
+          <span class="start-arrow">&rarr;</span>
+        </a>
+        <a href="/tutorial/" class="start-card">
+          <span class="start-icon">&#x1F4FA;</span>
+          <h2 class="start-title">Tutorial</h2>
+          <p class="start-desc">Animovany navod</p>
+          <span class="start-arrow">&rarr;</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  .hero-headline {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 700;
+    color: var(--t1);
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .hero-subtitle {
+    font-size: 17px;
+    color: var(--t2);
+    max-width: 560px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+  .start-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .start-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    padding: 32px 20px;
+    text-decoration: none;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    position: relative;
+  }
+  .start-card:hover {
+    border-color: var(--ac);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15);
+  }
+  .start-icon {
+    font-size: 36px;
+    margin-bottom: 16px;
+    display: block;
+    line-height: 1;
+  }
+  .start-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--t1);
+    margin-bottom: 8px;
+  }
+  .start-desc {
+    font-size: 13px;
+    color: var(--t2);
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+  .start-arrow {
+    font-size: 18px;
+    color: var(--ac2);
+    margin-top: auto;
+    transition: transform 0.2s;
+  }
+  .start-card:hover .start-arrow {
+    transform: translateX(4px);
+  }
+  @media (max-width: 960px) {
+    .start-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  @media (max-width: 600px) {
+    .start-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
