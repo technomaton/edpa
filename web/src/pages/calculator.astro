@@ -1,0 +1,751 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { edpa, itemView } from '../lib/edpa-engine';
+import { people, items, iterations } from '../lib/demo-data-walkthrough';
+
+const iter = iterations[0];
+const results = people.map(p => edpa(p.id, iter.id, people, items, 'simple')!);
+const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simple')!);
+---
+
+<Layout title="Kalkulator EDPA" description="EDPA krok po kroku — konkretni priklad vypoctu s realnymi cisly. Od vstupu po odvozene hodiny.">
+
+  <!-- Hero -->
+  <section class="calc-hero section">
+    <div class="container" style="text-align:center;">
+      <p class="tag">Kalkulator</p>
+      <h1 class="calc-headline">EDPA krok po kroku</h1>
+      <p class="calc-subtitle">
+        Konkretni priklad vypoctu s realnymi cisly.<br>
+        Od vstupu po odvozene hodiny — overitelne rucne.
+      </p>
+      <div class="mode-switch" id="modeSwitch">
+        <button class="mode-btn active" data-mode="simple">Simple: JS &times; CW</button>
+        <button class="mode-btn" data-mode="full">Full: JS &times; CW &times; RS</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 01: Inputs -->
+  <section class="section calc-section" id="inputs">
+    <div class="container">
+      <div class="calc-step fade-in">
+        <span class="step-number">01</span>
+        <p class="tag">Vstupy</p>
+        <h2 class="section-title">Tym a work items</h2>
+        <p class="calc-desc">
+          Tri lide s ruznou kapacitou pracuji na ctyrech Stories v jedne iteraci.
+          Kazdy clovek ma ruznou miru zapojeni (CW) na ruznych itemech.
+        </p>
+      </div>
+
+      <!-- People cards -->
+      <div class="grid grid-3 calc-people fade-in">
+        {people.map(p => (
+          <div class={`card ${p.role === 'Architect' ? 'accent' : p.role === 'Developer' ? 'cyan' : 'yellow'}`}>
+            <div class="person-name">{p.name}</div>
+            <div class="person-role">{p.role}</div>
+            <div class="person-stats">
+              <span>{p.fte} FTE</span>
+              <span class="person-cap">{p.capacity}h / iterace</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Items table with CW matrix -->
+      <div class="card fade-in" style="margin-top:20px;">
+        <div class="tag">Work items &amp; Contribution Weight (CW)</div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>JS</th>
+                <th>Alice (Arch)</th>
+                <th>Bob (Dev)</th>
+                <th>Carol (PM)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(w => (
+                <tr>
+                  <td><code>{w.id}</code> {w.title}</td>
+                  <td class="td-js">{w.js}</td>
+                  {people.map(p => {
+                    const cn = w.contributions.find(c => c.personId === p.id);
+                    return (
+                      <td class={cn ? 'td-cw-active' : 'td-cw-empty'}>
+                        {cn ? (
+                          <span>
+                            <span class="cw-val">{cn.cw}</span>
+                            <span class="rs-val" data-rs={cn.rs}> / {cn.rs}</span>
+                          </span>
+                        ) : '—'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div class="note" style="margin-top:12px;">
+          CW = Contribution Weight (mira zapojeni). RS = Relevance Signal (ve Full modu).
+          Zobrazeno jako <span class="cw-val">CW</span> / <span class="rs-val">RS</span>.
+        </div>
+      </div>
+
+      <!-- Formula -->
+      <div class="formula fade-in" style="margin-top:20px;" id="formulaBox">
+        <strong>Score</strong> = JobSize &times; CW
+        <br><strong>DerivedHours</strong> = (Score / &Sigma;Scores) &times; Capacity
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 02: Score computation -->
+  <section class="section calc-section" id="score">
+    <div class="container">
+      <div class="calc-step fade-in">
+        <span class="step-number">02</span>
+        <p class="tag">Score</p>
+        <h2 class="section-title">Vypocet skore</h2>
+        <p class="calc-desc">
+          Pro kazdy par (osoba, item) vynasobime JobSize &times; CW.
+          Vysledkem je surovy Score, ktery urcuje relativni podil na kapacite.
+        </p>
+      </div>
+
+      <div class="grid grid-3 fade-in" id="scoreCards">
+        {results.map(r => (
+          <div class={`card ${r.person.role === 'Architect' ? 'accent' : r.person.role === 'Developer' ? 'cyan' : 'yellow'}`}>
+            <div class="person-name">{r.person.name}</div>
+            <div class="person-role">{r.person.role} &middot; {r.person.capacity}h</div>
+            <table class="score-table">
+              <thead>
+                <tr><th>Item</th><th>JS</th><th>CW</th><th class="rs-col">RS</th><th>Score</th></tr>
+              </thead>
+              <tbody>
+                {r.items.map(x => (
+                  <tr>
+                    <td><code>{x.id}</code></td>
+                    <td class="td-js">{x.js}</td>
+                    <td class="td-cw">{x.cw}</td>
+                    <td class="td-rs rs-col">{x.rs}</td>
+                    <td class="td-score">{x.score.toFixed(2)}</td>
+                  </tr>
+                ))}
+                <tr class="total-row">
+                  <td colspan="3" class="rs-hide-span">Total</td>
+                  <td colspan="4" class="rs-show-span" style="display:none;">Total</td>
+                  <td></td>
+                  <td class="td-score total-score">&Sigma; {r.totalScore.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 03: Per-Person -->
+  <section class="section calc-section" id="per-person">
+    <div class="container">
+      <div class="calc-step fade-in">
+        <span class="step-number">03</span>
+        <p class="tag">Per-Person</p>
+        <h2 class="section-title">Odvozene hodiny</h2>
+        <p class="calc-desc">
+          Kazdy Score vydelime celkovym souctem a vynasobime kapacitou.
+          Vysledek: kolik hodin clovek stravil na kazdem itemu.
+        </p>
+      </div>
+
+      <div id="personCards">
+        {results.map(r => (
+          <div class={`card fade-in ${r.person.role === 'Architect' ? 'accent' : r.person.role === 'Developer' ? 'cyan' : 'yellow'}`} style="margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+              <div>
+                <span class="person-name">{r.person.name}</span>
+                <span class="person-role" style="margin-left:8px;">{r.person.role}</span>
+              </div>
+              <div class="guarantee-badge">
+                <span class="guarantee-check">&check;</span>
+                &Sigma; = {r.totalHours.toFixed(1)}h = {r.person.capacity}h
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr><th>Item</th><th>Score</th><th>Vypocet</th><th>Ratio</th><th>Hours</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {r.items.map(x => {
+                    const pct = x.ratio * 100;
+                    return (
+                      <tr>
+                        <td><code>{x.id}</code> {x.title}</td>
+                        <td class="td-score">{x.score.toFixed(2)}</td>
+                        <td class="td-computation">
+                          {x.score.toFixed(2)} / {r.totalScore.toFixed(2)} &times; {r.person.capacity}
+                        </td>
+                        <td>{pct.toFixed(1)}%</td>
+                        <td class="td-hours">{x.hours.toFixed(1)}h</td>
+                        <td style="width:100px;">
+                          <div class="bar-bg">
+                            <div class="bar-fill" style={`width:${pct}%`}></div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr class="total-row">
+                    <td>Celkem</td>
+                    <td class="td-score">{r.totalScore.toFixed(2)}</td>
+                    <td></td>
+                    <td>100%</td>
+                    <td class="td-hours total-hours">{r.totalHours.toFixed(1)}h</td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 04: Per-Item -->
+  <section class="section calc-section" id="per-item">
+    <div class="container">
+      <div class="calc-step fade-in">
+        <span class="step-number">04</span>
+        <p class="tag">Per-Item</p>
+        <h2 class="section-title">Kolik staly jednotlive polozky?</h2>
+        <p class="calc-desc">
+          Stejna data, jiny pohled. Pro kazdy item vidime, kdo a kolik hodin prispel.
+          Podily se vzdy secti na 100 %.
+        </p>
+      </div>
+
+      <div class="grid grid-2 fade-in" id="itemCards">
+        {itemResults.map(ir => (
+          <div class="card green">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <div>
+                <code style="color:var(--gn);font-weight:600;">{ir.item.id}</code>
+                <span style="margin-left:6px;">{ir.item.title}</span>
+              </div>
+              <span class="badge badge-yellow">JS {ir.item.js}</span>
+            </div>
+            <table class="item-table">
+              <thead>
+                <tr><th>Osoba</th><th>Role</th><th>CW</th><th>Hours</th><th>Podil</th><th></th></tr>
+              </thead>
+              <tbody>
+                {ir.contributors.map(c => {
+                  const share = ir.totalHours > 0 ? (c.hours / ir.totalHours * 100) : 0;
+                  return (
+                    <tr>
+                      <td>{c.person.name}</td>
+                      <td class="td-role">{c.person.role}</td>
+                      <td class="td-cw">{c.cw}</td>
+                      <td class="td-hours">{c.hours.toFixed(1)}h</td>
+                      <td>{share.toFixed(1)}%</td>
+                      <td style="width:80px;">
+                        <div class="bar-bg">
+                          <div class="bar-fill bar-green" style={`width:${share}%`}></div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr class="total-row">
+                  <td colspan="3">Celkem</td>
+                  <td class="td-hours">{ir.totalHours.toFixed(1)}h</td>
+                  <td>100%</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 05: Guarantee -->
+  <section class="section calc-section" id="guarantee">
+    <div class="container">
+      <div class="calc-step fade-in">
+        <span class="step-number">05</span>
+        <p class="tag">Garance</p>
+        <h2 class="section-title">Matematicka garance</h2>
+      </div>
+
+      <div class="grid grid-3 fade-in" id="guaranteeCards">
+        {results.map(r => (
+          <div class={`card ${r.ok ? 'green' : ''}`} style="text-align:center;">
+            <div class="person-name">{r.person.name}</div>
+            <div class="guarantee-big">
+              <span class="guarantee-check-big">&check;</span>
+            </div>
+            <div class="guarantee-eq">
+              <span class="guarantee-sum">&Sigma; {r.totalHours.toFixed(1)}h</span>
+              <span class="guarantee-equals">=</span>
+              <span class="guarantee-cap">{r.person.capacity}h</span>
+            </div>
+            <div class="guarantee-label">Capacity</div>
+          </div>
+        ))}
+      </div>
+
+      <div class="formula fade-in" style="margin-top:24px;text-align:center;font-size:15px;">
+        &Sigma; DerivedHours = Capacity — vzdy, bez vyjimky.
+        <br><span style="font-size:12px;color:var(--t3);">Proporcionalni alokace garantuje, ze soucet pomeru = 1.0 a soucet hodin = kapacita.</span>
+      </div>
+
+      <div class="cta-box fade-in">
+        <p>Chcete videt EDPA na realnych datech?</p>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <a href="/dashboard/" class="btn btn-primary">Dashboard demo</a>
+          <a href="/methodology/" class="btn btn-secondary">Metodika</a>
+          <a href="/evaluation/" class="btn btn-secondary">Evaluace &amp; testy</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<script>
+  import { edpa, itemView } from '../lib/edpa-engine';
+  import { people, items, iterations } from '../lib/demo-data-walkthrough';
+
+  let mode: 'simple' | 'full' = 'simple';
+  const iter = iterations[0];
+
+  // Mode toggle
+  const btns = document.querySelectorAll('.mode-btn');
+  btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const newMode = (btn as HTMLElement).dataset.mode as 'simple' | 'full';
+      if (newMode === mode) return;
+      mode = newMode;
+      btns.forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.mode === mode));
+      recompute();
+    });
+  });
+
+  function recompute() {
+    const results = people.map(p => edpa(p.id, iter.id, people, items, mode)!);
+    const itemResults = items.map(w => itemView(w.id, iter.id, people, items, mode)!);
+    const isFullMode = mode === 'full';
+
+    // Update formula box
+    const formulaBox = document.getElementById('formulaBox');
+    if (formulaBox) {
+      formulaBox.innerHTML = isFullMode
+        ? '<strong>Score</strong> = JobSize &times; CW &times; RS<br><strong>DerivedHours</strong> = (Score / &Sigma;Scores) &times; Capacity'
+        : '<strong>Score</strong> = JobSize &times; CW<br><strong>DerivedHours</strong> = (Score / &Sigma;Scores) &times; Capacity';
+    }
+
+    // Toggle RS column visibility
+    document.querySelectorAll('.rs-col').forEach(el => {
+      (el as HTMLElement).style.display = isFullMode ? '' : 'none';
+    });
+    document.querySelectorAll('.rs-val').forEach(el => {
+      (el as HTMLElement).style.display = isFullMode ? '' : 'none';
+    });
+
+    // Update score cards
+    const scoreCards = document.getElementById('scoreCards');
+    if (scoreCards) {
+      const cards = scoreCards.querySelectorAll('.card');
+      results.forEach((r, i) => {
+        const card = cards[i];
+        if (!card) return;
+        const rows = card.querySelectorAll('.score-table tbody tr:not(.total-row)');
+        r.items.forEach((x, j) => {
+          const row = rows[j];
+          if (!row) return;
+          const cells = row.querySelectorAll('td');
+          cells[1].textContent = String(x.js);
+          cells[2].textContent = String(x.cw);
+          cells[3].textContent = String(x.rs);
+          cells[4].textContent = x.score.toFixed(2);
+        });
+        const totalCell = card.querySelector('.total-score');
+        if (totalCell) totalCell.innerHTML = '&Sigma; ' + r.totalScore.toFixed(2);
+      });
+    }
+
+    // Update per-person cards
+    const personCards = document.getElementById('personCards');
+    if (personCards) {
+      const cards = personCards.querySelectorAll('.card');
+      results.forEach((r, i) => {
+        const card = cards[i];
+        if (!card) return;
+
+        // Update guarantee badge
+        const badge = card.querySelector('.guarantee-badge');
+        if (badge) badge.innerHTML = `<span class="guarantee-check">&check;</span> &Sigma; = ${r.totalHours.toFixed(1)}h = ${r.person.capacity}h`;
+
+        const rows = card.querySelectorAll('tbody tr:not(.total-row)');
+        r.items.forEach((x, j) => {
+          const row = rows[j];
+          if (!row) return;
+          const pct = x.ratio * 100;
+          const cells = row.querySelectorAll('td');
+          cells[1].textContent = x.score.toFixed(2);
+          cells[2].textContent = `${x.score.toFixed(2)} / ${r.totalScore.toFixed(2)} × ${r.person.capacity}`;
+          cells[3].textContent = pct.toFixed(1) + '%';
+          cells[4].textContent = x.hours.toFixed(1) + 'h';
+          const fill = row.querySelector('.bar-fill') as HTMLElement;
+          if (fill) fill.style.width = pct + '%';
+        });
+
+        const totalRow = card.querySelector('.total-row');
+        if (totalRow) {
+          const cells = totalRow.querySelectorAll('td');
+          cells[1].textContent = r.totalScore.toFixed(2);
+          cells[4].textContent = r.totalHours.toFixed(1) + 'h';
+        }
+      });
+    }
+
+    // Update per-item cards
+    const itemCardsEl = document.getElementById('itemCards');
+    if (itemCardsEl) {
+      const cards = itemCardsEl.querySelectorAll('.card');
+      itemResults.forEach((ir, i) => {
+        const card = cards[i];
+        if (!card) return;
+        const rows = card.querySelectorAll('tbody tr:not(.total-row)');
+        ir.contributors.forEach((c, j) => {
+          const row = rows[j];
+          if (!row) return;
+          const share = ir.totalHours > 0 ? (c.hours / ir.totalHours * 100) : 0;
+          const cells = row.querySelectorAll('td');
+          cells[2].textContent = String(c.cw);
+          cells[3].textContent = c.hours.toFixed(1) + 'h';
+          cells[4].textContent = share.toFixed(1) + '%';
+          const fill = row.querySelector('.bar-fill') as HTMLElement;
+          if (fill) fill.style.width = share + '%';
+        });
+        const totalRow = card.querySelector('.total-row');
+        if (totalRow) {
+          const cells = totalRow.querySelectorAll('td');
+          cells[1].textContent = ir.totalHours.toFixed(1) + 'h';
+        }
+      });
+    }
+
+    // Update guarantee cards
+    const guaranteeCards = document.getElementById('guaranteeCards');
+    if (guaranteeCards) {
+      const cards = guaranteeCards.querySelectorAll('.card');
+      results.forEach((r, i) => {
+        const card = cards[i];
+        if (!card) return;
+        const sum = card.querySelector('.guarantee-sum');
+        if (sum) sum.innerHTML = '&Sigma; ' + r.totalHours.toFixed(1) + 'h';
+      });
+    }
+  }
+
+  // Scroll fade-in
+  function initFadeIn() {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          (e.target as HTMLElement).classList.add('visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  }
+  document.addEventListener('DOMContentLoaded', initFadeIn);
+  document.addEventListener('astro:page-load', initFadeIn);
+
+  // Initialize RS column visibility
+  document.querySelectorAll('.rs-col').forEach(el => {
+    (el as HTMLElement).style.display = 'none';
+  });
+  document.querySelectorAll('.rs-val').forEach(el => {
+    (el as HTMLElement).style.display = 'none';
+  });
+</script>
+
+</Layout>
+
+<style>
+  /* Hero */
+  .calc-hero { padding-top: 80px; padding-bottom: 40px; }
+  .calc-headline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(26px, 4vw, 38px);
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--ac2), var(--cy));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+  .calc-subtitle {
+    font-size: 15px;
+    color: var(--t2);
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+
+  /* Mode switch */
+  .mode-switch {
+    display: inline-flex;
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .mode-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    color: var(--t3);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .mode-btn.active {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--ac2);
+  }
+  .mode-btn:hover:not(.active) {
+    color: var(--t1);
+  }
+
+  /* Steps */
+  .calc-section { position: relative; }
+  .calc-step { margin-bottom: 20px; }
+  .step-number {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ac);
+    background: rgba(99, 102, 241, 0.1);
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .calc-desc {
+    font-size: 14px;
+    color: var(--t2);
+    line-height: 1.6;
+    max-width: 700px;
+  }
+
+  /* People cards */
+  .person-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--t1);
+  }
+  .person-role {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--t3);
+    margin-bottom: 8px;
+  }
+  .person-stats {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--t2);
+  }
+  .person-cap {
+    font-weight: 600;
+    color: var(--gn);
+  }
+
+  /* Input table */
+  .td-js {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--yl);
+  }
+  .td-cw-active {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .td-cw-empty {
+    color: var(--t3);
+    text-align: center;
+  }
+  .cw-val {
+    color: var(--cy);
+    font-weight: 600;
+  }
+  .rs-val {
+    color: var(--gn);
+    font-size: 11px;
+  }
+
+  /* Score tables */
+  .score-table { margin-top: 10px; }
+  .score-table th, .score-table td { padding: 4px 8px; font-size: 12px; }
+  .td-cw { color: var(--cy); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .td-rs { color: var(--gn); font-family: 'JetBrains Mono', monospace; }
+  .td-score {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--ac2);
+  }
+  .total-row {
+    border-top: 2px solid var(--bd);
+  }
+  .total-row td {
+    font-weight: 600;
+    padding-top: 8px;
+  }
+  .total-score { font-size: 13px; }
+
+  /* Per-person computation */
+  .td-computation {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--t3);
+  }
+  .td-hours {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--gn);
+  }
+  .total-hours {
+    font-size: 14px;
+  }
+
+  /* Bars */
+  .bar-bg {
+    background: var(--s2);
+    border-radius: 3px;
+    height: 6px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: var(--ac);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+  .bar-green {
+    background: var(--gn);
+  }
+
+  /* Item tables */
+  .item-table th, .item-table td { font-size: 12px; }
+  .td-role {
+    font-size: 11px;
+    color: var(--t3);
+  }
+
+  /* Guarantee */
+  .guarantee-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--gn);
+    background: rgba(52, 211, 153, 0.08);
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(52, 211, 153, 0.2);
+  }
+  .guarantee-check {
+    color: var(--gn);
+    font-weight: 700;
+    margin-right: 2px;
+  }
+  .guarantee-big {
+    margin: 16px 0 8px;
+  }
+  .guarantee-check-big {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(52, 211, 153, 0.1);
+    border: 2px solid var(--gn);
+    color: var(--gn);
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .guarantee-eq {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    margin: 8px 0 4px;
+  }
+  .guarantee-sum {
+    color: var(--ac2);
+    font-weight: 700;
+  }
+  .guarantee-equals {
+    color: var(--gn);
+    margin: 0 6px;
+    font-weight: 700;
+  }
+  .guarantee-cap {
+    color: var(--gn);
+    font-weight: 700;
+  }
+  .guarantee-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--t3);
+  }
+
+  /* CTA */
+  .cta-box {
+    text-align: center;
+    margin-top: 32px;
+    padding: 24px;
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+  }
+  .cta-box p {
+    font-size: 15px;
+    color: var(--t2);
+    margin-bottom: 16px;
+  }
+
+  /* Fade-in */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .fade-in.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* RS column hidden by default (toggled by JS) */
+  .rs-col { display: none; }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .calc-hero { padding-top: 60px; }
+    .grid-3 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .mode-btn { font-size: 10px; padding: 6px 10px; }
+    .td-computation { display: none; }
+  }
+</style>
