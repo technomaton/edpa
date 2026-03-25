@@ -69,19 +69,33 @@ Pred zacatkem je treba mit:
 
 ## Faze 1: Infrastruktura (Den 1, ~4 hodiny)
 
+### Cesta A: Claude Code (doporuceno)
+
+V terminalu s Claude Code nainstalovanym:
+
+```
+/edpa setup
+```
+
+Claude Code provede kroky 1.1-1.6 automaticky -- vytvori repo, nakonfiguruje tym, nastavi Issue Types a vytvori GitHub Project.
+
+### Cesta B: Manualni CLI
+
+Nasledujici kroky popisuji manualni postup bez Claude Code.
+
 ### 1.1 Vytvorit repozitar
 
 **Varianta A: Z EDPA sablony (doporuceno)**
 
 ```bash
-gh repo create my-org/my-project --template technomaton/edpa --private
+gh repo create my-org/my-project --template your-org/edpa --private
 cd my-project
 ```
 
 **Varianta B: Klonovat a upravit**
 
 ```bash
-git clone https://github.com/technomaton/edpa.git my-project
+git clone https://github.com/your-org/edpa.git my-project
 cd my-project
 rm -rf .git
 git init
@@ -589,6 +603,16 @@ python scripts/edpa_sync.py diff --mock
 
 Na konci kazde iterace (po 2 tydnech):
 
+**Claude Code (doporuceno):**
+
+```
+/edpa close-iteration PI-2026-1.1
+```
+
+Claude Code stahne evidenci, spusti EDPA engine a vygeneruje reporty automaticky.
+
+**Manualni CLI:**
+
 ```bash
 python scripts/edpa_engine.py \
   --iteration PI-2026-1.1 \
@@ -666,6 +690,22 @@ delivery:
 ---
 
 ## Faze 3: PI Close (Po 4-5 iteracich)
+
+### Cesta A: Claude Code (doporuceno)
+
+```
+/edpa calibrate
+```
+
+Claude Code spusti CW kalibraci, vyhodnoti MAD a navrh uprav heuristik. Pro generovani reportu:
+
+```
+/edpa reports
+```
+
+### Cesta B: Manualni CLI
+
+Nasledujici kroky popisuji manualni postup.
 
 ### 3.1 Retrospektiva
 
@@ -779,6 +819,23 @@ pi:
 
 ## Faze 4: Kontinualni provoz
 
+### S Claude Code (doporuceno)
+
+Kazda iterace:
+
+```
+/edpa close-iteration PI-2026-1.X    # uzavreni iterace
+/edpa reports                         # generovani reportu
+```
+
+Kazdy PI:
+
+```
+/edpa calibrate                       # CW kalibrace
+```
+
+### Manualni postup
+
 ### Kazda iterace (kazde 2 tydny)
 
 1. **Planning** -- vybrat stories, prirazit assignees
@@ -865,6 +922,15 @@ python scripts/edpa_backlog.py status
 ---
 
 ## CLI Reference
+
+### Claude Code prikazy (doporuceno)
+
+| Prikaz | Popis |
+|--------|-------|
+| `/edpa setup` | Pocatecni setup projektu -- repo, tym, Issue Types, GitHub Project |
+| `/edpa close-iteration PI-2026-1.X` | Uzavreni iterace -- stazeni evidence, EDPA engine, reporty |
+| `/edpa reports` | Generovani reportu a vykazu |
+| `/edpa calibrate` | CW kalibrace -- vyhodnoceni MAD, navrh uprav heuristik |
 
 ### edpa_engine.py -- EDPA vypocetni jadro
 

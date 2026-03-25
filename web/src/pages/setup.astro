@@ -1,0 +1,915 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Setup Wizard" description="Interaktivni pruvodce nastavenim EDPA projektu. Vygenerujte konfiguracni soubory a spustte projekt.">
+
+  <section class="hero section">
+    <div class="container hero-inner">
+      <p class="tag">Setup Wizard</p>
+      <h1 class="hero-headline">Nastav si EDPA projekt</h1>
+      <p class="hero-subtitle">
+        Vyplnte formulare, stahnte vygenerovane konfiguracni soubory a spustte projekt.
+      </p>
+    </div>
+  </section>
+
+  <section class="section wizard-section">
+    <div class="container">
+
+      <!-- Progress bar -->
+      <div class="wizard-progress">
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-steps">
+          <button class="progress-step active" data-step="1"><span class="step-num">1</span><span class="step-label">Projekt</span></button>
+          <button class="progress-step" data-step="2"><span class="step-num">2</span><span class="step-label">Tym</span></button>
+          <button class="progress-step" data-step="3"><span class="step-num">3</span><span class="step-label">Konfigurace</span></button>
+          <button class="progress-step" data-step="4"><span class="step-num">4</span><span class="step-label">Spusteni</span></button>
+        </div>
+      </div>
+
+      <!-- Step 1: Projekt -->
+      <div class="wizard-step active" id="step1">
+        <h2 class="step-title">Projekt</h2>
+        <p class="step-desc">Zakladni informace o vasem projektu.</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="projectName">Nazev projektu</label>
+            <input class="form-input" type="text" id="projectName" placeholder="Medical Platform" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="githubOrg">GitHub organizace</label>
+            <input class="form-input" type="text" id="githubOrg" placeholder="my-org" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="githubRepo">GitHub repo</label>
+            <input class="form-input" type="text" id="githubRepo" placeholder="my-project" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="program">Program / registrace <span class="form-optional">(volitelne)</span></label>
+            <input class="form-input" type="text" id="program" placeholder="OP TAK" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Tym -->
+      <div class="wizard-step" id="step2">
+        <h2 class="step-title">Tym</h2>
+        <p class="step-desc">Pridejte cleny tymu a nastavte jejich role a kapacity.</p>
+
+        <div class="team-table-wrap">
+          <table class="team-table" id="teamTable">
+            <thead>
+              <tr>
+                <th>Jmeno</th>
+                <th>ID</th>
+                <th>Role</th>
+                <th>FTE</th>
+                <th>Kapacita (h)</th>
+                <th>Smlouva</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="teamBody">
+            </tbody>
+          </table>
+        </div>
+
+        <div class="team-actions">
+          <button class="btn btn-secondary" id="addMemberBtn">+ Pridat clena</button>
+          <div class="team-summary" id="teamSummary">Celkem: 0 clenu, 0.0 FTE, 0h/iteraci</div>
+        </div>
+      </div>
+
+      <!-- Step 3: Konfigurace -->
+      <div class="wizard-step" id="step3">
+        <h2 class="step-title">Konfigurace</h2>
+        <p class="step-desc">Vygenerovane konfiguracni soubory na zaklade vasich vstupu.</p>
+
+        <div class="config-files">
+          <div class="config-file">
+            <div class="config-file-header">
+              <span class="config-file-name">people.yaml</span>
+              <button class="btn btn-secondary btn-sm copy-btn" data-target="peoplePre">Kopirovat</button>
+            </div>
+            <pre class="config-pre" id="peoplePre"></pre>
+          </div>
+          <div class="config-file">
+            <div class="config-file-header">
+              <span class="config-file-name">config.yaml</span>
+              <button class="btn btn-secondary btn-sm copy-btn" data-target="configPre">Kopirovat</button>
+            </div>
+            <pre class="config-pre" id="configPre"></pre>
+          </div>
+          <div class="config-file">
+            <div class="config-file-header">
+              <span class="config-file-name">project.yaml</span>
+              <button class="btn btn-secondary btn-sm copy-btn" data-target="projectPre">Kopirovat</button>
+            </div>
+            <pre class="config-pre" id="projectPre"></pre>
+          </div>
+        </div>
+
+        <div class="download-wrap">
+          <button class="btn btn-primary" id="downloadAllBtn">Stahnout vse jako ZIP</button>
+        </div>
+      </div>
+
+      <!-- Step 4: Spusteni -->
+      <div class="wizard-step" id="step4">
+        <h2 class="step-title">Spusteni</h2>
+        <p class="step-desc">Vyberte si jednu z cest, jak projekt spustit.</p>
+
+        <div class="grid grid-2 launch-grid">
+          <div class="card green launch-card">
+            <div class="launch-badge">doporuceno</div>
+            <h3 class="card-heading">Path A: Claude Code</h3>
+            <p class="card-text">Nejrychlejsi cesta. Claude Code vas provede vsim interaktivne.</p>
+            <pre class="launch-pre" id="launchA"></pre>
+          </div>
+          <div class="card accent launch-card">
+            <h3 class="card-heading">Path B: Manualni CLI</h3>
+            <p class="card-text">Krok po kroku rucne pres terminal.</p>
+            <pre class="launch-pre" id="launchB"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation buttons -->
+      <div class="wizard-nav">
+        <button class="btn btn-secondary" id="prevBtn" style="visibility:hidden;">Zpet</button>
+        <button class="btn btn-primary" id="nextBtn">Dalsi</button>
+      </div>
+
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  .hero { padding-top: 100px; padding-bottom: 40px; }
+  .hero-inner { text-align: center; }
+  .hero-headline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(24px, 4vw, 36px);
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--ac2), var(--cy));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-subtitle {
+    font-size: 15px;
+    color: var(--t2);
+    line-height: 1.6;
+    max-width: 540px;
+    margin: 0 auto;
+  }
+  .wizard-section { padding-top: 0; }
+
+  /* Progress */
+  .wizard-progress { margin-bottom: 40px; }
+  .progress-track {
+    height: 3px;
+    background: var(--s2);
+    border-radius: 2px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 25%;
+    background: linear-gradient(90deg, var(--ac), var(--cy));
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+  .progress-steps {
+    display: flex;
+    justify-content: space-between;
+  }
+  .progress-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    color: var(--t3);
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  .progress-step.active .step-num,
+  .progress-step.completed .step-num {
+    background: var(--ac);
+    border-color: var(--ac);
+    color: #fff;
+  }
+  .progress-step.completed .step-num {
+    background: var(--gn);
+    border-color: var(--gn);
+  }
+  .step-label {
+    font-size: 11px;
+    color: var(--t3);
+    transition: color 0.3s;
+  }
+  .progress-step.active .step-label { color: var(--t1); }
+  .progress-step.completed .step-label { color: var(--gn); }
+
+  /* Steps */
+  .wizard-step { display: none; }
+  .wizard-step.active { display: block; }
+  .step-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(20px, 3vw, 26px);
+    font-weight: 700;
+    color: var(--t1);
+    margin-bottom: 8px;
+  }
+  .step-desc {
+    font-size: 14px;
+    color: var(--t2);
+    margin-bottom: 24px;
+  }
+
+  /* Form */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--t2);
+    font-weight: 500;
+  }
+  .form-optional { color: var(--t3); font-weight: 400; }
+  .form-input, .form-select {
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--t1);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus, .form-select:focus {
+    border-color: var(--ac);
+  }
+  .form-input::placeholder { color: var(--t3); }
+  .form-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a6380'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+  .form-select option {
+    background: var(--s1);
+    color: var(--t1);
+  }
+
+  /* Team table */
+  .team-table-wrap {
+    overflow-x: auto;
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+  }
+  .team-table { margin: 0; }
+  .team-table th {
+    font-size: 10px;
+    white-space: nowrap;
+    padding: 8px 10px;
+  }
+  .team-table td { padding: 6px 6px; }
+  .team-table .form-input,
+  .team-table .form-select {
+    padding: 7px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    width: 100%;
+    min-width: 80px;
+  }
+  .team-table .form-select {
+    min-width: 90px;
+  }
+  .team-table .name-input { min-width: 130px; }
+  .team-table .id-input {
+    min-width: 100px;
+    color: var(--t3);
+    background: var(--s2);
+  }
+  .team-table .cap-input {
+    min-width: 70px;
+    color: var(--cy);
+    background: var(--s2);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+  .remove-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--t3);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px 8px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .remove-btn:hover {
+    color: var(--rd);
+    border-color: var(--rd);
+    background: rgba(248, 113, 113, 0.08);
+  }
+  .team-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .team-summary {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--cy);
+    padding: 6px 14px;
+    background: rgba(34, 211, 238, 0.06);
+    border: 1px solid rgba(34, 211, 238, 0.15);
+    border-radius: 8px;
+  }
+
+  /* Config preview */
+  .config-files { display: flex; flex-direction: column; gap: 20px; }
+  .config-file {
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .config-file-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--s2);
+    border-bottom: 1px solid var(--bd);
+  }
+  .config-file-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--yl);
+    font-weight: 600;
+  }
+  .btn-sm { padding: 5px 12px; font-size: 11px; }
+  .config-pre {
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--t2);
+    overflow-x: auto;
+    white-space: pre;
+    margin: 0;
+  }
+  .download-wrap {
+    margin-top: 20px;
+    text-align: center;
+  }
+
+  /* Launch */
+  .launch-grid { margin-bottom: 20px; }
+  .launch-card { position: relative; }
+  .launch-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gn);
+    background: rgba(52, 211, 153, 0.12);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .launch-pre {
+    margin-top: 12px;
+    padding: 14px;
+    background: var(--bg);
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--gn);
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  /* Wizard nav */
+  .wizard-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--bd);
+  }
+
+  /* Copy success */
+  .copy-btn.copied {
+    color: var(--gn) !important;
+    border-color: var(--gn) !important;
+  }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .hero { padding-top: 72px; padding-bottom: 24px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .launch-grid { grid-template-columns: 1fr; }
+    .step-label { display: none; }
+    .progress-steps { justify-content: space-around; }
+    .team-actions { flex-direction: column; align-items: stretch; text-align: center; }
+  }
+</style>
+
+<script>
+  function initWizard() {
+    let currentStep = 1;
+    const totalSteps = 4;
+
+    const state = {
+      projectName: '',
+      githubOrg: '',
+      githubRepo: '',
+      program: '',
+      members: [] as Array<{name: string; id: string; role: string; fte: number; capacity: number; contract: string}>
+    };
+
+    // DOM refs
+    const steps = document.querySelectorAll('.wizard-step');
+    const progressSteps = document.querySelectorAll('.progress-step');
+    const progressFill = document.getElementById('progressFill') as HTMLDivElement;
+    const prevBtn = document.getElementById('prevBtn') as HTMLButtonElement;
+    const nextBtn = document.getElementById('nextBtn') as HTMLButtonElement;
+    const teamBody = document.getElementById('teamBody') as HTMLTableSectionElement;
+    const teamSummary = document.getElementById('teamSummary') as HTMLDivElement;
+    const addMemberBtn = document.getElementById('addMemberBtn') as HTMLButtonElement;
+
+    // Step 1 inputs
+    const projectNameInput = document.getElementById('projectName') as HTMLInputElement;
+    const githubOrgInput = document.getElementById('githubOrg') as HTMLInputElement;
+    const githubRepoInput = document.getElementById('githubRepo') as HTMLInputElement;
+    const programInput = document.getElementById('program') as HTMLInputElement;
+
+    // Bind step 1 inputs
+    [projectNameInput, githubOrgInput, githubRepoInput, programInput].forEach(input => {
+      if (input) input.addEventListener('input', syncProjectState);
+    });
+
+    function syncProjectState() {
+      state.projectName = projectNameInput?.value || '';
+      state.githubOrg = githubOrgInput?.value || '';
+      state.githubRepo = githubRepoInput?.value || '';
+      state.program = programInput?.value || '';
+    }
+
+    // Name to ID
+    function nameToId(name: string): string {
+      return name
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+
+    // Add member row
+    function addMember(name = '', role = 'Dev', fte = 1.0, contract = '') {
+      const idx = state.members.length;
+      const id = name ? nameToId(name) : '';
+      const capacity = fte * 80;
+      state.members.push({ name, id, role, fte, capacity, contract });
+      renderTeamTable();
+    }
+
+    function removeMember(idx: number) {
+      state.members.splice(idx, 1);
+      renderTeamTable();
+    }
+
+    function renderTeamTable() {
+      if (!teamBody) return;
+      teamBody.innerHTML = '';
+      state.members.forEach((m, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input class="form-input name-input" type="text" value="${escapeHtml(m.name)}" data-idx="${i}" data-field="name" placeholder="Jan Novak" /></td>
+          <td><input class="form-input id-input" type="text" value="${escapeHtml(m.id)}" data-idx="${i}" data-field="id" readonly tabindex="-1" /></td>
+          <td>
+            <select class="form-select" data-idx="${i}" data-field="role">
+              ${['Arch','Dev','DevSecOps','PM','QA','BO'].map(r => `<option value="${r}" ${m.role === r ? 'selected' : ''}>${r}</option>`).join('')}
+            </select>
+          </td>
+          <td>
+            <select class="form-select" data-idx="${i}" data-field="fte">
+              ${[0.25,0.5,0.75,1.0,1.2].map(f => `<option value="${f}" ${m.fte === f ? 'selected' : ''}>${f}</option>`).join('')}
+            </select>
+          </td>
+          <td><input class="form-input cap-input" type="text" value="${m.capacity}" readonly tabindex="-1" /></td>
+          <td>
+            <select class="form-select" data-idx="${i}" data-field="contract">
+              <option value="" ${m.contract === '' ? 'selected' : ''}>-</option>
+              ${['HPP','DPC','External'].map(c => `<option value="${c}" ${m.contract === c ? 'selected' : ''}>${c}</option>`).join('')}
+            </select>
+          </td>
+          <td><button class="remove-btn" data-idx="${i}" title="Odebrat">&#x2715;</button></td>
+        `;
+        teamBody.appendChild(tr);
+      });
+
+      // Bind events
+      teamBody.querySelectorAll('input[data-field="name"]').forEach(el => {
+        el.addEventListener('input', (e) => {
+          const input = e.target as HTMLInputElement;
+          const idx = parseInt(input.dataset.idx || '0');
+          state.members[idx].name = input.value;
+          state.members[idx].id = nameToId(input.value);
+          const idInput = teamBody.querySelector(`input[data-idx="${idx}"][data-field="id"]`) as HTMLInputElement;
+          if (idInput) idInput.value = state.members[idx].id;
+        });
+      });
+      teamBody.querySelectorAll('select[data-field="role"]').forEach(el => {
+        el.addEventListener('change', (e) => {
+          const select = e.target as HTMLSelectElement;
+          const idx = parseInt(select.dataset.idx || '0');
+          state.members[idx].role = select.value;
+        });
+      });
+      teamBody.querySelectorAll('select[data-field="fte"]').forEach(el => {
+        el.addEventListener('change', (e) => {
+          const select = e.target as HTMLSelectElement;
+          const idx = parseInt(select.dataset.idx || '0');
+          state.members[idx].fte = parseFloat(select.value);
+          state.members[idx].capacity = state.members[idx].fte * 80;
+          const capInput = teamBody.querySelector(`input[data-idx="${idx}"][data-field][readonly].cap-input`) as HTMLInputElement;
+          if (capInput) capInput.value = String(state.members[idx].capacity);
+          updateSummary();
+        });
+      });
+      teamBody.querySelectorAll('select[data-field="contract"]').forEach(el => {
+        el.addEventListener('change', (e) => {
+          const select = e.target as HTMLSelectElement;
+          const idx = parseInt(select.dataset.idx || '0');
+          state.members[idx].contract = select.value;
+        });
+      });
+      teamBody.querySelectorAll('.remove-btn').forEach(el => {
+        el.addEventListener('click', (e) => {
+          const btn = e.currentTarget as HTMLButtonElement;
+          const idx = parseInt(btn.dataset.idx || '0');
+          removeMember(idx);
+        });
+      });
+
+      updateSummary();
+    }
+
+    function updateSummary() {
+      if (!teamSummary) return;
+      const count = state.members.length;
+      const totalFte = state.members.reduce((s, m) => s + m.fte, 0);
+      const totalCap = state.members.reduce((s, m) => s + m.capacity, 0);
+      teamSummary.textContent = `Celkem: ${count} clenu, ${totalFte.toFixed(1)} FTE, ${totalCap}h/iteraci`;
+    }
+
+    // YAML generators
+    function generatePeopleYaml(): string {
+      const lines = ['# EDPA People Registry', `# Generated: ${new Date().toISOString().split('T')[0]}`, '', 'people:'];
+      state.members.forEach(m => {
+        if (!m.name) return;
+        lines.push(`  - name: "${m.name}"`);
+        lines.push(`    id: "${m.id}"`);
+        lines.push(`    role: ${m.role}`);
+        lines.push(`    fte: ${m.fte}`);
+        lines.push(`    capacity_h: ${m.capacity}`);
+        if (m.contract) {
+          lines.push(`    contract: ${m.contract}`);
+        }
+        lines.push('');
+      });
+      const totalFte = state.members.reduce((s, m) => s + m.fte, 0);
+      const totalCap = state.members.reduce((s, m) => s + m.capacity, 0);
+      lines.push(`# Total: ${state.members.filter(m => m.name).length} members, ${totalFte.toFixed(1)} FTE, ${totalCap}h/iteration`);
+      return lines.join('\n');
+    }
+
+    function generateConfigYaml(): string {
+      const org = state.githubOrg || 'my-org';
+      const repo = state.githubRepo || 'my-project';
+      const lines = [
+        '# EDPA Configuration',
+        `# Generated: ${new Date().toISOString().split('T')[0]}`,
+        '',
+        'edpa:',
+        '  version: "2.2.0"',
+        '',
+        'github:',
+        `  org: "${org}"`,
+        `  repo: "${repo}"`,
+        '',
+        'iteration:',
+        '  length_weeks: 2',
+        '  hours_per_iteration: 80',
+        '',
+        'scoring:',
+        '  contribution_weights:',
+        '    assignee: 1.0',
+        '    contribute_command: 0.6',
+        '    pr_author: 0.6',
+        '    commit: 0.25',
+        '    pr_reviewer: 0.25',
+        '    comment: 0.15',
+        '',
+        'outputs:',
+        '  snapshots_dir: "snapshots"',
+        '  reports_dir: "reports"',
+        '  signed_dir: "signed"',
+      ];
+      return lines.join('\n');
+    }
+
+    function generateProjectYaml(): string {
+      const name = state.projectName || 'My Project';
+      const org = state.githubOrg || 'my-org';
+      const repo = state.githubRepo || 'my-project';
+      const program = state.program;
+      const lines = [
+        '# EDPA Project Descriptor',
+        `# Generated: ${new Date().toISOString().split('T')[0]}`,
+        '',
+        'project:',
+        `  name: "${name}"`,
+        `  github: "${org}/${repo}"`,
+      ];
+      if (program) {
+        lines.push(`  program: "${program}"`);
+      }
+      lines.push('');
+      lines.push('work_items:');
+      lines.push('  hierarchy:');
+      lines.push('    - Initiative');
+      lines.push('    - Epic');
+      lines.push('    - Feature');
+      lines.push('    - Story');
+      lines.push('    - Task');
+      lines.push('');
+      lines.push('custom_fields:');
+      lines.push('  - name: "Job Size"');
+      lines.push('    type: single_select');
+      lines.push('    options: [1, 2, 3, 5, 8, 13]');
+      lines.push('  - name: "WSJF"');
+      lines.push('    type: number');
+      return lines.join('\n');
+    }
+
+    function updateConfigPreviews() {
+      const peoplePre = document.getElementById('peoplePre');
+      const configPre = document.getElementById('configPre');
+      const projectPre = document.getElementById('projectPre');
+      if (peoplePre) peoplePre.textContent = generatePeopleYaml();
+      if (configPre) configPre.textContent = generateConfigYaml();
+      if (projectPre) projectPre.textContent = generateProjectYaml();
+    }
+
+    function updateLaunchCommands() {
+      const org = state.githubOrg || '{org}';
+      const repo = state.githubRepo || '{repo}';
+
+      const launchA = document.getElementById('launchA');
+      if (launchA) {
+        launchA.textContent = `# V terminalu s Claude Code:\n/edpa setup\n# Claude Code se te zepta na vse interaktivne`;
+      }
+
+      const launchB = document.getElementById('launchB');
+      if (launchB) {
+        launchB.textContent = [
+          `# 1. Vytvorit repo`,
+          `gh repo create ${org}/${repo} --clone`,
+          `cd ${repo}`,
+          ``,
+          `# 2. Zkopirovat EDPA`,
+          `# (download ze github.com/technomaton/edpa)`,
+          ``,
+          `# 3. Vlozit vygenerovane soubory`,
+          `# (paste people.yaml, config.yaml z kroku 3)`,
+          ``,
+          `# 4. Nastavit Issue Types`,
+          `python scripts/edpa_issue_types.py setup --org ${org}`,
+          ``,
+          `# 5. Vytvorit GitHub Project`,
+          `python scripts/edpa_project_setup.py --org ${org} --repo ${repo}`,
+        ].join('\n');
+      }
+    }
+
+    // Navigation
+    function goToStep(step: number) {
+      if (step < 1 || step > totalSteps) return;
+      syncProjectState();
+
+      currentStep = step;
+      steps.forEach((s, i) => s.classList.toggle('active', i === step - 1));
+      progressSteps.forEach((s, i) => {
+        s.classList.toggle('active', i === step - 1);
+        s.classList.toggle('completed', i < step - 1);
+      });
+      if (progressFill) progressFill.style.width = `${(step / totalSteps) * 100}%`;
+
+      prevBtn.style.visibility = step === 1 ? 'hidden' : 'visible';
+      nextBtn.textContent = step === totalSteps ? 'Hotovo' : 'Dalsi';
+
+      if (step === 3) updateConfigPreviews();
+      if (step === 4) updateLaunchCommands();
+    }
+
+    prevBtn?.addEventListener('click', () => goToStep(currentStep - 1));
+    nextBtn?.addEventListener('click', () => {
+      if (currentStep === totalSteps) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      goToStep(currentStep + 1);
+    });
+
+    progressSteps.forEach(s => {
+      s.addEventListener('click', () => {
+        const step = parseInt((s as HTMLElement).dataset.step || '1');
+        goToStep(step);
+      });
+    });
+
+    // Add member
+    addMemberBtn?.addEventListener('click', () => addMember());
+
+    // Copy buttons
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = (btn as HTMLElement).dataset.target;
+        if (!target) return;
+        const pre = document.getElementById(target);
+        if (!pre) return;
+        navigator.clipboard.writeText(pre.textContent || '').then(() => {
+          btn.textContent = 'Zkopirovano!';
+          btn.classList.add('copied');
+          setTimeout(() => {
+            btn.textContent = 'Kopirovat';
+            btn.classList.remove('copied');
+          }, 2000);
+        });
+      });
+    });
+
+    // Download ZIP
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+    downloadAllBtn?.addEventListener('click', () => {
+      syncProjectState();
+      updateConfigPreviews();
+      downloadAsZip();
+    });
+
+    function downloadAsZip() {
+      // Simple ZIP implementation (no library)
+      const files = [
+        { name: 'people.yaml', content: generatePeopleYaml() },
+        { name: 'config.yaml', content: generateConfigYaml() },
+        { name: 'project.yaml', content: generateProjectYaml() },
+      ];
+
+      const encoder = new TextEncoder();
+      const parts: Uint8Array[] = [];
+      const centralDir: Uint8Array[] = [];
+      let offset = 0;
+
+      for (const file of files) {
+        const nameBytes = encoder.encode(file.name);
+        const contentBytes = encoder.encode(file.content);
+
+        // Local file header
+        const localHeader = new Uint8Array(30 + nameBytes.length);
+        const lv = new DataView(localHeader.buffer);
+        lv.setUint32(0, 0x04034b50, true); // signature
+        lv.setUint16(4, 20, true); // version needed
+        lv.setUint16(6, 0, true); // flags
+        lv.setUint16(8, 0, true); // compression (store)
+        lv.setUint16(10, 0, true); // mod time
+        lv.setUint16(12, 0, true); // mod date
+        lv.setUint32(14, crc32(contentBytes), true);
+        lv.setUint32(18, contentBytes.length, true); // compressed
+        lv.setUint32(22, contentBytes.length, true); // uncompressed
+        lv.setUint16(26, nameBytes.length, true);
+        lv.setUint16(28, 0, true); // extra length
+        localHeader.set(nameBytes, 30);
+
+        // Central directory entry
+        const cdEntry = new Uint8Array(46 + nameBytes.length);
+        const cv = new DataView(cdEntry.buffer);
+        cv.setUint32(0, 0x02014b50, true); // signature
+        cv.setUint16(4, 20, true); // version made by
+        cv.setUint16(6, 20, true); // version needed
+        cv.setUint16(8, 0, true); // flags
+        cv.setUint16(10, 0, true); // compression
+        cv.setUint16(12, 0, true); // mod time
+        cv.setUint16(14, 0, true); // mod date
+        cv.setUint32(16, crc32(contentBytes), true);
+        cv.setUint32(20, contentBytes.length, true);
+        cv.setUint32(24, contentBytes.length, true);
+        cv.setUint16(28, nameBytes.length, true);
+        cv.setUint16(30, 0, true); // extra
+        cv.setUint16(32, 0, true); // comment
+        cv.setUint16(34, 0, true); // disk
+        cv.setUint16(36, 0, true); // internal attrs
+        cv.setUint32(38, 0, true); // external attrs
+        cv.setUint32(42, offset, true); // local header offset
+        cdEntry.set(nameBytes, 46);
+
+        parts.push(localHeader, contentBytes);
+        centralDir.push(cdEntry);
+        offset += localHeader.length + contentBytes.length;
+      }
+
+      const cdOffset = offset;
+      let cdSize = 0;
+      centralDir.forEach(e => cdSize += e.length);
+
+      // End of central directory
+      const eocd = new Uint8Array(22);
+      const ev = new DataView(eocd.buffer);
+      ev.setUint32(0, 0x06054b50, true);
+      ev.setUint16(4, 0, true);
+      ev.setUint16(6, 0, true);
+      ev.setUint16(8, files.length, true);
+      ev.setUint16(10, files.length, true);
+      ev.setUint32(12, cdSize, true);
+      ev.setUint32(16, cdOffset, true);
+      ev.setUint16(20, 0, true);
+
+      const blob = new Blob([...parts, ...centralDir, eocd], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `edpa-config-${state.githubRepo || 'project'}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function crc32(bytes: Uint8Array): number {
+      let crc = 0xFFFFFFFF;
+      for (let i = 0; i < bytes.length; i++) {
+        crc ^= bytes[i];
+        for (let j = 0; j < 8; j++) {
+          crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+        }
+      }
+      return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    function escapeHtml(s: string): string {
+      return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Init with 3 empty rows
+    addMember(); addMember(); addMember();
+    goToStep(1);
+  }
+
+  document.addEventListener('DOMContentLoaded', initWizard);
+  document.addEventListener('astro:page-load', initWizard);
+</script>

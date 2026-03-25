@@ -35,24 +35,23 @@ import Layout from '../layouts/Layout.astro';
           <span class="terminal-dot red"></span>
           <span class="terminal-dot yellow"></span>
           <span class="terminal-dot green"></span>
-          <span class="terminal-title">~/kashealth</span>
+          <span class="terminal-title">~/your-project</span>
         </div>
         <div class="terminal-body" id="term-setup">
           <div class="term-line" data-delay="0">
             <span class="term-prompt">$</span>
-            <span class="term-cmd typing" style="--chars:55">gh repo create kashealth/medical-platform --clone</span>
+            <span class="term-cmd typing" style="--chars:11">/edpa setup</span>
           </div>
           <div class="term-line" data-delay="1">
             <span class="term-ok">&#10003;</span>
             <span class="term-text">Created repository</span>
           </div>
           <div class="term-line" data-delay="2">
-            <span class="term-prompt">$</span>
-            <span class="term-cmd typing" style="--chars:16">pip install pyyaml</span>
+            <span class="term-ok">&#10003;</span>
+            <span class="term-text">Dependencies installed</span>
           </div>
           <div class="term-line" data-delay="3">
-            <span class="term-prompt">$</span>
-            <span class="term-cmd typing" style="--chars:52">python scripts/edpa_issue_types.py setup --org kashealth</span>
+            <span class="term-text term-comment"># nebo manualne: python scripts/edpa_issue_types.py setup --org your-org</span>
           </div>
           <div class="term-line" data-delay="4">
             <span class="term-ok">&#10003;</span>
@@ -217,12 +216,12 @@ import Layout from '../layouts/Layout.astro';
           <span class="terminal-dot red"></span>
           <span class="terminal-dot yellow"></span>
           <span class="terminal-dot green"></span>
-          <span class="terminal-title">~/kashealth</span>
+          <span class="terminal-title">~/your-project</span>
         </div>
         <div class="terminal-body" id="term-report">
           <div class="term-line" data-delay="0">
             <span class="term-prompt">$</span>
-            <span class="term-cmd typing" style="--chars:48">python scripts/edpa_engine.py --iteration PI-2026-1.1</span>
+            <span class="term-cmd typing" style="--chars:38">/edpa close-iteration PI-2026-1.1</span>
           </div>
           <div class="term-line" data-delay="1"><span class="term-text">&nbsp;</span></div>
           <div class="report-table" data-delay="2">
@@ -373,7 +372,7 @@ import Layout from '../layouts/Layout.astro';
         <div class="terminal-body">
           <div class="term-line" data-delay="0">
             <span class="term-prompt">$</span>
-            <span class="term-cmd typing" style="--chars:36">python scripts/edpa_engine.py --demo</span>
+            <span class="term-cmd typing" style="--chars:11">/edpa setup</span>
           </div>
         </div>
       </div>
@@ -526,6 +525,11 @@ import Layout from '../layouts/Layout.astro';
   .term-bold {
     color: var(--gn);
     font-weight: 700;
+  }
+  .term-comment {
+    color: var(--t3);
+    font-size: 11px;
+    font-style: italic;
   }
   .term-pink { color: var(--pk); }
   .term-purple { color: var(--ac2); }

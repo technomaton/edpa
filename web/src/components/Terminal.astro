@@ -1,0 +1,264 @@
+---
+interface Props {
+  title?: string;
+  commands: string[];
+  outputs?: string[];
+  copyable?: boolean;
+  animated?: boolean;
+  theme?: 'dark' | 'green';
+}
+
+const {
+  title = 'Terminal',
+  commands,
+  outputs = [],
+  copyable = true,
+  animated = false,
+  theme = 'dark',
+} = Astro.props;
+
+// Build interleaved lines: each command followed by its corresponding output (if any)
+type Line = { type: 'cmd'; text: string } | { type: 'out'; text: string };
+const lines: Line[] = [];
+commands.forEach((cmd, i) => {
+  lines.push({ type: 'cmd', text: cmd });
+  if (outputs[i]) {
+    // Split multi-line outputs into separate output lines
+    outputs[i].split('\n').forEach((outLine) => {
+      lines.push({ type: 'out', text: outLine });
+    });
+  }
+});
+
+// Commands only (for copy button)
+const copyText = commands.join('\n');
+
+const terminalId = `terminal-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<div class:list={['terminal', `terminal--${theme}`, { 'terminal--animated': animated }]} id={terminalId}>
+  <div class="terminal-header">
+    <div class="terminal-dots">
+      <span class="terminal-dot red"></span>
+      <span class="terminal-dot yellow"></span>
+      <span class="terminal-dot green"></span>
+    </div>
+    <span class="terminal-title">{title}</span>
+  </div>
+  <div class="terminal-body">
+    {lines.map((line, i) => {
+      if (line.type === 'cmd') {
+        return (
+          <div class="terminal-line terminal-cmd" style={animated ? `animation-delay: ${i * 0.15}s` : undefined}>
+            {line.text}
+          </div>
+        );
+      }
+      // Determine output style based on leading character
+      const isOk = line.text.trimStart().startsWith('\u2713');
+      const isErr = line.text.trimStart().startsWith('\u2717');
+      return (
+        <div
+          class:list={['terminal-line', 'terminal-out', { 'terminal-ok': isOk, 'terminal-err': isErr }]}
+          style={animated ? `animation-delay: ${i * 0.15}s` : undefined}
+        >
+          {line.text}
+        </div>
+      );
+    })}
+    {copyable && (
+      <button class="terminal-copy" data-copy={copyText} aria-label="Copy commands to clipboard" type="button">
+        <span class="terminal-copy-icon">{'\uD83D\uDCCB'}</span>
+        <span class="terminal-copy-label">Copy</span>
+      </button>
+    )}
+  </div>
+</div>
+
+<script>
+  function initTerminalCopy() {
+    document.querySelectorAll<HTMLButtonElement>('.terminal-copy').forEach((btn) => {
+      // Avoid double-binding
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = 'true';
+
+      btn.addEventListener('click', async () => {
+        const text = btn.dataset.copy ?? '';
+        try {
+          await navigator.clipboard.writeText(text);
+          const label = btn.querySelector('.terminal-copy-label');
+          if (label) {
+            const prev = label.textContent;
+            label.textContent = 'Copied!';
+            setTimeout(() => { label.textContent = prev; }, 1500);
+          }
+        } catch {
+          // Fallback: select-and-copy via textarea
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', initTerminalCopy);
+  document.addEventListener('astro:page-load', initTerminalCopy);
+</script>
+
+<style>
+  /* ── Container ── */
+  .terminal {
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    margin: 16px 0;
+  }
+
+  /* ── Header / title bar ── */
+  .terminal-header {
+    background: var(--s1);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--bd);
+    user-select: none;
+  }
+
+  .terminal-dots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .terminal-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .terminal-dot.red    { background: var(--rd); }
+  .terminal-dot.yellow { background: var(--yl); }
+  .terminal-dot.green  { background: var(--gn); }
+
+  .terminal-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--t3);
+    letter-spacing: 0.3px;
+  }
+
+  /* ── Body ── */
+  .terminal-body {
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  /* ── Lines ── */
+  .terminal-line {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .terminal-cmd {
+    color: var(--t1);
+  }
+  .terminal-cmd::before {
+    content: '$ ';
+    color: var(--gn);
+    font-weight: 600;
+  }
+
+  .terminal-out {
+    color: var(--t3);
+  }
+  .terminal-ok {
+    color: var(--gn);
+  }
+  .terminal-err {
+    color: var(--rd);
+  }
+
+  /* ── Green theme overrides ── */
+  .terminal--green .terminal-cmd {
+    color: var(--gn);
+  }
+  .terminal--green .terminal-cmd::before {
+    color: #6ee7b7;
+  }
+  .terminal--green .terminal-out {
+    color: rgba(52, 211, 153, 0.6);
+  }
+
+  /* ── Copy button ── */
+  .terminal-copy {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--t3);
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .terminal-copy:hover {
+    color: var(--t1);
+    border-color: var(--ac);
+    background: var(--s2);
+  }
+  .terminal-copy-icon {
+    font-size: 12px;
+  }
+
+  /* ── Typing animation ── */
+  .terminal--animated .terminal-line {
+    opacity: 0;
+    animation: terminalFadeIn 0.3s ease forwards;
+  }
+
+  @keyframes terminalFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .terminal-body {
+      font-size: 11px;
+      padding: 12px;
+    }
+    .terminal-copy {
+      position: relative;
+      bottom: auto;
+      right: auto;
+      margin-top: 12px;
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+  }
+</style>

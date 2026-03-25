@@ -1,0 +1,231 @@
+---
+interface Props {
+  command: string;
+  description?: string;
+  bullets?: string[];
+  copyable?: boolean;
+}
+
+const {
+  command,
+  description,
+  bullets = [],
+  copyable = true,
+} = Astro.props;
+---
+
+<div class="claude-terminal">
+  <div class="claude-header">
+    <div class="claude-dots">
+      <span class="claude-dot red"></span>
+      <span class="claude-dot yellow"></span>
+      <span class="claude-dot green"></span>
+    </div>
+    <span class="claude-title">Claude Code</span>
+  </div>
+  <div class="claude-body">
+    <div class="claude-cmd">{command}</div>
+
+    {description && (
+      <div class="claude-desc">{description}</div>
+    )}
+
+    {bullets.length > 0 && (
+      <ul class="claude-bullets">
+        {bullets.map((item) => (
+          <li class="claude-bullet">{item}</li>
+        ))}
+      </ul>
+    )}
+
+    {copyable && (
+      <button class="claude-copy" data-copy={command} aria-label="Copy command to clipboard" type="button">
+        <span class="claude-copy-icon">{'\uD83D\uDCCB'}</span>
+        <span class="claude-copy-label">Copy</span>
+      </button>
+    )}
+  </div>
+</div>
+
+<script>
+  function initClaudeCopy() {
+    document.querySelectorAll<HTMLButtonElement>('.claude-copy').forEach((btn) => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = 'true';
+
+      btn.addEventListener('click', async () => {
+        const text = btn.dataset.copy ?? '';
+        try {
+          await navigator.clipboard.writeText(text);
+          const label = btn.querySelector('.claude-copy-label');
+          if (label) {
+            const prev = label.textContent;
+            label.textContent = 'Copied!';
+            setTimeout(() => { label.textContent = prev; }, 1500);
+          }
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', initClaudeCopy);
+  document.addEventListener('astro:page-load', initClaudeCopy);
+</script>
+
+<style>
+  /* ── Container ── */
+  .claude-terminal {
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    margin: 16px 0;
+  }
+
+  /* ── Header ── */
+  .claude-header {
+    background: var(--s1);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--bd);
+    user-select: none;
+  }
+
+  .claude-dots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .claude-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .claude-dot.red    { background: var(--rd); }
+  .claude-dot.yellow { background: var(--yl); }
+  .claude-dot.green  { background: var(--gn); }
+
+  .claude-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ac2);
+    letter-spacing: 0.3px;
+    font-weight: 600;
+  }
+
+  /* ── Body ── */
+  .claude-body {
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  /* ── Command line ── */
+  .claude-cmd {
+    color: var(--ac2);
+    font-weight: 600;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .claude-cmd::before {
+    content: '/ ';
+    color: var(--ac);
+    font-weight: 700;
+  }
+
+  /* ── Description ── */
+  .claude-desc {
+    color: var(--t2);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 14px;
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+
+  /* ── Bullet list ── */
+  .claude-bullets {
+    list-style: none;
+    margin-top: 8px;
+    padding: 0;
+  }
+
+  .claude-bullet {
+    color: var(--t2);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    padding-left: 18px;
+    position: relative;
+  }
+  .claude-bullet::before {
+    content: '\2022';
+    color: var(--ac);
+    position: absolute;
+    left: 0;
+    font-weight: 700;
+  }
+
+  /* ── Copy button ── */
+  .claude-copy {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--t3);
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .claude-copy:hover {
+    color: var(--ac2);
+    border-color: var(--ac);
+    background: var(--s2);
+  }
+  .claude-copy-icon {
+    font-size: 12px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .claude-body {
+      font-size: 11px;
+      padding: 12px;
+    }
+    .claude-cmd {
+      font-size: 12px;
+    }
+    .claude-copy {
+      position: relative;
+      bottom: auto;
+      right: auto;
+      margin-top: 12px;
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+  }
+</style>

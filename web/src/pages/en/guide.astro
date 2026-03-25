@@ -89,6 +89,8 @@ Roles: 2x developer, 1x tech-lead`,
     title: 'Set Up Issue Types',
     color: 'var(--or)',
     desc: 'Run the script to configure issue types in GitHub. EDPA uses a hierarchy: Initiative > Epic > Feature > Story > Task.',
+    claude: `/edpa setup
+# Claude Code sets up Issue Types automatically`,
     code: `python scripts/edpa_issue_types.py setup \\
   --org ORG \\
   --repo project-name
@@ -131,6 +133,8 @@ python scripts/edpa_backlog.py add \\
     title: 'Create GitHub Project',
     color: 'var(--ac)',
     desc: 'Automatically create a GitHub Project Board with the EDPA column layout — Backlog, Ready, In Progress, Review, Done.',
+    claude: `/edpa setup
+# Claude Code creates the GitHub Project automatically`,
     code: `python scripts/edpa_project_setup.py \\
   --org ORG \\
   --repo project-name \\
@@ -169,6 +173,8 @@ PR #42: "S-200: Login endpoint"
     title: 'End of Iteration',
     color: 'var(--gn)',
     desc: 'At the end of the iteration, run the EDPA engine. It fetches all evidence from GitHub and proportionally allocates hours based on actual work.',
+    claude: `/edpa close-iteration PI-2026-1.1
+# Claude Code fetches evidence and computes allocation`,
     code: `python scripts/edpa_engine.py \\
   --iteration PI-2026-1.1 \\
   --org ORG \\
@@ -196,6 +202,8 @@ Allocation:
     title: 'Reports & Timesheets',
     color: 'var(--yl)',
     desc: 'EDPA generates per-person markdown reports, JSON exports, and frozen snapshots. All reports are auditable and reproducible.',
+    claude: `/edpa reports
+# Claude Code generates all reports and timesheets`,
     code: `# Generated files
 reports/
 ├── PI-2026-1.1/
@@ -224,6 +232,8 @@ data/
     title: 'Retrospective + Calibration',
     color: 'var(--or)',
     desc: 'Compare EDPA outputs against ground truth. The evaluate_cw.py script computes MAD, correlation, and identifies outliers.',
+    claude: `/edpa calibrate
+# Claude Code runs calibration and shows MAD results`,
     code: `# Ground truth comparison
 python scripts/evaluate_cw.py \\
   --iteration PI-2026-1.1 \\
@@ -247,6 +257,8 @@ No weight adjustment needed.`,
     title: 'Next PI',
     color: 'var(--pk)',
     desc: 'Repeat for each iteration. With every cycle, calibration improves. Target: predictability > 80%, MAD < 0.05 by the third PI.',
+    claude: `/edpa close-iteration PI-2026-1.2
+# Next iteration — same workflow`,
     code: `# New iteration
 python scripts/edpa_engine.py \\
   --iteration PI-2026-1.2 \\
@@ -322,13 +334,32 @@ const phases = [
 
         <div class="step-content">
           <div class="step-code">
-            <div class="code-header">
-              <span class="code-dot red"></span>
-              <span class="code-dot yellow"></span>
-              <span class="code-dot green"></span>
-              <span class="code-label">terminal</span>
+            {step.claude && (
+              <div class="cmd-tabs">
+                <button class="cmd-tab active" data-tab="claude">Claude Code</button>
+                <button class="cmd-tab" data-tab="cli">CLI</button>
+              </div>
+            )}
+            {step.claude && (
+              <div class="cmd-panel" data-panel="claude">
+                <div class="code-header">
+                  <span class="code-dot red"></span>
+                  <span class="code-dot yellow"></span>
+                  <span class="code-dot green"></span>
+                  <span class="code-label">claude code (recommended)</span>
+                </div>
+                <pre><code>{step.claude}</code></pre>
+              </div>
+            )}
+            <div class={step.claude ? "cmd-panel" : undefined} data-panel={step.claude ? "cli" : undefined} style={step.claude ? "display:none" : undefined}>
+              <div class="code-header">
+                <span class="code-dot red"></span>
+                <span class="code-dot yellow"></span>
+                <span class="code-dot green"></span>
+                <span class="code-label">terminal</span>
+              </div>
+              <pre><code>{step.code}</code></pre>
             </div>
-            <pre><code>{step.code}</code></pre>
           </div>
 
           <div class="step-result">
@@ -377,8 +408,24 @@ const phases = [
 
     sections.forEach(s => observer.observe(s));
   }
-  document.addEventListener('DOMContentLoaded', initGuideProgress);
-  document.addEventListener('astro:page-load', initGuideProgress);
+  function initCmdTabs() {
+    document.querySelectorAll('.cmd-tabs').forEach(tabs => {
+      tabs.querySelectorAll('.cmd-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const parent = tabs.closest('.step-code');
+          if (!parent) return;
+          const target = btn.getAttribute('data-tab');
+          tabs.querySelectorAll('.cmd-tab').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          parent.querySelectorAll('.cmd-panel').forEach(p => {
+            (p as HTMLElement).style.display = p.getAttribute('data-panel') === target ? '' : 'none';
+          });
+        });
+      });
+    });
+  }
+  document.addEventListener('DOMContentLoaded', () => { initGuideProgress(); initCmdTabs(); });
+  document.addEventListener('astro:page-load', () => { initGuideProgress(); initCmdTabs(); });
 </script>
 
 <style>
@@ -545,6 +592,32 @@ const phases = [
     color: var(--t3);
     margin-left: auto;
   }
+  /* Command tabs */
+  .cmd-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--bd);
+    background: var(--s2);
+  }
+  .cmd-tab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    color: var(--t3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .cmd-tab:hover {
+    color: var(--t1);
+  }
+  .cmd-tab.active {
+    color: var(--ac);
+    border-bottom-color: var(--ac);
+  }
+
   .step-code pre {
     padding: 16px;
     overflow-x: auto;
