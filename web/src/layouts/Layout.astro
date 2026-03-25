@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import { VERSION } from '../lib/version';
 
 export interface Props {
   title: string;
@@ -9,7 +10,7 @@ export interface Props {
   lang?: string;
 }
 
-const { title, description = 'EDPA v2.0.0 — Evidence-Driven Proportional Allocation. Automaticke odvozeni hodin z delivery evidence.', lang = 'cs' } = Astro.props;
+const { title, description = `EDPA v${VERSION} — Evidence-Driven Proportional Allocation. Automaticke odvozeni hodin z delivery evidence.`, lang = 'cs' } = Astro.props;
 ---
 <!doctype html>
 <html lang={lang}>
@@ -19,7 +20,7 @@ const { title, description = 'EDPA v2.0.0 — Evidence-Driven Proportional Alloc
   <meta name="description" content={description} />
   <meta name="author" content="TECHNOMATON" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <title>{title} | EDPA v2.0.0</title>
+  <title>{title} | EDPA v{VERSION}</title>
 </head>
 <body>
   <Header currentPath={Astro.url.pathname} />

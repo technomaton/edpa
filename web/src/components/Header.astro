@@ -1,4 +1,5 @@
 ---
+import { VERSION } from '../lib/version';
 interface Props {
   currentPath: string;
 }
@@ -24,7 +25,7 @@ const switchPath = isEn
   <div class="container header-inner">
     <a href={`${prefix}/`} class="logo">
       <span class="logo-text">EDPA</span>
-      <span class="logo-version">v2.0.0</span>
+      <span class="logo-version">v{VERSION}</span>
     </a>
     <nav class="main-nav" aria-label="Main navigation">
       {links.map(link => (
