@@ -3,25 +3,58 @@ import Layout from '../layouts/Layout.astro';
 import { edpa, itemView } from '../lib/edpa-engine';
 import { people, items, iterations } from '../lib/demo-data-walkthrough';
 
+const defaultHpw = 40;
+const defaultIterPerPI = 5;
 const iter = iterations[0];
 const results = people.map(p => edpa(p.id, iter.id, people, items, 'simple')!);
 const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simple')!);
 ---
 
-<Layout title="Kalkulator EDPA" description="EDPA krok po kroku — konkretni priklad vypoctu s realnymi cisly. Od vstupu po odvozene hodiny.">
+<Layout title="Kalkulátor EDPA" description="EDPA krok po kroku — konkrétní příklad výpočtu s reálnými čísly. Od vstupů po odvozené hodiny.">
 
   <!-- Hero -->
   <section class="calc-hero section">
     <div class="container" style="text-align:center;">
-      <p class="tag">Kalkulator</p>
+      <p class="tag">Kalkulátor</p>
       <h1 class="calc-headline">EDPA krok po kroku</h1>
       <p class="calc-subtitle">
-        Konkretni priklad vypoctu s realnymi cisly.<br>
-        Od vstupu po odvozene hodiny — overitelne rucne.
+        Konkrétní příklad výpočtu s reálnými čísly.<br>
+        Od vstupů po odvozené hodiny — ověřitelné ručně.
       </p>
       <div class="mode-switch" id="modeSwitch">
         <button class="mode-btn active" data-mode="simple">Simple: JS &times; CW</button>
         <button class="mode-btn" data-mode="full">Full: JS &times; CW &times; RS</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Config panel -->
+  <section class="section" style="padding-top:0;padding-bottom:0;">
+    <div class="container">
+      <div class="card config-panel fade-in">
+        <div class="tag">Konfigurace</div>
+        <div class="config-grid">
+          <div class="config-item">
+            <label for="cfgHpw">Hodin v týdnu</label>
+            <input type="number" id="cfgHpw" value={defaultHpw} min="10" max="60" step="5" class="config-input">
+          </div>
+          <div class="config-item">
+            <label for="cfgIterPI">Iterací v PI</label>
+            <input type="number" id="cfgIterPI" value={defaultIterPerPI} min="2" max="12" step="1" class="config-input">
+          </div>
+          <div class="config-item">
+            <label>Kapacita na iteraci</label>
+            <span class="config-derived" id="cfgCapSummary">
+              {people.map(p => `${p.name} ${p.capacity}h`).join(' · ')}
+            </span>
+          </div>
+          <div class="config-item">
+            <label>PI celkem</label>
+            <span class="config-derived" id="cfgPISummary">
+              {people.map(p => `${p.name} ${p.capacity * defaultIterPerPI}h`).join(' · ')}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -32,28 +65,26 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
       <div class="calc-step fade-in">
         <span class="step-number">01</span>
         <p class="tag">Vstupy</p>
-        <h2 class="section-title">Tym a work items</h2>
+        <h2 class="section-title">Tým a work items</h2>
         <p class="calc-desc">
-          Tri lide s ruznou kapacitou pracuji na ctyrech Stories v jedne iteraci.
-          Kazdy clovek ma ruznou miru zapojeni (CW) na ruznych itemech.
+          Tři lidé s různou kapacitou pracují na čtyřech Stories v jedné iteraci.
+          Každý člověk má různou míru zapojení (CW) na různých itemech.
         </p>
       </div>
 
-      <!-- People cards -->
-      <div class="grid grid-3 calc-people fade-in">
+      <div class="grid grid-3 calc-people fade-in" id="peopleCards">
         {people.map(p => (
           <div class={`card ${p.role === 'Architect' ? 'accent' : p.role === 'Developer' ? 'cyan' : 'yellow'}`}>
             <div class="person-name">{p.name}</div>
             <div class="person-role">{p.role}</div>
             <div class="person-stats">
               <span>{p.fte} FTE</span>
-              <span class="person-cap">{p.capacity}h / iterace</span>
+              <span class="person-cap" data-fte={p.fte}>{p.capacity}h / iterace</span>
             </div>
           </div>
         ))}
       </div>
 
-      <!-- Items table with CW matrix -->
       <div class="card fade-in" style="margin-top:20px;">
         <div class="tag">Work items &amp; Contribution Weight (CW)</div>
         <div class="table-scroll">
@@ -91,12 +122,11 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
           </table>
         </div>
         <div class="note" style="margin-top:12px;">
-          CW = Contribution Weight (mira zapojeni). RS = Relevance Signal (ve Full modu).
+          CW = Contribution Weight (míra zapojení). RS = Relevance Signal (ve Full módu).
           Zobrazeno jako <span class="cw-val">CW</span> / <span class="rs-val">RS</span>.
         </div>
       </div>
 
-      <!-- Formula -->
       <div class="formula fade-in" style="margin-top:20px;" id="formulaBox">
         <strong>Score</strong> = JobSize &times; CW
         <br><strong>DerivedHours</strong> = (Score / &Sigma;Scores) &times; Capacity
@@ -104,16 +134,16 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
     </div>
   </section>
 
-  <!-- Step 02: Score computation -->
+  <!-- Step 02: Score -->
   <section class="section calc-section" id="score">
     <div class="container">
       <div class="calc-step fade-in">
         <span class="step-number">02</span>
         <p class="tag">Score</p>
-        <h2 class="section-title">Vypocet skore</h2>
+        <h2 class="section-title">Výpočet skóre</h2>
         <p class="calc-desc">
-          Pro kazdy par (osoba, item) vynasobime JobSize &times; CW.
-          Vysledkem je surovy Score, ktery urcuje relativni podil na kapacite.
+          Pro každý pár (osoba, item) vynásobíme JobSize &times; CW.
+          Výsledkem je surový Score, který určuje relativní podíl na kapacitě.
         </p>
       </div>
 
@@ -121,7 +151,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
         {results.map(r => (
           <div class={`card ${r.person.role === 'Architect' ? 'accent' : r.person.role === 'Developer' ? 'cyan' : 'yellow'}`}>
             <div class="person-name">{r.person.name}</div>
-            <div class="person-role">{r.person.role} &middot; {r.person.capacity}h</div>
+            <div class="person-role">{r.person.role} &middot; <span class="cap-display">{r.person.capacity}h</span></div>
             <table class="score-table">
               <thead>
                 <tr><th>Item</th><th>JS</th><th>CW</th><th class="rs-col">RS</th><th>Score</th></tr>
@@ -137,8 +167,8 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
                   </tr>
                 ))}
                 <tr class="total-row">
-                  <td colspan="3" class="rs-hide-span">Total</td>
-                  <td colspan="4" class="rs-show-span" style="display:none;">Total</td>
+                  <td colspan="3" class="rs-hide-span">Celkem</td>
+                  <td colspan="4" class="rs-show-span" style="display:none;">Celkem</td>
                   <td></td>
                   <td class="td-score total-score">&Sigma; {r.totalScore.toFixed(2)}</td>
                 </tr>
@@ -156,10 +186,10 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
       <div class="calc-step fade-in">
         <span class="step-number">03</span>
         <p class="tag">Per-Person</p>
-        <h2 class="section-title">Odvozene hodiny</h2>
+        <h2 class="section-title">Odvozené hodiny</h2>
         <p class="calc-desc">
-          Kazdy Score vydelime celkovym souctem a vynasobime kapacitou.
-          Vysledek: kolik hodin clovek stravil na kazdem itemu.
+          Každý Score vydělíme celkovým součtem a vynásobíme kapacitou.
+          Výsledek: kolik hodin člověk strávil na každém itemu.
         </p>
       </div>
 
@@ -179,7 +209,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
             <div class="table-scroll">
               <table>
                 <thead>
-                  <tr><th>Item</th><th>Score</th><th>Vypocet</th><th>Ratio</th><th>Hours</th><th></th></tr>
+                  <tr><th>Item</th><th>Score</th><th>Výpočet</th><th>Ratio</th><th>Hours</th><th></th></tr>
                 </thead>
                 <tbody>
                   {r.items.map(x => {
@@ -224,10 +254,10 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
       <div class="calc-step fade-in">
         <span class="step-number">04</span>
         <p class="tag">Per-Item</p>
-        <h2 class="section-title">Kolik staly jednotlive polozky?</h2>
+        <h2 class="section-title">Kolik stály jednotlivé položky?</h2>
         <p class="calc-desc">
-          Stejna data, jiny pohled. Pro kazdy item vidime, kdo a kolik hodin prispel.
-          Podily se vzdy secti na 100 %.
+          Stejná data, jiný pohled. Pro každý item vidíme, kdo a kolik hodin přispěl.
+          Podíly se vždy sečtou na 100 %.
         </p>
       </div>
 
@@ -243,7 +273,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
             </div>
             <table class="item-table">
               <thead>
-                <tr><th>Osoba</th><th>Role</th><th>CW</th><th>Hours</th><th>Podil</th><th></th></tr>
+                <tr><th>Osoba</th><th>Role</th><th>CW</th><th>Hours</th><th>Podíl</th><th></th></tr>
               </thead>
               <tbody>
                 {ir.contributors.map(c => {
@@ -283,7 +313,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
       <div class="calc-step fade-in">
         <span class="step-number">05</span>
         <p class="tag">Garance</p>
-        <h2 class="section-title">Matematicka garance</h2>
+        <h2 class="section-title">Matematická garance</h2>
       </div>
 
       <div class="grid grid-3 fade-in" id="guaranteeCards">
@@ -304,12 +334,12 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
       </div>
 
       <div class="formula fade-in" style="margin-top:24px;text-align:center;font-size:15px;">
-        &Sigma; DerivedHours = Capacity — vzdy, bez vyjimky.
-        <br><span style="font-size:12px;color:var(--t3);">Proporcionalni alokace garantuje, ze soucet pomeru = 1.0 a soucet hodin = kapacita.</span>
+        &Sigma; DerivedHours = Capacity — vždy, bez výjimky.
+        <br><span style="font-size:12px;color:var(--t3);">Proporcionální alokace garantuje, že součet poměrů = 1.0 a součet hodin = kapacita.</span>
       </div>
 
       <div class="cta-box fade-in">
-        <p>Chcete videt EDPA na realnych datech?</p>
+        <p>Chcete vidět EDPA na reálných datech?</p>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
           <a href="/dashboard/" class="btn btn-primary">Dashboard demo</a>
           <a href="/methodology/" class="btn btn-secondary">Metodika</a>
@@ -324,6 +354,8 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
   import { people, items, iterations } from '../lib/demo-data-walkthrough';
 
   let mode: 'simple' | 'full' = 'simple';
+  let hpw = 40;
+  let iterPerPI = 5;
   const iter = iterations[0];
 
   // Mode toggle
@@ -338,34 +370,67 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
     });
   });
 
+  // Config inputs
+  const cfgHpwEl = document.getElementById('cfgHpw') as HTMLInputElement;
+  const cfgIterPIEl = document.getElementById('cfgIterPI') as HTMLInputElement;
+
+  cfgHpwEl?.addEventListener('input', () => {
+    hpw = parseInt(cfgHpwEl.value) || 40;
+    updateCapacities();
+  });
+  cfgIterPIEl?.addEventListener('input', () => {
+    iterPerPI = parseInt(cfgIterPIEl.value) || 5;
+    updateSummaries();
+  });
+
+  function updateCapacities() {
+    people.forEach(p => { p.capacity = p.fte * hpw; });
+    updateSummaries();
+    updatePeopleCards();
+    recompute();
+  }
+
+  function updateSummaries() {
+    const capSummary = document.getElementById('cfgCapSummary');
+    const piSummary = document.getElementById('cfgPISummary');
+    if (capSummary) capSummary.textContent = people.map(p => `${p.name} ${p.capacity}h`).join(' · ');
+    if (piSummary) piSummary.textContent = people.map(p => `${p.name} ${p.capacity * iterPerPI}h`).join(' · ');
+  }
+
+  function updatePeopleCards() {
+    document.querySelectorAll('.person-cap').forEach(el => {
+      const fte = parseFloat((el as HTMLElement).dataset.fte || '0');
+      el.textContent = `${fte * hpw}h / iterace`;
+    });
+    document.querySelectorAll('.cap-display').forEach((el, i) => {
+      if (people[i]) el.textContent = people[i].capacity + 'h';
+    });
+  }
+
   function recompute() {
     const results = people.map(p => edpa(p.id, iter.id, people, items, mode)!);
     const itemResults = items.map(w => itemView(w.id, iter.id, people, items, mode)!);
     const isFullMode = mode === 'full';
 
-    // Update formula box
     const formulaBox = document.getElementById('formulaBox');
     if (formulaBox) {
       formulaBox.innerHTML = isFullMode
-        ? '<strong>Score</strong> = JobSize &times; CW &times; RS<br><strong>DerivedHours</strong> = (Score / &Sigma;Scores) &times; Capacity'
-        : '<strong>Score</strong> = JobSize &times; CW<br><strong>DerivedHours</strong> = (Score / &Sigma;Scores) &times; Capacity';
+        ? '<strong>Score</strong> = JobSize × CW × RS<br><strong>DerivedHours</strong> = (Score / ΣScores) × Capacity'
+        : '<strong>Score</strong> = JobSize × CW<br><strong>DerivedHours</strong> = (Score / ΣScores) × Capacity';
     }
 
-    // Toggle RS column visibility
-    document.querySelectorAll('.rs-col').forEach(el => {
-      (el as HTMLElement).style.display = isFullMode ? '' : 'none';
-    });
-    document.querySelectorAll('.rs-val').forEach(el => {
-      (el as HTMLElement).style.display = isFullMode ? '' : 'none';
-    });
+    document.querySelectorAll('.rs-col').forEach(el => { (el as HTMLElement).style.display = isFullMode ? '' : 'none'; });
+    document.querySelectorAll('.rs-val').forEach(el => { (el as HTMLElement).style.display = isFullMode ? '' : 'none'; });
 
-    // Update score cards
+    // Score cards
     const scoreCards = document.getElementById('scoreCards');
     if (scoreCards) {
       const cards = scoreCards.querySelectorAll('.card');
       results.forEach((r, i) => {
         const card = cards[i];
         if (!card) return;
+        const capEl = card.querySelector('.cap-display');
+        if (capEl) capEl.textContent = r.person.capacity + 'h';
         const rows = card.querySelectorAll('.score-table tbody tr:not(.total-row)');
         r.items.forEach((x, j) => {
           const row = rows[j];
@@ -381,18 +446,15 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
       });
     }
 
-    // Update per-person cards
+    // Per-person cards
     const personCards = document.getElementById('personCards');
     if (personCards) {
       const cards = personCards.querySelectorAll('.card');
       results.forEach((r, i) => {
         const card = cards[i];
         if (!card) return;
-
-        // Update guarantee badge
         const badge = card.querySelector('.guarantee-badge');
-        if (badge) badge.innerHTML = `<span class="guarantee-check">&check;</span> &Sigma; = ${r.totalHours.toFixed(1)}h = ${r.person.capacity}h`;
-
+        if (badge) badge.innerHTML = `<span class="guarantee-check">✓</span> Σ = ${r.totalHours.toFixed(1)}h = ${r.person.capacity}h`;
         const rows = card.querySelectorAll('tbody tr:not(.total-row)');
         r.items.forEach((x, j) => {
           const row = rows[j];
@@ -406,7 +468,6 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
           const fill = row.querySelector('.bar-fill') as HTMLElement;
           if (fill) fill.style.width = pct + '%';
         });
-
         const totalRow = card.querySelector('.total-row');
         if (totalRow) {
           const cells = totalRow.querySelectorAll('td');
@@ -416,7 +477,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
       });
     }
 
-    // Update per-item cards
+    // Per-item cards
     const itemCardsEl = document.getElementById('itemCards');
     if (itemCardsEl) {
       const cards = itemCardsEl.querySelectorAll('.card');
@@ -443,7 +504,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
       });
     }
 
-    // Update guarantee cards
+    // Guarantee cards
     const guaranteeCards = document.getElementById('guaranteeCards');
     if (guaranteeCards) {
       const cards = guaranteeCards.querySelectorAll('.card');
@@ -452,6 +513,8 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
         if (!card) return;
         const sum = card.querySelector('.guarantee-sum');
         if (sum) sum.innerHTML = '&Sigma; ' + r.totalHours.toFixed(1) + 'h';
+        const cap = card.querySelector('.guarantee-cap');
+        if (cap) cap.textContent = r.person.capacity + 'h';
       });
     }
   }
@@ -460,10 +523,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
   function initFadeIn() {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(e => {
-        if (e.isIntersecting) {
-          (e.target as HTMLElement).classList.add('visible');
-          observer.unobserve(e.target);
-        }
+        if (e.isIntersecting) { (e.target as HTMLElement).classList.add('visible'); observer.unobserve(e.target); }
       });
     }, { threshold: 0.1 });
     document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
@@ -472,279 +532,89 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
   document.addEventListener('astro:page-load', initFadeIn);
 
   // Initialize RS column visibility
-  document.querySelectorAll('.rs-col').forEach(el => {
-    (el as HTMLElement).style.display = 'none';
-  });
-  document.querySelectorAll('.rs-val').forEach(el => {
-    (el as HTMLElement).style.display = 'none';
-  });
+  document.querySelectorAll('.rs-col').forEach(el => { (el as HTMLElement).style.display = 'none'; });
+  document.querySelectorAll('.rs-val').forEach(el => { (el as HTMLElement).style.display = 'none'; });
 </script>
 
 </Layout>
 
 <style>
-  /* Hero */
   .calc-hero { padding-top: 80px; padding-bottom: 40px; }
   .calc-headline {
     font-family: 'JetBrains Mono', monospace;
-    font-size: clamp(26px, 4vw, 38px);
-    font-weight: 700;
+    font-size: clamp(26px, 4vw, 38px); font-weight: 700;
     background: linear-gradient(135deg, var(--ac2), var(--cy));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     margin-bottom: 12px;
   }
-  .calc-subtitle {
-    font-size: 15px;
-    color: var(--t2);
-    line-height: 1.6;
-    margin-bottom: 24px;
-  }
+  .calc-subtitle { font-size: 15px; color: var(--t2); line-height: 1.6; margin-bottom: 24px; }
+  .mode-switch { display: inline-flex; background: var(--s1); border: 1px solid var(--bd); border-radius: 8px; overflow: hidden; }
+  .mode-btn { font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 8px 16px; background: none; border: none; color: var(--t3); cursor: pointer; transition: all 0.2s; }
+  .mode-btn.active { background: rgba(99,102,241,0.15); color: var(--ac2); }
+  .mode-btn:hover:not(.active) { color: var(--t1); }
 
-  /* Mode switch */
-  .mode-switch {
-    display: inline-flex;
-    background: var(--s1);
-    border: 1px solid var(--bd);
-    border-radius: 8px;
-    overflow: hidden;
+  /* Config */
+  .config-panel { margin-bottom: 0; }
+  .config-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 12px; }
+  .config-item { display: flex; flex-direction: column; gap: 4px; }
+  .config-item label { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--t3); }
+  .config-input {
+    font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700;
+    color: var(--ac2); background: var(--s2); border: 1px solid var(--bd); border-radius: 6px;
+    padding: 6px 10px; width: 80px; text-align: center;
   }
-  .mode-btn {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    padding: 8px 16px;
-    background: none;
-    border: none;
-    color: var(--t3);
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .mode-btn.active {
-    background: rgba(99, 102, 241, 0.15);
-    color: var(--ac2);
-  }
-  .mode-btn:hover:not(.active) {
-    color: var(--t1);
-  }
+  .config-input:focus { outline: none; border-color: var(--ac); }
+  .config-derived { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gn); font-weight: 600; }
 
   /* Steps */
   .calc-section { position: relative; }
   .calc-step { margin-bottom: 20px; }
-  .step-number {
-    display: inline-block;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--ac);
-    background: rgba(99, 102, 241, 0.1);
-    padding: 3px 8px;
-    border-radius: 4px;
-    margin-bottom: 8px;
-  }
-  .calc-desc {
-    font-size: 14px;
-    color: var(--t2);
-    line-height: 1.6;
-    max-width: 700px;
-  }
-
-  /* People cards */
-  .person-name {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--t1);
-  }
-  .person-role {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--t3);
-    margin-bottom: 8px;
-  }
-  .person-stats {
-    display: flex;
-    justify-content: space-between;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--t2);
-  }
-  .person-cap {
-    font-weight: 600;
-    color: var(--gn);
-  }
-
-  /* Input table */
-  .td-js {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-    color: var(--yl);
-  }
-  .td-cw-active {
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .td-cw-empty {
-    color: var(--t3);
-    text-align: center;
-  }
-  .cw-val {
-    color: var(--cy);
-    font-weight: 600;
-  }
-  .rs-val {
-    color: var(--gn);
-    font-size: 11px;
-  }
-
-  /* Score tables */
+  .step-number { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--ac); background: rgba(99,102,241,0.1); padding: 3px 8px; border-radius: 4px; margin-bottom: 8px; }
+  .calc-desc { font-size: 14px; color: var(--t2); line-height: 1.6; max-width: 700px; }
+  .person-name { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; color: var(--t1); }
+  .person-role { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--t3); margin-bottom: 8px; }
+  .person-stats { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--t2); }
+  .person-cap { font-weight: 600; color: var(--gn); }
+  .td-js { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--yl); }
+  .td-cw-active { font-family: 'JetBrains Mono', monospace; }
+  .td-cw-empty { color: var(--t3); text-align: center; }
+  .cw-val { color: var(--cy); font-weight: 600; }
+  .rs-val { color: var(--gn); font-size: 11px; }
   .score-table { margin-top: 10px; }
   .score-table th, .score-table td { padding: 4px 8px; font-size: 12px; }
   .td-cw { color: var(--cy); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
   .td-rs { color: var(--gn); font-family: 'JetBrains Mono', monospace; }
-  .td-score {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-    color: var(--ac2);
-  }
-  .total-row {
-    border-top: 2px solid var(--bd);
-  }
-  .total-row td {
-    font-weight: 600;
-    padding-top: 8px;
-  }
+  .td-score { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--ac2); }
+  .total-row { border-top: 2px solid var(--bd); }
+  .total-row td { font-weight: 600; padding-top: 8px; }
   .total-score { font-size: 13px; }
-
-  /* Per-person computation */
-  .td-computation {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--t3);
-  }
-  .td-hours {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-    color: var(--gn);
-  }
-  .total-hours {
-    font-size: 14px;
-  }
-
-  /* Bars */
-  .bar-bg {
-    background: var(--s2);
-    border-radius: 3px;
-    height: 6px;
-    overflow: hidden;
-  }
-  .bar-fill {
-    height: 100%;
-    background: var(--ac);
-    border-radius: 3px;
-    transition: width 0.3s ease;
-  }
-  .bar-green {
-    background: var(--gn);
-  }
-
-  /* Item tables */
+  .td-computation { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--t3); }
+  .td-hours { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--gn); }
+  .total-hours { font-size: 14px; }
+  .bar-bg { background: var(--s2); border-radius: 3px; height: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--ac); border-radius: 3px; transition: width 0.3s ease; }
+  .bar-green { background: var(--gn); }
   .item-table th, .item-table td { font-size: 12px; }
-  .td-role {
-    font-size: 11px;
-    color: var(--t3);
-  }
-
-  /* Guarantee */
-  .guarantee-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--gn);
-    background: rgba(52, 211, 153, 0.08);
-    padding: 4px 10px;
-    border-radius: 6px;
-    border: 1px solid rgba(52, 211, 153, 0.2);
-  }
-  .guarantee-check {
-    color: var(--gn);
-    font-weight: 700;
-    margin-right: 2px;
-  }
-  .guarantee-big {
-    margin: 16px 0 8px;
-  }
-  .guarantee-check-big {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: rgba(52, 211, 153, 0.1);
-    border: 2px solid var(--gn);
-    color: var(--gn);
-    font-size: 24px;
-    font-weight: 700;
-  }
-  .guarantee-eq {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 16px;
-    margin: 8px 0 4px;
-  }
-  .guarantee-sum {
-    color: var(--ac2);
-    font-weight: 700;
-  }
-  .guarantee-equals {
-    color: var(--gn);
-    margin: 0 6px;
-    font-weight: 700;
-  }
-  .guarantee-cap {
-    color: var(--gn);
-    font-weight: 700;
-  }
-  .guarantee-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--t3);
-  }
-
-  /* CTA */
-  .cta-box {
-    text-align: center;
-    margin-top: 32px;
-    padding: 24px;
-    background: var(--s1);
-    border: 1px solid var(--bd);
-    border-radius: var(--r);
-  }
-  .cta-box p {
-    font-size: 15px;
-    color: var(--t2);
-    margin-bottom: 16px;
-  }
-
-  /* Fade-in */
-  .fade-in {
-    opacity: 0;
-    transform: translateY(16px);
-    transition: opacity 0.5s ease, transform 0.5s ease;
-  }
-  .fade-in.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  /* RS column hidden by default (toggled by JS) */
+  .td-role { font-size: 11px; color: var(--t3); }
+  .guarantee-badge { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gn); background: rgba(52,211,153,0.08); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(52,211,153,0.2); }
+  .guarantee-check { color: var(--gn); font-weight: 700; margin-right: 2px; }
+  .guarantee-big { margin: 16px 0 8px; }
+  .guarantee-check-big { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; background: rgba(52,211,153,0.1); border: 2px solid var(--gn); color: var(--gn); font-size: 24px; font-weight: 700; }
+  .guarantee-eq { font-family: 'JetBrains Mono', monospace; font-size: 16px; margin: 8px 0 4px; }
+  .guarantee-sum { color: var(--ac2); font-weight: 700; }
+  .guarantee-equals { color: var(--gn); margin: 0 6px; font-weight: 700; }
+  .guarantee-cap { color: var(--gn); font-weight: 700; }
+  .guarantee-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--t3); }
+  .cta-box { text-align: center; margin-top: 32px; padding: 24px; background: var(--s1); border: 1px solid var(--bd); border-radius: var(--r); }
+  .cta-box p { font-size: 15px; color: var(--t2); margin-bottom: 16px; }
+  .fade-in { opacity: 0; transform: translateY(16px); transition: opacity 0.5s ease, transform 0.5s ease; }
+  .fade-in.visible { opacity: 1; transform: translateY(0); }
   .rs-col { display: none; }
-
-  /* Mobile */
   @media (max-width: 768px) {
     .calc-hero { padding-top: 60px; }
     .grid-3 { grid-template-columns: 1fr; }
     .grid-2 { grid-template-columns: 1fr; }
+    .config-grid { grid-template-columns: 1fr 1fr; }
     .mode-btn { font-size: 10px; padding: 6px 10px; }
     .td-computation { display: none; }
   }

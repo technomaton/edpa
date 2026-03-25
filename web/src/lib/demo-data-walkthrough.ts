@@ -1,9 +1,10 @@
 import type { Person, WorkItem, Iteration, Team } from './edpa-engine';
 
+// Default: 40h/week, 1-week iteration → capacity = FTE × 40
 export const people: Person[] = [
-  { id: 'alice', name: 'Alice', role: 'Architect', team: 'core', fte: 0.75, capacity: 60 },
-  { id: 'bob',   name: 'Bob',   role: 'Developer', team: 'core', fte: 1.0,  capacity: 80 },
-  { id: 'carol', name: 'Carol', role: 'PM',        team: 'core', fte: 0.5,  capacity: 40 },
+  { id: 'alice', name: 'Alice', role: 'Architect', team: 'core', fte: 0.75, capacity: 30 },
+  { id: 'bob',   name: 'Bob',   role: 'Developer', team: 'core', fte: 1.0,  capacity: 40 },
+  { id: 'carol', name: 'Carol', role: 'PM',        team: 'core', fte: 0.5,  capacity: 20 },
 ];
 
 export const items: WorkItem[] = [
@@ -43,7 +44,7 @@ export const items: WorkItem[] = [
 ];
 
 export const iterations: Iteration[] = [
-  { id: 'demo-1', name: 'Iteration 1', dates: '2026-03-17 — 2026-03-28', status: 'closed' },
+  { id: 'demo-1', name: 'Iterace 1', dates: '2026-03-17 — 2026-03-21', status: 'closed' },
 ];
 
 export const teams: Team[] = [
