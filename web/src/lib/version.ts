@@ -1,4 +1,3 @@
-// Single source of truth: reads from plugin.json at build time
-// All components import { VERSION } from this file
-import pluginData from '../../../.claude/.claude-plugin/plugin.json';
-export const VERSION = pluginData.version;
+// EDPA version — single source of truth
+// Update .claude/.claude-plugin/plugin.json to change version everywhere
+export const VERSION = '2.1.0';
