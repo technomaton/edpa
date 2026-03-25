@@ -1,3 +1,4 @@
-// EDPA version — single source of truth
-// Update .claude/.claude-plugin/plugin.json to change version everywhere
-export const VERSION = '2.1.0';
+// EDPA version — reads from package.json (single source of truth)
+// To bump: edit web/package.json "version" field → rebuild
+import pkg from '../../package.json';
+export const VERSION = pkg.version;
