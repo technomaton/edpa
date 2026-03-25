@@ -2,7 +2,7 @@
 project:
   name: Medical Platform & Datovy e-shop
   registration: CZ.01.01.01/01/24_062/0007440
-  organization: CVUT FBMI + Medicalc s.r.o.
+  organization: CVUT FBMI + Partner s.r.o.
   program: OP TAK
 people:
 - id: urbanek
@@ -30,32 +30,32 @@ people:
   fte: 0.75
   capacity: 60
 - id: pm
-  name: PM Medicalc
+  name: PM Partner
   role: PM
-  team: Medicalc
+  team: Partner
   fte: 0.5
   capacity: 40
 - id: d1
   name: Sr Dev MC
   role: Dev
-  team: Medicalc
+  team: Partner
   fte: 0.5
   capacity: 40
 - id: d2
   name: DB Spec MC
   role: Dev
-  team: Medicalc
+  team: Partner
   fte: 0.5
   capacity: 40
 - id: do
   name: DevOps MC
   role: Dev
-  team: Medicalc
+  team: Partner
   fte: 0.25
   capacity: 20
 teams:
 - id: CVUT
   planning_factor: 0.8
-- id: Medicalc
+- id: Partner
   planning_factor: 0.75
 _note: EXAMPLE DATA — replace with your team when deploying

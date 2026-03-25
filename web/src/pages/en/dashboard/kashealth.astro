@@ -28,7 +28,7 @@ const velocityData = iterations.map(it => {
 });
 ---
 
-<Layout title="Dashboard — kashealth" description="EDPA dashboard for kashealth.cz — real case study of Medical Platform project (OP TAK, ČVUT FBMI + Medicalc)." lang="en">
+<Layout title="Dashboard — kashealth" description="EDPA dashboard for kashealth.cz — real case study of Medical Platform project (OP TAK, ČVUT FBMI + Partner)." lang="en">
   <div class="container" style="padding-top: 32px; padding-bottom: 40px;">
     <!-- Demo version switcher -->
     <div style="display: flex; gap: 8px; margin-bottom: 16px;">
@@ -46,7 +46,7 @@ const velocityData = iterations.map(it => {
           <span class="badge badge-yellow" style="cursor: pointer;" id="modeLabel">Operational (Simple): JS × CW</span>
         </div>
       </div>
-      <div class="dash-meta" style="margin-top: 6px;">{project.program} | {project.organization} | {project.registration} | EDPA v2.0.0</div>
+      <div class="dash-meta" style="margin-top: 6px;">{project.program} | {project.organization} | {project.registration} | EDPA v2.1.0</div>
     </div>
 
     <!-- KPI row -->
@@ -204,13 +204,13 @@ const velocityData = iterations.map(it => {
 
     // Team capacity chart
     const cvutH = people.filter(p => p.team === 'CVUT').reduce((a, p) => a + p.capacity, 0);
-    const mcH = people.filter(p => p.team === 'Medicalc').reduce((a, p) => a + p.capacity, 0);
+    const mcH = people.filter(p => p.team === 'Partner').reduce((a, p) => a + p.capacity, 0);
     const teamCanvas = document.getElementById('teamChart') as HTMLCanvasElement;
     if (teamCanvas) {
       charts.team = new Chart(teamCanvas, {
         type: 'doughnut',
         data: {
-          labels: [`CVUT ${cvutH}h`, `Medicalc ${mcH}h`],
+          labels: [`CVUT ${cvutH}h`, `Partner ${mcH}h`],
           datasets: [{ data: [cvutH, mcH], backgroundColor: ['rgba(99,102,241,0.6)', 'rgba(34,211,238,0.6)'], borderWidth: 0 }]
         },
         options: {

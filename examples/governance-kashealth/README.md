@@ -6,7 +6,7 @@ This directory contains a real-world governance document for the
 ## What this demonstrates
 
 A complete EDPA v2.2 deployment for a cross-organizational team comprising
-CVUT FBMI and Medicalc software s.r.o., covering:
+CVUT FBMI and Partner s.r.o., covering:
 
 - **Tooling** -- Microsoft 365 Teams + GitHub (no Jira, no Confluence)
 - **Identity** -- kashealth.cz domain with a hybrid member/guest model (5 licensed + guests)

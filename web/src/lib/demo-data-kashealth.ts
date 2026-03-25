@@ -3,7 +3,7 @@ import type { Person, WorkItem, Iteration, ProjectConfig, Team } from './edpa-en
 export const project: ProjectConfig = {
   name: 'Medical Platform a Datovy e-shop',
   registration: 'CZ.01.01.01/01/24_062/0007440',
-  organization: 'CVUT FBMI + Medicalc s.r.o.',
+  organization: 'CVUT FBMI + Partner s.r.o.',
   program: 'OP TAK',
 };
 
@@ -17,7 +17,7 @@ export const config = {
 
 export const teams: Team[] = [
   { id: 'CVUT', planning_factor: 0.8 },
-  { id: 'Medicalc', planning_factor: 0.75 },
+  { id: 'Partner', planning_factor: 0.75 },
 ];
 
 export const people: Person[] = [
@@ -25,10 +25,10 @@ export const people: Person[] = [
   { id: 'tuma', name: 'O. Tuma', role: 'DevSecOps', team: 'CVUT', fte: 1.0, capacity: 80 },
   { id: 'turyna', name: 'Turyna', role: 'Dev', team: 'CVUT', fte: 0.75, capacity: 60 },
   { id: 'matousek', name: 'Matousek', role: 'Dev', team: 'CVUT', fte: 0.75, capacity: 60 },
-  { id: 'pm', name: 'PM Medicalc', role: 'PM', team: 'Medicalc', fte: 0.5, capacity: 40 },
-  { id: 'd1', name: 'Sr Dev MC', role: 'Dev', team: 'Medicalc', fte: 0.5, capacity: 40 },
-  { id: 'd2', name: 'DB Spec MC', role: 'Dev', team: 'Medicalc', fte: 0.5, capacity: 40 },
-  { id: 'do', name: 'DevOps MC', role: 'Dev', team: 'Medicalc', fte: 0.25, capacity: 20 },
+  { id: 'pm', name: 'PM Partner', role: 'PM', team: 'Partner', fte: 0.5, capacity: 40 },
+  { id: 'd1', name: 'Sr Dev MC', role: 'Dev', team: 'Partner', fte: 0.5, capacity: 40 },
+  { id: 'd2', name: 'DB Spec MC', role: 'Dev', team: 'Partner', fte: 0.5, capacity: 40 },
+  { id: 'do', name: 'DevOps MC', role: 'Dev', team: 'Partner', fte: 0.25, capacity: 20 },
 ];
 
 export const iterations: Iteration[] = [
