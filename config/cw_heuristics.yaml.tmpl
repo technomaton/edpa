@@ -35,7 +35,9 @@ role_weights:
   reviewer: 0.25       # PR reviewer, commit author
   consulted: 0.15      # issue/PR komentář
 
-# Per-role koeficienty (aplikují se když je role známa z capacity.yaml)
+# Per-role koeficienty — APLIKOVÁNY enginem v2.0+
+# (V v1.x byly deklarovány ale engine je ignoroval — opraveno v v2.0)
+# compute_cw() čte person.role z capacity.yaml a aplikuje příslušný override.
 role_overrides:
 
   # ═══ STRATEGICKÉ ROLE (Git je podhodnocuje) ═══

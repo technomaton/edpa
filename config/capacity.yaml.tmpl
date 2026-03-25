@@ -49,6 +49,7 @@ people:
 #     fte: 1.0
 #     capacity_per_iteration: 40
 #     evidence_default: true     # Default pro Git auto-detection
+#     evidence_scope: ["S-*", "F-*"]  # fnmatch patterns pro item IDs (v2.0)
 #
 #   - id: urbanek-pm             # Smlouva 2: DPČ, PM
 #     name: "Jaroslav Urbánek"
@@ -57,6 +58,12 @@ people:
 #     fte: 0.2
 #     capacity_per_iteration: 8
 #     evidence_default: false
+#     evidence_scope: ["E-*", "I-*"]  # PM vidí Epics/Initiatives
+#
+# evidence_scope (v2.0):
+#   Seznam fnmatch patterns pro item IDs.
+#   Pouze items matchující tyto patterns generují evidence pro tento kontrakt.
+#   evidence_default: true = fallback pro items bez matchujícího scope.
 #
 # EDPA garance platí per záznam:
 #   Σ DerivedHours[urbanek-arch] = 40h
