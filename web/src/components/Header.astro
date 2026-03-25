@@ -13,6 +13,7 @@ const links = [
   { href: `${prefix}/presentation/`, label: isEn ? 'Presentation' : 'Prezentace' },
   { href: `${prefix}/methodology/`, label: isEn ? 'Methodology' : 'Metodika' },
   { href: `${prefix}/evaluation/`, label: isEn ? 'Evaluation' : 'Evaluace' },
+  { href: `${prefix}/guide/`, label: isEn ? 'Guide' : 'Průvodce' },
 ];
 
 const switchPath = isEn
@@ -23,7 +24,7 @@ const switchPath = isEn
   <div class="container header-inner">
     <a href={`${prefix}/`} class="logo">
       <span class="logo-text">EDPA</span>
-      <span class="logo-version">v1.0.0</span>
+      <span class="logo-version">v2.0.0</span>
     </a>
     <nav class="main-nav" aria-label="Main navigation">
       {links.map(link => (

@@ -1,0 +1,911 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Tutorial" description="EDPA tutorial — scrollytelling pruvodce od setup po prvni vykaz za 5 minut.">
+
+  <!-- Hero -->
+  <section class="tut-hero section">
+    <div class="container tut-hero-inner">
+      <p class="tag">Scrollytelling tutorial</p>
+      <h1 class="tut-headline">Od nuly k prvnimu vykazu</h1>
+      <p class="tut-subtitle">
+        Scrollujte dolu a sledujte, jak EDPA funguje krok po kroku.
+      </p>
+      <div class="scroll-hint">
+        <span class="scroll-arrow"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 1: Setup za 5 minut -->
+  <section class="section tut-section" id="setup">
+    <div class="container">
+      <div class="tut-step fade-in">
+        <span class="step-number">01</span>
+        <p class="tag">Zacatek</p>
+        <h2 class="section-title">Setup za 5 minut</h2>
+        <p class="tut-desc">
+          Vytvorte repo, nainstalujte zavislosti a nastavte issue types.
+          Cely setup se vejde do jednoho terminalu.
+        </p>
+      </div>
+      <div class="terminal fade-in">
+        <div class="terminal-bar">
+          <span class="terminal-dot red"></span>
+          <span class="terminal-dot yellow"></span>
+          <span class="terminal-dot green"></span>
+          <span class="terminal-title">~/kashealth</span>
+        </div>
+        <div class="terminal-body" id="term-setup">
+          <div class="term-line" data-delay="0">
+            <span class="term-prompt">$</span>
+            <span class="term-cmd typing" style="--chars:55">gh repo create kashealth/medical-platform --clone</span>
+          </div>
+          <div class="term-line" data-delay="1">
+            <span class="term-ok">&#10003;</span>
+            <span class="term-text">Created repository</span>
+          </div>
+          <div class="term-line" data-delay="2">
+            <span class="term-prompt">$</span>
+            <span class="term-cmd typing" style="--chars:16">pip install pyyaml</span>
+          </div>
+          <div class="term-line" data-delay="3">
+            <span class="term-prompt">$</span>
+            <span class="term-cmd typing" style="--chars:52">python scripts/edpa_issue_types.py setup --org kashealth</span>
+          </div>
+          <div class="term-line" data-delay="4">
+            <span class="term-ok">&#10003;</span>
+            <span class="term-text"><span class="term-pink">Initiative</span> (PINK)</span>
+          </div>
+          <div class="term-line" data-delay="5">
+            <span class="term-ok">&#10003;</span>
+            <span class="term-text"><span class="term-purple">Epic</span> (PURPLE)</span>
+          </div>
+          <div class="term-line" data-delay="6">
+            <span class="term-ok">&#10003;</span>
+            <span class="term-text"><span class="term-blue">Feature</span> (BLUE)</span>
+          </div>
+          <div class="term-line" data-delay="7">
+            <span class="term-ok">&#10003;</span>
+            <span class="term-text"><span class="term-green">Story</span> (GREEN)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 2: Tym pracuje -->
+  <section class="section tut-section" id="team">
+    <div class="container">
+      <div class="tut-step fade-in">
+        <span class="step-number">02</span>
+        <p class="tag">Denni prace</p>
+        <h2 class="section-title">Tym pracuje</h2>
+        <p class="tut-desc">
+          Tym commituje, reviewuje, testuje. EDPA sbira evidence automaticky
+          z kazdeho git logu a pull requestu.
+        </p>
+      </div>
+      <div class="terminal fade-in">
+        <div class="terminal-bar">
+          <span class="terminal-dot red"></span>
+          <span class="terminal-dot yellow"></span>
+          <span class="terminal-dot green"></span>
+          <span class="terminal-title">git log --oneline</span>
+        </div>
+        <div class="terminal-body" id="term-team">
+          <div class="git-log-entry" data-delay="0">
+            <div class="avatar avatar-blue">PS</div>
+            <div class="git-entry-content">
+              <span class="git-hash">abc1234</span>
+              <span class="git-author">Petr</span>
+              <span class="git-msg">feat(S-200): implement OMOP parser</span>
+            </div>
+          </div>
+          <div class="git-log-entry" data-delay="1">
+            <div class="avatar avatar-green">JU</div>
+            <div class="git-entry-content">
+              <span class="git-hash">def5678</span>
+              <span class="git-author">Jaroslav</span>
+              <span class="git-msg">review: approve PR #12</span>
+            </div>
+          </div>
+          <div class="git-log-entry" data-delay="2">
+            <div class="avatar avatar-cyan">KN</div>
+            <div class="git-entry-content">
+              <span class="git-hash">ghi9012</span>
+              <span class="git-author">Katerina</span>
+              <span class="git-msg">test(S-200): add unit tests</span>
+            </div>
+          </div>
+          <div class="git-log-entry" data-delay="3">
+            <div class="avatar avatar-pink">MK</div>
+            <div class="git-entry-content">
+              <span class="git-hash">jkl3456</span>
+              <span class="git-author">Marie</span>
+              <span class="git-msg">docs(E-10): update acceptance criteria</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: EDPA pocita -->
+  <section class="section tut-section" id="compute">
+    <div class="container">
+      <div class="tut-step fade-in">
+        <span class="step-number">03</span>
+        <p class="tag">Engine</p>
+        <h2 class="section-title">EDPA pocita</h2>
+        <p class="tut-desc">
+          Z git evidence se automaticky vypocte Score, pomer a odvozene hodiny.
+          Zadny rucni vstup.
+        </p>
+      </div>
+
+      <!-- Data flow visualization -->
+      <div class="data-flow fade-in">
+        <div class="flow-row">
+          <div class="flow-box flow-input">
+            <span class="flow-label">Git Evidence</span>
+          </div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-box flow-formula">
+            <span class="flow-label">Score = JS &times; CW</span>
+          </div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-box flow-output">
+            <span class="flow-label">DerivedHours = (Score/&Sigma;) &times; Cap</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Animated numbers -->
+      <div class="numbers-grid fade-in">
+        <div class="number-card">
+          <span class="number-label">JobSize</span>
+          <span class="number-value counter" data-target="8" data-decimals="0">0</span>
+        </div>
+        <div class="number-card">
+          <span class="number-label">&times;</span>
+        </div>
+        <div class="number-card">
+          <span class="number-label">CW</span>
+          <span class="number-value counter" data-target="0.30" data-decimals="2">0</span>
+        </div>
+        <div class="number-card">
+          <span class="number-label">=</span>
+        </div>
+        <div class="number-card accent-border">
+          <span class="number-label">Score</span>
+          <span class="number-value counter" data-target="2.40" data-decimals="2">0</span>
+        </div>
+        <div class="number-card">
+          <span class="number-label">&rarr;</span>
+        </div>
+        <div class="number-card">
+          <span class="number-label">Ratio</span>
+          <span class="number-value counter" data-target="17.2" data-decimals="1">0</span><span class="number-unit">%</span>
+        </div>
+        <div class="number-card">
+          <span class="number-label">&rarr;</span>
+        </div>
+        <div class="number-card green-border">
+          <span class="number-label">Hours</span>
+          <span class="number-value counter" data-target="6.9" data-decimals="1">0</span><span class="number-unit">h</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 4: Vykaz za 30 sekund -->
+  <section class="section tut-section" id="report">
+    <div class="container">
+      <div class="tut-step fade-in">
+        <span class="step-number">04</span>
+        <p class="tag">Vystup</p>
+        <h2 class="section-title">Vykaz za 30 sekund</h2>
+        <p class="tut-desc">
+          Jeden prikaz vygeneruje kompletni vykaz za iteraci.
+          Vsechny invarianty se kontroluji automaticky.
+        </p>
+      </div>
+      <div class="terminal fade-in">
+        <div class="terminal-bar">
+          <span class="terminal-dot red"></span>
+          <span class="terminal-dot yellow"></span>
+          <span class="terminal-dot green"></span>
+          <span class="terminal-title">~/kashealth</span>
+        </div>
+        <div class="terminal-body" id="term-report">
+          <div class="term-line" data-delay="0">
+            <span class="term-prompt">$</span>
+            <span class="term-cmd typing" style="--chars:48">python scripts/edpa_engine.py --iteration PI-2026-1.1</span>
+          </div>
+          <div class="term-line" data-delay="1"><span class="term-text">&nbsp;</span></div>
+          <div class="report-table" data-delay="2">
+            <div class="report-row report-header">
+              <span class="report-col col-name">Person</span>
+              <span class="report-col col-num">Cap</span>
+              <span class="report-col col-num">Derived</span>
+              <span class="report-col col-sm">Items</span>
+              <span class="report-col col-sm">OK</span>
+            </div>
+            <div class="report-divider"></div>
+            <div class="report-row" data-delay="3">
+              <span class="report-col col-name">Petr Svoboda</span>
+              <span class="report-col col-num">80h</span>
+              <span class="report-col col-num col-derived">80.0h</span>
+              <span class="report-col col-sm">4</span>
+              <span class="report-col col-sm col-ok">&#10003;</span>
+            </div>
+            <div class="report-row" data-delay="4">
+              <span class="report-col col-name">Jaroslav Urbanek</span>
+              <span class="report-col col-num">56h</span>
+              <span class="report-col col-num col-derived">56.0h</span>
+              <span class="report-col col-sm">7</span>
+              <span class="report-col col-sm col-ok">&#10003;</span>
+            </div>
+            <div class="report-row" data-delay="5">
+              <span class="report-col col-name">Marie Kralova</span>
+              <span class="report-col col-num">40h</span>
+              <span class="report-col col-num col-derived">40.0h</span>
+              <span class="report-col col-sm">3</span>
+              <span class="report-col col-sm col-ok">&#10003;</span>
+            </div>
+            <div class="report-row" data-delay="6">
+              <span class="report-col col-name">Katerina Novakova</span>
+              <span class="report-col col-num">64h</span>
+              <span class="report-col col-num col-derived">64.0h</span>
+              <span class="report-col col-sm">5</span>
+              <span class="report-col col-sm col-ok">&#10003;</span>
+            </div>
+            <div class="report-row" data-delay="7">
+              <span class="report-col col-name">Tomas Horak</span>
+              <span class="report-col col-num">80h</span>
+              <span class="report-col col-num col-derived">80.0h</span>
+              <span class="report-col col-sm">6</span>
+              <span class="report-col col-sm col-ok">&#10003;</span>
+            </div>
+            <div class="report-row" data-delay="8">
+              <span class="report-col col-name">Jan Dvorak</span>
+              <span class="report-col col-num">60h</span>
+              <span class="report-col col-num col-derived">60.0h</span>
+              <span class="report-col col-sm">4</span>
+              <span class="report-col col-sm col-ok">&#10003;</span>
+            </div>
+            <div class="report-row" data-delay="9">
+              <span class="report-col col-name">Eva Prochazkova</span>
+              <span class="report-col col-num">60h</span>
+              <span class="report-col col-num col-derived">60.0h</span>
+              <span class="report-col col-sm">5</span>
+              <span class="report-col col-sm col-ok">&#10003;</span>
+            </div>
+            <div class="report-divider" data-delay="10"></div>
+            <div class="report-row report-total" data-delay="10">
+              <span class="report-col col-name">TEAM</span>
+              <span class="report-col col-num">440h</span>
+              <span class="report-col col-num col-derived">440.0h</span>
+              <span class="report-col col-sm"></span>
+              <span class="report-col col-sm"></span>
+            </div>
+          </div>
+          <div class="term-line" data-delay="11">
+            <span class="term-text">&nbsp;</span>
+          </div>
+          <div class="term-line" data-delay="12">
+            <span class="term-ok">&#10003;</span>
+            <span class="term-text term-bold">Invariants: ALL PASSED</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 5: Kalibrace se uci -->
+  <section class="section tut-section" id="calibration">
+    <div class="container">
+      <div class="tut-step fade-in">
+        <span class="step-number">05</span>
+        <p class="tag">Self-tuning</p>
+        <h2 class="section-title">Kalibrace se uci</h2>
+        <p class="tut-desc">
+          S kazdou iteraci se presnost zlepshuje.
+          MAD (Mean Absolute Deviation) klesa.
+        </p>
+      </div>
+
+      <div class="mad-chart fade-in">
+        <div class="mad-row" data-delay="0">
+          <span class="mad-label">PI-1</span>
+          <div class="mad-bar-wrap">
+            <div class="mad-bar" data-width="100"></div>
+          </div>
+          <span class="mad-value">MAD = 0.051</span>
+          <span class="mad-change"></span>
+        </div>
+        <div class="mad-row" data-delay="1">
+          <span class="mad-label">PI-2</span>
+          <div class="mad-bar-wrap">
+            <div class="mad-bar mad-bar-2" data-width="78"></div>
+          </div>
+          <span class="mad-value">MAD = 0.040</span>
+          <span class="mad-change mad-down">&darr; 20%</span>
+        </div>
+        <div class="mad-row" data-delay="2">
+          <span class="mad-label">PI-3</span>
+          <div class="mad-bar-wrap">
+            <div class="mad-bar mad-bar-3" data-width="63"></div>
+          </div>
+          <span class="mad-value">MAD = 0.032</span>
+          <span class="mad-change mad-down">&darr; 37%</span>
+        </div>
+      </div>
+
+      <div class="note fade-in" style="margin-top: 24px;">
+        Karpathy loop: compare &rarr; adjust &rarr; repeat.
+        Kalibrovano Monte Carlo simulaci (68 000+ zaznamu, p&lt;0.001).
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 6: Zacnete dnes -->
+  <section class="section tut-section tut-cta-section" id="start">
+    <div class="container">
+      <div class="tut-step fade-in" style="text-align: center;">
+        <span class="step-number">06</span>
+        <p class="tag">Start</p>
+        <h2 class="section-title tut-cta-title">Zacnete dnes</h2>
+        <p class="tut-desc" style="max-width: 540px; margin-left: auto; margin-right: auto;">
+          Spustte demo, prozkoumejte dashboard a zacnete s EDPA
+          ve vasem tymu.
+        </p>
+      </div>
+      <div class="terminal fade-in" style="max-width: 500px; margin: 0 auto;">
+        <div class="terminal-bar">
+          <span class="terminal-dot red"></span>
+          <span class="terminal-dot yellow"></span>
+          <span class="terminal-dot green"></span>
+          <span class="terminal-title">~/your-project</span>
+        </div>
+        <div class="terminal-body">
+          <div class="term-line" data-delay="0">
+            <span class="term-prompt">$</span>
+            <span class="term-cmd typing" style="--chars:36">python scripts/edpa_engine.py --demo</span>
+          </div>
+        </div>
+      </div>
+      <div class="tut-cta-actions fade-in">
+        <a href="/dashboard/" class="btn btn-primary">Dashboard demo &rarr;</a>
+        <a href="/methodology/" class="btn btn-secondary">Metodika</a>
+        <a href="/" class="btn btn-secondary">Zpet na uvod</a>
+      </div>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  /* ---- Hero ---- */
+  .tut-hero { padding-top: 100px; padding-bottom: 40px; }
+  .tut-hero-inner { text-align: center; }
+  .tut-headline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(26px, 5vw, 42px);
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 14px;
+    background: linear-gradient(135deg, var(--ac2), var(--cy));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .tut-subtitle {
+    font-size: 16px;
+    color: var(--t2);
+    line-height: 1.6;
+    max-width: 520px;
+    margin: 0 auto 32px;
+  }
+  .scroll-hint {
+    display: flex;
+    justify-content: center;
+  }
+  .scroll-arrow {
+    display: block;
+    width: 24px;
+    height: 24px;
+    border-right: 2px solid var(--t3);
+    border-bottom: 2px solid var(--t3);
+    transform: rotate(45deg);
+    animation: bounce-down 2s infinite;
+  }
+  @keyframes bounce-down {
+    0%, 100% { transform: rotate(45deg) translateY(0); opacity: 1; }
+    50% { transform: rotate(45deg) translateY(8px); opacity: 0.4; }
+  }
+
+  /* ---- Section common ---- */
+  .tut-section { padding: 60px 0 80px; }
+  .tut-step { margin-bottom: 32px; }
+  .step-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--s3);
+    line-height: 1;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .tut-desc {
+    font-size: 15px;
+    color: var(--t2);
+    line-height: 1.6;
+    max-width: 600px;
+  }
+
+  /* ---- Fade-in animation ---- */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  }
+  .fade-in.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ---- Terminal ---- */
+  .terminal {
+    background: #0d1117;
+    border: 1px solid var(--bd);
+    border-radius: 12px;
+    overflow: hidden;
+    max-width: 720px;
+  }
+  .terminal-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: #161b22;
+    border-bottom: 1px solid var(--bd);
+  }
+  .terminal-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .terminal-dot.red { background: #ff5f57; }
+  .terminal-dot.yellow { background: #febc2e; }
+  .terminal-dot.green { background: #28c840; }
+  .terminal-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--t3);
+    margin-left: 8px;
+  }
+  .terminal-body {
+    padding: 16px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+
+  /* Terminal lines */
+  .term-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+  }
+  .term-line.shown {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .term-prompt {
+    color: var(--gn);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .term-cmd {
+    color: var(--t1);
+  }
+  .term-ok {
+    color: var(--gn);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .term-text {
+    color: var(--t2);
+  }
+  .term-bold {
+    color: var(--gn);
+    font-weight: 700;
+  }
+  .term-pink { color: var(--pk); }
+  .term-purple { color: var(--ac2); }
+  .term-blue { color: var(--cy); }
+  .term-green { color: var(--gn); }
+
+  /* Typing animation */
+  .typing {
+    display: inline-block;
+    overflow: hidden;
+    white-space: nowrap;
+    width: 0;
+    border-right: 2px solid var(--gn);
+  }
+  .term-line.shown .typing {
+    animation: typing 1.2s steps(var(--chars, 40)) forwards,
+               blink-caret 0.6s step-end 3;
+  }
+  @keyframes typing {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+  @keyframes blink-caret {
+    50% { border-color: transparent; }
+  }
+
+  /* ---- Git log entries ---- */
+  .git-log-entry {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  }
+  .git-log-entry.shown {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .avatar-blue { background: var(--ac); }
+  .avatar-green { background: #059669; }
+  .avatar-cyan { background: #0891b2; }
+  .avatar-pink { background: #db2777; }
+  .git-entry-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .git-hash {
+    color: var(--yl);
+    font-size: 12px;
+  }
+  .git-author {
+    color: var(--cy);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .git-msg {
+    color: var(--t2);
+    font-size: 12px;
+  }
+
+  /* ---- Data flow ---- */
+  .data-flow {
+    margin-bottom: 32px;
+  }
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .flow-box {
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    padding: 14px 20px;
+    text-align: center;
+  }
+  .flow-input { border-color: var(--yl); }
+  .flow-input .flow-label { color: var(--yl); }
+  .flow-formula { border-color: var(--ac2); }
+  .flow-formula .flow-label { color: var(--ac2); }
+  .flow-output { border-color: var(--gn); }
+  .flow-output .flow-label { color: var(--gn); }
+  .flow-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .flow-arrow {
+    font-size: 24px;
+    color: var(--t3);
+    flex-shrink: 0;
+  }
+
+  /* ---- Numbers grid ---- */
+  .numbers-grid {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 24px 0;
+  }
+  .number-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 70px;
+  }
+  .number-card.accent-border { border-color: var(--ac2); }
+  .number-card.green-border { border-color: var(--gn); }
+  .number-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--t3);
+  }
+  .number-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--t1);
+  }
+  .number-unit {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--t3);
+    font-weight: 600;
+  }
+
+  /* ---- Report table (inside terminal) ---- */
+  .report-table {
+    padding: 4px 0;
+  }
+  .report-row {
+    display: flex;
+    gap: 4px;
+    padding: 3px 0;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.35s ease-out, transform 0.35s ease-out;
+  }
+  .report-row.shown {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .report-header {
+    opacity: 1;
+    transform: none;
+  }
+  .report-header .report-col {
+    color: var(--t3);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .report-col {
+    font-size: 12px;
+    color: var(--t2);
+  }
+  .col-name { flex: 1 1 180px; min-width: 140px; }
+  .col-num { flex: 0 0 70px; text-align: right; }
+  .col-sm { flex: 0 0 50px; text-align: center; }
+  .col-derived { color: var(--gn); }
+  .col-ok { color: var(--gn); font-weight: 700; }
+  .report-divider {
+    height: 1px;
+    background: var(--bd);
+    margin: 4px 0;
+    opacity: 0;
+    transition: opacity 0.35s ease-out;
+  }
+  .report-divider.shown { opacity: 1; }
+  .report-total .report-col {
+    font-weight: 700;
+    color: var(--t1);
+  }
+  .report-total .col-derived { color: var(--gn); }
+
+  /* ---- MAD chart ---- */
+  .mad-chart {
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .mad-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  }
+  .mad-row.shown {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .mad-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--t2);
+    flex: 0 0 40px;
+    font-weight: 600;
+  }
+  .mad-bar-wrap {
+    flex: 1;
+    height: 28px;
+    background: var(--s1);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--bd);
+  }
+  .mad-bar {
+    height: 100%;
+    width: 0;
+    border-radius: 5px;
+    background: linear-gradient(90deg, var(--ac), var(--cy));
+    transition: width 1.2s ease-out;
+  }
+  .mad-row.shown .mad-bar {
+    width: calc(var(--bar-w, 100) * 1%);
+  }
+  .mad-bar-2 { background: linear-gradient(90deg, var(--ac), var(--gn)); }
+  .mad-bar-3 { background: linear-gradient(90deg, var(--gn), var(--cy)); }
+  .mad-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--t2);
+    flex: 0 0 110px;
+  }
+  .mad-change {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    flex: 0 0 60px;
+  }
+  .mad-down { color: var(--gn); font-weight: 600; }
+
+  /* ---- CTA ---- */
+  .tut-cta-section { text-align: center; }
+  .tut-cta-title {
+    background: linear-gradient(135deg, var(--ac2), var(--cy));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .tut-cta-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 32px;
+  }
+
+  /* ---- Responsive ---- */
+  @media (max-width: 768px) {
+    .tut-hero { padding-top: 72px; padding-bottom: 24px; }
+    .tut-headline { font-size: 24px; }
+    .step-number { font-size: 36px; }
+    .terminal { font-size: 11px; }
+    .terminal-body { padding: 12px 14px; font-size: 11px; }
+    .flow-row { flex-direction: column; gap: 8px; }
+    .flow-arrow { transform: rotate(90deg); }
+    .numbers-grid { gap: 6px; }
+    .number-card { padding: 10px 10px; min-width: 56px; }
+    .number-value { font-size: 18px; }
+    .git-entry-content { gap: 6px; }
+    .git-msg { display: block; width: 100%; }
+    .mad-value { flex: 0 0 90px; font-size: 11px; }
+    .mad-change { flex: 0 0 50px; font-size: 11px; }
+    .tut-cta-actions { flex-direction: column; align-items: center; }
+    .col-name { flex: 1 1 120px; min-width: 100px; }
+    .col-num { flex: 0 0 50px; }
+    .col-sm { flex: 0 0 36px; }
+    .report-col { font-size: 10px; }
+  }
+</style>
+
+<script>
+  function initTutorial() {
+    // ---- Intersection Observer: fade-in elements ----
+    const fadeEls = document.querySelectorAll('.fade-in');
+    const fadeObs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          fadeObs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+    fadeEls.forEach(el => fadeObs.observe(el));
+
+    // ---- Terminal lines: staggered reveal ----
+    const terminalBodies = document.querySelectorAll('.terminal-body');
+    const termObs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          revealTerminal(entry.target);
+          termObs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.2 });
+    terminalBodies.forEach(el => termObs.observe(el));
+
+    function revealTerminal(container: Element) {
+      const items = container.querySelectorAll('[data-delay]');
+      items.forEach(item => {
+        const delay = parseInt(item.getAttribute('data-delay') || '0', 10);
+        setTimeout(() => {
+          item.classList.add('shown');
+        }, delay * 350);
+      });
+    }
+
+    // ---- MAD bar widths ----
+    const madBars = document.querySelectorAll('.mad-bar');
+    madBars.forEach(bar => {
+      const w = bar.getAttribute('data-width') || '100';
+      (bar as HTMLElement).style.setProperty('--bar-w', w);
+    });
+
+    // ---- Counter animation ----
+    const counters = document.querySelectorAll('.counter');
+    const counterObs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          animateCounter(entry.target as HTMLElement);
+          counterObs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.5 });
+    counters.forEach(el => counterObs.observe(el));
+
+    function animateCounter(el: HTMLElement) {
+      const target = parseFloat(el.getAttribute('data-target') || '0');
+      const decimals = parseInt(el.getAttribute('data-decimals') || '0', 10);
+      const duration = 1200;
+      const start = performance.now();
+
+      function update(now: number) {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        // ease-out cubic
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const current = target * ease;
+        el.textContent = current.toFixed(decimals);
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        }
+      }
+      requestAnimationFrame(update);
+    }
+  }
+
+  // Support both initial load and Astro page transitions
+  document.addEventListener('DOMContentLoaded', initTutorial);
+  document.addEventListener('astro:page-load', initTutorial);
+</script>

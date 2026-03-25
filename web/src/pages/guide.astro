@@ -1,0 +1,600 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const steps = [
+  {
+    num: 1,
+    title: 'Prerekvizity',
+    color: 'var(--ac)',
+    desc: 'Nainstalujte GitHub CLI, Python 3.10+ a PyYAML. Ověřte přihlášení do GitHub, abyste mohli automatizovat práci s repozitáři a projekty.',
+    code: `# GitHub CLI — přihlášení
+gh auth login
+
+# Python závislo­sti
+pip install pyyaml
+
+# Ověření verzí
+python3 --version   # >= 3.10
+gh --version`,
+    result: `✓ Logged in to github.com as your-user
+✓ pyyaml installed
+Python 3.12.1
+gh version 2.44.1`,
+  },
+  {
+    num: 2,
+    title: 'Vytvořit repo',
+    color: 'var(--cy)',
+    desc: 'Vytvořte nový GitHub repozitář pro váš projekt. Repo bude obsahovat veškerou konfiguraci, skripty a data EDPA frameworku.',
+    code: `# Vytvořit privátní repo a naklonovat
+gh repo create ORG/project-name \\
+  --private --clone
+
+cd project-name`,
+    result: `✓ Created repository ORG/project-name on GitHub
+✓ Cloned to ./project-name`,
+  },
+  {
+    num: 3,
+    title: 'Zkopírovat EDPA',
+    color: 'var(--gn)',
+    desc: 'Překopírujte EDPA adresářovou strukturu — skripty, šablony a konfigurační soubory. Toto je základ celého frameworku.',
+    code: `# Struktura EDPA v repozitáři
+├── config/
+│   ├── people.yaml
+│   ├── iterations.yaml
+│   └── issue_types.yaml
+├── scripts/
+│   ├── edpa_engine.py
+│   ├── edpa_project_setup.py
+│   ├── edpa_issue_types.py
+│   ├── edpa_backlog.py
+│   └── evaluate_cw.py
+├── data/
+│   └── snapshots/
+└── reports/`,
+    result: `project-name/
+├── config/       ← konfigurace týmu a iterací
+├── scripts/      ← automatizační skripty
+├── data/         ← snapshoty a surová data
+└── reports/      ← generované výkazy`,
+  },
+  {
+    num: 4,
+    title: 'Nastavit tým',
+    color: 'var(--yl)',
+    desc: 'Upravte people.yaml — definujte členy týmu, jejich role, FTE úvazky a GitHub uživatelská jména. Toto je klíčový vstup pro alokaci.',
+    code: `# config/people.yaml
+team:
+  - name: "Jan Novák"
+    github: "jnovak"
+    role: "developer"
+    fte: 1.0
+
+  - name: "Eva Malá"
+    github: "emala"
+    role: "developer"
+    fte: 0.8
+
+  - name: "Petr Král"
+    github: "pkral"
+    role: "tech-lead"
+    fte: 1.0`,
+    result: `Tým: 3 členové
+Celková kapacita: 2.8 FTE
+Role: 2× developer, 1× tech-lead`,
+  },
+  {
+    num: 5,
+    title: 'Nastavit Issue Types',
+    color: 'var(--or)',
+    desc: 'Spusťte skript pro konfiguraci typů issues v GitHub. EDPA rozlišuje hierarchii: Initiative > Epic > Feature > Story > Task.',
+    code: `python scripts/edpa_issue_types.py setup \\
+  --org ORG \\
+  --repo project-name
+
+# Ověření
+python scripts/edpa_issue_types.py list \\
+  --org ORG --repo project-name`,
+    result: `✓ Created label: initiative  (color: #f472b6)
+✓ Created label: epic        (color: #818cf8)
+✓ Created label: feature     (color: #22d3ee)
+✓ Created label: story       (color: #f97316)
+✓ Created label: task        (color: #fbbf24)
+5 issue types configured.`,
+  },
+  {
+    num: 6,
+    title: 'Naplnit backlog',
+    color: 'var(--pk)',
+    desc: 'Přidejte první work items do backlogu — Stories a Tasky s odhadem story pointů. Backlog je vstupem pro WSJF prioritizaci.',
+    code: `# Přidat Story
+python scripts/edpa_backlog.py add \\
+  --type Story \\
+  --title "Implementovat login endpoint" \\
+  --points 5 \\
+  --feature F-100-auth
+
+# Přidat Task
+python scripts/edpa_backlog.py add \\
+  --type Task \\
+  --title "Napsat unit testy pro auth" \\
+  --points 3 \\
+  --parent S-200-login`,
+    result: `✓ Created: S-200 "Implementovat login endpoint" [5 SP]
+  → linked to F-100-auth
+✓ Created: T-301 "Napsat unit testy pro auth" [3 SP]
+  → linked to S-200-login`,
+  },
+  {
+    num: 7,
+    title: 'Vytvořit GitHub Project',
+    color: 'var(--ac)',
+    desc: 'Automaticky vytvořte GitHub Project Board s EDPA sloupcovým layoutem — Backlog, Ready, In Progress, Review, Done.',
+    code: `python scripts/edpa_project_setup.py \\
+  --org ORG \\
+  --repo project-name \\
+  --iteration PI-2026-1.1`,
+    result: `✓ Created project: "EDPA — PI-2026-1.1"
+✓ Columns: Backlog | Ready | In Progress | Review | Done
+✓ Linked 12 issues to project
+✓ Custom fields: Story Points, WSJF Score, Type`,
+  },
+  {
+    num: 8,
+    title: 'Tým začne pracovat',
+    color: 'var(--cy)',
+    desc: 'Tým pracuje standardním GitHub flow — branch naming konvence, commity, pull requesty a code review. EDPA vše sleduje automaticky.',
+    code: `# Branch naming konvence
+git checkout -b feature/S-200-login-endpoint
+
+# Commit s referencí na issue
+git commit -m "feat(auth): implement JWT login
+
+Resolves #200"
+
+# Pull Request
+gh pr create \\
+  --title "S-200: Login endpoint" \\
+  --body "Implements JWT auth flow" \\
+  --assignee jnovak`,
+    result: `Branch: feature/S-200-login-endpoint
+Commits: 4 (linked to S-200)
+PR #42: "S-200: Login endpoint"
+  → Review requested: pkral
+  → Status: Approved ✓ → Merged`,
+  },
+  {
+    num: 9,
+    title: 'Konec iterace',
+    color: 'var(--gn)',
+    desc: 'Na konci iterace spusťte EDPA engine. Ten stáhne veškerou evidenci z GitHubu a proporcionálně alokuje hodiny podle skutečné práce.',
+    code: `python scripts/edpa_engine.py \\
+  --iteration PI-2026-1.1 \\
+  --org ORG \\
+  --repo project-name
+
+# Engine automaticky:
+# 1. Stáhne commits, PRs, reviews, comments
+# 2. Spočítá contribution weight (CW)
+# 3. Alokuje hodiny: hours = CW × capacity
+# 4. Vygeneruje reporty`,
+    result: `EDPA Engine v1.0.0 — PI-2026-1.1
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Fetched:  47 commits, 12 PRs, 8 reviews
+Team:     3 members, 2.8 FTE
+Capacity: 448 hours (2 weeks)
+
+Allocation:
+  jnovak  │████████████████░░│ 178.2h (39.8%)
+  emala   │█████████████░░░░░│ 142.6h (31.8%)
+  pkral   │████████████░░░░░░│ 127.2h (28.4%)
+                        Total: 448.0h ✓`,
+  },
+  {
+    num: 10,
+    title: 'Výkazy a reporty',
+    color: 'var(--yl)',
+    desc: 'EDPA generuje per-person markdown reporty, JSON export a frozen snapshot. Výkazy jsou auditovatelné a reprodukovatelné.',
+    code: `# Vygenerované soubory
+reports/
+├── PI-2026-1.1/
+│   ├── summary.md           # souhrnný report
+│   ├── jnovak.md            # per-person výkaz
+│   ├── emala.md
+│   ├── pkral.md
+│   ├── allocation.json      # strojově čitelný
+│   └── evidence.json        # surová evidence
+data/
+└── snapshots/
+    └── PI-2026-1.1.json     # frozen snapshot`,
+    result: `reports/PI-2026-1.1/summary.md:
+┌─────────┬────────┬────────┬────────┐
+│ Person  │ Hours  │ Share  │ Items  │
+├─────────┼────────┼────────┼────────┤
+│ jnovak  │ 178.2  │ 39.8%  │ 7      │
+│ emala   │ 142.6  │ 31.8%  │ 5      │
+│ pkral   │ 127.2  │ 28.4%  │ 6      │
+├─────────┼────────┼────────┼────────┤
+│ TOTAL   │ 448.0  │ 100%   │ 18     │
+└─────────┴────────┴────────┴────────┘`,
+  },
+  {
+    num: 11,
+    title: 'Retrospektiva + kalibrace',
+    color: 'var(--or)',
+    desc: 'Porovnejte EDPA výstupy se skutečností (ground truth). Skript evaluate_cw.py počítá MAD, korelaci a identifikuje outliers.',
+    code: `# Ground truth srovnání
+python scripts/evaluate_cw.py \\
+  --iteration PI-2026-1.1 \\
+  --ground-truth data/ground_truth.csv
+
+# Výstup: korelace, MAD, scatter plot
+# MAD < 0.05 → výborná kalibrace
+# MAD 0.05-0.10 → dobrá kalibrace
+# MAD > 0.10 → vyžaduje úpravu vah`,
+    result: `Evaluation: PI-2026-1.1
+━━━━━━━━━━━━━━━━━━━━━━━
+Pearson r:     0.94
+MAD:           0.032  ← výborná kalibrace
+Max deviation: 0.061 (pkral)
+
+Verdict: EXCELLENT
+No weight adjustment needed.`,
+  },
+  {
+    num: 12,
+    title: 'Další PI',
+    color: 'var(--pk)',
+    desc: 'Opakujte pro každou iteraci. S každým cyklem se kalibrace zpřesňuje. Cíl: prediktabilita > 80 %, MAD < 0.05 do třetího PI.',
+    code: `# Nová iterace
+python scripts/edpa_engine.py \\
+  --iteration PI-2026-1.2 \\
+  --org ORG --repo project-name
+
+# Trend analýza napříč iteracemi
+python scripts/edpa_engine.py trend \\
+  --from PI-2026-1.1 \\
+  --to PI-2026-1.4`,
+    result: `Trend: PI-2026-1.1 → PI-2026-1.4
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MAD:            0.032 → 0.018  ↓ improving
+Predictability: 78%   → 91%   ↑ on target
+Correlation:    0.94  → 0.98  ↑ strong
+
+Status: Mature — framework calibrated.`,
+  },
+];
+
+const phases = [
+  { label: 'Setup', steps: [1,2,3], color: 'var(--ac)' },
+  { label: 'Config', steps: [4,5,6], color: 'var(--cy)' },
+  { label: 'Run', steps: [7,8,9], color: 'var(--gn)' },
+  { label: 'Report', steps: [10,11,12], color: 'var(--yl)' },
+];
+---
+
+<Layout title="Průvodce — od nuly k prvnímu reportu" description="Interaktivní průvodce EDPA frameworkem: 12 kroků od instalace po první výkaz.">
+
+  <!-- Progress bar -->
+  <div class="guide-progress" id="guideProgress">
+    <div class="progress-track">
+      {phases.map(phase => (
+        <div class="progress-phase" style={`--phase-color: ${phase.color}`}>
+          <span class="phase-label">{phase.label}</span>
+          <div class="phase-dots">
+            {phase.steps.map(s => (
+              <span class="phase-dot" data-step={s}></span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <section class="section guide-hero">
+    <div class="container">
+      <p class="tag">Step-by-Step Guide</p>
+      <h1 class="guide-title">Od nuly k prvnimu reportu</h1>
+      <p class="guide-subtitle">
+        12 kroků, které vás provedou celým EDPA frameworkem —
+        od instalace nástrojů po kalibrovaný výkaz hodin.
+      </p>
+      <a href="#step-1" class="btn btn-primary">Začít průvodce</a>
+    </div>
+  </section>
+
+  <!-- Steps -->
+  {steps.map((step, i) => (
+    <section class="guide-step" id={`step-${step.num}`} style={`--step-color: ${step.color}`}>
+      <div class="container">
+        <div class="step-header">
+          <span class="step-number" style={`color: ${step.color}`}>{String(step.num).padStart(2, '0')}</span>
+          <div>
+            <h2 class="step-title">{step.title}</h2>
+            <p class="step-desc">{step.desc}</p>
+          </div>
+        </div>
+
+        <div class="step-content">
+          <div class="step-code">
+            <div class="code-header">
+              <span class="code-dot red"></span>
+              <span class="code-dot yellow"></span>
+              <span class="code-dot green"></span>
+              <span class="code-label">terminal</span>
+            </div>
+            <pre><code>{step.code}</code></pre>
+          </div>
+
+          <div class="step-result">
+            <div class="result-label">Ocekavany vystup</div>
+            <pre><code>{step.result}</code></pre>
+          </div>
+        </div>
+
+        <div class="step-nav">
+          {i > 0 && (
+            <a href={`#step-${steps[i - 1].num}`} class="btn btn-secondary step-prev-btn">Zpet</a>
+          )}
+          {i < steps.length - 1 ? (
+            <a href={`#step-${steps[i + 1].num}`} class="btn btn-primary step-next-btn">Dalsi krok &rarr;</a>
+          ) : (
+            <a href="/" class="btn btn-primary step-next-btn">Hotovo — zpet na EDPA</a>
+          )}
+        </div>
+      </div>
+    </section>
+  ))}
+
+</Layout>
+
+<script>
+  function initGuideProgress() {
+    const sections = document.querySelectorAll('.guide-step');
+    const dots = document.querySelectorAll('.phase-dot');
+    const fill = document.getElementById('progressFill');
+    if (!sections.length || !fill) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.id;
+          const num = parseInt(id.replace('step-', ''));
+          const pct = (num / 12) * 100;
+          fill.style.width = pct + '%';
+          dots.forEach(d => {
+            const ds = parseInt(d.getAttribute('data-step') || '0');
+            d.classList.toggle('active', ds <= num);
+          });
+        }
+      });
+    }, { threshold: 0.3 });
+
+    sections.forEach(s => observer.observe(s));
+  }
+  document.addEventListener('DOMContentLoaded', initGuideProgress);
+  document.addEventListener('astro:page-load', initGuideProgress);
+</script>
+
+<style>
+  /* Progress bar — sticky top */
+  .guide-progress {
+    position: sticky;
+    top: 56px;
+    z-index: 90;
+    background: rgba(8, 10, 16, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--bd);
+    padding: 10px 24px 8px;
+  }
+  .progress-track {
+    display: flex;
+    justify-content: space-between;
+    max-width: 1200px;
+    margin: 0 auto 8px;
+  }
+  .progress-phase {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .phase-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--phase-color);
+    opacity: 0.7;
+  }
+  .phase-dots {
+    display: flex;
+    gap: 6px;
+  }
+  .phase-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--s3);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .phase-dot.active {
+    background: var(--phase-color);
+    box-shadow: 0 0 8px var(--phase-color);
+  }
+  .progress-bar {
+    max-width: 1200px;
+    margin: 0 auto;
+    height: 3px;
+    background: var(--s2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--ac), var(--cy), var(--gn), var(--yl));
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  /* Hero */
+  .guide-hero {
+    text-align: center;
+    padding: 80px 0 60px;
+  }
+  .guide-title {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    margin: 12px 0;
+    background: linear-gradient(135deg, var(--t1), var(--ac3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .guide-subtitle {
+    font-size: 17px;
+    color: var(--t2);
+    max-width: 600px;
+    margin: 0 auto 28px;
+    line-height: 1.6;
+  }
+
+  /* Steps */
+  .guide-step {
+    padding: 64px 0;
+    border-left: 3px solid var(--step-color);
+    margin-left: 24px;
+    scroll-margin-top: 120px;
+  }
+  @media (max-width: 768px) {
+    .guide-step {
+      margin-left: 0;
+      border-left: none;
+      border-top: 3px solid var(--step-color);
+    }
+  }
+  .step-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  .step-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1;
+    opacity: 0.85;
+    flex-shrink: 0;
+  }
+  .step-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--t1);
+    margin-bottom: 6px;
+  }
+  .step-desc {
+    font-size: 15px;
+    color: var(--t2);
+    line-height: 1.6;
+    max-width: 640px;
+  }
+
+  /* Code block */
+  .step-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 900px) {
+    .step-content {
+      grid-template-columns: 1fr;
+    }
+  }
+  .step-code {
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .code-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: var(--s2);
+    border-bottom: 1px solid var(--bd);
+  }
+  .code-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .code-dot.red { background: #f87171; }
+  .code-dot.yellow { background: #fbbf24; }
+  .code-dot.green { background: #34d399; }
+  .code-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--t3);
+    margin-left: auto;
+  }
+  .step-code pre {
+    padding: 16px;
+    overflow-x: auto;
+  }
+  .step-code code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--gn);
+    background: none;
+    padding: 0;
+  }
+
+  /* Result box */
+  .step-result {
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .result-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--t3);
+    padding: 10px 14px;
+    background: var(--s2);
+    border-bottom: 1px solid var(--bd);
+  }
+  .step-result pre {
+    padding: 16px;
+    overflow-x: auto;
+  }
+  .step-result code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--t2);
+    background: none;
+    padding: 0;
+  }
+
+  /* Navigation */
+  .step-nav {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+  .step-prev-btn {
+    margin-right: auto;
+  }
+</style>

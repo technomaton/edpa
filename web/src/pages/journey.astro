@@ -1,0 +1,324 @@
+---
+import '../styles/global.css';
+import '../styles/presentation.css';
+import Header from '../components/Header.astro';
+
+const title = 'EDPA — User Journey';
+const description = 'EDPA user journey prezentace — 15 slidů pokrývající cestu týmu od ručních timesheetů k automatizovanému vykazování.';
+---
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content={description} />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>{title} | EDPA v1.0.0</title>
+</head>
+<body class="presentation-body">
+  <Header currentPath="/journey/" />
+  <div class="deck" id="deck"></div>
+  <div class="pres-nav">
+    <div class="nav-l"><span class="logo">EDPA v1.0.0</span><span class="nav-label">&middot; User Journey</span></div>
+    <div class="nav-c" id="dots"></div>
+    <div class="nav-r">
+      <button class="pres-btn" id="btnPrev">&larr; Zp&#283;t</button>
+      <span class="pg" id="pgN">1/15</span>
+      <button class="pres-btn" id="btnNext">D&#225;le &rarr;</button>
+    </div>
+  </div>
+
+<script>
+import { initSlideDeck } from '../scripts/slide-engine';
+
+const S=[
+
+// 0 — Vas tym dnes
+`<div style="text-align:center;max-width:850px;margin:0 auto">
+<div class="s-tag fade">Slide 1 &middot; V\u00e1\u0161 t\u00fdm dnes</div>
+<div class="s-h1 fade d1" style="font-size:44px;background:linear-gradient(135deg,var(--or),var(--rd));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Ru\u010dn\u00ed timesheets, nikdo je nem\u00e1 r\u00e1d.</div>
+<div class="s-sub fade d2" style="margin:0 auto">Co kdyby se hodiny odvodily automaticky z toho, co t\u00fdm re\u00e1ln\u011b d\u011bl\u00e1?</div>
+<div class="sg sg3 fade d3" style="max-width:750px;margin:20px auto 0">
+<div class="sc o"><div class="sc-i">&#x1F4DD;</div><div class="sc-t">Dnes</div><div class="sc-l">Ru\u010dn\u00ed \u010dasov\u00e9 v\u00fdkazy<br>Subjektivn\u00ed, neauditovateln\u00e9<br>Nep\u0159\u00edjemn\u00e1 administrativa</div></div>
+<div class="sc g"><div class="sc-i">&#x2192;</div><div class="sc-t">Z\u00edtra</div><div class="sc-l">Automatick\u00e9 odvozen\u00ed<br>Z delivery evidence<br>Matematicky ov\u011b\u0159en\u00e9</div></div>
+<div class="sc a"><div class="sc-i">&#x2705;</div><div class="sc-t">V\u00fdsledek</div><div class="sc-l">P\u0159esn\u00e9 v\u00fdkazy<br>Nulov\u00e1 administrativa<br>T\u00fdm se soust\u0159ed\u00ed na pr\u00e1ci</div></div>
+</div>
+<div class="qt fade d4">Co kdybychom to zm\u011bnili?</div>
+</div>`,
+
+// 1 — EDPA za 30 sekund
+`<div class="s-tag fade">Slide 2 &middot; EDPA za 30 sekund</div>
+<div class="s-h1 fade d1">Kdo p\u0159isp\u00edv\u00e1, dostane hodiny. Automaticky.</div>
+<div class="s-sub fade d2">EDPA (Evidence-Driven Proportional Allocation) odvozuje pracovn\u00ed hodiny z delivery evidence &mdash; commit\u016f, review, koment\u00e1\u0159\u016f. Matematicky zaru\u010den\u011b.</div>
+<div class="sg sg4 fade d3">
+<div class="sc a"><div class="sc-t">1. Evidence</div><div class="sc-v" style="color:var(--ac2)">Git</div><div class="sc-l">Commity, PR, review, koment\u00e1\u0159e &mdash; re\u00e1ln\u00e1 pr\u00e1ce</div></div>
+<div class="sc c"><div class="sc-t">2. V\u00e1hy</div><div class="sc-v" style="color:var(--cy)">CW</div><div class="sc-l">Contribution Weights &mdash; ka\u017ed\u00fd sign\u00e1l m\u00e1 v\u00e1hu</div></div>
+<div class="sc g"><div class="sc-t">3. Score</div><div class="sc-v" style="color:var(--gn)">\u03a3</div><div class="sc-l">Proportional allocation na z\u00e1klad\u011b sk\u00f3re</div></div>
+<div class="sc y"><div class="sc-t">4. V\u00fdkaz</div><div class="sc-v" style="color:var(--yl)">h</div><div class="sc-l">Hodiny za iteraci per-person i per-item</div></div>
+</div>
+<div class="fm fade d4">Evidence &rarr; CW &times; signal &rarr; Score &rarr; hours = (score / \u2211scores) &times; capacity</div>`,
+
+// 2 — Den 1: Setup
+`<div class="s-tag fade">Slide 3 &middot; Den 1: Setup</div>
+<div class="s-h1 fade d1">15 minut a jedete</div>
+<div class="s-sub fade d2">Repo, t\u00fdm, backlog &mdash; v\u0161e nastav\u00edte b\u011bhem jedn\u00e9 k\u00e1vy.</div>
+<div class="sg sg3 fade d3">
+<div class="sc a" style="min-height:170px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">1. Repo</div><div class="sc-l"><code>gh repo create --template edpa-template</code><br><br>Klonovn\u00e1n\u00ed EDPA repo template. V\u0161echny skripty a konfigurace jsou p\u0159ipraveny.</div></div>
+<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F465;</div><div class="sc-t">2. T\u00fdm</div><div class="sc-l"><code>config/team.yaml</code><br><br>Definujte \u010dleny t\u00fdmu, role, kapacitu. Jeden YAML soubor.</div></div>
+<div class="sc g" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">3. Backlog</div><div class="sc-l"><code>backlog/*.yaml</code><br><br>Vytvo\u0159te polo\u017eky backlogu. Ka\u017ed\u00e1 polo\u017eka = 1 YAML soubor.</div></div>
+</div>
+<div class="s-note fade d4"><b>V\u00fdsledek:</b> B\u011b\u017e\u00edc\u00ed repo s t\u00fdmem a backlogem. Za 15 minut.</div>`,
+
+// 3 — Issue Types
+`<div class="s-tag fade">Slide 4 &middot; Issue Types</div>
+<div class="s-h1 fade d1">Hierarchie od vize po \u00fakol</div>
+<div class="s-sub fade d2">4 \u00farovn\u011b &mdash; ka\u017ed\u00e1 s vlastn\u00ed barvou, prefixem a \u00fa\u010delem.</div>
+<div class="sg sg4 fade d3">
+<div class="sc p" style="border-left:4px solid var(--pk);min-height:160px"><div class="sc-t" style="color:var(--pk)">Initiative</div><div class="sc-v" style="font-size:20px;color:var(--pk)">INI-001</div><div class="sc-l">Strategick\u00fd c\u00edl<br>Horizont: PI / kvart\u00e1l<br><span class="tg tg-r">Nejvy\u0161\u0161\u00ed \u00farove\u0148</span></div></div>
+<div class="sc o" style="border-left:4px solid var(--or);min-height:160px"><div class="sc-t" style="color:var(--or)">Epic</div><div class="sc-v" style="font-size:20px;color:var(--or)">EPC-010</div><div class="sc-l">Funk\u010dn\u00ed celek<br>Horizont: iterace<br><span class="tg tg-y">Dekompozice Initiative</span></div></div>
+<div class="sc a" style="border-left:4px solid var(--ac);min-height:160px"><div class="sc-t" style="color:var(--ac)">Feature</div><div class="sc-v" style="font-size:20px;color:var(--ac)">FEA-042</div><div class="sc-l">Doru\u010diteln\u00e1 vlastnost<br>Horizont: dny<br><span class="tg tg-b">Dekompozice Epicu</span></div></div>
+<div class="sc g" style="border-left:4px solid var(--gn);min-height:160px"><div class="sc-t" style="color:var(--gn)">Story</div><div class="sc-v" style="font-size:20px;color:var(--gn)">STR-099</div><div class="sc-l">Atomick\u00fd \u00fakol<br>Horizont: hodiny<br><span class="tg tg-g">Nejni\u017e\u0161\u00ed \u00farove\u0148</span></div></div>
+</div>
+<div class="fm fade d4">Initiative &rarr; Epic &rarr; Feature &rarr; Story</div>`,
+
+// 4 — Backlog v Gitu
+`<div class="s-tag fade">Slide 5 &middot; Backlog v Gitu</div>
+<div class="s-h1 fade d1">1 soubor = 1 polo\u017eka backlogu</div>
+<div class="s-sub fade d2">Backlog je verzovan\u00fd v Gitu. \u017d\u00e1dn\u00e1 extern\u00ed datab\u00e1ze, \u017e\u00e1dn\u00fd vendor lock-in.</div>
+<div class="cols fade d3">
+<div class="col">
+<div class="sc c" style="padding:14px">
+<div class="sc-t">backlog/str-099.yaml</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cy);line-height:1.8;white-space:pre">type: story
+id: STR-099
+title: "Implementace login flow"
+parent: FEA-042
+estimate: 5
+priority: high
+assignee: urbanek</div>
+</div>
+<div class="s-note" style="margin-top:10px"><b>Tip:</b> YAML soubory jsou snadno mergeovateln\u00e9 a review-ovateln\u00e9 v PR.</div>
+</div>
+<div class="col">
+<div class="sc a" style="padding:14px">
+<div class="sc-t">edpa_backlog.py tree</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ac2);line-height:1.8;white-space:pre">INI-001 Platforma v2
+  EPC-010 Autentizace
+    FEA-042 Login flow
+      STR-099 Login impl.
+      STR-100 Token refresh
+    FEA-043 SSO integrace
+  EPC-011 Dashboard
+    FEA-050 Widgets</div>
+</div>
+</div>
+</div>`,
+
+// 5 — GitHub Project
+`<div class="s-tag fade">Slide 6 &middot; GitHub Project</div>
+<div class="s-h1 fade d1">Board, custom fields, WSJF ranking</div>
+<div class="s-sub fade d2">GitHub Projects jako single source of truth pro prioritizaci a sledov\u00e1n\u00ed.</div>
+<div class="sg sg3 fade d3">
+<div class="sc a"><div class="sc-t">Board View</div><div class="sc-l"><b>Backlog</b> &rarr; <b>Ready</b> &rarr; <b>In Progress</b> &rarr; <b>Review</b> &rarr; <b>Done</b><br><br>Drag-and-drop. Automatick\u00e9 p\u0159esuny p\u0159es GitHub Actions.</div></div>
+<div class="sc c"><div class="sc-t">Custom Fields</div><div class="sc-l"><b>WSJF Score</b> &mdash; prioritizace<br><b>Issue Type</b> &mdash; INI/EPC/FEA/STR<br><b>Iteration</b> &mdash; PI a iterace<br><b>Estimate</b> &mdash; story points</div></div>
+<div class="sc g"><div class="sc-t">WSJF Ranking</div><div class="sc-l"><b>Weighted Shortest Job First</b><br><br>Automatick\u00fd v\u00fdpo\u010det priority na z\u00e1klad\u011b business value, time criticality a risk reduction.</div></div>
+</div>
+<div class="fm fade d4">WSJF = (Business Value + Time Criticality + Risk Reduction) / Job Size</div>`,
+
+// 6 — Tyden 1: Tym pracuje
+`<div class="s-tag fade">Slide 7 &middot; T\u00fdden 1: T\u00fdm pracuje</div>
+<div class="s-h1 fade d1">Branch, commit, PR, review</div>
+<div class="s-sub fade d2">T\u00fdm pracuje norm\u00e1ln\u011b. EDPA sb\u00edr\u00e1 evidence automaticky na pozad\u00ed.</div>
+<div class="sg sg4 fade d3">
+<div class="sc a" style="min-height:140px"><div class="sc-t">1. Branch</div><div class="sc-v" style="font-size:14px;color:var(--ac2)">feat/STR-099</div><div class="sc-l">Konvence pojmenov\u00e1n\u00ed branch\u00ed podle issue ID.</div></div>
+<div class="sc c" style="min-height:140px"><div class="sc-t">2. Commit</div><div class="sc-v" style="font-size:14px;color:var(--cy)">fix(STR-099): ...</div><div class="sc-l">Conventional commits s referenc\u00ed na issue.</div></div>
+<div class="sc g" style="min-height:140px"><div class="sc-t">3. PR</div><div class="sc-v" style="font-size:14px;color:var(--gn)">#42 Login flow</div><div class="sc-l">Pull request propojen\u00fd s issue. Closes #STR-099.</div></div>
+<div class="sc y" style="min-height:140px"><div class="sc-t">4. Review</div><div class="sc-v" style="font-size:14px;color:var(--yl)">Approved</div><div class="sc-l">Code review = dal\u0161\u00ed evidence sign\u00e1l pro reviewera.</div></div>
+</div>
+<div class="qt fade d4">T\u00fdm ned\u011bl\u00e1 nic nav\u00edc. V\u0161echna evidence vznik\u00e1 p\u0159irozen\u011b z b\u011b\u017en\u00e9 pr\u00e1ce.</div>`,
+
+// 7 — Evidence detection
+`<div class="s-tag fade">Slide 8 &middot; Evidence Detection</div>
+<div class="s-h1 fade d1">Od Git sign\u00e1lu k hodin\u00e1m</div>
+<div class="s-sub fade d2">Animovan\u00fd flow: jak EDPA transformuje ka\u017edodenn\u00ed pr\u00e1ci na p\u0159esn\u00e9 v\u00fdkazy.</div>
+<div style="display:flex;align-items:center;gap:0;margin:20px 0;flex-wrap:wrap;justify-content:center">
+<div class="sc c fade d1" style="padding:14px 18px;text-align:center;min-width:140px"><div class="sc-t">Git Sign\u00e1ly</div><div style="font-size:13px;color:var(--cy)">commit, PR, review<br>comment, approve</div></div>
+<div class="fade d2" style="font-size:28px;color:var(--t3);padding:0 8px">&rarr;</div>
+<div class="sc a fade d2" style="padding:14px 18px;text-align:center;min-width:140px"><div class="sc-t">CW V\u00e1hy</div><div style="font-size:13px;color:var(--ac2)">commit: 1.0<br>PR author: 1.5<br>review: 0.8</div></div>
+<div class="fade d3" style="font-size:28px;color:var(--t3);padding:0 8px">&rarr;</div>
+<div class="sc g fade d3" style="padding:14px 18px;text-align:center;min-width:140px"><div class="sc-t">Score</div><div style="font-size:13px;color:var(--gn)">Urb\u00e1nek: 14.2<br>Nov\u00e1k: 11.8<br>Dvo\u0159\u00e1k: 9.4</div></div>
+<div class="fade d4" style="font-size:28px;color:var(--t3);padding:0 8px">&rarr;</div>
+<div class="sc y fade d4" style="padding:14px 18px;text-align:center;min-width:140px"><div class="sc-t">Hodiny</div><div style="font-size:13px;color:var(--yl)">Urb\u00e1nek: 64h<br>Nov\u00e1k: 53h<br>Dvo\u0159\u00e1k: 42h</div></div>
+</div>
+<div class="fm fade d5">hours_i = (score_i / \u2211 scores) &times; total_capacity</div>
+<div class="s-note fade d5">Ka\u017ed\u00fd sign\u00e1l m\u00e1 konfiguratelnou v\u00e1hu (CW). T\u00fdm si v\u00e1hy kalibruje b\u011bhem retrospektiv.</div>`,
+
+// 8 — Konec iterace
+`<div class="s-tag fade">Slide 9 &middot; Konec iterace</div>
+<div class="s-h1 fade d1">1 p\u0159\u00edkaz &mdash; v\u00fdkazy, snapshot, report</div>
+<div class="s-sub fade d2">Na konci ka\u017ed\u00e9 iterace spust\u00edte jeden skript. V\u0161e ostatn\u00ed je automatick\u00e9.</div>
+<div class="cols fade d3">
+<div class="col">
+<div class="sc g" style="padding:16px">
+<div class="sc-t">P\u0159\u00edkaz</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gn);line-height:2;white-space:pre">$ python scripts/edpa_engine.py \\
+    --iteration PI1-I2 \\
+    --team config/team.yaml \\
+    --output reports/</div>
+</div>
+</div>
+<div class="col">
+<div class="sg" style="gap:8px">
+<div class="sc a" style="padding:10px"><div class="sc-l"><b>&#x1F4CA; V\u00fdkazy</b><br>Per-person i per-item rozd\u011blen\u00ed hodin</div></div>
+<div class="sc c" style="padding:10px"><div class="sc-l"><b>&#x1F4F8; Snapshot</b><br>Zmrazen\u00fd stav evidence pro audit</div></div>
+<div class="sc y" style="padding:10px"><div class="sc-l"><b>&#x1F4DD; Report</b><br>Markdown report pro stakeholdery</div></div>
+</div>
+</div>
+</div>
+<div class="qt fade d4">Jeden p\u0159\u00edkaz nahrazuje hodiny ru\u010dn\u00edho vykazov\u00e1n\u00ed pro cel\u00fd t\u00fdm.</div>`,
+
+// 9 — Vykaz Urbanka
+`<div class="s-tag fade">Slide 10 &middot; V\u00fdkaz Urb\u00e1nka</div>
+<div class="s-h1 fade d1">Per-person v\u00fdkaz s polo\u017ekami</div>
+<div class="s-sub fade d2">Uk\u00e1zkov\u00fd v\u00fdkaz jednoho \u010dlena t\u00fdmu za iteraci PI1-I2.</div>
+<div class="cols fade d3">
+<div class="col" style="flex:2">
+<div class="sc a" style="padding:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+<div><span class="sc-t" style="display:block">V\u00fdkaz</span><b style="font-size:18px">Jan Urb\u00e1nek</b></div>
+<div style="text-align:right"><span class="tg tg-b">PI1-I2</span><br><span style="font-size:12px;color:var(--t3)">2 t\u00fddny</span></div>
+</div>
+<table>
+<thead><tr><th>Issue</th><th>Typ</th><th>Sign\u00e1ly</th><th style="text-align:right">Hodiny</th></tr></thead>
+<tbody>
+<tr><td>STR-099 Login flow</td><td><span class="tg tg-g">Story</span></td><td>8 commit, 1 PR, 2 review</td><td style="text-align:right;color:var(--gn)"><b>18.4h</b></td></tr>
+<tr><td>STR-100 Token refresh</td><td><span class="tg tg-g">Story</span></td><td>5 commit, 1 PR</td><td style="text-align:right;color:var(--gn)"><b>12.1h</b></td></tr>
+<tr><td>STR-105 Error handling</td><td><span class="tg tg-g">Story</span></td><td>6 commit, 1 PR, 3 review</td><td style="text-align:right;color:var(--gn)"><b>16.8h</b></td></tr>
+<tr><td>FEA-042 Code review</td><td><span class="tg tg-b">Feature</span></td><td>4 review, 6 comment</td><td style="text-align:right;color:var(--gn)"><b>9.2h</b></td></tr>
+<tr style="background:rgba(99,102,241,.05)"><td colspan="3"><b>CELKEM</b></td><td style="text-align:right;color:var(--ac2)"><b>56.5h</b></td></tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="col" style="flex:1">
+<div class="sc c" style="padding:14px;margin-bottom:8px"><div class="sc-t">Kapacita</div><div class="sc-v" style="color:var(--cy)">60h</div><div class="sc-l">Alokace na iteraci</div></div>
+<div class="sc g" style="padding:14px;margin-bottom:8px"><div class="sc-t">Vyk\u00e1z\u00e1no</div><div class="sc-v" style="color:var(--gn)">56.5h</div><div class="sc-l">94.2% vyu\u017eit\u00ed</div></div>
+<div class="sc y" style="padding:14px"><div class="sc-t">Sk\u00f3re</div><div class="sc-v" style="color:var(--yl)">14.2</div><div class="sc-l">Evidence-based</div></div>
+</div>
+</div>`,
+
+// 10 — Dual-view
+`<div class="s-tag fade">Slide 11 &middot; Dual-view</div>
+<div class="s-h1 fade d1">Per-person + Per-item</div>
+<div class="s-sub fade d2">Dva pohledy na stejn\u00e1 data &mdash; v\u00fdkaz pro \u010dlov\u011bka i n\u00e1kladov\u00e1 karta pro polo\u017eku.</div>
+<div class="sg sg2 fade d3">
+<div class="sc a" style="padding:16px">
+<div class="sc-t" style="color:var(--ac2);margin-bottom:10px">Per-person v\u00fdkaz</div>
+<div class="sc-l" style="margin-bottom:8px"><b>Jan Urb\u00e1nek</b> &mdash; PI1-I2</div>
+<table>
+<thead><tr><th>Issue</th><th style="text-align:right">Hodiny</th></tr></thead>
+<tbody>
+<tr><td>STR-099 Login flow</td><td style="text-align:right">18.4h</td></tr>
+<tr><td>STR-100 Token refresh</td><td style="text-align:right">12.1h</td></tr>
+<tr><td>STR-105 Error handling</td><td style="text-align:right">16.8h</td></tr>
+<tr style="background:rgba(99,102,241,.05)"><td><b>CELKEM</b></td><td style="text-align:right;color:var(--ac2)"><b>47.3h</b></td></tr>
+</tbody>
+</table>
+<div style="margin-top:8px;font-size:12px;color:var(--t3)">Pou\u017eit\u00ed: \u010dasov\u00e9 v\u00fdkazy, fakturace</div>
+</div>
+<div class="sc g" style="padding:16px">
+<div class="sc-t" style="color:var(--gn);margin-bottom:10px">Per-item n\u00e1kladov\u00e1 karta</div>
+<div class="sc-l" style="margin-bottom:8px"><b>FEA-042 Login flow</b></div>
+<table>
+<thead><tr><th>\u010clen t\u00fdmu</th><th style="text-align:right">Hodiny</th></tr></thead>
+<tbody>
+<tr><td>Urb\u00e1nek (dev)</td><td style="text-align:right">30.5h</td></tr>
+<tr><td>Nov\u00e1k (review)</td><td style="text-align:right">8.2h</td></tr>
+<tr><td>Dvo\u0159\u00e1k (test)</td><td style="text-align:right">5.1h</td></tr>
+<tr style="background:rgba(52,211,153,.05)"><td><b>CELKEM</b></td><td style="text-align:right;color:var(--gn)"><b>43.8h</b></td></tr>
+</tbody>
+</table>
+<div style="margin-top:8px;font-size:12px;color:var(--t3)">Pou\u017eit\u00ed: n\u00e1kladov\u00e1 anal\u00fdza, rozpocet</div>
+</div>
+</div>
+<div class="s-note fade d4"><b>Stejn\u00e1 data, dva pohledy.</b> Person-view pro vykazov\u00e1n\u00ed, item-view pro n\u00e1kladovou anal\u00fdzu polo\u017eek backlogu.</div>`,
+
+// 11 — Retrospektiva
+`<div class="s-tag fade">Slide 12 &middot; Retrospektiva</div>
+<div class="s-h1 fade d1">T\u00fdm koriguje, syst\u00e9m se u\u010d\u00ed</div>
+<div class="s-sub fade d2">Na konci ka\u017ed\u00e9 iterace t\u00fdm porovn\u00e1 EDPA v\u00fdstup se skute\u010dnost\u00ed a uprav\u00ed CW v\u00e1hy.</div>
+<div class="sg sg3 fade d3">
+<div class="sc c"><div class="sc-i">&#x1F4CA;</div><div class="sc-t">1. Ground Truth</div><div class="sc-l">T\u00fdm zad\u00e1 skute\u010dn\u00e9 hodiny (ground truth). <b>Jen jednou za iteraci</b> &mdash; ne denn\u011b.</div></div>
+<div class="sc y"><div class="sc-i">&#x1F50D;</div><div class="sc-t">2. Porovn\u00e1n\u00ed</div><div class="sc-l">EDPA spo\u010d\u00edt\u00e1 <b>MAD</b> (Mean Absolute Deviation) mezi odhadem a realitou.<br><br><code>MAD = avg(|edpa_h - real_h|)</code></div></div>
+<div class="sc g"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">3. Kalibrace CW</div><div class="sc-l">T\u00fdm uprav\u00ed v\u00e1hy sign\u00e1l\u016f tak, aby MAD v p\u0159\u00ed\u0161t\u00ed iteraci klesla. <b>Feedback loop.</b></div></div>
+</div>
+<div class="fm fade d4">MAD = (1/n) &times; \u2211 |edpa_hours_i - actual_hours_i|
+C\u00edl: MAD < 2h na osobu za iteraci</div>
+<div class="qt fade d5">Retrospektiva nen\u00ed kritika &mdash; je to kalibrace senzoru.</div>`,
+
+// 12 — Auto-kalibrace
+`<div class="s-tag fade">Slide 13 &middot; Auto-kalibrace</div>
+<div class="s-h1 fade d1">Karpathy loop: heuristika se u\u010d\u00ed</div>
+<div class="s-sub fade d2">Ka\u017ed\u00e1 retrospektiva generuje nov\u00e1 data. Syst\u00e9m konverguje k p\u0159esnosti.</div>
+<div class="cols fade d3">
+<div class="col">
+<div class="sc a" style="padding:16px">
+<div class="sc-t">Karpathy Loop</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ac2);line-height:2.2;white-space:pre">1. Sb\u011br evidence (Git sign\u00e1ly)
+2. V\u00fdpo\u010det hodin (CW model)
+3. Porovn\u00e1n\u00ed s ground truth
+4. Gradient: \u0394CW = f(MAD)
+5. Update v\u00e1h
+6. GOTO 1</div>
+</div>
+</div>
+<div class="col">
+<div class="sg" style="gap:8px">
+<div class="sc o" style="padding:10px"><div class="sc-t">Iterace 1</div><div style="display:flex;justify-content:space-between"><span class="sc-l">MAD</span><span style="color:var(--or);font-weight:700;font-family:'JetBrains Mono',monospace">4.8h</span></div></div>
+<div class="sc y" style="padding:10px"><div class="sc-t">Iterace 2</div><div style="display:flex;justify-content:space-between"><span class="sc-l">MAD</span><span style="color:var(--yl);font-weight:700;font-family:'JetBrains Mono',monospace">3.1h</span></div></div>
+<div class="sc g" style="padding:10px"><div class="sc-t">Iterace 3</div><div style="display:flex;justify-content:space-between"><span class="sc-l">MAD</span><span style="color:var(--gn);font-weight:700;font-family:'JetBrains Mono',monospace">1.9h</span></div></div>
+<div class="sc g" style="padding:10px"><div class="sc-t">Iterace 4</div><div style="display:flex;justify-content:space-between"><span class="sc-l">MAD</span><span style="color:var(--gn);font-weight:700;font-family:'JetBrains Mono',monospace">1.4h</span></div></div>
+<div class="sc g" style="padding:10px;border:1px solid var(--gn)"><div class="sc-t">Iterace 5+</div><div style="display:flex;justify-content:space-between"><span class="sc-l">MAD</span><span style="color:var(--gn);font-weight:700;font-family:'JetBrains Mono',monospace">&lt; 1h</span></div></div>
+</div>
+</div>
+</div>
+<div class="s-note fade d4"><b>MAD kles\u00e1 s ka\u017edou iterac\u00ed.</b> Po 3&ndash;4 iterac\u00edch syst\u00e9m konverguje a v\u00fdkazy jsou p\u0159esn\u00e9.</div>`,
+
+// 13 — Po 2 PI
+`<div class="s-tag fade">Slide 14 &middot; Po 2 PI</div>
+<div class="s-h1 fade d1">Predictability &gt; 80%, t\u00fdm konverguje</div>
+<div class="s-sub fade d2">Po dvou Program Incrementech m\u00e1 t\u00fdm zkalibrovan\u00fd model a p\u0159esn\u00e9 v\u00fdkazy.</div>
+<div class="sg sg3 fade d3">
+<div class="sc g" style="text-align:center;padding:20px"><div class="sc-t">Predictability</div><div class="sc-v" style="font-size:36px;color:var(--gn)">&gt; 80%</div><div class="sc-l">Shoda EDPA v\u00fdstupu se skute\u010dnost\u00ed</div></div>
+<div class="sc a" style="text-align:center;padding:20px"><div class="sc-t">MAD</div><div class="sc-v" style="font-size:36px;color:var(--ac2)">&lt; 1.5h</div><div class="sc-l">Pr\u016fm\u011brn\u00e1 odchylka na osobu</div></div>
+<div class="sc c" style="text-align:center;padding:20px"><div class="sc-t">Administrativa</div><div class="sc-v" style="font-size:36px;color:var(--cy)">0h</div><div class="sc-l">Nulov\u00fd overhead vykazov\u00e1n\u00ed</div></div>
+</div>
+<div class="sg sg2 fade d4" style="margin-top:14px">
+<div class="sc y" style="padding:14px"><div class="sc-t">Co t\u00fdm z\u00edsk\u00e1v\u00e1</div><div class="sc-l"><b>V\u00edce \u010dasu na pr\u00e1ci</b> &mdash; \u017e\u00e1dn\u00e9 vypl\u0148ov\u00e1n\u00ed timesheet\u016f<br><b>F\u00e9rov\u00e9 hodnocen\u00ed</b> &mdash; evidence-based, ne subjektivn\u00ed<br><b>Transparentnost</b> &mdash; ka\u017ed\u00fd vid\u00ed, jak hodiny vznikly</div></div>
+<div class="sc y" style="padding:14px"><div class="sc-t">Co management z\u00edsk\u00e1v\u00e1</div><div class="sc-l"><b>Auditovatelnost</b> &mdash; ka\u017ed\u00e1 hodina je trasovatel\u00e1 na evidence<br><b>N\u00e1kladov\u00e1 data</b> &mdash; per-item cost tracking<br><b>Prediktabilita</b> &mdash; spolehlivost v\u00fdkaz\u016f roste</div></div>
+</div>`,
+
+// 14 — Zacnete dnes
+`<div style="text-align:center;max-width:850px;margin:0 auto">
+<div class="s-tag fade">Slide 15 &middot; Za\u010dn\u011bte dnes</div>
+<div class="s-h1 fade d1" style="font-size:44px;background:linear-gradient(135deg,var(--gn),var(--cy));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Za\u010dn\u011bte dnes</div>
+<div class="s-sub fade d2" style="margin:0 auto">Jeden p\u0159\u00edkaz a m\u00e1te funk\u010dn\u00ed demo.</div>
+<div class="sc g fade d3" style="max-width:650px;margin:20px auto;padding:20px;text-align:left">
+<div class="sc-t">Quick Start</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--gn);line-height:2.2;white-space:pre">pip install pyyaml
+python scripts/edpa_engine.py --demo</div>
+</div>
+<div class="sg sg3 fade d4" style="max-width:700px;margin:16px auto 0">
+<div class="sc a" style="text-align:center;padding:12px"><div class="sc-t">GitHub</div><div style="font-size:12px;color:var(--ac2)">Open Source repo<br>MIT licence</div></div>
+<div class="sc c" style="text-align:center;padding:12px"><div class="sc-t">Dokumentace</div><div style="font-size:12px;color:var(--cy)">Metodika + API<br>P\u0159\u00edklady</div></div>
+<div class="sc g" style="text-align:center;padding:12px"><div class="sc-t">Podpora</div><div style="font-size:12px;color:var(--gn)">GitHub Issues<br>Discussions</div></div>
+</div>
+<div class="qt fade d5">Hodiny odvozeny z reality. \u017d\u00e1dn\u00e9 timesheets. Matematicky zaru\u010den\u011b.</div>
+</div>`
+
+];
+
+initSlideDeck(S);
+</script>
+</body>
+</html>
