@@ -8,20 +8,22 @@ Get EDPA running in 10 minutes.
 - GitHub CLI (`gh`) authenticated (`gh auth login`)
 - A GitHub repository for your project
 
-## Step 1: Create your project from template
+## Step 1: Install EDPA plugin
 
 ```bash
-gh repo create my-org/my-project --template technomaton/edpa-template --private
 cd my-project
+curl -fsSL https://edpa.technomaton.com/install.sh | sh
+# or: npx @technomaton/edpa init
 ```
 
-Or clone directly:
-```bash
-git clone https://github.com/technomaton/edpa.git my-project
-cd my-project
+## Step 2: Initialize and configure
+
+**Option A: Interactive (recommended)**
+```
+/edpa setup "My Project"
 ```
 
-## Step 2: Configure your team
+**Option B: Manual**
 
 Copy and edit the capacity registry:
 ```bash

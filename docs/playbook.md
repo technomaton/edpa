@@ -2,8 +2,8 @@
 
 Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allocation) na novy projekt. Od prazdneho repozitare po uzavreni prvniho Planning Intervalu a kalibraci heuristik.
 
-**Verze:** EDPA v2.1.0
-**Posledni aktualizace:** 2026-03-22
+**Verze:** EDPA v3.0.0
+**Posledni aktualizace:** 2026-03-28
 
 ---
 
@@ -83,23 +83,29 @@ Claude Code provede kroky 1.1-1.6 automaticky -- vytvori repo, nakonfiguruje tym
 
 Nasledujici kroky popisuji manualni postup bez Claude Code.
 
-### 1.1 Vytvorit repozitar
+### 1.1 Nainstalovat EDPA plugin
 
-**Varianta A: Z EDPA sablony (doporuceno)**
+**Varianta A: Shell installer (doporuceno)**
 
 ```bash
-gh repo create my-org/my-project --template technomaton/edpa-template --private
 cd my-project
+curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 
-**Varianta B: Klonovat a upravit**
+**Varianta B: npx**
 
 ```bash
-git clone https://github.com/your-org/edpa.git my-project
 cd my-project
-rm -rf .git
-git init
-git remote add origin git@github.com:my-org/my-project.git
+npx @technomaton/edpa init
+```
+
+**Varianta C: Manualni kopie**
+
+```bash
+cd my-project
+gh repo clone technomaton/edpa /tmp/edpa
+cp -r /tmp/edpa/plugin/ .claude/
+rm -rf /tmp/edpa
 ```
 
 Vysledna struktura:
@@ -227,7 +233,7 @@ project:
   domain: "mujprojekt.cz"
 
 governance:
-  methodology: "EDPA v2.1.0"
+  methodology: "EDPA v3.0.0"
   calculation_mode: "simple"            # simple (JS x CW) nebo full (JS x CW x RS)
   audit_mode: "full"
 
