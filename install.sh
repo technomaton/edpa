@@ -36,11 +36,12 @@ else
   mv "$TMPDIR"/edpa-* "$TMPDIR/edpa"
 fi
 
-# Copy plugin contents into .claude/
+# Copy plugin contents into .claude/ (including hidden files like .mcp.json, .claude-plugin/)
 cp -R "$TMPDIR/edpa/plugin/"* "$TARGET/"
+cp -R "$TMPDIR/edpa/plugin/".* "$TARGET/" 2>/dev/null || true
 
 # Create .edpa structure if it doesn't exist
-for dir in config backlog reports snapshots data; do
+for dir in config backlog/initiatives backlog/epics backlog/features backlog/stories iterations reports snapshots data; do
   mkdir -p ".edpa/$dir"
 done
 
