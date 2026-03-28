@@ -213,11 +213,11 @@ python .claude/edpa/scripts/backlog.py validate                # Kontrola integr
 ## 7. Kompletní flow — od nuly po běžící projekt
 
 ```
-1. Vytvořit repo
-   gh repo create org/project --template technomaton/edpa-template --clone
+1. Nainstalovat EDPA plugin
+   curl -fsSL https://edpa.technomaton.com/install.sh | sh
 
 2. Inicializovat EDPA
-   # Automaticky z template — nemusíte kopírovat
+   /edpa setup "Project Name"
    
    
    
