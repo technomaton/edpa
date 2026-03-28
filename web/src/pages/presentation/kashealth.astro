@@ -13,13 +13,13 @@ const description = 'EDPA prezentace pro kashealth.cz — kompletní governance 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content={description} />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <title>{title} | EDPA v2.1.0</title>
+  <title>{title} | EDPA v3.0.0</title>
 </head>
 <body class="presentation-body">
   <Header currentPath="/presentation/" />
   <div class="deck" id="deck"></div>
   <div class="pres-nav">
-    <div class="nav-l"><span class="logo">kashealth.cz</span><span class="nav-label">&middot; EDPA v2.1.0 &middot; Kompletní řešení</span></div>
+    <div class="nav-l"><span class="logo">kashealth.cz</span><span class="nav-label">&middot; EDPA v3.0.0 &middot; Kompletní řešení</span></div>
     <div class="nav-c" id="dots"></div>
     <div class="nav-r">
       <button class="pres-btn" id="btnPrev">&larr; Zpět</button>
@@ -41,7 +41,7 @@ const S=[
 <div class="fade d3" style="font-size:14px;color:var(--t3);font-style:italic;margin-bottom:24px">Capacity derivation from delivery evidence</div>
 <div class="sg sg4 fade d4" style="max-width:700px;margin:0 auto">
 <div class="sc a" style="text-align:center;padding:12px"><div class="sc-t">Tooling</div><div style="font-size:12px;color:var(--ac2)">Teams + GitHub</div></div>
-<div class="sc c" style="text-align:center;padding:12px"><div class="sc-t">Metodika</div><div style="font-size:12px;color:var(--cy)">EDPA v2.1.0</div></div>
+<div class="sc c" style="text-align:center;padding:12px"><div class="sc-t">Metodika</div><div style="font-size:12px;color:var(--cy)">EDPA v3.0.0</div></div>
 <div class="sc g" style="text-align:center;padding:12px"><div class="sc-t">Skills</div><div style="font-size:12px;color:var(--gn)">4 composable</div></div>
 <div class="sc y" style="text-align:center;padding:12px"><div class="sc-t">Template</div><div style="font-size:12px;color:var(--yl)">GitHub repo</div></div>
 </div>
@@ -117,7 +117,7 @@ const S=[
 </div></div>`,
 
 // 5: EDPA CORE
-`<div class="s-tag fade">EDPA v2.1.0</div>
+`<div class="s-tag fade">EDPA v3.0.0</div>
 <div class="s-h1 fade d1">Čas se neměří — odvozuje se</div>
 <div class="qt fade d2">Člověk deklaruje kapacitu. Systém identifikuje work items, na nichž se podílel. Kapacita se rozpadne poměrově podle evidence.</div>
 <div class="cols fade d3">
@@ -259,9 +259,10 @@ Garance: &#x2211; podilu = 100%</div>
 </div>
 <div class="col">
 <div class="sc g" style="margin-bottom:8px"><div class="sc-t">Pro kashealth.cz</div><div class="sc-l">
-<code>gh repo create kashealth/medical-platform</code><br>
-<code>--template technomaton/edpa-template</code><br><br>
-Edituj <code>.edpa/config/</code> &#x2192; hotovo.
+<code>cd medical-platform</code><br>
+<code>curl -fsSL edpa.technomaton.com/install.sh | sh</code><br>
+<code>/edpa setup "Medical Platform"</code><br><br>
+Plugin + setup &#x2192; hotovo.
 </div></div>
 <div class="sc c" style="margin-bottom:8px"><div class="sc-t">Pro jiny projekt</div><div class="sc-l">
 "Use this template" na GitHubu.<br>
@@ -400,7 +401,7 @@ Loop:
 <div class="sc a" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--ac2)">3. Den 1: nasazení</div></div>
 <div class="sc y" style="padding:8px;text-align:center"><div style="font-size:10px;color:var(--yl)">4. První PI</div></div>
 </div></div>
-<div class="fade d5" style="margin-top:16px;font-size:11px;color:var(--t3)">kashealth.cz &middot; EDPA v2.1.0 &middot; Medical Platform a Datový e-shop &middot; CZ.01.01.01/01/24_062/0007440</div>
+<div class="fade d5" style="margin-top:16px;font-size:11px;color:var(--t3)">kashealth.cz &middot; EDPA v3.0.0 &middot; Medical Platform a Datový e-shop &middot; CZ.01.01.01/01/24_062/0007440</div>
 </div>`
 ];
 

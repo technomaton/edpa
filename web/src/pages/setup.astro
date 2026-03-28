@@ -163,8 +163,8 @@ import Layout from '../layouts/Layout.astro';
         <div class="launch-cards">
           <div class="form-card launch-card launch-card--recommended">
             <div class="launch-badge">doporuceno</div>
-            <h3 class="card-heading">Path A: Template repo</h3>
-            <p class="card-text">Nejrychlejsi cesta. Vytvorte repo z EDPA template a vlozte vygenerovane soubory.</p>
+            <h3 class="card-heading">Path A: Plugin install</h3>
+            <p class="card-text">Nejrychlejsi cesta. Nainstalujte EDPA plugin a spustte setup.</p>
             <pre class="launch-pre" id="launchA"></pre>
           </div>
           <div class="form-card launch-card">
@@ -180,7 +180,7 @@ import Layout from '../layouts/Layout.astro';
         </div>
 
         <div class="form-card launch-note">
-          <p class="launch-note-text">Template repo obsahuje <code>.claude/edpa/</code> (skripty, šablony), <code>.edpa/</code> strukturu, Claude Code skills. Neobsahuje <code>web/</code> ani <code>docs/examples/</code>.</p>
+          <p class="launch-note-text">Plugin nainstaluje <code>.claude/edpa/</code> (skripty, sablony, workflows) a Claude Code skills/commands. Setup pak vytvori <code>.edpa/</code> strukturu pro projektova data.</p>
         </div>
       </div>
 
@@ -965,24 +965,30 @@ import Layout from '../layouts/Layout.astro';
       const launchA = document.getElementById('launchA');
       if (launchA) {
         launchA.textContent = [
-          `gh repo create ${org}/${repo} --template technomaton/edpa-template --clone`,
           `cd ${repo}`,
-          `# Vlozte vygenerovane soubory z kroku 3`,
+          `curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
+          `# nebo: npx @technomaton/edpa init`,
+          `# potom: /edpa setup "${state.projectName || 'Projekt'}"`,
         ].join('\n');
       }
 
       const launchB = document.getElementById('launchB');
       if (launchB) {
-        launchB.textContent = `/edpa setup`;
+        launchB.textContent = [
+          `cd ${repo}`,
+          `curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
+          `/edpa setup "${state.projectName || 'Projekt'}"`,
+        ].join('\n');
       }
 
       const launchC = document.getElementById('launchC');
       if (launchC) {
         launchC.textContent = [
-          `gh repo create ${org}/${repo} --clone`,
-          `# Stahnte EDPA z github.com/technomaton/edpa`,
-          `# Zkopirujte: .claude/, .edpa/, .github/`,
-          `# (web/ a docs/examples/ vynechte -- nejsou potreba pro novy projekt)`,
+          `cd ${repo}`,
+          `gh repo clone technomaton/edpa /tmp/edpa`,
+          `cp -r /tmp/edpa/plugin/ .claude/`,
+          `rm -rf /tmp/edpa`,
+          `# potom: /edpa setup "${state.projectName || 'Projekt'}"`,
         ].join('\n');
       }
     }

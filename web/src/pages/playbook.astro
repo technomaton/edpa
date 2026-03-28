@@ -8,7 +8,7 @@ import Layout from '../layouts/Layout.astro';
     <div class="tag">Playbook</div>
     <h1>EDPA Playbook — Od nuly po první PI</h1>
     <p class="subtitle">Kompletní příručka pro nasazení metodiky EDPA na nový projekt</p>
-    <p class="meta">EDPA v2.1.0 &middot; Březen 2026</p>
+    <p class="meta">EDPA v3.0.0 &middot; Březen 2026</p>
   </div>
 
   <div class="methodology-layout">
@@ -95,16 +95,18 @@ gh auth refresh -s repo,project,read:project,admin:org</code></pre>
     <h3>Cesta B: Manuální CLI</h3>
     <p>Následující kroky popisují manuální postup bez Claude Code.</p>
 
-    <h3>1.1 Vytvořit repozitář</h3>
-    <p><strong>Varianta A: Z EDPA šablony (doporučeno)</strong></p>
-    <pre><code>gh repo create my-org/my-project --template technomaton/edpa-template --private
-cd my-project</code></pre>
-    <p><strong>Varianta B: Klonovat a upravit</strong></p>
-    <pre><code>git clone https://github.com/your-org/edpa.git my-project
-cd my-project
-rm -rf .git
-git init
-git remote add origin git@github.com:my-org/my-project.git</code></pre>
+    <h3>1.1 Nainstalovat EDPA plugin</h3>
+    <p><strong>Varianta A: Shell installer (doporučeno)</strong></p>
+    <pre><code>cd my-project
+curl -fsSL https://edpa.technomaton.com/install.sh | sh</code></pre>
+    <p><strong>Varianta B: npx</strong></p>
+    <pre><code>cd my-project
+npx @technomaton/edpa init</code></pre>
+    <p><strong>Varianta C: Manuální kopie</strong></p>
+    <pre><code>cd my-project
+gh repo clone technomaton/edpa /tmp/edpa
+cp -r /tmp/edpa/plugin/ .claude/
+rm -rf /tmp/edpa</code></pre>
 
     <p>Výsledná struktura:</p>
     <pre><code>my-project/
@@ -186,7 +188,7 @@ people:
   domain: "mujprojekt.cz"
 
 governance:
-  methodology: "EDPA v2.1.0"
+  methodology: "EDPA v3.0.0"
   calculation_mode: "simple"            # simple (JS x CW) nebo full (JS x CW x RS)
   audit_mode: "full"
 
