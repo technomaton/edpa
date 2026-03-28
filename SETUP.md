@@ -1,69 +1,99 @@
-# Setting Up as GitHub Template Repository
+# EDPA Setup
 
-## Step 1: Create the repo
+## Installation
 
-```bash
-# Option A: Create from this template on GitHub
-# Click "Use this template" on https://github.com/technomaton/edpa
-
-# Option B: CLI
-gh repo create my-org/my-project --template technomaton/edpa-template --private
-cd my-project
-```
-
-## Step 2: Configure your project
+Install the EDPA plugin into your project:
 
 ```bash
-cp config/capacity.yaml.tmpl config/capacity.yaml
-cp config/cw_heuristics.yaml.tmpl config/cw_heuristics.yaml
-cp config/project.yaml.tmpl config/project.yaml
+npx @technomaton/edpa init
+# or
+curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 
-Edit `config/capacity.yaml` with your team members.
-Edit `config/project.yaml` with your project name and metadata.
+This copies the EDPA plugin into `.claude/edpa/` and sets up slash commands and skills.
 
-Or use Claude Code:
+## Setup
+
+Initialize governance for your project:
+
 ```
-Set up EDPA governance for My Project
+/edpa setup "Project Name"
 ```
 
-## Step 3: Configure GitHub Projects
+This will:
+1. Create `.edpa/config/capacity.yaml` from template
+2. Create `.edpa/config/heuristics.yaml` from template
+3. Set up GitHub Project with custom fields (Job Size, WSJF, etc.)
+4. Configure branch naming enforcement via GitHub Actions
+5. Create initial backlog structure in `.edpa/backlog/`
+
+## Manual Configuration
+
+If you prefer to configure manually instead of using `/edpa setup`:
+
+### Team capacity
+
+Edit `.edpa/config/capacity.yaml`:
+
+```yaml
+cadence:
+  iteration_weeks: 2    # 1 (AI-native) or 2 (classic)
+
+people:
+  - id: alice
+    name: "Alice Smith"
+    role: Dev
+    fte: 1.0
+    capacity_per_iteration: 80
+```
+
+### CW heuristics
+
+Edit `.edpa/config/heuristics.yaml` (defaults are calibrated from Monte Carlo simulation):
+
+```yaml
+base_weights:
+  owner: 1.0
+  key_contributor: 0.6
+  reviewer: 0.25
+  consulted: 0.15
+```
+
+### GitHub Project
 
 See [docs/github-setup.md](docs/github-setup.md) for custom field definitions.
 
-```bash
-# Create project
-gh project create --title "My Project Governance" --owner @me
-
-# Add custom fields via GraphQL
-PROJECT_ID=$(gh project list --owner @me --format json | jq -r '.projects[0].id')
-
-gh project field-create $PROJECT_ID --name "Issue Type" --data-type "SINGLE_SELECT" \
-  --single-select-options "Initiative,Epic,Feature,Story,Task,Bug"
-gh project field-create $PROJECT_ID --name "Job Size" --data-type "NUMBER"
-gh project field-create $PROJECT_ID --name "Business Value" --data-type "NUMBER"
-gh project field-create $PROJECT_ID --name "Time Criticality" --data-type "NUMBER"
-gh project field-create $PROJECT_ID --name "Risk Reduction" --data-type "NUMBER"
-gh project field-create $PROJECT_ID --name "WSJF Score" --data-type "NUMBER"
-```
-
-## Step 4: Verify
+## Verify Installation
 
 ```bash
-# Test branch naming check
+# Test the engine
+python3 .claude/edpa/scripts/engine.py --demo
+
+# Test branch naming
 git checkout -b feature/S-001-test-story
-echo "test" > test.txt
-git add . && git commit -m "test: verify branch naming"
-git push origin feature/S-001-test-story
-gh pr create --title "S-001: Test story" --body "Closes #1"
-# CI should pass
-
-# Test EDPA engine
-python scripts/edpa_engine.py --demo
 ```
 
-## Step 5: Mark as template (optional)
+## Day-to-Day Usage
 
-If you want others to use your configured repo as a template:
-1. Go to repo **Settings** → scroll to **Template repository**
-2. Check **"Template repository"**
+| Task | Command |
+|------|---------|
+| Close iteration | `/edpa close-iteration PI-2026-1.3` |
+| Generate reports | `/edpa reports` |
+| Sync with GitHub | `/edpa sync` |
+| Calibrate heuristics | `/edpa calibrate` |
+
+## Migration from v2.x
+
+If upgrading from the old GitHub template approach:
+
+| Old path | New path |
+|----------|----------|
+| `scripts/edpa_engine.py` | `.claude/edpa/scripts/engine.py` |
+| `config/capacity.yaml` | `.edpa/config/capacity.yaml` |
+| `config/cw_heuristics.yaml` | `.edpa/config/heuristics.yaml` |
+| `config/project.yaml` | `.edpa/config/project.yaml` |
+| `reports/` | `.edpa/reports/` |
+| `snapshots/` | `.edpa/snapshots/` |
+| `data/` | `.edpa/data/` |
+| `claude-code/skills/` | `.claude/skills/` |
+| `claude-code/commands/` | `.claude/commands/` |

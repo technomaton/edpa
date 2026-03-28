@@ -2,7 +2,7 @@
 
 ## Native Issue Types (org-level)
 
-Issue Types are a native GitHub feature, managed at the organization level (not per-project custom fields). Create them via `edpa_issue_types.py setup`:
+Issue Types are a native GitHub feature, managed at the organization level (not per-project custom fields). Create them via `.claude/edpa/scripts/issue_types.py setup`:
 
 | Issue Type | Description |
 |------------|-------------|
@@ -35,10 +35,10 @@ Create these on your GitHub Project:
 ## Fields NOT to put in GitHub Projects
 
 These belong in the Evidence & Reporting layer, not operational metadata:
-- Iteration Capacity (hours) → `config/capacity.yaml`
-- Derived Hours → `reports/` snapshots
-- FTE → `config/capacity.yaml`
-- Signature status → `/snapshots/` + `/signed/`
+- Iteration Capacity (hours) → `.edpa/config/capacity.yaml`
+- Derived Hours → `.edpa/reports/` snapshots
+- FTE → `.edpa/config/capacity.yaml`
+- Signature status → `.edpa/snapshots/` + `.edpa/reports/signed/`
 
 ## Hierarchy via sub-issues and native Issue Types
 

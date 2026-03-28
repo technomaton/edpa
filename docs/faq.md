@@ -20,7 +20,7 @@ Those tools measure **developer productivity metrics** (cycle time, PR throughpu
 ### Does EDPA work without Claude Code?
 
 Yes. EDPA has two interfaces:
-1. **Python CLI** (`scripts/edpa_engine.py`) — works anywhere with Python 3.10+
+1. **Python CLI** (`.claude/edpa/scripts/engine.py`) — works anywhere with Python 3.10+
 2. **Claude Code skills** — conversational interface for AI-assisted governance
 
 The Python CLI is fully standalone. Claude Code skills provide a more convenient experience.
@@ -91,8 +91,8 @@ Whether your specific auditor accepts it depends on your grant program. The meth
 
 No. Snapshots are immutable. Corrections create new revisions:
 ```
-snapshots/PI-2026-1.3.json        # original
-snapshots/PI-2026-1.3_rev2.json   # correction (includes reason and diff)
+.edpa/snapshots/PI-2026-1.3.json        # original
+.edpa/snapshots/PI-2026-1.3_rev2.json   # correction (includes reason and diff)
 ```
 
 ## Setup

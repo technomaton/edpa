@@ -1,5 +1,50 @@
 # Changelog
 
+## 3.0.0 — 2026-03-28
+
+Plugin-first distribution + restructured directories. **BREAKING CHANGE.**
+
+### Breaking Changes
+- Installation via `npx @technomaton/edpa init` or `curl` — GitHub template approach dropped
+- All scripts moved: `scripts/edpa_engine.py` -> `.claude/edpa/scripts/engine.py`
+- All config moved: `config/capacity.yaml` -> `.edpa/config/capacity.yaml`
+- Heuristics renamed: `config/cw_heuristics.yaml` -> `.edpa/config/heuristics.yaml`
+- Reports, snapshots, data moved under `.edpa/` prefix
+- Claude Code skills/commands moved from `claude-code/` to `.claude/` (standard plugin location)
+
+### Added
+- `install.sh` — shell installer (detects `.claude/`, downloads release, copies plugin)
+- `plugin/` directory — single source of truth for installable EDPA plugin
+- **edpa-sync** skill — 5th skill for GitHub Projects <-> Git backlog synchronization
+- `/edpa sync` command
+- `plugin/.claude-plugin/plugin.json` — plugin manifest
+
+### Changed
+- Source reorganized: `plugin/` contains all installable assets (scripts, templates, workflows, skills, commands)
+- `.edpa/` restructured: `config/`, `backlog/`, `reports/`, `snapshots/`, `data/`
+- README, SETUP, CONTRIBUTING updated for new paths and installation method
+
+### Removed
+- GitHub template approach (`gh repo create --template`)
+- `config/*.tmpl` files at repo root (moved to `plugin/edpa/templates/`)
+- `scripts/` directory at repo root (moved to `plugin/edpa/scripts/`)
+
+### Migration
+| Old path | New path |
+|----------|----------|
+| `scripts/edpa_engine.py` | `.claude/edpa/scripts/engine.py` |
+| `scripts/evaluate_cw.py` | `.claude/edpa/scripts/evaluate_cw.py` |
+| `scripts/edpa_sync.py` | `.claude/edpa/scripts/sync.py` |
+| `scripts/edpa_backlog.py` | `.claude/edpa/scripts/backlog.py` |
+| `scripts/edpa_issue_types.py` | `.claude/edpa/scripts/issue_types.py` |
+| `scripts/edpa_project_setup.py` | `.claude/edpa/scripts/project_setup.py` |
+| `config/capacity.yaml` | `.edpa/config/capacity.yaml` |
+| `config/cw_heuristics.yaml` | `.edpa/config/heuristics.yaml` |
+| `config/project.yaml` | `.edpa/config/project.yaml` |
+| `reports/` | `.edpa/reports/` |
+| `snapshots/` | `.edpa/snapshots/` |
+| `data/` | `.edpa/data/` |
+
 ## 2.0.0 — 2026-03-25
 
 Multi-contract engine + role_overrides fix. **BREAKING CHANGE.**

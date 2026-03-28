@@ -25,10 +25,10 @@ cd my-project
 
 Copy and edit the capacity registry:
 ```bash
-cp config/capacity.yaml.tmpl config/capacity.yaml
+cp .claude/edpa/templates/capacity.yaml.tmpl .edpa/config/capacity.yaml
 ```
 
-Edit `config/capacity.yaml` with your team:
+Edit `.edpa/config/capacity.yaml` with your team:
 ```yaml
 cadence:
   iteration_weeks: 2        # 2-week iterations
@@ -56,17 +56,17 @@ people:
 
 Copy the heuristics (defaults work fine for most teams):
 ```bash
-cp config/cw_heuristics.yaml.tmpl config/cw_heuristics.yaml
-cp config/project.yaml.tmpl config/project.yaml
+cp .claude/edpa/templates/heuristics.yaml.tmpl .edpa/config/heuristics.yaml
+cp .claude/edpa/templates/project.yaml.tmpl .edpa/config/project.yaml
 ```
 
-Edit `config/project.yaml` with your project name.
+Edit `.edpa/config/project.yaml` with your project name.
 
 ## Step 3: Try the demo
 
 Before using real data, run the built-in demo:
 ```bash
-python scripts/edpa_engine.py --demo
+python .claude/edpa/scripts/engine.py --demo
 ```
 
 You'll see a complete EDPA calculation with sample data, including per-person breakdown and invariant validation.
@@ -100,19 +100,19 @@ Close iteration PI-2026-1.1
 
 Or manually:
 ```bash
-python scripts/edpa_engine.py --iteration PI-2026-1.1 \
-  --capacity config/capacity.yaml \
-  --heuristics config/cw_heuristics.yaml
+python .claude/edpa/scripts/engine.py --iteration PI-2026-1.1 \
+  --capacity .edpa/config/capacity.yaml \
+  --heuristics .edpa/config/heuristics.yaml
 ```
 
 ## Step 7: Review outputs
 
-Check the generated reports in `reports/iteration-PI-2026-1.1/`:
+Check the generated reports in `.edpa/reports/iteration-PI-2026-1.1/`:
 - `edpa_results.json` — raw calculation data
 - `vykaz-{person}.md` — per-person timesheet
 - `item-costs.xlsx` — per-item cost allocation
 
-Check the frozen snapshot in `snapshots/PI-2026-1.1.json`.
+Check the frozen snapshot in `.edpa/snapshots/PI-2026-1.1.json`.
 
 ## What's Next?
 

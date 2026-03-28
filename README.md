@@ -2,7 +2,7 @@
 
 **Derive hours from Git evidence. No timesheets.**
 
-[![EDPA](https://img.shields.io/badge/EDPA-v1.0.0-34d399)](docs/methodology.md)
+[![EDPA](https://img.shields.io/badge/EDPA-v3.0.0-34d399)](docs/methodology.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/Made_for-GitHub-181717?logo=github)](https://github.com)
 
@@ -27,9 +27,9 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 
 **After EDPA:**
 ```
-$ python scripts/edpa_engine.py --demo
+$ python3 .claude/edpa/scripts/engine.py --demo
 
-EDPA v1.0.0 — Iteration DEMO-1.1 (simple mode)
+EDPA v3.0.0 — Iteration DEMO-1.1 (simple mode)
 ======================================================================
 Person                    Role     Capacity  Derived  Items    OK
 ----------------------------------------------------------------------
@@ -52,16 +52,23 @@ All invariants passed: YES
 
 ## Quick Start
 
-### 1. Use this template
+### 1. Install the EDPA plugin
 
 ```bash
-gh repo create my-project --template technomaton/edpa-template --private
-cd my-project
+npx @technomaton/edpa init
+# or
+curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 
-### 2. Configure your team
+This installs the EDPA plugin into `.claude/edpa/` in your project.
 
-Edit `config/capacity.yaml`:
+### 2. Set up governance
+
+```
+/edpa setup "My Project"
+```
+
+Or manually edit `.edpa/config/capacity.yaml`:
 ```yaml
 cadence:
   iteration_weeks: 2    # 1 (AI-native) or 2 (classic)
@@ -88,23 +95,21 @@ CI enforces this automatically. Everything else generates evidence.
 
 With Claude Code:
 ```
-Close iteration PI-2026-1.3
+/edpa close-iteration PI-2026-1.3
 ```
 
 Or with the Python CLI:
 ```bash
-python scripts/edpa_engine.py --iteration PI-2026-1.3 \
-  --capacity config/capacity.yaml \
-  --heuristics config/cw_heuristics.yaml
+python3 .claude/edpa/scripts/engine.py --iteration PI-2026-1.3 \
+  --capacity .edpa/config/capacity.yaml \
+  --heuristics .edpa/config/heuristics.yaml
 ```
 
 ### 5. Try the demo
 
 ```bash
-git clone https://github.com/technomaton/edpa.git
-cd edpa
-pip install pyyaml
-python scripts/edpa_engine.py --demo
+npx @technomaton/edpa init
+python3 .claude/edpa/scripts/engine.py --demo
 ```
 
 ## How It Works
@@ -123,33 +128,56 @@ Two complementary views from the same data:
 | **Per-person** | How did P's time distribute? | Timesheet | Sum = capacity |
 | **Per-item** | What did item X cost? | Cost allocation | Sum = 100% |
 
-## Repo Structure
+## Directory Structure
+
+After installation, your project will have:
 
 ```
 .
-├── config/                    # Team and project configuration
-│   ├── capacity.yaml.tmpl     # Team members, FTE, capacity
-│   ├── cw_heuristics.yaml.tmpl # Evidence scoring weights
-│   └── project.yaml.tmpl      # Project metadata
-├── scripts/
-│   ├── edpa_engine.py         # Standalone Python EDPA engine
-│   ├── evaluate_cw.py         # CW evaluator for auto-calibration (LOCKED)
-│   ├── edpa_issue_types.py    # GitHub Issue Types management (list, setup, assign, migrate)
-│   ├── edpa_project_setup.py  # Automated GitHub Project initialization
-│   ├── edpa_sync.py           # GitHub Projects ↔ Git bidirectional sync
-│   └── edpa_backlog.py        # Git-native backlog CLI (tree, wsjf, validate)
-├── docs/                      # Full methodology documentation
-├── examples/                  # Worked examples and sample data
-├── claude-code/               # Claude Code skills and commands
-├── .github/                   # Actions, issue templates, PR template
-├── .mcp.json                  # GitHub MCP server configuration
-├── snapshots/                 # Frozen iteration snapshots (auto-generated)
-└── reports/                   # Generated timesheets & exports (auto-generated)
+├── .claude/
+│   └── edpa/                      # EDPA plugin (installed by npx/curl)
+│       ├── scripts/
+│       │   ├── engine.py          # Core EDPA engine
+│       │   ├── evaluate_cw.py     # CW evaluator for auto-calibration
+│       │   ├── backlog.py         # Git-native backlog CLI
+│       │   ├── sync.py            # GitHub Projects <-> Git sync
+│       │   ├── issue_types.py     # GitHub Issue Types management
+│       │   ├── project_setup.py   # GitHub Project initialization
+│       │   └── project_views.py   # GitHub Project view setup
+│       ├── templates/             # Config templates (.tmpl)
+│       └── workflows/             # GitHub Actions workflows
+├── .edpa/                         # Project governance data
+│   ├── config/
+│   │   ├── capacity.yaml          # Team members, FTE, capacity
+│   │   └── heuristics.yaml        # Evidence scoring weights (CW)
+│   ├── backlog/                   # Work items (file-per-item)
+│   ├── reports/                   # Generated timesheets & exports
+│   ├── snapshots/                 # Frozen iteration snapshots
+│   └── data/                      # Raw evidence data
+├── .mcp.json                      # GitHub MCP server configuration
+└── ...your project files
+```
+
+Source repository structure:
+
+```
+.
+├── plugin/                        # Plugin source (what gets installed)
+│   ├── edpa/scripts/              # Python engine + utilities
+│   ├── edpa/templates/            # Config templates
+│   ├── edpa/workflows/            # GitHub Actions
+│   ├── commands/edpa/             # Claude Code slash commands
+│   ├── skills/                    # Claude Code skills (5 skills)
+│   └── .mcp.json                  # MCP server config
+├── docs/                          # Full methodology + examples
+├── web/                           # Public website (edpa.technomaton.com)
+├── install.sh                     # Shell installer
+└── .edpa/                         # Governance data for this repo
 ```
 
 ## Claude Code Integration
 
-EDPA includes 4 composable skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code):
+EDPA includes 5 composable skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code):
 
 | Command | What it does |
 |---------|-------------|
@@ -157,18 +185,19 @@ EDPA includes 4 composable skills for [Claude Code](https://docs.anthropic.com/e
 | `/edpa close-iteration` | Compute hours + generate reports |
 | `/edpa reports` | Generate timesheets, snapshots, Excel exports |
 | `/edpa calibrate` | Auto-calibrate CW heuristics (after 1st PI) |
+| `/edpa sync` | Sync GitHub Projects <-> Git backlog |
 
 Skills work on 26+ platforms (Codex CLI, Cursor, Gemini CLI, etc.)
 
 ## Cross-Platform
 
 ```bash
-# Claude Code — skills auto-detected from claude-code/
+# Claude Code — skills auto-detected from .claude/
 # Codex CLI
-cp -r claude-code/skills/* ~/.codex/skills/
+cp -r .claude/skills/* ~/.codex/skills/
 # Cursor — auto-detected
 # Gemini CLI
-cp -r claude-code/skills/* ~/.gemini/skills/
+cp -r .claude/skills/* ~/.gemini/skills/
 ```
 
 ## Who Is This For?
@@ -182,7 +211,7 @@ cp -r claude-code/skills/* ~/.gemini/skills/
 
 | Document | Description |
 |----------|-------------|
-| [Methodology](docs/methodology.md) | Full EDPA v1.0.0 specification |
+| [Methodology](docs/methodology.md) | Full EDPA v3.0.0 specification |
 | [Quick Start](docs/quick-start.md) | 10-minute setup guide |
 | [Evidence Detection](docs/evidence-detection.md) | How GitHub signals map to CW |
 | [Dual-View](docs/dual-view.md) | Per-person vs per-item perspectives |
@@ -200,7 +229,7 @@ cp -r claude-code/skills/* ~/.gemini/skills/
 | [calibrate_roles.py](https://github.com/technomaton/edpa-simulation/blob/main/scripts/calibrate_roles.py) | Multi-scenario CW calibration (8 scenarios, 569 pairs, MAD reduction 6.7%) |
 | [edpa.technomaton.com](https://edpa.technomaton.com) | Public website with interactive dashboard, presentation, methodology, evaluation |
 
-The default CW weights in `config/cw_heuristics.yaml.tmpl` are calibrated from 8 team scenarios
+The default CW weights in `.edpa/config/heuristics.yaml` are calibrated from 8 team scenarios
 (Startup, Enterprise, DevOps-heavy, Research, Consultancy, AI-Native, Regulated, kashealth).
 Key correction: BO/PM/Arch are systematically undervalued by Git auto-detection; QA slightly overvalued.
 
@@ -219,4 +248,4 @@ MIT — see [LICENSE](LICENSE)
 
 ---
 
-*Built by [TECHNOMATON](https://technomaton.com). Methodology by Jaroslav Urbánek.*
+*Built by [TECHNOMATON](https://technomaton.com). Methodology by Jaroslav Urbanek.*

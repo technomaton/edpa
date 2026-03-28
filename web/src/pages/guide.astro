@@ -40,31 +40,27 @@ cd project-name`,
     color: 'var(--gn)',
     desc: 'Překopírujte EDPA adresářovou strukturu — skripty, šablony a konfigurační soubory. Toto je základ celého frameworku.',
     code: `# Struktura EDPA v repozitáři
-├── config/
-│   ├── people.yaml
-│   ├── iterations.yaml
-│   └── issue_types.yaml
-├── scripts/
-│   ├── edpa_engine.py
-│   ├── edpa_project_setup.py
-│   ├── edpa_issue_types.py
-│   ├── edpa_backlog.py
-│   └── evaluate_cw.py
-├── data/
-│   └── snapshots/
-└── reports/`,
+├── .claude/edpa/
+│   ├── scripts/           # engine, sync, backlog, ...
+│   └── templates/         # YAML šablony
+├── .edpa/
+│   ├── config/            # capacity, project, heuristics
+│   ├── data/              # ground truth
+│   ├── reports/           # generované výkazy
+│   └── snapshots/         # zmrazené snapshoty
+└── docs/examples/         # ukázkové konfigurace`,
     result: `project-name/
-├── config/       ← konfigurace týmu a iterací
-├── scripts/      ← automatizační skripty
-├── data/         ← snapshoty a surová data
-└── reports/      ← generované výkazy`,
+├── .claude/edpa/  ← skripty a šablony (plugin)
+├── .edpa/config/  ← konfigurace týmu a iterací
+├── .edpa/data/    ← snapshoty a surová data
+└── .edpa/reports/ ← generované výkazy`,
   },
   {
     num: 4,
     title: 'Nastavit tým',
     color: 'var(--yl)',
     desc: 'Upravte people.yaml — definujte členy týmu, jejich role, FTE úvazky a GitHub uživatelská jména. Toto je klíčový vstup pro alokaci.',
-    code: `# config/people.yaml
+    code: `# .edpa/config/people.yaml
 team:
   - name: "Jan Novák"
     github: "jnovak"
@@ -91,12 +87,12 @@ Role: 2× developer, 1× tech-lead`,
     desc: 'Spusťte skript pro konfiguraci typů issues v GitHub. EDPA rozlišuje hierarchii: Initiative > Epic > Feature > Story > Task.',
     claude: `/edpa setup
 # Claude Code nastavi Issue Types automaticky`,
-    code: `python scripts/edpa_issue_types.py setup \\
+    code: `python3 .claude/edpa/scripts/issue_types.py setup \\
   --org ORG \\
   --repo project-name
 
 # Ověření
-python scripts/edpa_issue_types.py list \\
+python3 .claude/edpa/scripts/issue_types.py list \\
   --org ORG --repo project-name`,
     result: `✓ Created label: initiative  (color: #f472b6)
 ✓ Created label: epic        (color: #818cf8)
@@ -111,14 +107,14 @@ python scripts/edpa_issue_types.py list \\
     color: 'var(--pk)',
     desc: 'Přidejte první work items do backlogu — Stories a Tasky s odhadem story pointů. Backlog je vstupem pro WSJF prioritizaci.',
     code: `# Přidat Story
-python scripts/edpa_backlog.py add \\
+python3 .claude/edpa/scripts/backlog.py add \\
   --type Story \\
   --title "Implementovat login endpoint" \\
   --points 5 \\
   --feature F-100-auth
 
 # Přidat Task
-python scripts/edpa_backlog.py add \\
+python3 .claude/edpa/scripts/backlog.py add \\
   --type Task \\
   --title "Napsat unit testy pro auth" \\
   --points 3 \\
@@ -135,7 +131,7 @@ python scripts/edpa_backlog.py add \\
     desc: 'Automaticky vytvořte GitHub Project Board s EDPA sloupcovým layoutem — Backlog, Ready, In Progress, Review, Done.',
     claude: `/edpa setup
 # Claude Code vytvori GitHub Project automaticky`,
-    code: `python scripts/edpa_project_setup.py \\
+    code: `python3 .claude/edpa/scripts/project_setup.py \\
   --org ORG \\
   --repo project-name \\
   --iteration PI-2026-1.1`,
@@ -175,7 +171,7 @@ PR #42: "S-200: Login endpoint"
     desc: 'Na konci iterace spusťte EDPA engine. Ten stáhne veškerou evidenci z GitHubu a proporcionálně alokuje hodiny podle skutečné práce.',
     claude: `/edpa close-iteration PI-2026-1.1
 # Claude Code stahne evidenci a spocita alokaci`,
-    code: `python scripts/edpa_engine.py \\
+    code: `python3 .claude/edpa/scripts/engine.py \\
   --iteration PI-2026-1.1 \\
   --org ORG \\
   --repo project-name
@@ -205,7 +201,7 @@ Allocation:
     claude: `/edpa reports
 # Claude Code vygeneruje vsechny reporty a vykazy`,
     code: `# Vygenerované soubory
-reports/
+.edpa/reports/
 ├── PI-2026-1.1/
 │   ├── summary.md           # souhrnný report
 │   ├── jnovak.md            # per-person výkaz
@@ -213,10 +209,9 @@ reports/
 │   ├── pkral.md
 │   ├── allocation.json      # strojově čitelný
 │   └── evidence.json        # surová evidence
-data/
-└── snapshots/
-    └── PI-2026-1.1.json     # frozen snapshot`,
-    result: `reports/PI-2026-1.1/summary.md:
+.edpa/snapshots/
+└── PI-2026-1.1.json         # frozen snapshot`,
+    result: `.edpa/reports/PI-2026-1.1/summary.md:
 ┌─────────┬────────┬────────┬────────┐
 │ Person  │ Hours  │ Share  │ Items  │
 ├─────────┼────────┼────────┼────────┤
@@ -235,9 +230,9 @@ data/
     claude: `/edpa calibrate
 # Claude Code spusti kalibraci a zobrazi MAD vysledky`,
     code: `# Ground truth srovnání
-python scripts/evaluate_cw.py \\
+python3 .claude/edpa/scripts/evaluate_cw.py \\
   --iteration PI-2026-1.1 \\
-  --ground-truth data/ground_truth.csv
+  --ground-truth .edpa/data/ground_truth.csv
 
 # Výstup: korelace, MAD, scatter plot
 # MAD < 0.05 → výborná kalibrace
@@ -260,12 +255,12 @@ No weight adjustment needed.`,
     claude: `/edpa close-iteration PI-2026-1.2
 # Dalsi iterace — stejny postup`,
     code: `# Nová iterace
-python scripts/edpa_engine.py \\
+python3 .claude/edpa/scripts/engine.py \\
   --iteration PI-2026-1.2 \\
   --org ORG --repo project-name
 
 # Trend analýza napříč iteracemi
-python scripts/edpa_engine.py trend \\
+python3 .claude/edpa/scripts/engine.py trend \\
   --from PI-2026-1.1 \\
   --to PI-2026-1.4`,
     result: `Trend: PI-2026-1.1 → PI-2026-1.4

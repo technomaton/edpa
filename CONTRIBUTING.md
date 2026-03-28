@@ -15,7 +15,7 @@ Thank you for your interest in contributing to EDPA!
 1. Fork the repository
 2. Create a feature branch following EDPA naming: `feature/S-XXX-description`
 3. Make your changes
-4. Run tests: `python -m pytest tests/`
+4. Run tests: `python3 -m pytest tests/`
 5. Submit a PR using the PR template
 
 ### Branch Naming
@@ -46,9 +46,17 @@ bugfix/B-15-fix-invariant-check
 git clone https://github.com/technomaton/edpa.git
 cd edpa
 pip install pyyaml openpyxl pytest
-python -m pytest tests/
-python scripts/edpa_engine.py --demo
+python3 -m pytest tests/
+python3 plugin/edpa/scripts/engine.py --demo
 ```
+
+## Project Structure
+
+- `plugin/` — EDPA plugin source (skills, commands, scripts, templates)
+- `docs/` — Methodology documentation
+- `web/` — Public website (edpa.technomaton.com)
+- `tests/` — Test suite
+- `.edpa/` — Governance data for this repo
 
 ## License
 

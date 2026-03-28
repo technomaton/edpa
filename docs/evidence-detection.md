@@ -45,7 +45,7 @@ EDPA measures **contribution to project delivery**, not "lines of code".
 |----------|-----------|-----|
 | Dev commits code (`src/`) | **YES** | Implementation work |
 | PM updates backlog (`.edpa/`) | **YES** | Planning, prioritization, specification |
-| Arch edits config (`config/`) | **YES** | Architecture decisions, configuration |
+| Arch edits config (`.edpa/config/`) | **YES** | Architecture decisions, configuration |
 | BO comments on Epic | **YES** | Strategic direction, business decisions |
 | QA writes tests (`tests/`) | **YES** | Quality assurance |
 

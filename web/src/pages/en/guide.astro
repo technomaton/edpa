@@ -40,31 +40,27 @@ cd project-name`,
     color: 'var(--gn)',
     desc: 'Copy the EDPA directory structure into your repo — scripts, templates, and configuration files. This is the foundation of the entire framework.',
     code: `# EDPA structure in the repository
-├── config/
-│   ├── people.yaml
-│   ├── iterations.yaml
-│   └── issue_types.yaml
-├── scripts/
-│   ├── edpa_engine.py
-│   ├── edpa_project_setup.py
-│   ├── edpa_issue_types.py
-│   ├── edpa_backlog.py
-│   └── evaluate_cw.py
-├── data/
-│   └── snapshots/
-└── reports/`,
+├── .claude/edpa/
+│   ├── scripts/           # engine, sync, backlog, ...
+│   └── templates/         # YAML templates
+├── .edpa/
+│   ├── config/            # capacity, project, heuristics
+│   ├── data/              # ground truth
+│   ├── reports/           # generated reports
+│   └── snapshots/         # frozen snapshots
+└── docs/examples/         # example configurations`,
     result: `project-name/
-├── config/       ← team and iteration config
-├── scripts/      ← automation scripts
-├── data/         ← snapshots and raw data
-└── reports/      ← generated reports`,
+├── .claude/edpa/  ← scripts and templates (plugin)
+├── .edpa/config/  ← team and iteration config
+├── .edpa/data/    ← snapshots and raw data
+└── .edpa/reports/ ← generated reports`,
   },
   {
     num: 4,
     title: 'Configure Team',
     color: 'var(--yl)',
     desc: 'Edit people.yaml — define team members, their roles, FTE allocations, and GitHub usernames. This is the key input for hour allocation.',
-    code: `# config/people.yaml
+    code: `# .edpa/config/people.yaml
 team:
   - name: "Jan Novak"
     github: "jnovak"
@@ -91,12 +87,12 @@ Roles: 2x developer, 1x tech-lead`,
     desc: 'Run the script to configure issue types in GitHub. EDPA uses a hierarchy: Initiative > Epic > Feature > Story > Task.',
     claude: `/edpa setup
 # Claude Code sets up Issue Types automatically`,
-    code: `python scripts/edpa_issue_types.py setup \\
+    code: `python3 .claude/edpa/scripts/issue_types.py setup \\
   --org ORG \\
   --repo project-name
 
 # Verify
-python scripts/edpa_issue_types.py list \\
+python3 .claude/edpa/scripts/issue_types.py list \\
   --org ORG --repo project-name`,
     result: `✓ Created label: initiative  (color: #f472b6)
 ✓ Created label: epic        (color: #818cf8)
@@ -111,14 +107,14 @@ python scripts/edpa_issue_types.py list \\
     color: 'var(--pk)',
     desc: 'Add your first work items to the backlog — Stories and Tasks with story point estimates. The backlog feeds into WSJF prioritization.',
     code: `# Add a Story
-python scripts/edpa_backlog.py add \\
+python3 .claude/edpa/scripts/backlog.py add \\
   --type Story \\
   --title "Implement login endpoint" \\
   --points 5 \\
   --feature F-100-auth
 
 # Add a Task
-python scripts/edpa_backlog.py add \\
+python3 .claude/edpa/scripts/backlog.py add \\
   --type Task \\
   --title "Write unit tests for auth" \\
   --points 3 \\
@@ -135,7 +131,7 @@ python scripts/edpa_backlog.py add \\
     desc: 'Automatically create a GitHub Project Board with the EDPA column layout — Backlog, Ready, In Progress, Review, Done.',
     claude: `/edpa setup
 # Claude Code creates the GitHub Project automatically`,
-    code: `python scripts/edpa_project_setup.py \\
+    code: `python3 .claude/edpa/scripts/project_setup.py \\
   --org ORG \\
   --repo project-name \\
   --iteration PI-2026-1.1`,
@@ -175,7 +171,7 @@ PR #42: "S-200: Login endpoint"
     desc: 'At the end of the iteration, run the EDPA engine. It fetches all evidence from GitHub and proportionally allocates hours based on actual work.',
     claude: `/edpa close-iteration PI-2026-1.1
 # Claude Code fetches evidence and computes allocation`,
-    code: `python scripts/edpa_engine.py \\
+    code: `python3 .claude/edpa/scripts/engine.py \\
   --iteration PI-2026-1.1 \\
   --org ORG \\
   --repo project-name
@@ -205,7 +201,7 @@ Allocation:
     claude: `/edpa reports
 # Claude Code generates all reports and timesheets`,
     code: `# Generated files
-reports/
+.edpa/reports/
 ├── PI-2026-1.1/
 │   ├── summary.md           # summary report
 │   ├── jnovak.md            # per-person timesheet
@@ -213,10 +209,9 @@ reports/
 │   ├── pkral.md
 │   ├── allocation.json      # machine-readable
 │   └── evidence.json        # raw evidence
-data/
-└── snapshots/
-    └── PI-2026-1.1.json     # frozen snapshot`,
-    result: `reports/PI-2026-1.1/summary.md:
+.edpa/snapshots/
+└── PI-2026-1.1.json         # frozen snapshot`,
+    result: `.edpa/reports/PI-2026-1.1/summary.md:
 ┌─────────┬────────┬────────┬────────┐
 │ Person  │ Hours  │ Share  │ Items  │
 ├─────────┼────────┼────────┼────────┤
@@ -235,9 +230,9 @@ data/
     claude: `/edpa calibrate
 # Claude Code runs calibration and shows MAD results`,
     code: `# Ground truth comparison
-python scripts/evaluate_cw.py \\
+python3 .claude/edpa/scripts/evaluate_cw.py \\
   --iteration PI-2026-1.1 \\
-  --ground-truth data/ground_truth.csv
+  --ground-truth .edpa/data/ground_truth.csv
 
 # Output: correlation, MAD, scatter plot
 # MAD < 0.05 → excellent calibration
@@ -260,12 +255,12 @@ No weight adjustment needed.`,
     claude: `/edpa close-iteration PI-2026-1.2
 # Next iteration — same workflow`,
     code: `# New iteration
-python scripts/edpa_engine.py \\
+python3 .claude/edpa/scripts/engine.py \\
   --iteration PI-2026-1.2 \\
   --org ORG --repo project-name
 
 # Trend analysis across iterations
-python scripts/edpa_engine.py trend \\
+python3 .claude/edpa/scripts/engine.py trend \\
   --from PI-2026-1.1 \\
   --to PI-2026-1.4`,
     result: `Trend: PI-2026-1.1 → PI-2026-1.4

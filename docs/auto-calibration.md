@@ -5,17 +5,17 @@
 One file, one metric, one loop. Inspired by Karpathy's autoresearch pattern.
 
 ```
-Target:     config/cw_heuristics.yaml
+Target:     .edpa/config/heuristics.yaml
 Metric:     mean_absolute_deviation (auto CW vs ground truth)
 Direction:  lower
 Budget:     50-100 experiments (configurable)
 Memory:     git log on calibration branch
-Evaluator:  scripts/evaluate_cw.py (LOCKED — agent must NOT edit)
+Evaluator:  .claude/edpa/scripts/evaluate_cw.py (LOCKED — agent must NOT edit)
 ```
 
 ## Prerequisites
 
-- ≥ 20 manually confirmed CW records in `data/ground_truth.yaml`
+- ≥ 20 manually confirmed CW records in `.edpa/data/ground_truth.yaml`
 - Typically available after 1st Planning Interval (~10 weeks, 4-5 iterations)
 - Records come from team retrospectives where auto-CW is compared to reality
 
@@ -42,7 +42,7 @@ undervalued. QA is slightly overvalued (many test commits ≠ ownership).
 
 ### Recommended Defaults (role_overrides)
 
-Applied in `config/cw_heuristics.yaml.tmpl`:
+Applied in `.claude/edpa/templates/heuristics.yaml.tmpl`:
 
 ```yaml
 role_overrides:
@@ -113,18 +113,18 @@ Correction rate trend:          18.7% → 14.8% (fewer corrections = better heur
      a. Read current heuristics + experiment history
      b. Propose ONE parameter change (threshold, weight, signal score)
      c. git commit -m "exp {n}: {param} {old} -> {new}"
-     d. Run: python scripts/evaluate_cw.py --ground-truth data/ground_truth.yaml --heuristics config/cw_heuristics.yaml
+     d. Run: python .claude/edpa/scripts/evaluate_cw.py --ground-truth .edpa/data/ground_truth.yaml --heuristics .edpa/config/heuristics.yaml
      e. Parse MAD from output
      f. If MAD < previous_best: KEEP (advance branch)
         Else: git reset --hard HEAD~1 (revert)
-     g. Log to data/calibration_log.tsv
+     g. Log to .edpa/data/calibration_log.tsv
 3. Print summary: initial MAD, final MAD, % improvement, optimized params
 4. Ask user: merge calibration branch into main?
 ```
 
 ## Safety constraints
 
-- **Agent MUST NOT edit scripts/evaluate_cw.py** — separation of optimizer from objective
+- **Agent MUST NOT edit .claude/edpa/scripts/evaluate_cw.py** — separation of optimizer from objective
 - **One change per experiment** — if you change 5 things, you don't know what worked
 - **Ordering preserved** — owner ≥ key ≥ reviewer ≥ consulted
 - **Bounds** — all weights in [0.05, 1.0], threshold in [0.5, 3.0]

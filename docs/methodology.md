@@ -45,7 +45,7 @@ The model provides two complementary views of the same data:
 |---|---|---|
 | **Operational Metadata Layer** | Live delivery data | GitHub Issues + GitHub Projects |
 | **Capacity Registry Layer** | People's capacity, roles, FTE, availability | YAML/JSON config in repo |
-| **Evidence & Reporting Layer** | Frozen snapshots, timesheets, Excel, signatures | `/snapshots`, `/reports`, `/signed` |
+| **Evidence & Reporting Layer** | Frozen snapshots, timesheets, Excel, signatures | `.edpa/snapshots`, `.edpa/reports`, `.edpa/reports/signed` |
 
 ### 3.2 GitHub as Source of Truth
 
@@ -77,7 +77,7 @@ Granularity rules: Story max 8 SP (2/10) or 5 SP (1/5), Feature max 13, Epic max
 
 Before EDPA derives hours (ex-post), the team must plan the iteration (ex-ante). Planning requires confirmed capacity as input.
 
-**Step 1 — Confirm Capacity.** Each team member confirms availability for the iteration. This is a commitment, not an estimate. External collaborators negotiate allocation explicitly. Result: `Capacity[P, I]` in `capacity.yaml` with `availability: confirmed`.
+**Step 1 — Confirm Capacity.** Each team member confirms availability for the iteration. This is a commitment, not an estimate. External collaborators negotiate allocation explicitly. Result: `Capacity[P, I]` in `.edpa/config/capacity.yaml` with `availability: confirmed`.
 
 **Step 2 — Calculate Planning Capacity.**
 
@@ -86,7 +86,7 @@ Team_Total_Capacity = Σ Capacity[P, I]
 Team_Planning_Capacity = Team_Total_Capacity × planning_factor (default 0.8)
 ```
 
-The `planning_factor` is a **team-level** property (configured per team in `capacity.yaml` under `teams:`). Different teams may choose different factors based on their support load, maturity, and risk tolerance. It reserves a buffer for support, maintenance, incidents, and unplanned work.
+The `planning_factor` is a **team-level** property (configured per team in `.edpa/config/capacity.yaml` under `teams:`). Different teams may choose different factors based on their support load, maturity, and risk tolerance. It reserves a buffer for support, maintenance, incidents, and unplanned work.
 
 **Step 3 — Select Work.** Pull stories from the prioritized backlog (WSJF order) until `Σ JobSize` approaches historical velocity scaled by `planning_factor`. Do not plan to 100% of capacity.
 
@@ -267,15 +267,15 @@ After the first Planning Interval, sufficient ground truth exists: manually conf
 Principle: one file, one metric, one loop.
 
 ```text
-Target:     cw_heuristics.yaml
+Target:     .edpa/config/heuristics.yaml
 Metric:     mean_absolute_deviation (auto CW vs ground truth)
 Direction:  lower
-Eval:       python scripts/evaluate_cw.py --ground-truth last_pi
+Eval:       python .claude/edpa/scripts/evaluate_cw.py --ground-truth last_pi
 Budget:     50–100 experiments, ~2h overnight
 Memory:     git log on calibration branch
 ```
 
-Safety constraint: agent must NOT edit evaluate_cw.py (evaluator). Separation of optimizer from objective function prevents gaming.
+Safety constraint: agent must NOT edit .claude/edpa/scripts/evaluate_cw.py (evaluator). Separation of optimizer from objective function prevents gaming.
 
 When to activate: earliest after 1st PI (10 weeks), when >= 20 manually confirmed CW records exist.
 
@@ -331,16 +331,16 @@ No item enters delivery without: Issue Type, Parent, Job Size, BV+TC+RR, Owner. 
 ### 10.1 Pipeline
 ```text
 Iteration Close → per person:
-  /reports/iteration-{I}/vykaz-{person}.md
-  /reports/iteration-{I}/vykaz-{person}.json
-  /reports/iteration-{I}/summary.xlsx
-  /reports/iteration-{I}/item-costs.xlsx    ← per-item view
+  .edpa/reports/iteration-{I}/vykaz-{person}.md
+  .edpa/reports/iteration-{I}/vykaz-{person}.json
+  .edpa/reports/iteration-{I}/summary.xlsx
+  .edpa/reports/iteration-{I}/item-costs.xlsx    ← per-item view
 
 PI Close → aggregation:
-  /reports/planning-interval-{PI}/summary.xlsx
+  .edpa/reports/planning-interval-{PI}/summary.xlsx
 
 Annual:
-  /reports/2026/annual.xlsx
+  .edpa/reports/2026/annual.xlsx
 ```
 
 ### 10.2 Freeze Rule

@@ -13,10 +13,10 @@ import json
 import sys
 from pathlib import Path
 
-# Add scripts directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+# Add plugin scripts directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "plugin" / "edpa" / "scripts"))
 
-from edpa_engine import run_edpa, generate_demo_data, detect_evidence, compute_cw
+from engine import run_edpa, generate_demo_data, detect_evidence, compute_cw
 
 
 def test_sum_equals_capacity():

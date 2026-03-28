@@ -241,8 +241,8 @@ Guarantee: &#x2211; shares = 100%</div>
 &#x251C;&#x2500;&#x2500; edpa-reports/SKILL.md
 &#x251C;&#x2500;&#x2500; edpa-autocalib/SKILL.md
 &#x251C;&#x2500;&#x2500; references/ (7 files)
-&#x251C;&#x2500;&#x2500; scripts/evaluate_cw.py
-&#x251C;&#x2500;&#x2500; examples/capacity-example.yaml
+&#x251C;&#x2500;&#x2500; scripts/evaluate_cw.py    &larr; .claude/edpa/scripts/
+&#x251C;&#x2500;&#x2500; docs/examples/capacity-example.yaml
 &#x2514;&#x2500;&#x2500; plugin.json
 
 <b>.github/</b>
@@ -250,20 +250,20 @@ Guarantee: &#x2211; shares = 100%</div>
 &#x251C;&#x2500;&#x2500; ISSUE_TEMPLATE/ (epic, feature, story)
 &#x2514;&#x2500;&#x2500; PULL_REQUEST_TEMPLATE.md
 
-<b>config/</b> (capacity, heuristics, project)
+<b>.edpa/config/</b> (capacity, heuristics, project)
 <b>docs/</b> methodology.md
-<b>data/</b> ground_truth.yaml
-<b>snapshots/</b> + <b>reports/</b> (auto-generated)</div>
+<b>.edpa/data/</b> ground_truth.yaml
+<b>.edpa/snapshots/</b> + <b>.edpa/reports/</b> (auto-generated)</div>
 </div>
 <div class="col">
 <div class="sc g" style="margin-bottom:8px"><div class="sc-t">For your project</div><div class="sc-l">
 <code>gh repo create org/project</code><br>
 <code>--template technomaton/edpa-template</code><br><br>
-Edit <code>config/</code> &#x2192; done.
+Edit <code>.edpa/config/</code> &#x2192; done.
 </div></div>
 <div class="sc c" style="margin-bottom:8px"><div class="sc-t">For another project</div><div class="sc-l">
 "Use this template" on GitHub.<br>
-<code>config/capacity.yaml</code> = your team.<br>
+<code>.edpa/config/capacity.yaml</code> = your team.<br>
 Claude Code: "Set up EDPA for My Project"
 </div></div>
 <div class="sc a"><div class="sc-t">Contents</div><div class="sc-l">4 skills + 7 references + 3 configs + 5 GitHub templates + CI workflow + evaluator + methodology</div></div>

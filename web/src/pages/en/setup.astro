@@ -180,7 +180,7 @@ import Layout from '../../layouts/Layout.astro';
         </div>
 
         <div class="form-card launch-note">
-          <p class="launch-note-text">Template repo contains <code>scripts/</code>, <code>config/</code>, <code>.edpa/</code> structure, Claude Code skills. Does not contain <code>web/</code> or <code>examples/</code>.</p>
+          <p class="launch-note-text">Template repo contains <code>.claude/edpa/</code> (scripts, templates), <code>.edpa/</code> structure, Claude Code skills. Does not contain <code>web/</code> or <code>docs/examples/</code>.</p>
         </div>
       </div>
 
@@ -981,8 +981,8 @@ import Layout from '../../layouts/Layout.astro';
         launchC.textContent = [
           `gh repo create ${org}/${repo} --clone`,
           `# Download EDPA from github.com/technomaton/edpa`,
-          `# Copy: scripts/, config/, .edpa/, .claude/, .github/`,
-          `# (skip web/ and examples/ -- not needed for a new project)`,
+          `# Copy: .claude/, .edpa/, .github/`,
+          `# (skip web/ and docs/examples/ -- not needed for a new project)`,
         ].join('\n');
       }
     }

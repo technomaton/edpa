@@ -37,12 +37,12 @@ jobs:
 
       - name: Verify configuration
         run: |
-          if [ ! -f config/capacity.yaml ]; then
-            echo "ERROR: config/capacity.yaml not found. Run EDPA setup first."
+          if [ ! -f .edpa/config/capacity.yaml ]; then
+            echo "ERROR: .edpa/config/capacity.yaml not found. Run /edpa setup first."
             exit 1
           fi
-          if [ ! -f config/cw_heuristics.yaml ]; then
-            echo "ERROR: config/cw_heuristics.yaml not found. Run EDPA setup first."
+          if [ ! -f .edpa/config/heuristics.yaml ]; then
+            echo "ERROR: .edpa/config/heuristics.yaml not found. Run /edpa setup first."
             exit 1
           fi
           echo "Configuration verified."
@@ -53,20 +53,20 @@ jobs:
           ITERATION_ID: ${{ inputs.iteration_id }}
           MODE: ${{ inputs.mode }}
         run: |
-          python scripts/edpa_engine.py \
+          python3 .claude/edpa/scripts/engine.py \
             --iteration "$ITERATION_ID" \
             --mode "$MODE" \
-            --capacity config/capacity.yaml \
-            --heuristics config/cw_heuristics.yaml
+            --capacity .edpa/config/capacity.yaml \
+            --heuristics .edpa/config/heuristics.yaml
 
       - name: Verify invariants
         run: |
-          RESULTS="reports/iteration-${{ inputs.iteration_id }}/edpa_results.json"
+          RESULTS=".edpa/reports/iteration-${{ inputs.iteration_id }}/edpa_results.json"
           if [ ! -f "$RESULTS" ]; then
             echo "ERROR: Engine did not produce results."
             exit 1
           fi
-          python -c "
+          python3 -c "
           import json, sys
           with open('$RESULTS') as f:
               data = json.load(f)
@@ -80,6 +80,6 @@ jobs:
         run: |
           git config user.name "EDPA Bot"
           git config user.email "edpa@github-actions"
-          git add reports/ snapshots/
+          git add .edpa/reports/ .edpa/snapshots/
           git commit -m "feat(edpa): close iteration ${{ inputs.iteration_id }}" || echo "No changes to commit"
           git push

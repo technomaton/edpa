@@ -61,6 +61,6 @@ stories_detail:
 
 edpa:
   mode: simple
-  results_file: reports/iteration-PI-2026-1.1/edpa_results.json
-  snapshot_file: snapshots/iteration-PI-2026-1.1.json
+  results_file: .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
+  snapshot_file: .edpa/snapshots/iteration-PI-2026-1.1.json
   invariants_passed: true

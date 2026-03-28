@@ -3,8 +3,8 @@
 ## Five pillars of audit compliance
 
 1. **GitHub delivery evidence** — commits, PRs, reviews, comments (living data)
-2. **Capacity registry** — `config/capacity.yaml` (versioned in git)
-3. **Frozen snapshot** — `snapshots/iteration-{ID}.json` (immutable)
+2. **Capacity registry** — `.edpa/config/capacity.yaml` (versioned in git)
+3. **Frozen snapshot** — `.edpa/snapshots/iteration-{ID}.json` (immutable)
 4. **Reproducible calculation** — Score = JS × CW (× RS), DerivedHours = (Score/ΣScores) × Capacity
 5. **Signed output** — BankID electronic signature (Czech law 21/2020 Sb.)
 
@@ -17,9 +17,9 @@ After Iteration Close generates a snapshot:
 
 Example:
 ```
-snapshots/PI-2026-1.3.json          # original
-snapshots/PI-2026-1.3_rev2.json     # correction
-snapshots/PI-2026-1.3_rev3.json     # second correction
+.edpa/snapshots/PI-2026-1.3.json          # original
+.edpa/snapshots/PI-2026-1.3_rev2.json     # correction
+.edpa/snapshots/PI-2026-1.3_rev3.json     # second correction
 ```
 
 Each revision includes: reason for correction, diff from previous, timestamp, author.
@@ -34,7 +34,7 @@ Each revision includes: reason for correction, diff from previous, timestamp, au
   "frozen": true,
   "methodology": "EDPA v2.2",
   "mode": "simple",
-  "capacity_registry": { "...": "copy from config/capacity.yaml at computation time" },
+  "capacity_registry": { "...": "copy from .edpa/config/capacity.yaml at computation time" },
   "items": [
     {
       "id": "S-200",
@@ -70,20 +70,20 @@ Each revision includes: reason for correction, diff from previous, timestamp, au
 Phase 1 (immediate): GitHub Issue comment with confirmation + BankID screenshot
 Phase 2 (later): Integration via Signi.com or DigiSign with BankID API
 
-Signed documents stored in `/reports/signed/`.
+Signed documents stored in `.edpa/reports/signed/`.
 
 ## Reporting pipeline
 
 ```
 Iteration Close → per person:
-  /reports/iteration-{ID}/vykaz-{person}.md
-  /reports/iteration-{ID}/vykaz-{person}.json
-  /reports/iteration-{ID}/summary.xlsx
-  /reports/iteration-{ID}/item-costs.xlsx
+  .edpa/reports/iteration-{ID}/vykaz-{person}.md
+  .edpa/reports/iteration-{ID}/vykaz-{person}.json
+  .edpa/reports/iteration-{ID}/summary.xlsx
+  .edpa/reports/iteration-{ID}/item-costs.xlsx
 
 PI Close → aggregation:
-  /reports/pi-{PI}/pi-summary.xlsx
+  .edpa/reports/pi-{PI}/pi-summary.xlsx
 
 Annual:
-  /reports/{year}/annual.xlsx
+  .edpa/reports/{year}/annual.xlsx
 ```

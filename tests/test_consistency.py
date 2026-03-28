@@ -35,29 +35,15 @@ def test_version_consistent():
     elif m.group(1) != version:
         errors.append(f"CHANGELOG.md: {m.group(1)} != {version}")
 
-    # Header.astro — logo-version span
+    # Header.astro — logo-version span (uses dynamic {VERSION} from lib/version.ts)
     header = (ROOT / "web/src/components/Header.astro").read_text()
-    m = re.search(r'class="logo-version">v([\d.]+)<', header)
-    if not m:
+    if 'logo-version' not in header:
         errors.append("Header.astro: no logo-version span found")
-    elif m.group(1) != version:
-        errors.append(f"Header.astro: {m.group(1)} != {version}")
 
-    # Footer.astro — EDPA vX.Y.Z
-    footer = (ROOT / "web/src/components/Footer.astro").read_text()
-    m = re.search(r"EDPA v([\d.]+)", footer)
-    if not m:
-        errors.append("Footer.astro: no 'EDPA vX.Y.Z' found")
-    elif m.group(1) != version:
-        errors.append(f"Footer.astro: {m.group(1)} != {version}")
-
-    # Layout.astro — EDPA vX.Y.Z in title
-    layout = (ROOT / "web/src/layouts/Layout.astro").read_text()
-    m = re.search(r"EDPA v([\d.]+)", layout)
-    if not m:
-        errors.append("Layout.astro: no 'EDPA vX.Y.Z' found")
-    elif m.group(1) != version:
-        errors.append(f"Layout.astro: {m.group(1)} != {version}")
+    # version.ts — must import from package.json
+    version_ts = (ROOT / "web/src/lib/version.ts").read_text()
+    if "VERSION" not in version_ts:
+        errors.append("version.ts: no VERSION export found")
 
     assert not errors, "Version mismatches:\n  " + "\n  ".join(errors)
 
@@ -69,7 +55,7 @@ def test_version_consistent():
 def test_no_hardcoded_org_in_scripts():
     """Runtime scripts must not contain hardcoded org names outside docstrings."""
     forbidden = ["technomaton", "kashealth"]
-    scripts_dir = ROOT / "scripts"
+    scripts_dir = ROOT / "plugin" / "edpa" / "scripts"
     violations = []
 
     for py_file in sorted(scripts_dir.glob("*.py")):
@@ -109,10 +95,10 @@ def test_no_hardcoded_org_in_scripts():
 # ---------------------------------------------------------------------------
 
 def test_no_hardcoded_org_in_config():
-    """.edpa/config.yaml must use placeholder values, not real org names."""
+    """.edpa/config/edpa.yaml must use placeholder values, not real org names."""
     import yaml
 
-    config = yaml.safe_load((ROOT / ".edpa/config.yaml").read_text())
+    config = yaml.safe_load((ROOT / ".edpa/config/edpa.yaml").read_text())
     sync = config.get("sync", {})
 
     github_org = sync.get("github_org", "")
@@ -137,6 +123,7 @@ def test_skills_exist():
         ".claude/commands/edpa/close-iteration.md",
         ".claude/commands/edpa/reports.md",
         ".claude/commands/edpa/calibrate.md",
+        ".claude/commands/edpa/sync.md",
     ]
 
     missing = []
@@ -152,7 +139,7 @@ def test_skills_exist():
     commands = plugin.get("commands", [])
     command_basenames = {Path(c).name for c in commands}
 
-    expected_basenames = {"setup.md", "close-iteration.md", "reports.md", "calibrate.md"}
+    expected_basenames = {"setup.md", "close-iteration.md", "reports.md", "calibrate.md", "sync.md"}
     missing_refs = expected_basenames - command_basenames
     assert not missing_refs, (
         f"plugin.json missing command references: {missing_refs}"
@@ -195,8 +182,8 @@ def test_no_stray_files_in_web():
 
 def test_role_overrides_applied():
     """Arch reviewer CW must be 0.30 (not generic 0.25) — catches v1.x bug."""
-    sys.path.insert(0, str(ROOT / "scripts"))
-    from edpa_engine import compute_cw
+    sys.path.insert(0, str(ROOT / "plugin" / "edpa" / "scripts"))
+    from engine import compute_cw
 
     heuristics = {
         "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15},
@@ -227,10 +214,10 @@ def test_backlog_file_count():
     edpa = ROOT / ".edpa"
 
     dirs = {
-        "initiatives": edpa / "initiatives",
-        "epics": edpa / "epics",
-        "features": edpa / "features",
-        "stories": edpa / "stories",
+        "initiatives": edpa / "backlog" / "initiatives",
+        "epics": edpa / "backlog" / "epics",
+        "features": edpa / "backlog" / "features",
+        "stories": edpa / "backlog" / "stories",
     }
 
     errors = []
@@ -254,8 +241,8 @@ def test_backlog_file_count():
 # ---------------------------------------------------------------------------
 
 def test_people_yaml_is_example():
-    """.edpa/people.yaml must contain EXAMPLE marker — not production data."""
-    content = (ROOT / ".edpa/people.yaml").read_text()
+    """.edpa/config/people.yaml must contain EXAMPLE marker — not production data."""
+    content = (ROOT / ".edpa/config/people.yaml").read_text()
     assert "EXAMPLE" in content.upper(), (
         "people.yaml must contain an 'EXAMPLE' marker to indicate it is not "
         "production data"

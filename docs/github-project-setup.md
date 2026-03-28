@@ -5,13 +5,13 @@
 EDPA používá GitHub Projects v2 jako vizuální vrstvu pro správu backlogu. Tento dokument popisuje kompletní postup inicializace nového projektu — od prerekvizit po synchronizaci s Git-native backlogem.
 
 ```
-GitHub Projects (UI)          Git repo (.edpa/)
+GitHub Projects (UI)          Git repo (.edpa/backlog/)
        │                             │
        │  ┌─────────────────────┐    │
-       ├──│  edpa_sync.py pull  │──→ │  Projects → backlog.yaml
+       ├──│  sync.py pull       │──→ │  Projects → .edpa/backlog/
        │  └─────────────────────┘    │
        │  ┌─────────────────────┐    │
-       │←─│  edpa_sync.py push  │──┤ │  backlog.yaml → Projects
+       │←─│  sync.py push       │──┤ │  .edpa/backlog/ → Projects
        │  └─────────────────────┘    │
 ```
 
@@ -31,7 +31,7 @@ gh auth status  # mělo by ukazovat 'project' scope
 
 ### Backlog soubor
 
-`.edpa/backlog.yaml` musí existovat s hierarchií work items (Initiative → Epic → Feature → Story). Viz [backlog format](#backlog-format) níže.
+`.edpa/backlog/` musí existovat s hierarchií work items (per-item YAML files) (Initiative → Epic → Feature → Story). Viz [backlog format](#backlog-format) níže.
 
 ### Python
 
@@ -45,7 +45,7 @@ pip install pyyaml
 Jeden příkaz vytvoří kompletní GitHub Project:
 
 ```bash
-python scripts/edpa_project_setup.py \
+python .claude/edpa/scripts/project_setup.py \
   --org <GITHUB_ORG> \
   --repo <REPO_NAME> \
   --project-title "EDPA — Název projektu"
@@ -54,7 +54,7 @@ python scripts/edpa_project_setup.py \
 ### Příklad
 
 ```bash
-python scripts/edpa_project_setup.py \
+python .claude/edpa/scripts/project_setup.py \
   --org technomaton \
   --repo edpa-simulation \
   --project-title "EDPA Simulation — Medical Platform"
@@ -64,18 +64,18 @@ python scripts/edpa_project_setup.py \
 
 | Krok | Akce | Detail |
 |------|------|--------|
-| **[1]** | Ověří Issue Types | Native GitHub Issue Types (org-level): Initiative, Epic, Feature, Story, Defect, Task — vytvořeny přes `edpa_issue_types.py setup` |
+| **[1]** | Ověří Issue Types | Native GitHub Issue Types (org-level): Initiative, Epic, Feature, Story, Defect, Task — vytvořeny přes `issue_types.py setup` |
 | **[2]** | Vytvoří GitHub Project | Projects v2 na org úrovni |
 | **[3]** | Vytvoří custom fields | Job Size, Business Value, Time Criticality, Risk Reduction, WSJF Score (NUMBER), Issue Type, Team (SINGLE_SELECT) |
 | **[4]** | Linkuje projekt k repo | Projekt viditelný v repo Projects tabu |
-| **[5]** | Vytvoří issues | Ze `.edpa/backlog.yaml`, s Issue Types podle úrovně (Epic, Feature, Story) |
+| **[5]** | Vytvoří issues | Ze `.edpa/backlog/`, s Issue Types podle úrovně (Epic, Feature, Story) |
 | **[6]** | Nastaví field values | JS, BV, TC, RR, WSJF, Issue Type, Status na všech project items |
-| **[7]** | Aktualizuje config | `.edpa/config.yaml` — uloží project number a ID pro sync |
+| **[7]** | Aktualizuje config | `.edpa/config/edpa.yaml` — uloží project number a ID pro sync |
 
 ### Dry-run
 
 ```bash
-python scripts/edpa_project_setup.py \
+python .claude/edpa/scripts/project_setup.py \
   --org technomaton --repo edpa-simulation --dry-run
 ```
 
@@ -104,23 +104,23 @@ Zobrazí plán bez provedení.
 ### GitHub Projects → Git (pull)
 
 ```bash
-python scripts/edpa_sync.py pull
+python .claude/edpa/scripts/sync.py pull
 ```
 
-Stáhne aktuální stav z GitHub Projects a aktualizuje `.edpa/backlog.yaml`. Změny zaloguje do `.edpa/changelog.jsonl`.
+Stáhne aktuální stav z GitHub Projects a aktualizuje `.edpa/backlog/`. Změny zaloguje do `.edpa/changelog.jsonl`.
 
 ### Git → GitHub Projects (push)
 
 ```bash
-python scripts/edpa_sync.py push
+python .claude/edpa/scripts/sync.py push
 ```
 
-Pošle změny z `.edpa/backlog.yaml` do GitHub Projects.
+Pošle změny z `.edpa/backlog/` do GitHub Projects.
 
 ### Diff (co se změní)
 
 ```bash
-python scripts/edpa_sync.py diff
+python .claude/edpa/scripts/sync.py diff
 ```
 
 Dry-run — ukáže rozdíly bez provedení.
@@ -128,7 +128,7 @@ Dry-run — ukáže rozdíly bez provedení.
 ### Stav synchronizace
 
 ```bash
-python scripts/edpa_sync.py status
+python .claude/edpa/scripts/sync.py status
 ```
 
 ### Automatická synchronizace (GitHub Actions)
@@ -137,14 +137,14 @@ Dvě Actions zajišťují automatický sync:
 
 | Workflow | Trigger | Směr |
 |----------|---------|------|
-| `sync-projects-to-git.yml` | Cron každých 15 minut | Projects → backlog.yaml |
-| `sync-git-to-projects.yml` | Push na `.edpa/backlog.yaml` | backlog.yaml → Projects |
+| `sync-projects-to-git.yml` | Cron každých 15 minut | Projects → `.edpa/backlog/` |
+| `sync-git-to-projects.yml` | Push na `.edpa/backlog/` | `.edpa/backlog/` → Projects |
 
 Loop prevention: commity od `github-actions[bot]` netriggerují reverse sync.
 
 ## 5. Backlog format
 
-`.edpa/backlog.yaml` — kompletní hierarchie v YAML:
+`.edpa/backlog/` — kompletní hierarchie v YAML:
 
 ```yaml
 project:
@@ -203,11 +203,11 @@ initiatives:
 ## 6. Backlog CLI
 
 ```bash
-python scripts/edpa_backlog.py tree                    # Celá hierarchie
-python scripts/edpa_backlog.py show E-10               # Detail položky + hypotéza
-python scripts/edpa_backlog.py wsjf                    # WSJF prioritizace
-python scripts/edpa_backlog.py status                  # Stav projektu
-python scripts/edpa_backlog.py validate                # Kontrola integrity
+python .claude/edpa/scripts/backlog.py tree                    # Celá hierarchie
+python .claude/edpa/scripts/backlog.py show E-10               # Detail položky + hypotéza
+python .claude/edpa/scripts/backlog.py wsjf                    # WSJF prioritizace
+python .claude/edpa/scripts/backlog.py status                  # Stav projektu
+python .claude/edpa/scripts/backlog.py validate                # Kontrola integrity
 ```
 
 ## 7. Kompletní flow — od nuly po běžící projekt
@@ -223,18 +223,18 @@ python scripts/edpa_backlog.py validate                # Kontrola integrity
    
 
 3. Naplnit backlog
-   # Editovat .edpa/backlog.yaml — definovat epicy, features, stories
-   python scripts/edpa_backlog.py validate
+   # Editovat .edpa/backlog/ — definovat epicy, features, stories (per-item files)
+   python .claude/edpa/scripts/backlog.py validate
 
 4. Setup GitHub Project
-   python scripts/edpa_project_setup.py --org ORG --repo REPO
+   python .claude/edpa/scripts/project_setup.py --org ORG --repo REPO
 
 5. Manuálně přidat sloupce v GitHub UI (viz krok 3 výše)
 
 6. Začít pracovat
    # Tým pracuje v GitHub Projects (Board view)
-   # Sync automaticky verzuje změny do .edpa/backlog.yaml
-   # Na konci iterace: python scripts/edpa_engine.py --iteration PI-YYYY-N.I
+   # Sync automaticky verzuje změny do .edpa/backlog/
+   # Na konci iterace: python .claude/edpa/scripts/engine.py --iteration PI-YYYY-N.I
 ```
 
 ## Reference
