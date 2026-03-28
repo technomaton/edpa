@@ -2,7 +2,7 @@
 
 Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allocation) na novy projekt. Od prazdneho repozitare po uzavreni prvniho Planning Intervalu a kalibraci heuristik.
 
-**Verze:** EDPA v1.1
+**Verze:** EDPA v2.1.0
 **Posledni aktualizace:** 2026-03-22
 
 ---
@@ -108,7 +108,11 @@ Vysledna struktura:
 my-project/
   .edpa/
     config.yaml          # Hlavni konfigurace
-    backlog.yaml         # Git-native backlog
+    people.yaml          # tym a projekt
+    initiatives/         # 1 soubor = 1 initiative
+    epics/               # 1 soubor = 1 epic
+    features/            # 1 soubor = 1 feature
+    stories/             # 1 soubor = 1 story
     changelog.jsonl      # Changelog syncu
     sync_state.json      # Stav posledni synchronizace
     iterations/          # Plany a vysledky iteraci
@@ -179,6 +183,24 @@ people:
 
 **Dulezite:** `planning_factor` je planovaci heuristika (planujeme na 80%). EDPA engine pocita vzdy se 100% kapacity -- buffer absorbuje neplanovane prace.
 
+Tym a projekt se zaroven konfiguruje v `.edpa/people.yaml`:
+
+```yaml
+# .edpa/people.yaml
+project:
+  name: "Nazev projektu"
+  organization: "Vase org"
+
+people:
+  - id: dev1
+    name: "Developer"
+    email: "dev@example.com"
+    role: Dev
+    team: "Core"
+    fte: 1.0
+    capacity: 80
+```
+
 ### 1.3 Nakonfigurovat projekt (project.yaml)
 
 ```bash
@@ -197,7 +219,7 @@ project:
   domain: "mujprojekt.cz"
 
 governance:
-  methodology: "EDPA v1.1"
+  methodology: "EDPA v2.1.0"
   calculation_mode: "simple"            # simple (JS x CW) nebo full (JS x CW x RS)
   audit_mode: "full"
 
@@ -307,61 +329,44 @@ EDPA vytvori tyto Issue Types:
 
 ### 1.7 Naplnit backlog
 
-Editovat `.edpa/backlog.yaml` -- flat struktura s parent referencemi:
+EDPA pouziva file-per-item strukturu -- kazdy work item je samostatny YAML soubor:
 
+```
+.edpa/
+  people.yaml                    # tym a projekt
+  config.yaml                    # sync konfigurace
+  initiatives/
+    I-1.yaml                     # 1 soubor = 1 initiative
+  epics/
+    E-1.yaml                     # 1 soubor = 1 epic
+  features/
+    F-1.yaml                     # 1 soubor = 1 feature
+  stories/
+    S-1.yaml                     # 1 soubor = 1 story
+  iterations/
+    PI-2026-1.1.yaml             # plan iterace
+```
+
+Priklad story souboru (`.edpa/stories/S-1.yaml`):
 ```yaml
-project:
-  name: "Muj Projekt"
+id: S-1
+type: Story
+title: "Implementace parseru"
+status: Planned
+parent: F-1
+js: 5
+assignee: dev1
+iteration: PI-2026-1.1
+```
 
-people:
-  - id: alice
-    name: "Alice Novakova"
-    role: Arch
-    team: "Muj Tym"
-    fte: 0.5
-    capacity: 40
+Pridani noveho itemu:
+```bash
+# Claude Code:
+/edpa setup    # interaktivne prida items
 
-teams:
-  - id: "Muj Tym"
-    planning_factor: 0.80
-
-initiatives:
-  - id: I-1
-    title: "Hlavni iniciativa projektu"
-    status: Active
-    owner: alice
-    epics:
-
-      - id: E-10
-        title: "Prvni epic"
-        type: Business               # Business nebo Enabler
-        js: 13                        # Job Size (Fibonacci: 1,2,3,5,8,13,20)
-        bv: 13                        # Business Value
-        tc: 8                         # Time Criticality
-        rr: 8                         # Risk Reduction
-        wsjf: 2.23                    # WSJF = (bv+tc+rr)/js
-        status: Active
-        owner: alice
-        features:
-
-          - id: F-100
-            title: "Prvni feature"
-            js: 8
-            bv: 8
-            tc: 5
-            rr: 5
-            wsjf: 2.25
-            status: Active
-            owner: alice
-            stories:
-
-              - id: S-200
-                title: "Prvni story"
-                js: 5                 # Max JS pro story: 8 (classic) nebo 5 (AI-native)
-                status: Active
-                feature: F-100
-                assignee: bob
-                iteration: PI-2026-1.1
+# CLI:
+python scripts/edpa_backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee dev1
+python scripts/edpa_backlog.py add --type Epic --title "..." --js 13 --bv 13 --tc 8 --rr 5
 ```
 
 Overit integritu:
@@ -415,7 +420,7 @@ Skript provede 7 kroku:
 2. Vytvori GitHub Project v2 na org urovni
 3. Vytvori custom fields: Job Size, Business Value, Time Criticality, Risk Reduction, WSJF Score (NUMBER), Team (SINGLE_SELECT)
 4. Linkuje projekt k repozitari
-5. Vytvori issues ze `.edpa/backlog.yaml` s nativnimi Issue Types
+5. Vytvori issues z item files v `.edpa/` s nativnimi Issue Types
 6. Nastavi field values (JS, BV, TC, RR, WSJF, status) na vsech project items
 7. Aktualizuje `.edpa/config.yaml` s cislem projektu pro sync
 
@@ -492,7 +497,7 @@ python scripts/edpa_sync.py status
 
 ```bash
 git add config/capacity.yaml config/project.yaml config/cw_heuristics.yaml
-git add .edpa/config.yaml .edpa/backlog.yaml
+git add .edpa/
 git commit -m "feat(edpa): initial EDPA setup for my-project"
 git push origin main
 ```
@@ -563,20 +568,20 @@ PR review = evidence pro EDPA (reviewer dostane CW dle role).
 
 ### 2.3 Sync (automaticky)
 
-Bidirekcni synchronizace mezi GitHub Projects (UI pro PM/BO) a `.edpa/backlog.yaml` (Git-native):
+Bidirekcni synchronizace mezi GitHub Projects (UI pro PM/BO) a item files v `.edpa/` (Git-native):
 
 **Automaticky pres GitHub Actions:**
 
 - `sync-projects-to-git.yml` -- kazych 15 minut stahuje zmeny z Projects do Gitu
-- `sync-git-to-projects.yml` -- pri push do `main` s zmenou v `.edpa/backlog.yaml` propaguje do Projects
+- `sync-git-to-projects.yml` -- pri push do `main` s zmenou v `.edpa/` propaguje do Projects
 
 **Manualne:**
 
 ```bash
-# Pull: GitHub Projects -> backlog.yaml
+# Pull: GitHub Projects -> item files in .edpa/
 python scripts/edpa_sync.py pull
 
-# Push: backlog.yaml -> GitHub Projects
+# Push: item files in .edpa/ -> GitHub Projects
 python scripts/edpa_sync.py push
 
 # Diff: zobrazit co by se zmenilo
@@ -793,7 +798,7 @@ Pokud MAD > 0.06, analyzovat kde jsou nejvetsi odchylky:
 
 ### 3.4 Planovani dalsiho PI
 
-1. **Nove epicy/features** -- pridat do `.edpa/backlog.yaml`
+1. **Nove epicy/features** -- pridat jako soubory do `.edpa/epics/` a `.edpa/features/`
 2. **WSJF prioritizace:**
 
 ```bash
@@ -866,8 +871,8 @@ python scripts/edpa_backlog.py status
 |----------|---------|--------|
 | `branch-check.yml` | PR opened/sync | Kontroluje branch naming konvenci |
 | `iteration-close.yml` | workflow_dispatch | Spusti EDPA engine, commity vysledky |
-| `sync-projects-to-git.yml` | cron (15min) + manual | Pull: Projects -> backlog.yaml |
-| `sync-git-to-projects.yml` | push na backlog.yaml | Push: backlog.yaml -> Projects |
+| `sync-projects-to-git.yml` | cron (15min) + manual | Pull: Projects -> item files in .edpa/ |
+| `sync-git-to-projects.yml` | push na .edpa/ | Push: item files in .edpa/ -> Projects |
 
 ---
 
@@ -893,7 +898,7 @@ python scripts/edpa_backlog.py status
 - [ ] Commity referuji work items (`feat(S-XXX): ...`)
 - [ ] PR reviews probihaji
 - [ ] Sync funguje (overit `edpa_sync.py status`)
-- [ ] Backlog.yaml se automaticky aktualizuje z Projects
+- [ ] Item files v .edpa/ se automaticky aktualizuji z Projects
 
 ### Konec iterace 1
 
@@ -962,10 +967,10 @@ python scripts/edpa_backlog.py status
 
 | Prikaz | Popis |
 |--------|-------|
-| `edpa_sync.py pull` | GitHub Projects -> `.edpa/backlog.yaml` |
+| `edpa_sync.py pull` | GitHub Projects -> item files in `.edpa/` |
 | `edpa_sync.py pull --commit` | Pull + auto-commit (pouziva CI) |
 | `edpa_sync.py pull --mock` | Simulace bez GitHub API |
-| `edpa_sync.py push` | `.edpa/backlog.yaml` -> GitHub Projects |
+| `edpa_sync.py push` | item files in `.edpa/` -> GitHub Projects |
 | `edpa_sync.py push --mock` | Simulace push |
 | `edpa_sync.py diff` | Zobrazí rozdily (dry-run) |
 | `edpa_sync.py diff --mock` | Rozdily v mock modu |
@@ -993,7 +998,6 @@ python scripts/edpa_backlog.py status
 | `edpa_project_setup.py --org ORG --repo REPO` | Vytvori kompletni Project |
 | `edpa_project_setup.py --org ORG --repo REPO --project-title "Nazev"` | S vlastnim nazvem |
 | `edpa_project_setup.py --org ORG --repo REPO --dry-run` | Jen ukaze co by udelal |
-| `edpa_project_setup.py --org ORG --repo REPO --backlog cesta/backlog.yaml` | Vlastni cesta k backlogu |
 
 ### edpa_project_views.py -- Project Views
 
@@ -1021,7 +1025,7 @@ python scripts/edpa_backlog.py status
 ## Architektura
 
 ```
-GitHub Projects (UI)  <-->  .edpa/backlog.yaml (Git)
+GitHub Projects (UI)  <-->  .edpa/ item files (Git)
        |                          |
   PM/BO pracuji            Verzovane, auditovatelne
        |                          |
@@ -1041,7 +1045,7 @@ GitHub Projects (UI)  <-->  .edpa/backlog.yaml (Git)
            sync pull     |              |     sync push
          (cron 15min)    v              |   (push trigger)
                     +---------------------------+
-                    |  .edpa/backlog.yaml (Git)  |
+                    |  .edpa/ item files (Git)   |
                     |  Source of truth           |
                     +---------------------------+
                               |
@@ -1165,7 +1169,7 @@ python scripts/edpa_sync.py conflicts
 python scripts/edpa_sync.py diff
 ```
 
-Rucne vyresit v `.edpa/backlog.yaml`, pak:
+Rucne vyresit v prislusnem item souboru v `.edpa/`, pak:
 
 ```bash
 python scripts/edpa_sync.py push
