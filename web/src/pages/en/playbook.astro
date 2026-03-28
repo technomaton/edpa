@@ -1,0 +1,1235 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+<Layout title="EDPA Playbook" lang="en" description="Complete guide for deploying EDPA — from empty repository to closing the first Planning Interval and calibrating heuristics.">
+<div class="container section playbook-page">
+
+  <div class="page-header">
+    <div class="tag">Playbook</div>
+    <h1>EDPA Playbook — Od nuly po první PI</h1>
+    <p class="subtitle">Kompletní příručka pro nasazení metodiky EDPA na nový projekt</p>
+    <p class="meta">EDPA v2.1.0 &middot; Březen 2026</p>
+  </div>
+
+  <div class="methodology-layout">
+
+  <aside class="sidebar-toc" id="sidebarToc">
+    <div class="toc-title">Obsah</div>
+    <ol class="toc-list">
+      <li><a href="#prerekvizity" class="toc-link" data-section="prerekvizity">Prerekvizity</a></li>
+      <li><a href="#faze-1" class="toc-link" data-section="faze-1">Fáze 1: Infrastruktura</a></li>
+      <li><a href="#faze-2" class="toc-link" data-section="faze-2">Fáze 2: První iterace</a></li>
+      <li><a href="#faze-3" class="toc-link" data-section="faze-3">Fáze 3: PI Close</a></li>
+      <li><a href="#faze-4" class="toc-link" data-section="faze-4">Fáze 4: Kontinuální provoz</a></li>
+      <li><a href="#checklist" class="toc-link" data-section="checklist">Checklist</a></li>
+      <li><a href="#cli-reference" class="toc-link" data-section="cli-reference">CLI Reference</a></li>
+      <li><a href="#architektura" class="toc-link" data-section="architektura">Architektura</a></li>
+      <li><a href="#troubleshooting" class="toc-link" data-section="troubleshooting">Troubleshooting</a></li>
+      <li><a href="#slovnicek" class="toc-link" data-section="slovnicek">Slovníček</a></li>
+    </ol>
+  </aside>
+
+  <div class="methodology-content">
+
+  <!-- Prerekvizity -->
+  <section id="prerekvizity">
+    <h2>Prerekvizity</h2>
+
+    <h3>Nástroje</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Nástroj</th><th>Minimální verze</th><th>Ověření</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Python</td><td>3.10+</td><td><code>python --version</code></td></tr>
+          <tr><td>PyYAML</td><td>libovolná</td><td><code>pip install pyyaml</code></td></tr>
+          <tr><td>GitHub CLI (gh)</td><td>2.40+</td><td><code>gh --version</code></td></tr>
+          <tr><td>Git</td><td>2.30+</td><td><code>git --version</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>GitHub CLI scopes</h3>
+    <pre><code>gh auth login
+gh auth refresh -s repo,project,read:project,admin:org</code></pre>
+    <p>Ověření:</p>
+    <pre><code>gh auth status
+# Musí ukazovat scopes: repo, project, admin:org</code></pre>
+
+    <h3>Organizace a tým</h3>
+    <p>Před začátkem je třeba mít:</p>
+    <ul>
+      <li>GitHub organizaci (např. <code>my-org</code>)</li>
+      <li>Definovaný tým: jména, role (Arch, Dev, DevSecOps, PM, QA, BO), FTE, kapacity</li>
+      <li>Alespoň základní backlog (1 Epic, 2-3 Features, 5-10 Stories)</li>
+    </ul>
+
+    <h3>Role v EDPA</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Role</th><th>Popis</th><th>Typické evidence v Gitu</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>BO</strong></td><td>Business Owner</td><td>Issue komentáře, validace</td></tr>
+          <tr><td><strong>PM</strong></td><td>Product Manager / Product Owner</td><td>Backlog management, specifikace</td></tr>
+          <tr><td><strong>Arch</strong></td><td>Architekt</td><td>Code review, design decisions</td></tr>
+          <tr><td><strong>Dev</strong></td><td>Vývojář</td><td>Commity, PR, assignee</td></tr>
+          <tr><td><strong>DevSecOps</strong></td><td>DevSecOps Engineer</td><td>CI/CD, security, infra commity</td></tr>
+          <tr><td><strong>QA</strong></td><td>Test Engineer</td><td>Testovací commity, review</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Fáze 1 -->
+  <section id="faze-1">
+    <h2>Fáze 1: Infrastruktura (Den 1, ~4 hodiny)</h2>
+
+    <h3>Cesta A: Claude Code (doporučeno)</h3>
+    <p>V terminálu s Claude Code nainstalovaným:</p>
+    <pre><code>/edpa setup</code></pre>
+    <p>Claude Code provede kroky 1.1-1.6 automaticky — vytvoří repo, nakonfiguruje tým, nastaví Issue Types a vytvoří GitHub Project.</p>
+
+    <h3>Cesta B: Manuální CLI</h3>
+    <p>Následující kroky popisují manuální postup bez Claude Code.</p>
+
+    <h3>1.1 Vytvořit repozitář</h3>
+    <p><strong>Varianta A: Z EDPA šablony (doporučeno)</strong></p>
+    <pre><code>gh repo create my-org/my-project --template technomaton/edpa-template --private
+cd my-project</code></pre>
+    <p><strong>Varianta B: Klonovat a upravit</strong></p>
+    <pre><code>git clone https://github.com/your-org/edpa.git my-project
+cd my-project
+rm -rf .git
+git init
+git remote add origin git@github.com:my-org/my-project.git</code></pre>
+
+    <p>Výsledná struktura:</p>
+    <pre><code>my-project/
+  .edpa/
+    config.yaml          # Hlavní konfigurace
+    people.yaml          # Tým a projekt
+    initiatives/         # 1 soubor = 1 initiative
+    epics/               # 1 soubor = 1 epic
+    features/            # 1 soubor = 1 feature
+    stories/             # 1 soubor = 1 story
+    changelog.jsonl      # Changelog syncu
+    sync_state.json      # Stav poslední synchronizace
+    iterations/          # Plány a výsledky iterací
+  .github/workflows/
+    branch-check.yml     # CI: kontrola branch naming
+    iteration-close.yml  # CI: uzavření iterace (workflow_dispatch)
+    sync-projects-to-git.yml   # Cron: Projects -&gt; Git (15 min)
+    sync-git-to-projects.yml   # Push trigger: Git -&gt; Projects
+  config/
+    capacity.yaml.tmpl   # Šablona kapacitního registru
+    cw_heuristics.yaml.tmpl    # Šablona CW heuristik
+    project.yaml.tmpl    # Šablona projektové konfigurace
+  scripts/
+    edpa_engine.py       # EDPA výpočetní jádro
+    edpa_backlog.py      # Správa backlogu (tree, show, wsjf, validate)
+    edpa_sync.py         # Bidirekční sync GitHub Projects &lt;-&gt; Git
+    edpa_issue_types.py  # Správa Issue Types na org úrovni
+    edpa_project_setup.py      # Automatické vytvoření GitHub Projectu
+    edpa_project_views.py      # Views setup
+    create_project_views.py    # Playwright automatizace views (volitelné)
+    evaluate_cw.py       # CW kalibrace (MAD evaluator)
+  data/                  # Ground truth data (po PI)
+  reports/               # Generované reporty per iterace
+  snapshots/             # Zmrazené snapshoty iterací
+  docs/                  # Dokumentace</code></pre>
+
+    <h3>1.2 Nakonfigurovat tým (capacity.yaml)</h3>
+    <pre><code>cp config/capacity.yaml.tmpl config/capacity.yaml</code></pre>
+    <p>Upravit <code>config/capacity.yaml</code>:</p>
+    <pre><code>cadence:
+  iteration_weeks: 2                    # 1 (AI-native) nebo 2 (classic)
+  pi_weeks: 10                          # 5 nebo 10
+  delivery_iterations_per_pi: 4         # PI minus IP iterace
+  ip_iterations_per_pi: 1              # Innovation &amp; Planning
+
+teams:
+  - id: "Muj Tym"
+    planning_factor: 0.8               # Plánujeme na 80% kapacity
+
+people:
+  - id: alice
+    name: "Alice Nováková"
+    role: Arch                          # Arch, Dev, DevSecOps, PM, QA, BO
+    team: "Muj Tym"
+    fte: 0.5
+    capacity_per_iteration: 40          # hodiny (FTE x 80 pro 2-týdenní iter.)
+    email: "alice@example.com"
+    availability: confirmed
+
+  - id: bob
+    name: "Bob Svoboda"
+    role: Dev
+    team: "Muj Tym"
+    fte: 1.0
+    capacity_per_iteration: 80
+    email: "bob@example.com"
+    availability: confirmed</code></pre>
+    <div class="note"><strong>Důležité:</strong> <code>planning_factor</code> je plánovací heuristika (plánujeme na 80%). EDPA engine počítá vždy se 100% kapacity — buffer absorbuje neplánované práce.</div>
+
+    <h3>1.3 Nakonfigurovat projekt (project.yaml)</h3>
+    <pre><code>cp config/project.yaml.tmpl config/project.yaml</code></pre>
+    <p>Upravit <code>config/project.yaml</code>:</p>
+    <pre><code>project:
+  name: "Muj Projekt"
+  registration: ""
+  program: ""
+  organizations:
+    - name: "Moje Organizace"
+  domain: "mujprojekt.cz"
+
+governance:
+  methodology: "EDPA v2.1.0"
+  calculation_mode: "simple"            # simple (JS x CW) nebo full (JS x CW x RS)
+  audit_mode: "full"
+
+naming:
+  pi_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;"
+  iteration_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;.&#123;iter_num&#125;"
+  branch_pattern: "&#123;type&#125;/&#123;item_id&#125;-&#123;description&#125;"
+  item_prefixes:
+    initiative: "I"
+    epic: "E"
+    feature: "F"
+    story: "S"
+    task: "T"
+    bug: "B"</code></pre>
+
+    <h3>1.4 Nakonfigurovat CW heuristiky</h3>
+    <pre><code>cp config/cw_heuristics.yaml.tmpl config/cw_heuristics.yaml</code></pre>
+    <p>Výchozí hodnoty jsou kalibrované Monte Carlo simulací (1000 scénářů, 66 362 záznamů, p&lt;0.001). Pro začátek stačí bez úprav.</p>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Evidence role</th><th>CW váha</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>owner (assignee)</td><td>1.00</td></tr>
+          <tr><td>key (PR author)</td><td>0.60</td></tr>
+          <tr><td>reviewer (commit/PR review)</td><td>0.25</td></tr>
+          <tr><td>consulted (komentář)</td><td>0.15</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Role-specifické korekce (strategické role jsou Gitem podhodnoceny):</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Role</th><th>Korekce</th><th>Důvod</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>BO consulted</td><td>0.30 (+0.15)</td><td>Rozhodování neviditelné v Gitu</td></tr>
+          <tr><td>PM consulted</td><td>0.20 (+0.05)</td><td>Specifikace neviditelná v Gitu</td></tr>
+          <tr><td>Arch reviewer</td><td>0.30 (+0.05)</td><td>Design review neviditelný</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>1.5 Nakonfigurovat .edpa/config.yaml</h3>
+    <pre><code>pi:
+  current: PI-2026-1
+  year: 2026
+  num: 1
+  iteration_weeks: 2
+  pi_weeks: 10
+  iterations:
+    - id: PI-2026-1.1
+      dates: "1.4.--14.4.2026"
+      status: planned
+    - id: PI-2026-1.2
+      dates: "15.4.--28.4.2026"
+      status: planned
+    - id: PI-2026-1.3
+      dates: "29.4.--12.5.2026"
+      status: planned
+    - id: PI-2026-1.4
+      dates: "13.5.--26.5.2026"
+      status: planned
+    - id: PI-2026-1.5
+      dates: "27.5.--9.6.2026"
+      status: planned
+      type: IP  # Innovation &amp; Planning
+
+sync:
+  github_org: "my-org"
+  github_project_number: 1
+  sync_interval: "15m"
+  auto_commit: true</code></pre>
+
+    <h3>1.6 Nastavit Issue Types na organizaci</h3>
+    <pre><code># Zobrazit aktuální typy
+python scripts/edpa_issue_types.py list --org my-org
+
+# Vytvořit EDPA sadu Issue Types
+python scripts/edpa_issue_types.py setup --org my-org
+
+# Dry-run (jen ukáže co by se stalo)
+python scripts/edpa_issue_types.py setup --org my-org --dry-run</code></pre>
+
+    <p>EDPA vytvoří tyto Issue Types:</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Typ</th><th>Barva</th><th>Popis</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Initiative</td><td style="color:var(--pk)">PINK</td><td>Business case, investiční záměr</td></tr>
+          <tr><td>Epic</td><td style="color:var(--ac2)">PURPLE</td><td>Strategický cíl, 6-9 měsíců</td></tr>
+          <tr><td>Feature</td><td style="color:var(--cy)">BLUE</td><td>Musí se vejít do Planning Intervalu</td></tr>
+          <tr><td>Story</td><td style="color:var(--gn)">GREEN</td><td>Dodáváno v iteraci</td></tr>
+          <tr><td>Defect</td><td style="color:var(--rd)">RED</td><td>Defekt v existující funkcionalitě</td></tr>
+          <tr><td>Task</td><td style="color:var(--yl)">YELLOW</td><td>Technická práce</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note"><strong>Poznámka:</strong> Enabler je <strong>label</strong> (Business vs Enabler klasifikace, SAFe), ne Issue Type.</div>
+
+    <h3>1.7 Naplnit backlog</h3>
+    <p>EDPA používá file-per-item strukturu — každý work item je samostatný YAML soubor:</p>
+    <pre><code>.edpa/
+  people.yaml
+  config.yaml
+  initiatives/
+    I-1.yaml         # 1 soubor = 1 initiative
+  epics/
+    E-1.yaml         # 1 soubor = 1 epic
+  features/
+    F-1.yaml         # 1 soubor = 1 feature
+  stories/
+    S-1.yaml         # 1 soubor = 1 story
+  iterations/
+    PI-2026-1.1.yaml # plán iterace</code></pre>
+
+    <p>Příklad story souboru (<code>.edpa/stories/S-1.yaml</code>):</p>
+    <pre><code>id: S-1
+type: Story
+title: "Implementace parseru"
+status: Planned
+parent: F-1
+js: 5
+assignee: dev1
+iteration: PI-2026-1.1</code></pre>
+
+    <p>Přidání nového itemu:</p>
+    <pre><code># Claude Code:
+/edpa setup    # interaktivně přidá items
+
+# CLI:
+python scripts/edpa_backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee dev1
+python scripts/edpa_backlog.py add --type Epic --title "..." --js 13 --bv 13 --tc 8 --rr 5</code></pre>
+
+    <p>Ověřit integritu:</p>
+    <pre><code>python scripts/edpa_backlog.py validate</code></pre>
+    <p>Zobrazit hierarchii:</p>
+    <pre><code>python scripts/edpa_backlog.py tree
+python scripts/edpa_backlog.py tree --level epic</code></pre>
+    <p>Zobrazit WSJF prioritizaci:</p>
+    <pre><code>python scripts/edpa_backlog.py wsjf
+python scripts/edpa_backlog.py wsjf --level feature</code></pre>
+
+    <h3>1.8 Vytvořit GitHub Project</h3>
+    <pre><code>python scripts/edpa_project_setup.py \
+  --org my-org \
+  --repo my-project \
+  --project-title "EDPA -- Muj Projekt"</code></pre>
+    <p>Skript provede 7 kroků:</p>
+    <ol>
+      <li>Ověří Issue Types na org</li>
+      <li>Vytvoří GitHub Project v2 na org úrovni</li>
+      <li>Vytvoří custom fields: Job Size, BV, TC, RR, WSJF Score, Team</li>
+      <li>Linkuje projekt k repozitáři</li>
+      <li>Vytvoří issues z item files v <code>.edpa/</code> s nativními Issue Types</li>
+      <li>Nastaví field values na všech project items</li>
+      <li>Aktualizuje <code>.edpa/config.yaml</code> s číslem projektu</li>
+    </ol>
+
+    <h3>1.9 Nastavit Project views</h3>
+    <p><strong>Cesta A: Manuální setup s instrukcemi</strong></p>
+    <pre><code>python scripts/edpa_project_views.py instructions --org my-org --project 1</code></pre>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>View</th><th>Typ</th><th>Filtr/Řazení</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>All Items</td><td>Table</td><td>Všechny položky</td></tr>
+          <tr><td>Board</td><td>Board</td><td>To Do / In Progress / In Review / Done</td></tr>
+          <tr><td>Epics</td><td>Table</td><td><code>type:Epic</code>, řazeno WSJF</td></tr>
+          <tr><td>Features</td><td>Table</td><td><code>type:Feature</code>, řazeno WSJF</td></tr>
+          <tr><td>Stories</td><td>Table</td><td><code>type:Story</code>, filtrováno iterací</td></tr>
+          <tr><td>WSJF Ranking</td><td>Table</td><td>Řazeno WSJF sestupně</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>Cesta B: Označit jako šablonu</strong></p>
+    <pre><code>python scripts/edpa_project_views.py template --org my-org --project 1</code></pre>
+    <p><strong>Cesta C: Vytvořit z šablony</strong></p>
+    <pre><code>python scripts/edpa_project_views.py create-from-template \
+  --org my-org --template 1 --title "Novy Projekt"</code></pre>
+    <p><strong>Ověření:</strong></p>
+    <pre><code>python scripts/edpa_project_views.py verify --org my-org --project 1</code></pre>
+
+    <h3>1.10 Ověřit setup</h3>
+    <pre><code># Demo EDPA engine (bez reálných dat)
+python scripts/edpa_engine.py --demo
+
+# Validace backlogu
+python scripts/edpa_backlog.py validate
+
+# Status projektu
+python scripts/edpa_backlog.py status
+
+# Sync status
+python scripts/edpa_sync.py status</code></pre>
+
+    <h3>1.11 Commitnout základní konfiguraci</h3>
+    <pre><code>git add config/capacity.yaml config/project.yaml config/cw_heuristics.yaml
+git add .edpa/
+git commit -m "feat(edpa): initial EDPA setup for my-project"
+git push origin main</code></pre>
+  </section>
+
+  <!-- Fáze 2 -->
+  <section id="faze-2">
+    <h2>Fáze 2: První iterace (Týden 1-2)</h2>
+
+    <h3>2.1 Iteration Planning</h3>
+    <ol>
+      <li><strong>Potvrzení kapacity</strong> — tým potvrdí dostupnost na iteraci</li>
+      <li><strong>Výběr stories</strong> — z backlogu dle WSJF pořadí, na 80% kapacity</li>
+    </ol>
+    <pre><code># WSJF ranking features
+python scripts/edpa_backlog.py wsjf --level feature
+
+# Tree pro konkrétní iteraci
+python scripts/edpa_backlog.py tree --iteration PI-2026-1.1</code></pre>
+    <ol start="3">
+      <li><strong>Přiřazení assignees</strong> — každá story musí mít assignee</li>
+      <li><strong>Aktualizace backlogu</strong> — <code>iteration: PI-2026-1.1</code> na vybraných stories</li>
+    </ol>
+
+    <h3>2.2 Denní práce</h3>
+    <p><strong>Branch naming konvence</strong> (CI kontrola v <code>.github/workflows/branch-check.yml</code>):</p>
+    <pre><code># Formát: &#123;type&#125;/&#123;ITEM_ID&#125;-&#123;popis&#125;
+git checkout -b feature/S-200-omop-parser
+git checkout -b feature/F-102-anon-engine
+git checkout -b bugfix/S-215-upload-validation
+git checkout -b chore/T-050-ci-pipeline</code></pre>
+    <p>Povolené typy: <code>feature</code>, <code>bugfix</code>, <code>hotfix</code>, <code>chore</code></p>
+
+    <p><strong>Commit konvence:</strong></p>
+    <pre><code>git commit -m "feat(S-200): implement OMOP CDM parser"
+git commit -m "fix(S-215): validate upload file size"
+git commit -m "test(S-201): add unit tests for parser"
+git commit -m "docs(E-10): update epic hypothesis"</code></pre>
+    <p>EDPA engine rozpoznává reference <code>S-XXX</code>, <code>F-XXX</code>, <code>E-XXX</code> v commitech a PR pro detekci evidence.</p>
+
+    <p><strong>Pull Request workflow:</strong></p>
+    <pre><code>git push origin feature/S-200-omop-parser
+gh pr create --title "S-200: OMOP CDM parser implementation" \
+  --body "Closes #42
+
+## Changes
+- Implemented OMOP CDM parser
+- Added schema validation
+
+## Testing
+- Unit tests: 15 passing
+"</code></pre>
+    <p>PR review = evidence pro EDPA (reviewer dostane CW dle role).</p>
+
+    <h3>2.3 Sync (automaticky)</h3>
+    <p>Bidirekční synchronizace mezi GitHub Projects (UI pro PM/BO) a item files v <code>.edpa/</code> (Git-native):</p>
+    <p><strong>Automaticky přes GitHub Actions:</strong></p>
+    <ul>
+      <li><code>sync-projects-to-git.yml</code> — každých 15 minut stahuje změny z Projects do Gitu</li>
+      <li><code>sync-git-to-projects.yml</code> — při push do <code>main</code> se změnou v <code>.edpa/</code> propaguje do Projects</li>
+    </ul>
+    <p><strong>Manuálně:</strong></p>
+    <pre><code># Pull: GitHub Projects -&gt; item files in .edpa/
+python scripts/edpa_sync.py pull
+
+# Push: item files in .edpa/ -&gt; GitHub Projects
+python scripts/edpa_sync.py push
+
+# Diff: zobrazit co by se změnilo
+python scripts/edpa_sync.py diff
+
+# Status
+python scripts/edpa_sync.py status</code></pre>
+
+    <h3>2.4 Iteration Close</h3>
+    <p>Na konci každé iterace (po 2 týdnech):</p>
+    <p><strong>Claude Code (doporučeno):</strong></p>
+    <pre><code>/edpa close-iteration PI-2026-1.1</code></pre>
+    <p><strong>Manuální CLI:</strong></p>
+    <pre><code>python scripts/edpa_engine.py \
+  --iteration PI-2026-1.1 \
+  --capacity config/capacity.yaml \
+  --heuristics config/cw_heuristics.yaml</code></pre>
+
+    <p><strong>Výstupy:</strong></p>
+    <pre><code>reports/iteration-PI-2026-1.1/
+  edpa_results.json      # Kompletní výpočet (JSON)
+  vykaz-alice.md         # Výkaz pro každou osobu
+  item-costs.xlsx        # Náklady per položka (Excel)
+snapshots/
+  PI-2026-1.1.json       # Zmrazený snapshot</code></pre>
+
+    <p><strong>Režim výpočtu:</strong></p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Režim</th><th>Vzorec</th><th>Použití</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>simple</td><td>JS &times; CW</td><td>Výchozí — Job Size &times; Contribution Weight</td></tr>
+          <tr><td>full</td><td>JS &times; CW &times; RS</td><td>S Role Strength — pro přesnější alokaci</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>Invarianty</strong> (engine automaticky kontroluje):</p>
+    <ul>
+      <li>Součet hodin osoby = její kapacita (odchylka &lt; 0.01h)</li>
+      <li>Součet poměrů = 1.0 (odchylka &lt; 0.001)</li>
+      <li>Žádné záporné hodiny</li>
+      <li>Pokud invariant selže, engine hlásí <code>FAIL</code></li>
+    </ul>
+
+    <h3>2.5 Aktualizace iteračního plánu</h3>
+    <p>Po uzavření iterace vytvořit/aktualizovat <code>.edpa/iterations/PI-2026-1.1.yaml</code>:</p>
+    <pre><code>iteration:
+  id: PI-2026-1.1
+  pi: PI-2026-1
+  dates: "1.4.--14.4.2026"
+  status: closed
+
+planning:
+  capacity: 380
+  planning_factor: 0.80
+  planned_sp: 24
+  stories:
+    - S-200
+    - S-201
+    - S-202
+
+delivery:
+  delivered_sp: 24
+  predictability: "100%"
+  velocity: 24
+  spillover: []
+  unplanned: []
+  notes: "První iterace -- plný delivery."</code></pre>
+  </section>
+
+  <!-- Fáze 3 -->
+  <section id="faze-3">
+    <h2>Fáze 3: PI Close (Po 4-5 iteracích)</h2>
+
+    <h3>Cesta A: Claude Code (doporučeno)</h3>
+    <pre><code>/edpa calibrate</code></pre>
+    <p>Claude Code spustí CW kalibraci, vyhodnotí MAD a návrh úprav heuristik.</p>
+    <pre><code>/edpa reports</code></pre>
+
+    <h3>Cesta B: Manuální CLI</h3>
+
+    <h3>3.1 Retrospektiva</h3>
+    <p>Na konci PI (po 4 delivery iteracích + 1 IP iterace):</p>
+    <ol>
+      <li><strong>Projít auto-detekci vs. realita</strong> na 5-10 stories</li>
+      <li>Pro každou story porovnat: kdo byl auto-detekován, jaké CW engine přiřadil, odpovídá realitě?</li>
+    </ol>
+
+    <h3>3.2 Zaznamenat ground truth</h3>
+    <p>Vytvořit <code>data/ground_truth.yaml</code>:</p>
+    <pre><code># Ground truth pro CW kalibraci
+records:
+  - item_id: S-200
+    person_id: alice
+    evidence_role: reviewer
+    auto_cw: 0.25
+    confirmed_cw: 0.35
+    person_role: Arch
+    notes: "Alice dělala design review + arch. rozhodnutí"
+
+  - item_id: S-200
+    person_id: bob
+    evidence_role: owner
+    auto_cw: 1.00
+    confirmed_cw: 1.00
+    person_role: Dev
+    notes: "Přesně -- Bob byl assignee a udělal všechnu práci"
+
+  # ... alespoň 20 záznamů pro kalibraci</code></pre>
+
+    <h3>3.3 Kalibrace CW heuristik</h3>
+    <pre><code>python scripts/evaluate_cw.py \
+  --ground-truth data/ground_truth.yaml \
+  --heuristics config/cw_heuristics.yaml</code></pre>
+    <p>Výstup:</p>
+    <pre><code>MAD=0.041200
+RECORDS=20
+TOTAL_DEVIATION=0.824000</code></pre>
+
+    <p><strong>Interpretace MAD (Mean Absolute Deviation):</strong></p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>MAD</th><th>Hodnocení</th><th>Akce</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>&lt; 0.03</td><td style="color:var(--gn)">Výborné</td><td>Bez změny</td></tr>
+          <tr><td>0.03 - 0.06</td><td style="color:var(--cy)">Dobré</td><td>Drobné korekce (volitelné)</td></tr>
+          <tr><td>0.06 - 0.10</td><td style="color:var(--yl)">Přijatelné</td><td>Zvážit úpravu role_overrides</td></tr>
+          <tr><td>&gt; 0.10</td><td style="color:var(--rd)">Špatné</td><td>Nutná kalibrace</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>3.4 Plánování dalšího PI</h3>
+    <ol>
+      <li><strong>Nové epicy/features</strong> — přidat jako soubory do <code>.edpa/epics/</code> a <code>.edpa/features/</code></li>
+      <li><strong>WSJF prioritizace:</strong> <code>python scripts/edpa_backlog.py wsjf</code></li>
+      <li><strong>Kapacitní plánování</strong> — aktualizovat <code>config/capacity.yaml</code></li>
+      <li><strong>Aktualizovat <code>.edpa/config.yaml</code></strong> — nový PI, iterace, datumy</li>
+    </ol>
+  </section>
+
+  <!-- Fáze 4 -->
+  <section id="faze-4">
+    <h2>Fáze 4: Kontinuální provoz</h2>
+
+    <h3>S Claude Code (doporučeno)</h3>
+    <p>Každá iterace:</p>
+    <pre><code>/edpa close-iteration PI-2026-1.X    # uzavření iterace
+/edpa reports                         # generování reportů</code></pre>
+    <p>Každý PI:</p>
+    <pre><code>/edpa calibrate                       # CW kalibrace</code></pre>
+
+    <h3>Každá iterace (každé 2 týdny)</h3>
+    <ol>
+      <li><strong>Planning</strong> — vybrat stories, přiřadit assignees</li>
+      <li><strong>Denní práce</strong> — branch naming, commity s referencemi, PR review</li>
+      <li><strong>Iteration Close</strong> — EDPA engine, generování reportů</li>
+      <li><strong>Sync</strong> — automaticky verzuje změny (GitHub Actions cron 15min)</li>
+      <li><strong>Review</strong> — tým zkontroluje výkazy, zahlásí korektury</li>
+    </ol>
+
+    <h3>Každý PI (každých 10 týdnů)</h3>
+    <ol>
+      <li><strong>Retrospektiva</strong> — auto-detected CW vs realita</li>
+      <li><strong>Ground truth</strong> — zaznamenat alespoň 20 nových záznamů</li>
+      <li><strong>CW kalibrace</strong> — <code>evaluate_cw.py</code>, vyhodnotit MAD</li>
+      <li><strong>Velocity trend</strong> — porovnat delivery across iterací</li>
+      <li><strong>Predictability</strong> — (delivered_sp / planned_sp) across iterací</li>
+    </ol>
+
+    <h3>Automatizace přes GitHub Actions</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Workflow</th><th>Trigger</th><th>Co dělá</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>branch-check.yml</code></td><td>PR opened/sync</td><td>Kontroluje branch naming konvenci</td></tr>
+          <tr><td><code>iteration-close.yml</code></td><td>workflow_dispatch</td><td>Spustí EDPA engine, commitne výsledky</td></tr>
+          <tr><td><code>sync-projects-to-git.yml</code></td><td>cron (15min)</td><td>Pull: Projects &rarr; item files</td></tr>
+          <tr><td><code>sync-git-to-projects.yml</code></td><td>push na .edpa/</td><td>Push: item files &rarr; Projects</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Checklist -->
+  <section id="checklist">
+    <h2>Checklist — Co mít hotové</h2>
+
+    <h3>Den 1</h3>
+    <ul class="checklist">
+      <li>Repo vytvořené s EDPA strukturou</li>
+      <li><code>config/capacity.yaml</code> — tým s rolemi, FTE, kapacitami</li>
+      <li><code>config/project.yaml</code> — název projektu, metadata</li>
+      <li><code>config/cw_heuristics.yaml</code> — výchozí heuristiky</li>
+      <li><code>.edpa/config.yaml</code> — PI, iterace, datumy, sync</li>
+      <li>Issue Types nastavené na organizaci</li>
+      <li>Backlog naplněný (alespoň 1 Epic, 3 Features, 10 Stories)</li>
+      <li><code>edpa_backlog.py validate</code> projde bez chyb</li>
+      <li>GitHub Project vytvořen</li>
+      <li>Project views nastaveny</li>
+      <li><code>edpa_engine.py --demo</code> projde úspěšně</li>
+    </ul>
+
+    <h3>Týden 1</h3>
+    <ul class="checklist">
+      <li>Tým pracuje s branch naming konvencí</li>
+      <li>Commity referují work items (<code>feat(S-XXX): ...</code>)</li>
+      <li>PR reviews probíhají</li>
+      <li>Sync funguje (<code>edpa_sync.py status</code>)</li>
+      <li>Item files v .edpa/ se automaticky aktualizují</li>
+    </ul>
+
+    <h3>Konec iterace 1</h3>
+    <ul class="checklist">
+      <li>EDPA engine spuštěn pro iteraci</li>
+      <li><code>edpa_results.json</code> vygenerován</li>
+      <li>Výkazy vygenerovány (per-person)</li>
+      <li>Všechny invarianty prošly (<code>all_invariants_passed: true</code>)</li>
+      <li>Tým zkontroloval výsledky</li>
+      <li>Iterační soubor vytvořen v <code>.edpa/iterations/</code></li>
+    </ul>
+
+    <h3>Konec iterace 2-4</h3>
+    <ul class="checklist">
+      <li>Velocity stabilní (odchylka &lt; 20%)</li>
+      <li>Prediktabilita &gt; 80%</li>
+      <li>Žádné nevyřešené sync konflikty</li>
+    </ul>
+
+    <h3>Konec PI 1</h3>
+    <ul class="checklist">
+      <li>Ground truth zaznamenáno (min. 20 záznamů)</li>
+      <li>CW kalibrace provedena (<code>evaluate_cw.py</code>)</li>
+      <li>MAD vyhodnoceno (cíl: &lt; 0.06)</li>
+      <li>Heuristiky upraveny (pokud MAD &gt; 0.06)</li>
+      <li>Plánování PI 2 — nové epicy, WSJF, kapacity</li>
+    </ul>
+  </section>
+
+  <!-- CLI Reference -->
+  <section id="cli-reference">
+    <h2>CLI Reference</h2>
+
+    <h3>Claude Code příkazy (doporučeno)</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Příkaz</th><th>Popis</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/edpa setup</code></td><td>Počáteční setup projektu — repo, tým, Issue Types, GitHub Project</td></tr>
+          <tr><td><code>/edpa close-iteration PI-2026-1.X</code></td><td>Uzavření iterace — stažení evidence, EDPA engine, reporty</td></tr>
+          <tr><td><code>/edpa reports</code></td><td>Generování reportů a výkazů</td></tr>
+          <tr><td><code>/edpa calibrate</code></td><td>CW kalibrace — vyhodnocení MAD, návrh úprav heuristik</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>edpa_engine.py — EDPA výpočetní jádro</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Příkaz</th><th>Popis</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>edpa_engine.py --demo</code></td><td>Demo s ukázkovými daty</td></tr>
+          <tr><td><code>edpa_engine.py --iteration ID --capacity ... --heuristics ...</code></td><td>Plný EDPA výpočet pro iteraci</td></tr>
+          <tr><td><code>edpa_engine.py --iteration ID --mode full ...</code></td><td>Výpočet s Role Strength (JS &times; CW &times; RS)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>edpa_backlog.py — Správa backlogu</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Příkaz</th><th>Popis</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>edpa_backlog.py tree</code></td><td>Zobrazí plnou hierarchii (I &rarr; E &rarr; F &rarr; S)</td></tr>
+          <tr><td><code>edpa_backlog.py tree --level epic</code></td><td>Jen epicy</td></tr>
+          <tr><td><code>edpa_backlog.py tree --iteration PI-2026-1.1</code></td><td>Filtr stories na iteraci</td></tr>
+          <tr><td><code>edpa_backlog.py show S-200</code></td><td>Detail položky</td></tr>
+          <tr><td><code>edpa_backlog.py status</code></td><td>Celkový status projektu</td></tr>
+          <tr><td><code>edpa_backlog.py wsjf</code></td><td>WSJF prioritizace (všechny úrovně)</td></tr>
+          <tr><td><code>edpa_backlog.py validate</code></td><td>Kontrola integrity backlogu</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>edpa_sync.py — Bidirekční sync</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Příkaz</th><th>Popis</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>edpa_sync.py pull</code></td><td>GitHub Projects &rarr; item files in <code>.edpa/</code></td></tr>
+          <tr><td><code>edpa_sync.py push</code></td><td>item files in <code>.edpa/</code> &rarr; GitHub Projects</td></tr>
+          <tr><td><code>edpa_sync.py diff</code></td><td>Zobrazí rozdíly (dry-run)</td></tr>
+          <tr><td><code>edpa_sync.py status</code></td><td>Stav poslední synchronizace</td></tr>
+          <tr><td><code>edpa_sync.py conflicts</code></td><td>Nevyřešené konflikty</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>edpa_issue_types.py — Issue Types (org-level)</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Příkaz</th><th>Popis</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>edpa_issue_types.py list --org ORG</code></td><td>Zobrazí aktuální typy</td></tr>
+          <tr><td><code>edpa_issue_types.py setup --org ORG</code></td><td>Vytvoří EDPA sadu Issue Types</td></tr>
+          <tr><td><code>edpa_issue_types.py setup --org ORG --dry-run</code></td><td>Dry-run setup</td></tr>
+          <tr><td><code>edpa_issue_types.py migrate --org ORG --repo REPO</code></td><td>Migruje labels &rarr; Issue Types</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>edpa_project_setup.py — Inicializace GitHub Projectu</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Příkaz</th><th>Popis</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>edpa_project_setup.py --org ORG --repo REPO</code></td><td>Vytvoří kompletní Project</td></tr>
+          <tr><td><code>edpa_project_setup.py --org ORG --repo REPO --dry-run</code></td><td>Jen ukáže co by udělal</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>evaluate_cw.py — CW Kalibrace</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Příkaz</th><th>Popis</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>evaluate_cw.py --ground-truth data/ground_truth.yaml --heuristics config/cw_heuristics.yaml</code></td><td>Spočítá MAD</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Architektura -->
+  <section id="architektura">
+    <h2>Architektura</h2>
+
+    <pre><code>GitHub Projects (UI)  &lt;--&gt;  .edpa/ item files (Git)
+       |                          |
+  PM/BO pracují            Verzované, auditovatelné
+       |                          |
+  Issue Types (org)        EDPA engine (výpočet)
+       |                          |
+  Custom fields            Reports + Snapshots</code></pre>
+
+    <h3>Tok dat</h3>
+    <pre><code>                    +---------------------------+
+                    |    GitHub Projects (UI)    |
+                    |  PM/BO spravují backlog    |
+                    +---------------------------+
+                         |              ^
+           sync pull     |              |     sync push
+         (cron 15min)    v              |   (push trigger)
+                    +---------------------------+
+                    |  .edpa/ item files (Git)   |
+                    |  Source of truth           |
+                    +---------------------------+
+                              |
+                    +---------+---------+
+                    |                   |
+              +----------+       +----------+
+              |  Engine  |       |  Backlog |
+              | (výpočet)|       |  CLI     |
+              +----------+       +----------+
+                    |                   |
+              +----------+       +----------+
+              | Reports  |       |  WSJF    |
+              | Snapshots|       |  Tree    |
+              | Výkazy   |       |  Validate|
+              +----------+       +----------+</code></pre>
+
+    <h3>Evidence detection</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Signál</th><th style="text-align:right">Váha</th><th>Evidence role</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>GitHub issue assignee</td><td style="text-align:right">4.0</td><td>owner</td></tr>
+          <tr><td><code>/contribute @person weight:X</code></td><td style="text-align:right">3.0</td><td>key</td></tr>
+          <tr><td>PR author referencing item</td><td style="text-align:right">2.0</td><td>key</td></tr>
+          <tr><td>Commit author s S-XXX/F-XXX</td><td style="text-align:right">1.0</td><td>reviewer</td></tr>
+          <tr><td>PR reviewer</td><td style="text-align:right">1.0</td><td>reviewer</td></tr>
+          <tr><td>Issue/PR komentář</td><td style="text-align:right">0.5</td><td>consulted</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Nejvyšší signál určuje evidence role (signály se nesčítají).</p>
+
+    <h3>Výpočet EDPA (simple mode)</h3>
+    <p>Pro každou osobu v iteraci:</p>
+    <ol>
+      <li>Detekovat evidence na každé položce</li>
+      <li>Pro každý pár (osoba, položka): <code>score = JS &times; CW</code></li>
+      <li>Pro každou osobu: <code>ratio_i = score_i / sum(scores)</code></li>
+      <li>Odvozené hodiny: <code>hours_i = ratio_i &times; capacity</code></li>
+    </ol>
+    <div class="note"><strong>Invariant:</strong> <code>sum(hours) = capacity</code> (přesně, ne přibližně).</div>
+  </section>
+
+  <!-- Troubleshooting -->
+  <section id="troubleshooting">
+    <h2>Troubleshooting</h2>
+
+    <h3>gh auth — chybějící scopes</h3>
+    <pre><code>ERROR: insufficient scopes for organization query</code></pre>
+    <p><strong>Řešení:</strong></p>
+    <pre><code>gh auth refresh -s repo,project,read:project,admin:org
+gh auth status  # ověřit</code></pre>
+
+    <h3>Issue Types — "Not Found" při setup</h3>
+    <pre><code>ERROR: Organization not found or insufficient permissions</code></pre>
+    <p><strong>Řešení:</strong></p>
+    <ul>
+      <li>Ověřit že jste člen organizace s admin právy</li>
+      <li>Issue Types vyžadují org-level přístup (ne personal account)</li>
+      <li><code>gh auth refresh -s admin:org</code></li>
+    </ul>
+
+    <h3>Backlog validate — chyby</h3>
+    <pre><code>ERROR: S-200 references non-existent feature F-999</code></pre>
+    <p><strong>Řešení:</strong> ověřit že všechny <code>feature:</code> reference v stories ukazují na existující features.</p>
+    <pre><code>WARNING: S-200 Job Size exceeds maximum (JS=13, max=8)</code></pre>
+    <p><strong>Řešení:</strong> Story JS max 8 (classic) nebo 5 (AI-native). Rozdělit velkou story na menší.</p>
+
+    <h3>EDPA engine — invariant failure</h3>
+    <pre><code>INVARIANT FAILURE -- check results
+All invariants passed: NO</code></pre>
+    <p><strong>Možné příčiny:</strong></p>
+    <ul>
+      <li>Osoba nemá žádné evidence (není assignee, žádné commity)</li>
+      <li>Všechny CW jsou 0</li>
+      <li>Kapacita je 0</li>
+    </ul>
+    <p><strong>Řešení:</strong> ověřit že každá osoba má alespoň 1 přiřazený work item, commity/PR referují správné item ID, kapacity &gt; 0 v <code>config/capacity.yaml</code>.</p>
+
+    <h3>Sync — konflikty</h3>
+    <pre><code>CONFLICT: S-200 modified in both Git and Projects</code></pre>
+    <p><strong>Řešení:</strong></p>
+    <pre><code># Zobrazit konflikty
+python scripts/edpa_sync.py conflicts
+
+# Diff
+python scripts/edpa_sync.py diff</code></pre>
+    <p>Ručně vyřešit v příslušném item souboru v <code>.edpa/</code>, pak:</p>
+    <pre><code>python scripts/edpa_sync.py push</code></pre>
+
+    <h3>Sync — loop prevence</h3>
+    <p>Workflow <code>sync-git-to-projects.yml</code> obsahuje:</p>
+    <pre><code>if: github.actor != 'github-actions[bot]'</code></pre>
+    <p>To zabraňuje nekonečné smyčce: push &rarr; sync &rarr; push &rarr; sync...</p>
+
+    <h3>GitHub Project — custom fields chybí</h3>
+    <pre><code>ERROR: Field "Job Size" not found on project</code></pre>
+    <p><strong>Řešení:</strong> spustit znovu <code>edpa_project_setup.py</code> nebo ručně: Settings &rarr; Custom fields &rarr; Add field.</p>
+
+    <h3>Branch naming CI failure</h3>
+    <pre><code>Branch name does not follow EDPA convention.
+Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</code></pre>
+    <p><strong>Řešení:</strong> formát <code>feature/S-200-omop-parser</code>. Typy: <code>feature</code>, <code>bugfix</code>, <code>hotfix</code>, <code>chore</code>. <code>main</code>, <code>develop</code>, <code>release/*</code> jsou výjimky.</p>
+
+    <h3>MAD příliš vysoké (&gt; 0.10)</h3>
+    <p><strong>Řešení:</strong></p>
+    <ol>
+      <li>Analyzovat záznamy s největším <code>abs(auto_cw - confirmed_cw)</code></li>
+      <li>Seskupit dle role</li>
+      <li>Pokud BO má konzistentně vyšší confirmed_cw &rarr; zvýšit <code>role_overrides.BO.consulted</code></li>
+      <li>Pokud Arch reviewer je podhodnocen &rarr; zvýšit <code>role_overrides.Arch.reviewer</code></li>
+      <li>Znovu evaluovat</li>
+    </ol>
+
+    <h3>Iteration close — "config not found"</h3>
+    <pre><code>ERROR: config/capacity.yaml not found. Run EDPA setup first.</code></pre>
+    <p><strong>Řešení:</strong></p>
+    <pre><code>cp config/capacity.yaml.tmpl config/capacity.yaml
+cp config/cw_heuristics.yaml.tmpl config/cw_heuristics.yaml
+cp config/project.yaml.tmpl config/project.yaml</code></pre>
+  </section>
+
+  <!-- Slovníček -->
+  <section id="slovnicek">
+    <h2>Slovníček</h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Termín</th><th>Význam</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>PI</strong></td><td>Planning Interval (10 týdnů = 4 delivery + 1 IP iterace)</td></tr>
+          <tr><td><strong>IP</strong></td><td>Innovation &amp; Planning (poslední iterace PI)</td></tr>
+          <tr><td><strong>JS</strong></td><td>Job Size — relativní velikost práce (Fibonacci)</td></tr>
+          <tr><td><strong>BV</strong></td><td>Business Value — obchodní hodnota</td></tr>
+          <tr><td><strong>TC</strong></td><td>Time Criticality — časová kritičnost</td></tr>
+          <tr><td><strong>RR</strong></td><td>Risk Reduction — snížení rizika</td></tr>
+          <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR)/JS</td></tr>
+          <tr><td><strong>CW</strong></td><td>Contribution Weight — váha příspěvku (0.0 - 1.0)</td></tr>
+          <tr><td><strong>RS</strong></td><td>Role Strength — síla role (volitelné v full mode)</td></tr>
+          <tr><td><strong>MAD</strong></td><td>Mean Absolute Deviation — průměrná absolutní odchylka</td></tr>
+          <tr><td><strong>Evidence</strong></td><td>Doklad o práci (commit, PR, assignee, komentář)</td></tr>
+          <tr><td><strong>Ground truth</strong></td><td>Potvrzená realita od týmu (pro kalibraci)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  </div><!-- /methodology-content -->
+  </div><!-- /methodology-layout -->
+</div>
+
+<script>
+  const links = document.querySelectorAll('.toc-link');
+  const sections = document.querySelectorAll('section[id]');
+
+  function updateActive() {
+    let current = '';
+    for (const section of sections) {
+      const top = section.getBoundingClientRect().top;
+      if (top <= 100) current = section.id;
+    }
+    links.forEach(link => {
+      link.classList.toggle('active', link.dataset.section === current);
+    });
+  }
+
+  window.addEventListener('scroll', updateActive, { passive: true });
+  updateActive();
+</script>
+</Layout>
+
+<style>
+  .playbook-page {
+    padding-bottom: 40px;
+  }
+  .page-header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--bd);
+    margin-bottom: 40px;
+  }
+  .page-header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--ac), var(--cy));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-top: 8px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: var(--t2);
+    font-style: italic;
+    margin-top: 4px;
+  }
+  .meta {
+    font-size: 11px;
+    color: var(--t3);
+    margin-top: 6px;
+  }
+
+  .methodology-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+  .sidebar-toc {
+    position: sticky;
+    top: 72px;
+    max-height: calc(100vh - 88px);
+    overflow-y: auto;
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    padding: 20px 16px;
+  }
+  .toc-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--t3);
+    margin-bottom: 14px;
+  }
+  .toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .toc-list li {
+    margin-bottom: 0;
+  }
+  .toc-link {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--t3);
+    padding: 5px 10px;
+    border-left: 2px solid transparent;
+    border-radius: 0 4px 4px 0;
+    transition: all 0.15s;
+    text-decoration: none;
+    line-height: 1.4;
+  }
+  .toc-link:hover {
+    color: var(--t1);
+    background: var(--s2);
+  }
+  .toc-link.active {
+    color: var(--ac2);
+    border-left-color: var(--ac);
+    background: rgba(99, 102, 241, 0.06);
+  }
+  .methodology-content {
+    min-width: 0;
+  }
+
+  section {
+    margin-bottom: 48px;
+    scroll-margin-top: 72px;
+  }
+  h2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--t1);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--bd);
+  }
+  h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ac3);
+    margin: 24px 0 12px;
+  }
+  p {
+    font-size: 14px;
+    color: var(--t2);
+    margin-bottom: 8px;
+    line-height: 1.7;
+  }
+  ul, ol {
+    font-size: 14px;
+    color: var(--t2);
+    padding-left: 20px;
+    margin: 8px 0;
+  }
+  li {
+    margin-bottom: 4px;
+    line-height: 1.6;
+  }
+
+  pre {
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    padding: 16px;
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+  pre code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--t1);
+    background: none;
+    padding: 0;
+  }
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--s2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--ac3);
+  }
+
+  .card {
+    background: var(--s1);
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    padding: 16px;
+    margin: 12px 0;
+  }
+  .note {
+    font-size: 13px;
+    color: var(--t3);
+    background: var(--s1);
+    border-left: 3px solid var(--ac);
+    padding: 12px 16px;
+    border-radius: 0 var(--r) var(--r) 0;
+    margin: 12px 0;
+    line-height: 1.6;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    text-align: left;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--t3);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--bd);
+  }
+  tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--s2);
+    color: var(--t2);
+  }
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .checklist {
+    list-style: none;
+    padding-left: 0;
+  }
+  .checklist li {
+    padding: 4px 0 4px 28px;
+    position: relative;
+  }
+  .checklist li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--bd);
+    border-radius: 3px;
+    background: var(--s1);
+  }
+
+  @media (max-width: 900px) {
+    .methodology-layout {
+      grid-template-columns: 1fr;
+    }
+    .sidebar-toc {
+      position: static;
+      max-height: none;
+    }
+    .page-header h1 {
+      font-size: 18px;
+    }
+  }
+</style>

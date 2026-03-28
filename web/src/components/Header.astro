@@ -25,6 +25,7 @@ const dropdownItems = [
   { href: `${prefix}/comic/`, label: isEn ? 'Comic' : 'Komix' },
   { href: `${prefix}/tutorial/`, label: 'Tutorial' },
   { href: `${prefix}/calculator/`, label: isEn ? 'Calculator' : 'Kalkulátor' },
+  { href: `${prefix}/playbook/`, label: 'Playbook' },
 ];
 
 const isDropdownActive = dropdownItems.some(item => currentPath.startsWith(item.href)) || currentPath.startsWith(dropdownHref);
