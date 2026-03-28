@@ -92,14 +92,7 @@ cd my-project
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 
-**Varianta B: npx**
-
-```bash
-cd my-project
-npx @technomaton/edpa init
-```
-
-**Varianta C: Manualni kopie**
+**Varianta B: Manualni kopie**
 
 ```bash
 cd my-project

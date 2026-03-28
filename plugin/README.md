@@ -5,8 +5,6 @@ This directory contains the installable EDPA plugin for Claude Code and compatib
 ## Installation
 
 ```bash
-npx @technomaton/edpa init
-# or
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 

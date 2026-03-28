@@ -5,8 +5,6 @@
 Install the EDPA plugin into your project:
 
 ```bash
-npx @technomaton/edpa init
-# or
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 

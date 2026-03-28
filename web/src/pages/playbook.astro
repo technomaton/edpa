@@ -99,10 +99,7 @@ gh auth refresh -s repo,project,read:project,admin:org</code></pre>
     <p><strong>Varianta A: Shell installer (doporučeno)</strong></p>
     <pre><code>cd my-project
 curl -fsSL https://edpa.technomaton.com/install.sh | sh</code></pre>
-    <p><strong>Varianta B: npx</strong></p>
-    <pre><code>cd my-project
-npx @technomaton/edpa init</code></pre>
-    <p><strong>Varianta C: Manuální kopie</strong></p>
+    <p><strong>Varianta B: Manuální kopie</strong></p>
     <pre><code>cd my-project
 gh repo clone technomaton/edpa /tmp/edpa
 cp -r /tmp/edpa/plugin/ .claude/

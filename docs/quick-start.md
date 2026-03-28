@@ -13,7 +13,6 @@ Get EDPA running in 10 minutes.
 ```bash
 cd my-project
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
-# or: npx @technomaton/edpa init
 ```
 
 ## Step 2: Initialize and configure

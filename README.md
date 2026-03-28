@@ -55,12 +55,10 @@ All invariants passed: YES
 ### 1. Install the EDPA plugin
 
 ```bash
-npx @technomaton/edpa init
-# or
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 
-This installs the EDPA plugin into `.claude/edpa/` in your project.
+This installs the EDPA plugin into `.claude/` in your project.
 
 ### 2. Set up governance
 
@@ -108,7 +106,7 @@ python3 .claude/edpa/scripts/engine.py --iteration PI-2026-1.3 \
 ### 5. Try the demo
 
 ```bash
-npx @technomaton/edpa init
+curl -fsSL https://edpa.technomaton.com/install.sh | sh
 python3 .claude/edpa/scripts/engine.py --demo
 ```
 
