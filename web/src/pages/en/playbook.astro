@@ -233,7 +233,7 @@ naming:
       </table>
     </div>
 
-    <h3>1.5 Nakonfigurovat .edpa/config.yaml</h3>
+    <h3>1.5 Nakonfigurovat .edpa/config/edpa.yaml</h3>
     <pre><code>pi:
   current: PI-2026-1
   year: 2026
@@ -348,7 +348,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
       <li>Linkuje projekt k repozitáři</li>
       <li>Vytvoří issues z item files v <code>.edpa/</code> s nativními Issue Types</li>
       <li>Nastaví field values na všech project items</li>
-      <li>Aktualizuje <code>.edpa/config.yaml</code> s číslem projektu</li>
+      <li>Aktualizuje <code>.edpa/config/edpa.yaml</code> s číslem projektu</li>
     </ol>
 
     <h3>1.9 Nastavit Project views</h3>
@@ -601,7 +601,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
       <li><strong>Nové epicy/features</strong> — přidat jako soubory do <code>.edpa/backlog/epics/</code> a <code>.edpa/backlog/features/</code></li>
       <li><strong>WSJF prioritizace:</strong> <code>python3 .claude/edpa/scripts/backlog.py wsjf</code></li>
       <li><strong>Kapacitní plánování</strong> — aktualizovat <code>.edpa/config/capacity.yaml</code></li>
-      <li><strong>Aktualizovat <code>.edpa/config.yaml</code></strong> — nový PI, iterace, datumy</li>
+      <li><strong>Aktualizovat <code>.edpa/config/edpa.yaml</code></strong> — nový PI, iterace, datumy</li>
     </ol>
   </section>
 
@@ -660,7 +660,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
       <li><code>.edpa/config/capacity.yaml</code> — tým s rolemi, FTE, kapacitami</li>
       <li><code>.edpa/config/project.yaml</code> — název projektu, metadata</li>
       <li><code>.edpa/config/heuristics.yaml</code> — výchozí heuristiky</li>
-      <li><code>.edpa/config.yaml</code> — PI, iterace, datumy, sync</li>
+      <li><code>.edpa/config/edpa.yaml</code> — PI, iterace, datumy, sync</li>
       <li>Issue Types nastavené na organizaci</li>
       <li>Backlog naplněný (alespoň 1 Epic, 3 Features, 10 Stories)</li>
       <li><code>edpa_backlog.py validate</code> projde bez chyb</li>
