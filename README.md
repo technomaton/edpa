@@ -55,7 +55,7 @@ All invariants passed: YES
 ### 1. Use this template
 
 ```bash
-gh repo create my-project --template technomaton/edpa --private
+gh repo create my-project --template technomaton/edpa-template --private
 cd my-project
 ```
 

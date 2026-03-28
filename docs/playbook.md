@@ -88,7 +88,7 @@ Nasledujici kroky popisuji manualni postup bez Claude Code.
 **Varianta A: Z EDPA sablony (doporuceno)**
 
 ```bash
-gh repo create my-org/my-project --template your-org/edpa --private
+gh repo create my-org/my-project --template technomaton/edpa-template --private
 cd my-project
 ```
 

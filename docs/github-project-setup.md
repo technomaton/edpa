@@ -214,13 +214,13 @@ python scripts/edpa_backlog.py validate                # Kontrola integrity
 
 ```
 1. Vytvořit repo
-   gh repo create org/project --public --clone
+   gh repo create org/project --template technomaton/edpa-template --clone
 
 2. Inicializovat EDPA
-   cp -r edpa/config/ config/
-   cp -r edpa/scripts/ scripts/
-   cp -r edpa/.edpa/ .edpa/
-   cp edpa/.github/workflows/sync-*.yml .github/workflows/
+   # Automaticky z template — nemusíte kopírovat
+   
+   
+   
 
 3. Naplnit backlog
    # Editovat .edpa/backlog.yaml — definovat epicy, features, stories

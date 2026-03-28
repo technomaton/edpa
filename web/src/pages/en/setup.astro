@@ -965,7 +965,7 @@ import Layout from '../../layouts/Layout.astro';
       const launchA = document.getElementById('launchA');
       if (launchA) {
         launchA.textContent = [
-          `gh repo create ${org}/${repo} --template technomaton/edpa --clone`,
+          `gh repo create ${org}/${repo} --template technomaton/edpa-template --clone`,
           `cd ${repo}`,
           `# Paste generated files from step 3`,
         ].join('\n');

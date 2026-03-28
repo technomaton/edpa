@@ -7,7 +7,7 @@
 # Click "Use this template" on https://github.com/technomaton/edpa
 
 # Option B: CLI
-gh repo create my-org/my-project --template technomaton/edpa --private
+gh repo create my-org/my-project --template technomaton/edpa-template --private
 cd my-project
 ```
 

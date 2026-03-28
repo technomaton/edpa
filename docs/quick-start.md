@@ -11,7 +11,7 @@ Get EDPA running in 10 minutes.
 ## Step 1: Create your project from template
 
 ```bash
-gh repo create my-org/my-project --template technomaton/edpa --private
+gh repo create my-org/my-project --template technomaton/edpa-template --private
 cd my-project
 ```
 
