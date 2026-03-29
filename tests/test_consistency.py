@@ -5,6 +5,7 @@ stray files, and configuration drift.
 Run: python -m pytest tests/test_consistency.py -v
 """
 import json
+import os
 import re
 import subprocess
 import sys
@@ -323,3 +324,48 @@ def test_web_build_succeeds():
     assert len(html_files) >= 14, (
         f"Expected >= 14 HTML files in dist/, found {len(html_files)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 13. Plugin hooks paths
+# ---------------------------------------------------------------------------
+
+def test_plugin_hooks_paths():
+    """All paths referenced in hooks.json must exist."""
+    hooks_path = ROOT / "plugin" / "hooks" / "hooks.json"
+    if not hooks_path.exists():
+        pytest.skip("hooks.json not found")
+    hooks = json.loads(hooks_path.read_text())
+    for event_hooks in hooks["hooks"].values():
+        for matcher_group in event_hooks:
+            for hook in matcher_group["hooks"]:
+                cmd = hook["command"]
+                resolved = cmd.replace("${CLAUDE_PLUGIN_ROOT}", str(ROOT / "plugin"))
+                assert Path(resolved).exists(), f"Hook script missing: {resolved}"
+
+
+# ---------------------------------------------------------------------------
+# 14. plugin.json hooks reference
+# ---------------------------------------------------------------------------
+
+def test_plugin_json_hooks_reference():
+    """plugin.json hooks field points to existing file."""
+    pj = json.loads((ROOT / "plugin/.claude-plugin/plugin.json").read_text())
+    hooks_ref = pj.get("hooks")
+    assert hooks_ref, "plugin.json missing hooks field"
+    hooks_path = ROOT / "plugin" / hooks_ref.lstrip("./")
+    assert hooks_path.exists(), f"hooks.json not found at {hooks_path}"
+
+
+# ---------------------------------------------------------------------------
+# 15. Hook scripts executable
+# ---------------------------------------------------------------------------
+
+def test_hook_scripts_executable():
+    """Hook shell scripts must be executable."""
+    hooks_dir = ROOT / "plugin" / "edpa" / "scripts" / "hooks"
+    for sh in hooks_dir.glob("*.sh"):
+        assert os.access(sh, os.X_OK), f"{sh.name} not executable"
+    pre_commit = hooks_dir / "pre-commit"
+    if pre_commit.exists():
+        assert os.access(pre_commit, os.X_OK), "pre-commit not executable"

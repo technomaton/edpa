@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "pre-commit": [
+      {
+        "matchers": ["**/*.yaml", "**/*.yml"],
+        "hooks": [
+          {
+            "command": "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/hooks/validate-yaml.sh",
+            "description": "Validate YAML syntax in .edpa directory"
+          }
+        ]
+      }
+    ],
+    "post-commit": [
+      {
+        "matchers": ["**/*"],
+        "hooks": [
+          {
+            "command": "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/hooks/commit-info.sh",
+            "description": "Generate EDPA commit info"
+          }
+        ]
+      }
+    ]
+  }
+}

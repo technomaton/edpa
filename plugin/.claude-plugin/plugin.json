@@ -25,5 +25,6 @@
     "./commands/edpa/calibrate.md",
     "./commands/edpa/sync.md"
   ],
-  "agents": []
+  "agents": [],
+  "hooks": "./hooks/hooks.json"
 }
