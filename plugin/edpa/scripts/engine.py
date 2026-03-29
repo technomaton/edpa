@@ -3,12 +3,15 @@
 EDPA Engine — Evidence-Driven Proportional Allocation v2.2
 
 Standalone Python implementation of the EDPA calculation engine.
-Computes derived hours from GitHub delivery evidence.
+Computes derived hours from delivery evidence stored in .edpa/backlog/.
 
 Usage:
-    python .claude/edpa/scripts/engine.py --iteration PI-2026-1.3 --capacity .edpa/config/capacity.yaml --heuristics .edpa/config/heuristics.yaml
-    python .claude/edpa/scripts/engine.py --iteration PI-2026-1.3 --mode full --capacity .edpa/config/capacity.yaml --heuristics .edpa/config/heuristics.yaml
+    python .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
+    python .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3 --mode full
     python .claude/edpa/scripts/engine.py --demo  # Run with built-in sample data
+
+    # Legacy mode (requires external item gathering):
+    python .claude/edpa/scripts/engine.py --capacity cap.yaml --heuristics h.yaml --iteration PI-2026-1.3
 """
 
 import argparse
@@ -180,7 +183,8 @@ def run_edpa(capacity_config, heuristics, items, mode="simple"):
 
     for person in people:
         pid = person["id"]
-        capacity = person.get("capacity_per_iteration") or person.get("capacity", 0)
+        cpi = person.get("capacity_per_iteration")
+        capacity = cpi if cpi is not None else person.get("capacity", 0)
         person_items = []
 
         for item in items:
@@ -260,6 +264,137 @@ def run_edpa(capacity_config, heuristics, items, mode="simple"):
         })
 
     return results
+
+
+def load_heuristics(edpa_root):
+    """Load CW heuristics from .edpa/config/, with fallback chain.
+
+    Tries: heuristics.yaml → cw_heuristics.yaml → template in .claude/
+    """
+    edpa_root = Path(edpa_root)
+    for name in ("heuristics.yaml", "cw_heuristics.yaml"):
+        path = edpa_root / "config" / name
+        if path.exists():
+            return load_yaml(path)
+    # Fallback to template (installed plugin)
+    template = edpa_root.parent / ".claude" / "edpa" / "templates" / "cw_heuristics.yaml.tmpl"
+    if template.exists():
+        return load_yaml(template)
+    return {"evidence_threshold": 1.0, "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15}}
+
+
+def load_backlog_items(edpa_root, iteration_id=None):
+    """Read .edpa/backlog/ YAML files and convert to engine item format.
+
+    Each backlog YAML has: id, type, title, js, status, assignee, contributors
+    Engine expects: id, level, job_size, assignees, body, pr_author, commit_authors, pr_reviewers, commenters
+
+    Args:
+        edpa_root: Path to .edpa/ directory
+        iteration_id: If given, only include items matching this iteration. If None, include all Done items.
+
+    Returns:
+        List of item dicts in engine format, plus a dict of manual CW overrides.
+    """
+    edpa_root = Path(edpa_root)
+    backlog_dir = edpa_root / "backlog"
+    if not backlog_dir.exists():
+        return [], {}
+
+    items = []
+    manual_cw_overrides = {}  # {(person_id, item_id): cw_value}
+
+    type_dirs = {
+        "stories": "Story",
+        "features": "Feature",
+        "epics": "Epic",
+        "initiatives": "Initiative",
+    }
+
+    for dir_name, level in type_dirs.items():
+        type_dir = backlog_dir / dir_name
+        if not type_dir.exists():
+            continue
+
+        for yaml_file in sorted(type_dir.glob("*.yaml")):
+            try:
+                data = load_yaml(yaml_file)
+            except Exception:
+                continue
+
+            if not data or not isinstance(data, dict):
+                continue
+
+            item_id = data.get("id", yaml_file.stem)
+            status = data.get("status", "")
+
+            # Filter: only Done items
+            if status.lower() not in ("done", "closed", "accepted"):
+                continue
+
+            # Filter by iteration if specified
+            if iteration_id and data.get("iteration") != iteration_id:
+                continue
+
+            js = data.get("js") or data.get("job_size", 0)
+            if not js or js <= 0:
+                continue
+
+            # Map contributors to engine evidence fields
+            assignees = []
+            pr_author = None
+            commit_authors = []
+            pr_reviewers = []
+            commenters = []
+            body_parts = []
+            contributors = data.get("contributors", []) or []
+
+            # Assignee from top-level field
+            assignee = data.get("assignee") or data.get("owner")
+            if assignee:
+                assignees.append({"login": assignee})
+
+            for contrib in contributors:
+                if not isinstance(contrib, dict):
+                    continue
+                person = contrib.get("person", "")
+                role = (contrib.get("role", "") or "").lower()
+                cw = contrib.get("cw")
+
+                # Store manual CW override if present
+                if cw is not None:
+                    manual_cw_overrides[(person, item_id)] = float(cw)
+
+                # Map contributor role to engine evidence fields
+                if role == "owner":
+                    if not any(a.get("login") == person for a in assignees):
+                        assignees.append({"login": person})
+                elif role == "key":
+                    if pr_author is None:
+                        pr_author = person
+                    commit_authors.append(person)
+                elif role == "reviewer":
+                    pr_reviewers.append(person)
+                elif role == "consulted":
+                    commenters.append(person)
+
+                # Generate /contribute command for manual CW
+                if cw is not None:
+                    body_parts.append(f"/contribute @{person} weight:{cw}")
+
+            items.append({
+                "id": item_id,
+                "level": data.get("type", level),
+                "job_size": js,
+                "assignees": assignees,
+                "body": "\n".join(body_parts) if body_parts else "",
+                "pr_author": pr_author,
+                "commit_authors": commit_authors,
+                "pr_reviewers": pr_reviewers,
+                "commenters": commenters,
+            })
+
+    return items, manual_cw_overrides
 
 
 def generate_demo_data():
@@ -371,13 +506,14 @@ def print_summary(results, mode, iteration_id, planning_factor=0.8):
 def main():
     parser = argparse.ArgumentParser(
         description="EDPA v2.2 — Evidence-Driven Proportional Allocation Engine",
-        epilog="Run with --demo to see a worked example without any configuration."
+        epilog="Run with --demo to see a worked example, or --edpa-root to read from .edpa/ filesystem."
     )
+    parser.add_argument("--edpa-root", help="Path to .edpa/ directory (reads backlog, config, heuristics)")
     parser.add_argument("--iteration", help="Iteration ID (e.g., PI-2026-1.3)")
     parser.add_argument("--mode", choices=["simple", "full"], default="simple",
                         help="Calculation mode (default: simple)")
-    parser.add_argument("--capacity", help="Path to capacity.yaml")
-    parser.add_argument("--heuristics", help="Path to cw_heuristics.yaml")
+    parser.add_argument("--capacity", help="Path to capacity.yaml (legacy mode)")
+    parser.add_argument("--heuristics", help="Path to cw_heuristics.yaml (legacy mode)")
     parser.add_argument("--output", help="Output path for edpa_results.json")
     parser.add_argument("--demo", action="store_true",
                         help="Run with built-in sample data")
@@ -387,21 +523,33 @@ def main():
         print("Running EDPA demo with sample data...\n")
         capacity, heuristics, items = generate_demo_data()
         iteration_id = "DEMO-1.1"
+    elif args.edpa_root:
+        # Filesystem-first mode: read everything from .edpa/
+        edpa_root = Path(args.edpa_root)
+        if not edpa_root.exists():
+            parser.error(f".edpa/ directory not found at {edpa_root}")
+
+        capacity = load_yaml(edpa_root / "config" / "people.yaml")
+        heuristics = load_heuristics(edpa_root)
+        iteration_id = args.iteration
+
+        items, manual_cw = load_backlog_items(edpa_root, iteration_id)
+        print(f"Loaded {len(items)} items from {edpa_root}/backlog/")
+        if iteration_id:
+            print(f"Filtered to iteration: {iteration_id}")
+        if manual_cw:
+            print(f"Manual CW overrides: {len(manual_cw)}")
     else:
+        # Legacy mode: explicit file paths
         if not args.capacity or not args.heuristics or not args.iteration:
-            parser.error("--iteration, --capacity, and --heuristics are required (or use --demo)")
+            parser.error("--edpa-root or (--iteration + --capacity + --heuristics) required (or --demo)")
 
         capacity = load_yaml(args.capacity)
         heuristics = load_yaml(args.heuristics)
         iteration_id = args.iteration
-
-        # In production: gather items from GitHub
-        # For now, items must be provided via --items or gathered by the Claude Code skill
-        print(f"Loading configuration from {args.capacity} and {args.heuristics}")
-        print(f"NOTE: In standalone mode, item data must be gathered from GitHub.")
-        print(f"      Use 'gh issue list' and 'gh pr list' to gather evidence,")
-        print(f"      or use the Claude Code /edpa close-iteration command for automated gathering.")
         items = []
+        print(f"Legacy mode: loading from {args.capacity} and {args.heuristics}")
+        print(f"NOTE: No items loaded. Use --edpa-root to read from .edpa/backlog/")
 
     # Resolve planning_factor from teams (team-level decision, not cadence)
     teams = capacity.get("teams", [])
@@ -429,6 +577,8 @@ def main():
     # Write output
     if args.output:
         output_path = Path(args.output)
+    elif args.edpa_root:
+        output_path = Path(args.edpa_root) / "reports" / f"iteration-{iteration_id}" / "edpa_results.json"
     elif not args.demo:
         output_path = Path(f".edpa/reports/iteration-{iteration_id}/edpa_results.json")
     else:
