@@ -1,5 +1,6 @@
 ---
 name: edpa-engine
+user-invocable: false
 description: >
   Run EDPA evidence-driven calculation for an iteration. Gathers GitHub delivery evidence
   (commits, PRs, reviews, comments), computes CW from heuristics, calculates Score and

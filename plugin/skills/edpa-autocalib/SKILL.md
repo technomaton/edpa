@@ -1,5 +1,6 @@
 ---
 name: edpa-autocalib
+user-invocable: false
 description: >
   Auto-calibrate EDPA CW heuristics using Karpathy's autoresearch loop. One file
   (cw_heuristics.yaml), one metric (MAD vs ground truth), one loop (modify→evaluate→keep/discard).

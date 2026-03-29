@@ -1,5 +1,6 @@
 ---
 name: edpa-sync
+user-invocable: false
 description: >
   Bidirectional sync between GitHub Projects and .edpa/backlog/ YAML files.
   Pull updates from GitHub Projects into local YAML, push local changes to GitHub,
