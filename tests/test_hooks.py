@@ -220,6 +220,7 @@ class TestSchemaStrictness:
 
     def _valid_doc(self):
         return {
+            "schema": "edpa-commit-info/1.0",
             "branch": "main",
             "diff": "some diff",
             "person": None,
@@ -261,7 +262,15 @@ class TestSchemaStrictness:
     def test_rejects_missing_diff(self, validate):
         """diff field required."""
         jsonschema = pytest.importorskip("jsonschema")
-        doc = {"branch": "main"}
+        doc = {"schema": "edpa-commit-info/1.0", "branch": "main"}
+        with pytest.raises(jsonschema.ValidationError):
+            validate(doc)
+
+    def test_rejects_wrong_schema_version(self, validate):
+        """Wrong schema version rejected."""
+        jsonschema = pytest.importorskip("jsonschema")
+        doc = self._valid_doc()
+        doc["schema"] = "wrong/2.0"
         with pytest.raises(jsonschema.ValidationError):
             validate(doc)
 

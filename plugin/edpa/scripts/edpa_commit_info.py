@@ -180,6 +180,7 @@ def get_commit_info(edpa_root=None):
     item = find_backlog_item(edpa_root, branch=branch, diff=diff)
 
     return {
+        "schema": "edpa-commit-info/1.0",
         "branch": branch,
         "diff": diff,
         "person": person,
