@@ -1,0 +1,22 @@
+{
+  "hooks": [
+    {
+      "matcher": "Write",
+      "hooks": [
+        {
+          "type": "afterToolUse",
+          "command": "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/hooks/validate_on_save.sh"
+        }
+      ]
+    },
+    {
+      "matcher": "Bash",
+      "hooks": [
+        {
+          "type": "afterToolUse",
+          "command": "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/hooks/edpa_post_commit.sh"
+        }
+      ]
+    }
+  ]
+}
