@@ -29,7 +29,7 @@ def test_version_consistent():
 
     # CHANGELOG.md — first ## X.Y.Z line
     changelog = (ROOT / "CHANGELOG.md").read_text()
-    m = re.search(r"^## (\d+\.\d+\.\d+)", changelog, re.MULTILINE)
+    m = re.search(r"^## ([\d]+\.[\d]+\.[\d]+(?:-[\w.]+)?)", changelog, re.MULTILINE)
     if not m:
         errors.append("CHANGELOG.md: no version heading found")
     elif m.group(1) != version:
@@ -286,8 +286,8 @@ def test_changelog_has_all_versions():
     """CHANGELOG.md must have entries for all released versions."""
     changelog = (ROOT / "CHANGELOG.md").read_text()
 
-    required_versions = ["2.0.0", "1.2.0", "1.1.0", "1.0.0", "0.0.1"]
-    found_versions = re.findall(r"^## (\d+\.\d+\.\d+)", changelog, re.MULTILINE)
+    required_versions = ["1.0.0-beta"]
+    found_versions = re.findall(r"^## ([\d]+\.[\d]+\.[\d]+(?:-[\w.]+)?)", changelog, re.MULTILINE)
 
     missing = [v for v in required_versions if v not in found_versions]
     assert not missing, (

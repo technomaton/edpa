@@ -2,7 +2,7 @@
 
 Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allocation) na novy projekt. Od prazdneho repozitare po uzavreni prvniho Planning Intervalu a kalibraci heuristik.
 
-**Verze:** EDPA v3.0.0
+**Verze:** EDPA v1.0.0-beta
 **Posledni aktualizace:** 2026-03-28
 
 ---
@@ -226,7 +226,7 @@ project:
   domain: "mujprojekt.cz"
 
 governance:
-  methodology: "EDPA v3.0.0"
+  methodology: "EDPA v1.0.0-beta"
   calculation_mode: "simple"            # simple (JS x CW) nebo full (JS x CW x RS)
   audit_mode: "full"
 

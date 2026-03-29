@@ -1,6 +1,6 @@
 {
   "name": "edpa",
-  "version": "3.0.0",
+  "version": "1.0.0-beta",
   "description": "EDPA — Evidence-Driven Proportional Allocation. Derive hours from Git delivery evidence. Zero timesheets, mathematical guarantee, Monte Carlo calibrated CW weights.",
   "author": {
     "name": "TECHNOMATON",

@@ -1,11 +1,11 @@
 # Changelog
 
-## 3.0.0 — 2026-03-28
+## 1.0.0-beta — 2026-03-29
 
-Plugin-first distribution + restructured directories. **BREAKING CHANGE.**
+First public beta. Plugin-first distribution, restructured directories.
 
-### Breaking Changes
-- Installation via `npx @technomaton/edpa init` or `curl` — GitHub template approach dropped
+### Breaking Changes (vs internal v2.x)
+- Installation via `curl -fsSL https://edpa.technomaton.com/install.sh | sh`
 - All scripts moved: `scripts/edpa_engine.py` -> `.claude/edpa/scripts/engine.py`
 - All config moved: `config/capacity.yaml` -> `.edpa/config/capacity.yaml`
 - Heuristics renamed: `config/cw_heuristics.yaml` -> `.edpa/config/heuristics.yaml`

@@ -2,7 +2,7 @@
 
 **Derive hours from Git evidence. No timesheets.**
 
-[![EDPA](https://img.shields.io/badge/EDPA-v3.0.0-34d399)](docs/methodology.md)
+[![EDPA](https://img.shields.io/badge/EDPA-v1.0.0-beta-34d399)](docs/methodology.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/Made_for-GitHub-181717?logo=github)](https://github.com)
 
@@ -29,7 +29,7 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 ```
 $ python3 .claude/edpa/scripts/engine.py --demo
 
-EDPA v3.0.0 — Iteration DEMO-1.1 (simple mode)
+EDPA v1.0.0-beta — Iteration DEMO-1.1 (simple mode)
 ======================================================================
 Person                    Role     Capacity  Derived  Items    OK
 ----------------------------------------------------------------------
@@ -209,7 +209,7 @@ cp -r .claude/skills/* ~/.gemini/skills/
 
 | Document | Description |
 |----------|-------------|
-| [Methodology](docs/methodology.md) | Full EDPA v3.0.0 specification |
+| [Methodology](docs/methodology.md) | Full EDPA v1.0.0-beta specification |
 | [Quick Start](docs/quick-start.md) | 10-minute setup guide |
 | [Evidence Detection](docs/evidence-detection.md) | How GitHub signals map to CW |
 | [Dual-View](docs/dual-view.md) | Per-person vs per-item perspectives |
