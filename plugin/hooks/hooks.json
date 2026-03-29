@@ -1,23 +1,25 @@
 {
   "hooks": {
-    "pre-commit": [
+    "PostToolUse": [
       {
-        "matchers": ["**/*.yaml", "**/*.yml"],
+        "matcher": "Edit|Write",
         "hooks": [
           {
-            "command": "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/hooks/validate-yaml.sh",
-            "description": "Validate YAML syntax in .edpa directory"
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/hooks/validate_on_save.sh",
+            "timeout": 10,
+            "statusMessage": "Validating syntax..."
           }
         ]
-      }
-    ],
-    "post-commit": [
+      },
       {
-        "matchers": ["**/*"],
+        "matcher": "Bash",
         "hooks": [
           {
-            "command": "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/hooks/commit-info.sh",
-            "description": "Generate EDPA commit info"
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/hooks/edpa_post_commit.sh",
+            "timeout": 10,
+            "statusMessage": "EDPA commit info"
           }
         ]
       }
