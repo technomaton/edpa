@@ -88,6 +88,7 @@ After installation, the plugin creates this structure in the target project:
 .edpa/
 ├── config/             # capacity.yaml, heuristics.yaml
 ├── backlog/            # Work items (file-per-item)
+├── iterations/         # Iteration definitions
 ├── reports/            # Generated timesheets
 ├── snapshots/          # Frozen iteration snapshots
 └── data/               # Raw evidence data
