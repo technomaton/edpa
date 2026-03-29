@@ -13,10 +13,12 @@ import json
 import sys
 from pathlib import Path
 
+import yaml
+
 # Add plugin scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "plugin" / "edpa" / "scripts"))
 
-from engine import run_edpa, generate_demo_data, detect_evidence, compute_cw
+from engine import run_edpa, generate_demo_data, detect_evidence, compute_cw, load_backlog_items
 
 
 def test_sum_equals_capacity():
@@ -294,6 +296,150 @@ def test_evidence_scope_routing():
     assert ("alice-arch", "E-10") not in evidence, (
         "E-10 should NOT be routed to alice-arch"
     )
+
+
+class TestLoadBacklogItems:
+    """Tests for load_backlog_items() and SAFe iteration hierarchy."""
+
+    def _create_item(self, backlog_dir, dir_name, item_id, item_type, js, status, iteration=None, assignee=None, contributors=None):
+        type_dir = backlog_dir / dir_name
+        type_dir.mkdir(parents=True, exist_ok=True)
+        data = {"id": item_id, "type": item_type, "js": js, "status": status}
+        if iteration is not None:
+            data["iteration"] = iteration
+        if assignee:
+            data["assignee"] = assignee
+        if contributors:
+            data["contributors"] = contributors
+        (type_dir / f"{item_id}.yaml").write_text(yaml.dump(data))
+
+    def test_load_stories_by_iteration(self, tmp_path):
+        """Stories filtered by exact iteration match."""
+        edpa_root = tmp_path / ".edpa"
+        backlog = edpa_root / "backlog"
+
+        self._create_item(backlog, "stories", "S-101", "Story", 5, "Done", "PI-2026-1.1", assignee="alice")
+        self._create_item(backlog, "stories", "S-102", "Story", 8, "Done", "PI-2026-1.1", assignee="bob")
+        self._create_item(backlog, "stories", "S-103", "Story", 3, "Done", "PI-2026-1.2", assignee="carol")
+
+        items, _ = load_backlog_items(edpa_root, iteration_id="PI-2026-1.1")
+
+        ids = [i["id"] for i in items]
+        assert "S-101" in ids
+        assert "S-102" in ids
+        assert "S-103" not in ids
+        assert len(items) == 2
+
+    def test_load_features_by_pi(self, tmp_path):
+        """Features included when PI prefix matches iteration."""
+        edpa_root = tmp_path / ".edpa"
+        backlog = edpa_root / "backlog"
+
+        self._create_item(backlog, "features", "F-10", "Feature", 13, "Done", "PI-2026-1", assignee="alice")
+        self._create_item(backlog, "features", "F-20", "Feature", 8, "Done", "PI-2026-2", assignee="bob")
+
+        items, _ = load_backlog_items(edpa_root, iteration_id="PI-2026-1.1")
+
+        ids = [i["id"] for i in items]
+        assert "F-10" in ids, "Feature with matching PI prefix should be included"
+        assert "F-20" not in ids, "Feature with different PI should be excluded"
+
+    def test_load_epics_always_included(self, tmp_path):
+        """Done Epics included regardless of iteration filter."""
+        edpa_root = tmp_path / ".edpa"
+        backlog = edpa_root / "backlog"
+
+        self._create_item(backlog, "epics", "E-1", "Epic", 21, "Done")
+        self._create_item(backlog, "initiatives", "I-1", "Initiative", 34, "Closed")
+
+        items, _ = load_backlog_items(edpa_root, iteration_id="PI-2026-1.1")
+
+        ids = [i["id"] for i in items]
+        assert "E-1" in ids, "Done Epic should always be included"
+        assert "I-1" in ids, "Closed Initiative should always be included"
+
+    def test_load_skips_active_items(self, tmp_path):
+        """Active items excluded from loading."""
+        edpa_root = tmp_path / ".edpa"
+        backlog = edpa_root / "backlog"
+
+        self._create_item(backlog, "stories", "S-200", "Story", 5, "Active", "PI-2026-1.1", assignee="alice")
+        self._create_item(backlog, "stories", "S-201", "Story", 3, "In Progress", "PI-2026-1.1", assignee="bob")
+        self._create_item(backlog, "stories", "S-202", "Story", 8, "Done", "PI-2026-1.1", assignee="carol")
+
+        items, _ = load_backlog_items(edpa_root, iteration_id="PI-2026-1.1")
+
+        ids = [i["id"] for i in items]
+        assert "S-200" not in ids, "Active story should be excluded"
+        assert "S-201" not in ids, "In Progress story should be excluded"
+        assert "S-202" in ids, "Done story should be included"
+
+    def test_contributor_to_engine_format(self, tmp_path):
+        """Contributors mapped to engine evidence fields."""
+        edpa_root = tmp_path / ".edpa"
+        backlog = edpa_root / "backlog"
+
+        contributors = [
+            {"person": "alice", "role": "owner"},
+            {"person": "bob", "role": "key"},
+            {"person": "carol", "role": "reviewer"},
+            {"person": "dave", "role": "consulted"},
+        ]
+        self._create_item(backlog, "stories", "S-300", "Story", 5, "Done", "PI-2026-1.1",
+                          assignee="alice", contributors=contributors)
+
+        items, _ = load_backlog_items(edpa_root, iteration_id="PI-2026-1.1")
+
+        assert len(items) == 1
+        item = items[0]
+        logins = [a["login"] for a in item["assignees"]]
+        assert "alice" in logins, "Owner should be in assignees"
+        assert item["pr_author"] == "bob", "Key contributor should be pr_author"
+        assert "carol" in item["pr_reviewers"], "Reviewer should be in pr_reviewers"
+        assert "dave" in item["commenters"], "Consulted should be in commenters"
+
+    def test_manual_cw_override(self, tmp_path):
+        """Contributor with explicit cw -> manual_cw_overrides."""
+        edpa_root = tmp_path / ".edpa"
+        backlog = edpa_root / "backlog"
+
+        contributors = [
+            {"person": "alice", "role": "key", "cw": 0.3},
+        ]
+        self._create_item(backlog, "stories", "S-400", "Story", 5, "Done", "PI-2026-1.1",
+                          contributors=contributors)
+
+        items, manual_cw = load_backlog_items(edpa_root, iteration_id="PI-2026-1.1")
+
+        assert ("alice", "S-400") in manual_cw, "Manual CW override should be recorded"
+        assert abs(manual_cw[("alice", "S-400")] - 0.3) < 0.001
+
+    def test_capacity_field_priority(self):
+        """capacity_per_iteration: 0 should be 0, not fallback."""
+        capacity = {
+            "people": [
+                {"id": "zero-cap", "name": "Zero Cap", "role": "Dev",
+                 "fte": 1.0, "capacity_per_iteration": 0, "capacity": 40}
+            ]
+        }
+        heuristics = {
+            "evidence_threshold": 1.0,
+            "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15},
+        }
+        items = [
+            {"id": "S-500", "level": "Story", "job_size": 5,
+             "assignees": [{"login": "zero-cap"}], "body": "",
+             "pr_author": "zero-cap", "commit_authors": [],
+             "pr_reviewers": [], "commenters": []}
+        ]
+
+        results = run_edpa(capacity, heuristics, items, mode="simple")
+
+        assert len(results) == 1
+        assert results[0]["capacity"] == 0, (
+            f"capacity_per_iteration=0 should yield 0, got {results[0]['capacity']}"
+        )
+        assert results[0]["total_derived"] == 0.0
 
 
 if __name__ == "__main__":
