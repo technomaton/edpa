@@ -25,6 +25,18 @@ Initializes complete EDPA v2.2 governance infrastructure for a GitHub-based proj
 
 `$ARGUMENTS` = project name (e.g., "Medical Platform")
 
+### Argument resolution (when $ARGUMENTS is empty)
+
+If `$ARGUMENTS` is empty, blank, or "help":
+
+1. Check if `.edpa/config/people.yaml` exists (re-initialization scenario):
+   - If yes, read `project.name` and present: "EDPA is already initialized for **{name}**. Re-run setup? [y/N]"
+   - If re-running, use existing project name as default.
+2. If `.edpa/` does not exist (fresh setup):
+   - Read the git remote to infer project name: `git remote get-url origin` → extract repo name
+   - Present: "Initialize EDPA for project: **{inferred-name}**? Or enter a different name."
+3. Ask user to confirm or provide project name before proceeding.
+
 ## Steps
 
 ### 1. Verify prerequisites

@@ -26,6 +26,24 @@ Computes derived hours for all team members for a given iteration using EDPA v2.
 
 `$ARGUMENTS` = iteration ID (e.g., "PI-2026-1.3") or "latest" for most recent closed iteration.
 
+### Argument resolution (when $ARGUMENTS is empty)
+
+If `$ARGUMENTS` is empty, blank, or "help":
+
+1. Read `.edpa/config/edpa.yaml` and extract `pi.iterations`
+2. Present available iterations with status and dates:
+   ```
+   Available iterations:
+     PI-2026-1.1  [closed]   1.4–14.4
+     PI-2026-1.2  [closed]   15.4–28.4
+     PI-2026-1.3  [closed]   29.4–12.5
+     PI-2026-1.4  [active]   13.5–26.5  <-- suggested
+     PI-2026-1.5  [planned]  27.5–9.6   (IP)
+   ```
+3. **Default suggestion:** the iteration with `status: active`. If none is active, suggest the latest `closed`.
+4. Ask user: "Which iteration to compute? [suggested-id]"
+5. If user confirms or provides an ID, proceed. If `.edpa/config/edpa.yaml` does not exist, inform user to run `/edpa setup` first.
+
 ## Prerequisites
 
 - `.edpa/config/capacity.yaml` exists (run edpa-setup first)

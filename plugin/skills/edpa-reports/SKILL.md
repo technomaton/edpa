@@ -27,6 +27,29 @@ per-item cost allocation, frozen snapshots, PI summaries, and Excel exports.
 
 `$ARGUMENTS` = iteration ID, or "pi" for PI-level aggregation, or "per-item {item_id}" for single item analysis.
 
+### Argument resolution (when $ARGUMENTS is empty)
+
+If `$ARGUMENTS` is empty, blank, or "help":
+
+1. Read `.edpa/config/edpa.yaml` and extract `pi.iterations`
+2. Check which iterations have existing results in `.edpa/reports/iteration-{ID}/edpa_results.json`
+3. Present options:
+   ```
+   Available iterations:
+     PI-2026-1.1  [closed]   1.4–14.4    results: yes
+     PI-2026-1.2  [closed]   15.4–28.4   results: yes
+     PI-2026-1.3  [closed]   29.4–12.5   results: yes
+     PI-2026-1.4  [active]   13.5–26.5   results: no (run engine first)
+     PI-2026-1.5  [planned]  27.5–9.6    (IP)
+
+   Other options:
+     "pi"                    PI-level aggregation across all closed iterations
+     "per-item {item_id}"    Cost allocation for a single item (e.g., "per-item S-200")
+   ```
+4. **Default suggestion:** the latest `closed` iteration that has `edpa_results.json`.
+5. Ask user: "Generate reports for which iteration? [suggested-id]"
+6. If `.edpa/config/edpa.yaml` does not exist, inform user to run `/edpa setup` first.
+
 ## Prerequisites
 
 - `.edpa/reports/iteration-{ID}/edpa_results.json` exists (run edpa-engine first)

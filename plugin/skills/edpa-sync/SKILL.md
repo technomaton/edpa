@@ -27,6 +27,22 @@ Supports pull (GitHub → local), push (local → GitHub), diff, and status comm
 
 `$ARGUMENTS` = command: "pull", "push", "diff", "status", or "pull --commit" (auto-commit after pull).
 
+### Argument resolution (when $ARGUMENTS is empty)
+
+If `$ARGUMENTS` is empty, blank, or "help":
+
+1. Present available sync commands:
+   ```
+   Available commands:
+     status          Show last sync time, local/remote changes, conflicts
+     diff            Show what would change (dry-run, no modifications)
+     pull            GitHub Projects -> .edpa/backlog/ YAML files
+     pull --commit   Pull + auto-commit changes
+     push            .edpa/backlog/ YAML files -> GitHub Projects
+   ```
+2. **Default suggestion:** "status" (safe, read-only overview).
+3. Ask user: "Which sync command? [status]"
+
 ## Prerequisites
 
 - `.edpa/config/edpa.yaml` exists with sync settings (github_org, github_project_number)

@@ -25,6 +25,31 @@ metadata:
 Optimizes CW heuristic parameters by running an autonomous experiment loop against
 manually confirmed ground truth data. Inspired by Karpathy's autoresearch pattern.
 
+## Arguments
+
+`$ARGUMENTS` = experiment budget (number, default: 50) or "auto".
+
+### Argument resolution (when $ARGUMENTS is empty)
+
+If `$ARGUMENTS` is empty, blank, or "help":
+
+1. Check if `.edpa/data/ground_truth.yaml` exists:
+   - If yes, count records and report: "Ground truth: **{count}** records (minimum 20 required)."
+   - If no, inform: "No ground truth file found. Create `.edpa/data/ground_truth.yaml` from retrospective data first."
+2. If sufficient records, check current heuristics state:
+   - Read `.edpa/config/heuristics.yaml` and show current role_weights
+   - Check if `.edpa/data/calibration_log.tsv` exists → show last calibration date and MAD
+3. Present:
+   ```
+   Calibration status:
+     Ground truth:    32 records (OK)
+     Current MAD:     0.12 (from last calibration 2026-03-15)
+     Suggested budget: 50 experiments
+
+   Run calibration with 50 experiments? [50]
+   ```
+4. **Default suggestion:** 50 experiments. User can override with any number.
+
 ## Prerequisites
 
 **Hard requirement:** `.edpa/data/ground_truth.yaml` with ≥ 20 records:
