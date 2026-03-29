@@ -40,6 +40,9 @@ fi
 cp -R "$TMPDIR/edpa/plugin/"* "$TARGET/"
 cp -R "$TMPDIR/edpa/plugin/".* "$TARGET/" 2>/dev/null || true
 
+# Make hook scripts executable
+chmod +x "$TARGET/edpa/scripts/hooks/"* 2>/dev/null || true
+
 # Create .edpa structure if it doesn't exist
 for dir in config backlog/initiatives backlog/epics backlog/features backlog/stories iterations reports snapshots data; do
   mkdir -p ".edpa/$dir"
