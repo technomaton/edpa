@@ -1,6 +1,14 @@
 id: I-1
 type: Initiative
 title: Medical Platform & Datovy e-shop
+js: 21
 status: Active
 parent: null
 owner: pm
+contributors:
+- person: pm
+  role: owner
+  cw: 0.6
+- person: urbanek
+  role: architect
+  cw: 0.3

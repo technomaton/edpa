@@ -7,7 +7,7 @@ bv: 5
 tc: 5
 rr: 13
 wsjf: 4.6
-status: Active
+status: Done
 parent: I-1
 owner: tuma
 epic_hypothesis:
@@ -41,7 +41,7 @@ epic_hypothesis:
     - OMOP + FHIR (standard) — budoucnostní, interoperabilní
     - Proprietary ETL — rychlejší start, ale vendor lock-in
     - Do nothing — platforma bez reálných dat
-contributions:
+contributors:
 - person: urbanek
   role: architect
   cw: 0.15
