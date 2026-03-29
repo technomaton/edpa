@@ -280,3 +280,156 @@ def test_list_resources(monkeypatch):
         assert r.name, f"Resource {r.uri} missing name"
         assert r.description, f"Resource {r.uri} missing description"
         assert r.mimeType, f"Resource {r.uri} missing mimeType"
+
+
+# ---------------------------------------------------------------------------
+# call_tool dispatcher (async)
+# ---------------------------------------------------------------------------
+
+def test_call_tool_status(monkeypatch):
+    """call_tool dispatches edpa_status correctly."""
+    monkeypatch.chdir(ROOT)
+    result = asyncio.run(mcp_server.call_tool("edpa_status", {}))
+    data = parse_result(result)
+    assert data["project"] == "Medical Platform & Datovy e-shop"
+
+
+def test_call_tool_iterations_with_filter(monkeypatch):
+    """call_tool passes status filter to edpa_iterations."""
+    monkeypatch.chdir(ROOT)
+    result = asyncio.run(mcp_server.call_tool("edpa_iterations", {"status": "active"}))
+    data = parse_result(result)
+    assert len(data) >= 1
+    assert data[0]["id"] == "PI-2026-1.4"
+
+
+def test_call_tool_people_with_filter(monkeypatch):
+    """call_tool passes team filter to edpa_people."""
+    monkeypatch.chdir(ROOT)
+    result = asyncio.run(mcp_server.call_tool("edpa_people", {"team": "CVUT"}))
+    data = parse_result(result)
+    assert len(data) == 4
+
+
+def test_call_tool_backlog_combined_filters(monkeypatch):
+    """call_tool passes all 3 filters to edpa_backlog."""
+    monkeypatch.chdir(ROOT)
+    result = asyncio.run(mcp_server.call_tool("edpa_backlog", {
+        "iteration": "PI-2026-1.1",
+        "type": "Story",
+        "status": "Done",
+    }))
+    data = parse_result(result)
+    assert len(data) >= 1
+    for item in data:
+        assert item["type"] == "Story"
+        assert item["status"] == "Done"
+        assert item["iteration"] == "PI-2026-1.1"
+
+
+def test_call_tool_item(monkeypatch):
+    """call_tool dispatches edpa_item correctly."""
+    monkeypatch.chdir(ROOT)
+    result = asyncio.run(mcp_server.call_tool("edpa_item", {"item_id": "S-200"}))
+    data = parse_result(result)
+    assert data["id"] == "S-200"
+
+
+def test_call_tool_unknown(monkeypatch):
+    """call_tool returns error for unknown tool name."""
+    monkeypatch.chdir(ROOT)
+    result = asyncio.run(mcp_server.call_tool("edpa_nonexistent", {}))
+    assert "Unknown tool" in result[0].text
+
+
+def test_call_tool_no_edpa_root(tmp_path, monkeypatch):
+    """call_tool returns error when .edpa/ not found."""
+    monkeypatch.chdir(tmp_path)
+    result = asyncio.run(mcp_server.call_tool("edpa_status", {}))
+    assert is_error(result)
+    assert "not found" in result[0].text
+
+
+# ---------------------------------------------------------------------------
+# read_resource (async)
+# ---------------------------------------------------------------------------
+
+def test_read_resource_config(monkeypatch):
+    """read_resource returns edpa.yaml content."""
+    monkeypatch.chdir(ROOT)
+    content = asyncio.run(mcp_server.read_resource("edpa://config"))
+    assert "PI-2026-1" in content
+    assert "iterations" in content
+
+
+def test_read_resource_people(monkeypatch):
+    """read_resource returns people.yaml content."""
+    monkeypatch.chdir(ROOT)
+    content = asyncio.run(mcp_server.read_resource("edpa://people"))
+    assert "urbanek" in content
+    assert "capacity" in content
+
+
+def test_read_resource_unknown_uri(monkeypatch):
+    """read_resource returns error for unknown URI."""
+    monkeypatch.chdir(ROOT)
+    content = asyncio.run(mcp_server.read_resource("edpa://nonexistent"))
+    assert "ERROR" in content
+
+
+def test_read_resource_no_edpa_root(tmp_path, monkeypatch):
+    """read_resource returns error when .edpa/ not found."""
+    monkeypatch.chdir(tmp_path)
+    content = asyncio.run(mcp_server.read_resource("edpa://config"))
+    assert "ERROR" in content
+
+
+# ---------------------------------------------------------------------------
+# Edge cases: item lookup
+# ---------------------------------------------------------------------------
+
+def test_handle_item_epic():
+    """Finds E-10 in epics/ directory."""
+    data = parse_result(_handle_item(EDPA_ROOT, "E-10"))
+    assert data["id"] == "E-10"
+    assert data["type"] == "Epic"
+
+
+def test_handle_item_initiative():
+    """Finds I-1 in initiatives/ directory."""
+    data = parse_result(_handle_item(EDPA_ROOT, "I-1"))
+    assert data["id"] == "I-1"
+    assert data["type"] == "Initiative"
+
+
+def test_handle_item_no_hyphen():
+    """Graceful handling for item ID without hyphen."""
+    result = _handle_item(EDPA_ROOT, "NOHYPHEN")
+    assert is_error(result)
+
+
+# ---------------------------------------------------------------------------
+# Edge cases: empty/missing backlog
+# ---------------------------------------------------------------------------
+
+def test_handle_backlog_empty(tmp_path):
+    """Returns empty list when backlog directory is missing."""
+    (tmp_path / "config").mkdir()
+    data = parse_result(_handle_backlog(tmp_path, None, None, None))
+    assert data == []
+
+
+def test_handle_backlog_combined_filters():
+    """Combined iteration + type + status filter works."""
+    data = parse_result(_handle_backlog(EDPA_ROOT, "PI-2026-1.2", "Story", "Done"))
+    assert len(data) >= 1
+    for item in data:
+        assert item["type"] == "Story"
+        assert item["status"] == "Done"
+        assert item["iteration"] == "PI-2026-1.2"
+
+
+def test_handle_backlog_no_match():
+    """Returns empty list when filters match nothing."""
+    data = parse_result(_handle_backlog(EDPA_ROOT, "PI-9999-9.9", None, None))
+    assert data == []
