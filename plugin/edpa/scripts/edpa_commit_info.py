@@ -147,7 +147,7 @@ def find_backlog_item(edpa_root, branch=None, diff=None):
     if diff:
         text += diff
 
-    refs = re.findall(r'[SFEIATB]-\d+', text)
+    refs = re.findall(r'[SFEITD]-\d+', text)
 
     for ref in refs:
         if ref in known_ids:

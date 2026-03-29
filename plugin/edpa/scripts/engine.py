@@ -71,7 +71,7 @@ def extract_item_refs(text):
     """Extract work item references (S-123, F-45, E-7) from text."""
     if not text:
         return []
-    return re.findall(r'[SFEIATB]-\d+', text)
+    return re.findall(r'[SFEITD]-\d+', text)
 
 
 def detect_evidence(people, items, iteration_id):
@@ -327,6 +327,7 @@ def load_backlog_items(edpa_root, iteration_id=None):
         "features": "Feature",
         "epics": "Epic",
         "initiatives": "Initiative",
+        "defects": "Defect",
     }
 
     for dir_name, level in type_dirs.items():

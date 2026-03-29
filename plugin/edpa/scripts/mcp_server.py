@@ -279,7 +279,7 @@ def _handle_item(edpa_root: Path, item_id: str) -> list[TextContent]:
 
     # Determine type directory from prefix
     prefix_map = {"S": "stories", "F": "features", "E": "epics", "I": "initiatives",
-                  "A": "stories", "T": "stories", "B": "stories"}
+                  "T": "stories", "D": "defects"}
     prefix = item_id.split("-")[0] if "-" in item_id else ""
     dir_name = prefix_map.get(prefix)
 

@@ -199,7 +199,7 @@ naming:
     feature: "F"
     story: "S"
     task: "T"
-    bug: "B"</code></pre>
+    defect: "D"</code></pre>
 
     <h3>1.4 Nakonfigurovat CW heuristiky</h3>
     <pre><code># /edpa setup generates .edpa/config/heuristics.yaml automatically</code></pre>
@@ -422,9 +422,9 @@ python3 .claude/edpa/scripts/backlog.py tree --iteration PI-2026-1.1</code></pre
     <pre><code># Formát: &#123;type&#125;/&#123;ITEM_ID&#125;-&#123;popis&#125;
 git checkout -b feature/S-200-omop-parser
 git checkout -b feature/F-102-anon-engine
-git checkout -b bugfix/S-215-upload-validation
+git checkout -b defect/D-215-upload-validation
 git checkout -b chore/T-050-ci-pipeline</code></pre>
-    <p>Povolené typy: <code>feature</code>, <code>bugfix</code>, <code>hotfix</code>, <code>chore</code></p>
+    <p>Povolené typy: <code>feature</code>, <code>defect</code>, <code>hotfix</code>, <code>chore</code></p>
 
     <p><strong>Commit konvence:</strong></p>
     <pre><code>git commit -m "feat(S-200): implement OMOP CDM parser"
@@ -936,7 +936,7 @@ python3 .claude/edpa/scripts/sync.py diff</code></pre>
     <h3>Branch naming CI failure</h3>
     <pre><code>Branch name does not follow EDPA convention.
 Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</code></pre>
-    <p><strong>Řešení:</strong> formát <code>feature/S-200-omop-parser</code>. Typy: <code>feature</code>, <code>bugfix</code>, <code>hotfix</code>, <code>chore</code>. <code>main</code>, <code>develop</code>, <code>release/*</code> jsou výjimky.</p>
+    <p><strong>Řešení:</strong> formát <code>feature/S-200-omop-parser</code>. Typy: <code>feature</code>, <code>defect</code>, <code>hotfix</code>, <code>chore</code>. <code>main</code>, <code>develop</code>, <code>release/*</code> jsou výjimky.</p>
 
     <h3>MAD příliš vysoké (&gt; 0.10)</h3>
     <p><strong>Řešení:</strong></p>

@@ -19,8 +19,8 @@ jobs:
             exit 0
           fi
 
-          # Require item reference: S-XXX, F-XXX, E-XXX, I-XXX, T-XXX, B-XXX
-          if [[ "$BRANCH" =~ (feature|bugfix|hotfix|chore)/[SFEIATB]-[0-9]+ ]]; then
+          # Require item reference: S-XXX, F-XXX, E-XXX, I-XXX, T-XXX, D-XXX
+          if [[ "$BRANCH" =~ (feature|defect|hotfix|chore)/[SFEITD]-[0-9]+ ]]; then
             echo "Branch name follows EDPA convention: $BRANCH"
             exit 0
           fi
@@ -31,7 +31,7 @@ jobs:
           echo "Examples:"
           echo "  feature/S-200-omop-parser"
           echo "  feature/F-102-anon-engine"
-          echo "  bugfix/S-215-upload-validation"
+          echo "  defect/D-215-upload-validation"
           echo ""
-          echo "Item prefixes: S (Story), F (Feature), E (Epic), T (Task), B (Bug)"
+          echo "Item prefixes: S (Story), F (Feature), E (Epic), T (Task), D (Defect)"
           exit 1

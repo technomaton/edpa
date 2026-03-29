@@ -77,6 +77,7 @@ TYPE_DIRS = {
     "Epic":       "epics",
     "Feature":    "features",
     "Story":      "stories",
+    "Defect":     "defects",
 }
 
 PREFIX_TO_DIR = {
@@ -84,6 +85,8 @@ PREFIX_TO_DIR = {
     "E": "epics",
     "F": "features",
     "S": "stories",
+    "D": "defects",
+    "T": "stories",
 }
 
 
@@ -117,7 +120,7 @@ def load_backlog(root):
 
     # Load all items from type directories
     items = []
-    for type_dir in ["initiatives", "epics", "features", "stories"]:
+    for type_dir in ["initiatives", "epics", "features", "stories", "defects"]:
         dir_path = edpa / "backlog" / type_dir
         if dir_path.exists():
             for f in sorted(dir_path.glob("*.yaml")):
