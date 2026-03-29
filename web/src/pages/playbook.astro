@@ -265,6 +265,9 @@ sync:
   auto_commit: true</code></pre>
 
     <h3>1.6 Nastavit Issue Types na organizaci</h3>
+    <p><strong>Claude Code (doporučeno):</strong></p>
+    <pre><code>/edpa setup</code></pre>
+    <p><strong>Manuální CLI:</strong></p>
     <pre><code># Zobrazit aktuální typy
 python3 .claude/edpa/scripts/issue_types.py list --org my-org
 
@@ -336,6 +339,9 @@ python3 .claude/edpa/scripts/backlog.py tree --level epic</code></pre>
 python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
 
     <h3>1.8 Vytvořit GitHub Project</h3>
+    <p><strong>Claude Code (doporučeno):</strong></p>
+    <pre><code>/edpa setup</code></pre>
+    <p><strong>Manuální CLI:</strong></p>
     <pre><code>python3 .claude/edpa/scripts/project_setup.py \
   --org my-org \
   --repo my-project \
@@ -352,6 +358,9 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     </ol>
 
     <h3>1.9 Nastavit Project views</h3>
+    <p><strong>Claude Code (doporučeno):</strong></p>
+    <pre><code>/edpa setup</code></pre>
+    <p><strong>Manuální CLI:</strong></p>
     <p><strong>Cesta A: Manuální setup s instrukcemi</strong></p>
     <pre><code>python3 .claude/edpa/scripts/project_views.py instructions --org my-org --project 1</code></pre>
     <div class="card">
@@ -379,6 +388,10 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     <pre><code>python3 .claude/edpa/scripts/project_views.py verify --org my-org --project 1</code></pre>
 
     <h3>1.10 Ověřit setup</h3>
+    <p><strong>Claude Code (doporučeno):</strong></p>
+    <pre><code>/edpa close-iteration    # demo ověření engine
+/edpa sync status        # ověření sync</code></pre>
+    <p><strong>Manuální CLI:</strong></p>
     <pre><code># Demo EDPA engine (bez reálných dat)
 python3 .claude/edpa/scripts/engine.py --demo
 
@@ -454,7 +467,12 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
       <li><code>sync-projects-to-git.yml</code> — každých 15 minut stahuje změny z Projects do Gitu</li>
       <li><code>sync-git-to-projects.yml</code> — při push do <code>main</code> se změnou v <code>.edpa/</code> propaguje do Projects</li>
     </ul>
-    <p><strong>Manuálně:</strong></p>
+    <p><strong>Claude Code (doporučeno):</strong></p>
+    <pre><code>/edpa sync pull      # GitHub Projects -> item files
+/edpa sync push      # item files -> GitHub Projects
+/edpa sync diff      # zobrazit co by se změnilo
+/edpa sync status    # stav synchronizace</code></pre>
+    <p><strong>Manuální CLI:</strong></p>
     <pre><code># Pull: GitHub Projects -&gt; item files in .edpa/
 python3 .claude/edpa/scripts/sync.py pull
 
@@ -570,6 +588,9 @@ records:
   # ... alespoň 20 záznamů pro kalibraci</code></pre>
 
     <h3>3.3 Kalibrace CW heuristik</h3>
+    <p><strong>Claude Code (doporučeno):</strong></p>
+    <pre><code>/edpa calibrate</code></pre>
+    <p><strong>Manuální CLI:</strong></p>
     <pre><code>python3 .claude/edpa/scripts/evaluate_cw.py \
   --ground-truth .edpa/data/ground_truth.yaml \
   --heuristics .edpa/config/heuristics.yaml</code></pre>
@@ -915,7 +936,10 @@ All invariants passed: NO</code></pre>
 
     <h3>Sync — konflikty</h3>
     <pre><code>CONFLICT: S-200 modified in both Git and Projects</code></pre>
-    <p><strong>Řešení:</strong></p>
+    <p><strong>Claude Code (doporučeno):</strong></p>
+    <pre><code>/edpa sync diff       # zobrazit rozdíly
+/edpa sync push       # po vyřešení push</code></pre>
+    <p><strong>Manuální CLI:</strong></p>
     <pre><code># Zobrazit konflikty
 python3 .claude/edpa/scripts/sync.py conflicts
 
