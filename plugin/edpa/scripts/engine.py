@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-EDPA Engine — Evidence-Driven Proportional Allocation v2.2
+EDPA Engine — Evidence-Driven Proportional Allocation
 
 Standalone Python implementation of the EDPA calculation engine.
 Computes derived hours from delivery evidence stored in .edpa/backlog/.
@@ -28,6 +28,24 @@ try:
 except ImportError:
     print("ERROR: PyYAML required. Install with: pip install pyyaml")
     sys.exit(1)
+
+
+def get_version():
+    """Read version from plugin.json (single source of truth)."""
+    for candidate in [
+        Path(__file__).parent.parent.parent / ".claude-plugin" / "plugin.json",
+        Path(__file__).parent.parent.parent.parent / ".claude" / ".claude-plugin" / "plugin.json",
+    ]:
+        try:
+            if candidate.exists():
+                with open(candidate) as f:
+                    return json.load(f).get("version", "unknown")
+        except Exception:
+            continue
+    return "unknown"
+
+
+VERSION = get_version()
 
 
 def load_yaml(path):
@@ -168,7 +186,7 @@ def compute_cw(evidence_entry, heuristics, person_role=None):
 
 def run_edpa(capacity_config, heuristics, items, mode="simple"):
     """
-    Run the core EDPA v2.2 calculation.
+    Run the core EDPA calculation.
 
     Returns: list of person results with derived hours.
     """
@@ -471,7 +489,7 @@ def generate_demo_data():
 def print_summary(results, mode, iteration_id, planning_factor=0.8):
     """Print human-readable summary table."""
     print(f"\n{'='*70}")
-    print(f"EDPA v2.2 — Iteration {iteration_id} ({mode} mode)")
+    print(f"EDPA {VERSION} — Iteration {iteration_id} ({mode} mode)")
     print(f"{'='*70}")
     print(f"{'Person':<25} {'Role':<8} {'Capacity':>8} {'Derived':>8} {'Items':>6} {'OK':>4}")
     print(f"{'-'*70}")
@@ -505,7 +523,7 @@ def print_summary(results, mode, iteration_id, planning_factor=0.8):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="EDPA v2.2 — Evidence-Driven Proportional Allocation Engine",
+        description=f"EDPA {VERSION} — Evidence-Driven Proportional Allocation Engine",
         epilog="Run with --demo to see a worked example, or --edpa-root to read from .edpa/ filesystem."
     )
     parser.add_argument("--edpa-root", help="Path to .edpa/ directory (reads backlog, config, heuristics)")
@@ -567,7 +585,7 @@ def main():
         "iteration": iteration_id,
         "mode": args.mode,
         "computed_at": datetime.now(timezone.utc).isoformat(),
-        "methodology": "EDPA v2.2",
+        "methodology": f"EDPA {VERSION}",
         "planning_factor": planning_factor,
         "people": results,
         "team_total": round(team_total, 2),
