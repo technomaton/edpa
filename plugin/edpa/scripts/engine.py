@@ -180,7 +180,7 @@ def run_edpa(capacity_config, heuristics, items, mode="simple"):
 
     for person in people:
         pid = person["id"]
-        capacity = person.get("capacity_per_iteration", 0)
+        capacity = person.get("capacity_per_iteration") or person.get("capacity", 0)
         person_items = []
 
         for item in items:
