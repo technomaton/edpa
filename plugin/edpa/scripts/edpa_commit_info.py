@@ -1,85 +1,197 @@
 #!/usr/bin/env python3
 """
-EDPA Commit Info — generates structured JSON after a git commit.
+EDPA Commit Info — enriches commit metadata with EDPA context.
 
-Reads the latest commit and produces edpa-commit-info/1.0 schema output
-for Claude Code post-commit hooks.
+Resolves:
+  - person: from people.yaml via git config email/name
+  - evidence: from cw_heuristics.yaml
+  - item: from .edpa/backlog/ matching branch or diff content
 
-Usage:
-    python edpa_commit_info.py
-
-Output (stdout): JSON object with schema edpa-commit-info/1.0
+Also re-exports compute_cw from engine for convenience.
 """
 
-import json
 import re
 import subprocess
-from datetime import datetime, timezone
+import sys
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    print("ERROR: PyYAML required. Install with: pip install pyyaml")
+    sys.exit(1)
+
+# Re-export compute_cw from engine
+sys.path.insert(0, str(Path(__file__).parent))
+from engine import compute_cw  # noqa: E402, F401
 
 
-def git(*args):
-    """Run a git command and return stripped stdout."""
-    result = subprocess.run(
-        ["git"] + list(args),
-        capture_output=True, text=True, timeout=10
-    )
-    return result.stdout.strip()
+def git_config(key):
+    """Get a git config value, or None."""
+    try:
+        result = subprocess.run(
+            ["git", "config", key],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    return None
 
 
-def extract_item_refs(text):
-    """Extract EDPA work item references (S-123, F-45, E-7, etc.) from text."""
-    if not text:
+def git_branch():
+    """Get the current git branch name, or None."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    return None
+
+
+def git_diff_staged():
+    """Get the staged diff, or empty string."""
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--stat"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    return ""
+
+
+def resolve_person(people, email=None, name=None):
+    """Resolve a person from people list by email or name.
+
+    Match priority:
+      1. email field matches git email exactly
+      2. id matches email prefix (before @)
+      3. id matches git user.name (case-insensitive)
+
+    Returns the person dict or None.
+    """
+    if not people:
+        return None
+
+    # 1. Match by email field
+    if email:
+        for person in people:
+            if person.get("email") == email:
+                return person
+
+    # 2. Match by id == email prefix
+    if email and "@" in email:
+        prefix = email.split("@")[0]
+        if prefix:  # guard against empty prefix (e.g., "@domain.com")
+            for person in people:
+                if person.get("id") == prefix:
+                    return person
+
+    # 3. Match by id == name (case-insensitive)
+    if name:
+        for person in people:
+            if person.get("id", "").lower() == name.lower():
+                return person
+
+    return None
+
+
+def load_people(edpa_root):
+    """Load people from .edpa/config/people.yaml, or return empty list."""
+    people_path = Path(edpa_root) / "config" / "people.yaml"
+    try:
+        data = yaml.safe_load(people_path.read_text())
+        return data.get("people", []) if data else []
+    except (FileNotFoundError, yaml.YAMLError):
         return []
-    return sorted(set(re.findall(r'[SFEIATB]-\d+', text)))
 
 
-def get_changed_edpa_files(diff_output):
-    """Identify .edpa/ files in a diff."""
-    edpa_files = []
-    for line in diff_output.splitlines():
-        if line.startswith(("A\t", "M\t", "D\t")):
-            path = line.split("\t", 1)[1]
-            if path.startswith(".edpa/"):
-                edpa_files.append(path)
-    return edpa_files
+def load_heuristics(edpa_root):
+    """Load heuristics from .edpa/config/cw_heuristics.yaml, or return None."""
+    for name in ("cw_heuristics.yaml", "heuristics.yaml"):
+        path = Path(edpa_root) / "config" / name
+        try:
+            return yaml.safe_load(path.read_text())
+        except (FileNotFoundError, yaml.YAMLError):
+            continue
+    return None
+
+
+def find_backlog_item(edpa_root, branch=None, diff=None):
+    """Find a matching backlog item from branch name or diff content.
+
+    Looks for item references like S-123, F-45, E-7 in branch name or diff.
+    Returns the item ID string or None.
+    """
+    backlog_dir = Path(edpa_root) / "backlog"
+    if not backlog_dir.is_dir():
+        return None
+
+    # Collect all known item IDs from backlog files
+    known_ids = set()
+    for yaml_file in backlog_dir.rglob("*.yaml"):
+        known_ids.add(yaml_file.stem)
+
+    # Extract references from branch and diff
+    text = ""
+    if branch:
+        text += branch + " "
+    if diff:
+        text += diff
+
+    refs = re.findall(r'[SFEIATB]-\d+', text)
+
+    for ref in refs:
+        if ref in known_ids:
+            return ref
+
+    return None
+
+
+def get_commit_info(edpa_root=None):
+    """Build commit info dict with EDPA context.
+
+    Returns dict with keys: branch, diff, person, evidence, item
+    """
+    if edpa_root is None:
+        edpa_root = ".edpa"
+
+    branch = git_branch()
+    diff = git_diff_staged()
+
+    # Resolve person
+    email = git_config("user.email")
+    name = git_config("user.name")
+    people = load_people(edpa_root)
+    person = resolve_person(people, email=email, name=name)
+
+    # Load heuristics for evidence context
+    heuristics = load_heuristics(edpa_root)
+
+    # Find backlog item
+    item = find_backlog_item(edpa_root, branch=branch, diff=diff)
+
+    return {
+        "branch": branch,
+        "diff": diff,
+        "person": person,
+        "evidence": heuristics,
+        "item": item,
+    }
 
 
 def main():
-    try:
-        # Get latest commit info (single git-log call for all fields)
-        log_line = git("log", "-1", "--format=%H%n%s%n%an%n%ae")
-        commit_hash, commit_msg, commit_author, commit_email = log_line.split("\n", 3)
-        branch = git("rev-parse", "--abbrev-ref", "HEAD")
-
-        # Get changed files
-        diff_output = git("diff-tree", "--no-commit-id", "-r", "--name-status", "HEAD")
-        edpa_files = get_changed_edpa_files(diff_output)
-
-        # Extract item references from commit message
-        item_refs = extract_item_refs(commit_msg)
-
-        # Count files changed
-        files_changed = len([l for l in diff_output.splitlines() if l.strip()])
-
-        info = {
-            "schema": "edpa-commit-info/1.0",
-            "commit": commit_hash[:12],
-            "branch": branch,
-            "author": commit_author,
-            "email": commit_email,
-            "message": commit_msg,
-            "item_refs": item_refs,
-            "edpa_files_changed": edpa_files,
-            "files_changed": files_changed,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-
-        print(json.dumps(info, indent=2))
-
-    except subprocess.TimeoutExpired:
-        print(json.dumps({"schema": "edpa-commit-info/1.0", "error": "git timeout"}))
-    except Exception as e:
-        print(json.dumps({"schema": "edpa-commit-info/1.0", "error": str(e)}))
+    import json
+    info = get_commit_info()
+    print(json.dumps(info, indent=2, default=str))
 
 
 if __name__ == "__main__":
