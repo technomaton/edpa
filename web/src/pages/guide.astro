@@ -168,22 +168,21 @@ PR #42: "S-200: Login endpoint"
     num: 9,
     title: 'Konec iterace',
     color: 'var(--gn)',
-    desc: 'Na konci iterace spusťte EDPA engine. Ten stáhne veškerou evidenci z GitHubu a proporcionálně alokuje hodiny podle skutečné práce.',
+    desc: 'Na konci iterace spusťte EDPA engine. Ten načte evidenci z .edpa/backlog/ YAML souborů (naplněných přes /edpa sync pull) a proporcionálně alokuje hodiny podle skutečné práce.',
     claude: `/edpa close-iteration PI-2026-1.1
 # Claude Code stahne evidenci a spocita alokaci`,
     code: `python3 .claude/edpa/scripts/engine.py \\
-  --iteration PI-2026-1.1 \\
-  --org ORG \\
-  --repo project-name
+  --edpa-root .edpa \\
+  --iteration PI-2026-1.1
 
 # Engine automaticky:
-# 1. Stáhne commits, PRs, reviews, comments
+# 1. Načte evidenci z .edpa/backlog/ YAML souborů
 # 2. Spočítá contribution weight (CW)
 # 3. Alokuje hodiny: hours = CW × capacity
 # 4. Vygeneruje reporty`,
     result: `EDPA Engine v1.0.0-beta — PI-2026-1.1
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Fetched:  47 commits, 12 PRs, 8 reviews
+Loaded:   47 commits, 12 PRs, 8 reviews
 Team:     3 members, 2.8 FTE
 Capacity: 448 hours (2 weeks)
 
@@ -202,7 +201,7 @@ Allocation:
 # Claude Code vygeneruje vsechny reporty a vykazy`,
     code: `# Vygenerované soubory
 .edpa/reports/
-├── PI-2026-1.1/
+├── iteration-PI-2026-1.1/
 │   ├── summary.md           # souhrnný report
 │   ├── jnovak.md            # per-person výkaz
 │   ├── emala.md
@@ -211,7 +210,7 @@ Allocation:
 │   └── evidence.json        # surová evidence
 .edpa/snapshots/
 └── PI-2026-1.1.json         # frozen snapshot`,
-    result: `.edpa/reports/PI-2026-1.1/summary.md:
+    result: `.edpa/reports/iteration-PI-2026-1.1/summary.md:
 ┌─────────┬────────┬────────┬────────┐
 │ Person  │ Hours  │ Share  │ Items  │
 ├─────────┼────────┼────────┼────────┤
@@ -256,13 +255,10 @@ No weight adjustment needed.`,
 # Dalsi iterace — stejny postup`,
     code: `# Nová iterace
 python3 .claude/edpa/scripts/engine.py \\
-  --iteration PI-2026-1.2 \\
-  --org ORG --repo project-name
+  --edpa-root .edpa \\
+  --iteration PI-2026-1.2
 
-# Trend analýza napříč iteracemi
-python3 .claude/edpa/scripts/engine.py trend \\
-  --from PI-2026-1.1 \\
-  --to PI-2026-1.4`,
+# Porovnejte výsledky iterací v .edpa/reports/`,
     result: `Trend: PI-2026-1.1 → PI-2026-1.4
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MAD:            0.032 → 0.018  ↓ improving

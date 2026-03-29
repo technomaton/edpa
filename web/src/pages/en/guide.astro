@@ -168,22 +168,21 @@ PR #42: "S-200: Login endpoint"
     num: 9,
     title: 'End of Iteration',
     color: 'var(--gn)',
-    desc: 'At the end of the iteration, run the EDPA engine. It fetches all evidence from GitHub and proportionally allocates hours based on actual work.',
+    desc: 'At the end of the iteration, run the EDPA engine. It reads evidence from .edpa/backlog/ YAML files (populated by /edpa sync pull) and proportionally allocates hours based on actual work.',
     claude: `/edpa close-iteration PI-2026-1.1
 # Claude Code fetches evidence and computes allocation`,
     code: `python3 .claude/edpa/scripts/engine.py \\
-  --iteration PI-2026-1.1 \\
-  --org ORG \\
-  --repo project-name
+  --edpa-root .edpa \\
+  --iteration PI-2026-1.1
 
 # The engine automatically:
-# 1. Fetches commits, PRs, reviews, comments
+# 1. Reads evidence from .edpa/backlog/ YAML files
 # 2. Computes contribution weight (CW)
 # 3. Allocates hours: hours = CW × capacity
 # 4. Generates reports`,
     result: `EDPA Engine v1.0.0-beta — PI-2026-1.1
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Fetched:  47 commits, 12 PRs, 8 reviews
+Loaded:   47 commits, 12 PRs, 8 reviews
 Team:     3 members, 2.8 FTE
 Capacity: 448 hours (2 weeks)
 
@@ -202,7 +201,7 @@ Allocation:
 # Claude Code generates all reports and timesheets`,
     code: `# Generated files
 .edpa/reports/
-├── PI-2026-1.1/
+├── iteration-PI-2026-1.1/
 │   ├── summary.md           # summary report
 │   ├── jnovak.md            # per-person timesheet
 │   ├── emala.md
@@ -211,7 +210,7 @@ Allocation:
 │   └── evidence.json        # raw evidence
 .edpa/snapshots/
 └── PI-2026-1.1.json         # frozen snapshot`,
-    result: `.edpa/reports/PI-2026-1.1/summary.md:
+    result: `.edpa/reports/iteration-PI-2026-1.1/summary.md:
 ┌─────────┬────────┬────────┬────────┐
 │ Person  │ Hours  │ Share  │ Items  │
 ├─────────┼────────┼────────┼────────┤
@@ -256,13 +255,10 @@ No weight adjustment needed.`,
 # Next iteration — same workflow`,
     code: `# New iteration
 python3 .claude/edpa/scripts/engine.py \\
-  --iteration PI-2026-1.2 \\
-  --org ORG --repo project-name
+  --edpa-root .edpa \\
+  --iteration PI-2026-1.2
 
-# Trend analysis across iterations
-python3 .claude/edpa/scripts/engine.py trend \\
-  --from PI-2026-1.1 \\
-  --to PI-2026-1.4`,
+# Compare iteration results in .edpa/reports/`,
     result: `Trend: PI-2026-1.1 → PI-2026-1.4
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MAD:            0.032 → 0.018  ↓ improving
