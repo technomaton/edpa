@@ -1,5 +1,5 @@
 #!/bin/sh
-# EDPA validate_on_save hook — validates YAML files when Claude Code writes them.
+# EDPA validate_on_save hook — validates YAML, JSON, and Python files when Claude Code writes them.
 # Reads Claude Code tool_input JSON from stdin.
 # Exit 0 always (non-blocking), but prints validation errors to stderr.
 set -e
@@ -18,25 +18,27 @@ except Exception:
     print('')
 " 2>/dev/null)
 
-# Skip if no file path or not a YAML file
+# Skip if no file path or not a supported file type
 case "$FILE_PATH" in
-    *.yaml|*.yml) ;;
+    *.yaml|*.yml|*.json|*.py) ;;
     *) exit 0 ;;
 esac
 
 # Skip if file doesn't exist
 [ -f "$FILE_PATH" ] || exit 0
 
-# Validate YAML syntax (pass path via env to avoid shell injection)
-EDPA_VALIDATE_PATH="$FILE_PATH" python3 -c "
-import os, sys, yaml
+# Validate syntax (pass path via env to avoid shell injection)
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="$SCRIPT_DIR" EDPA_VALIDATE_PATH="$FILE_PATH" python3 -c "
+import os, sys
 path = os.environ['EDPA_VALIDATE_PATH']
+script_dir = os.environ.get('SCRIPT_DIR', '')
+sys.path.insert(0, script_dir)
 try:
-    with open(path) as f:
-        yaml.safe_load(f)
-except yaml.YAMLError as e:
-    print(f'EDPA: YAML validation error in {path}:', file=sys.stderr)
-    print(str(e), file=sys.stderr)
+    from validate_syntax import validate_file
+    errors = validate_file(path)
+    for e in errors:
+        print(f'EDPA: validation error: {e}', file=sys.stderr)
 except Exception:
     pass
 " 2>&1
