@@ -472,10 +472,7 @@ python3 .claude/edpa/scripts/sync.py status</code></pre>
     <p><strong>Claude Code (doporučeno):</strong></p>
     <pre><code>/edpa close-iteration PI-2026-1.1</code></pre>
     <p><strong>Manuální CLI:</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/engine.py \
-  --iteration PI-2026-1.1 \
-  --capacity .edpa/config/capacity.yaml \
-  --heuristics .edpa/config/heuristics.yaml</code></pre>
+    <pre><code>python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1</code></pre>
 
     <p><strong>Výstupy:</strong></p>
     <pre><code>.edpa/reports/iteration-PI-2026-1.1/
@@ -663,10 +660,10 @@ TOTAL_DEVIATION=0.824000</code></pre>
       <li><code>.edpa/config/edpa.yaml</code> — PI, iterace, datumy, sync</li>
       <li>Issue Types nastavené na organizaci</li>
       <li>Backlog naplněný (alespoň 1 Epic, 3 Features, 10 Stories)</li>
-      <li><code>edpa_backlog.py validate</code> projde bez chyb</li>
+      <li><code>backlog.py validate</code> projde bez chyb</li>
       <li>GitHub Project vytvořen</li>
       <li>Project views nastaveny</li>
-      <li><code>edpa_engine.py --demo</code> projde úspěšně</li>
+      <li><code>engine.py --demo</code> projde úspěšně</li>
     </ul>
 
     <h3>Týden 1</h3>
@@ -674,7 +671,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
       <li>Tým pracuje s branch naming konvencí</li>
       <li>Commity referují work items (<code>feat(S-XXX): ...</code>)</li>
       <li>PR reviews probíhají</li>
-      <li>Sync funguje (<code>edpa_sync.py status</code>)</li>
+      <li>Sync funguje (<code>sync.py status</code>)</li>
       <li>Item files v .edpa/ se automaticky aktualizují</li>
     </ul>
 
@@ -724,78 +721,78 @@ TOTAL_DEVIATION=0.824000</code></pre>
       </table>
     </div>
 
-    <h3>edpa_engine.py — EDPA výpočetní jádro</h3>
+    <h3>engine.py — EDPA výpočetní jádro</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>edpa_engine.py --demo</code></td><td>Demo s ukázkovými daty</td></tr>
-          <tr><td><code>edpa_engine.py --iteration ID --capacity ... --heuristics ...</code></td><td>Plný EDPA výpočet pro iteraci</td></tr>
-          <tr><td><code>edpa_engine.py --iteration ID --mode full ...</code></td><td>Výpočet s Role Strength (JS &times; CW &times; RS)</td></tr>
+          <tr><td><code>engine.py --edpa-root .edpa --iteration ID</code></td><td>Plný EDPA výpočet pro iteraci (čte z .edpa/backlog/)</td></tr>
+          <tr><td><code>engine.py --demo</code></td><td>Demo s vestavěnými ukázkovými daty</td></tr>
+          <tr><td><code>engine.py --iteration ID --capacity ... --heuristics ...</code></td><td>Legacy režim s explicitními soubory</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>edpa_backlog.py — Správa backlogu</h3>
+    <h3>backlog.py — Správa backlogu</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>edpa_backlog.py tree</code></td><td>Zobrazí plnou hierarchii (I &rarr; E &rarr; F &rarr; S)</td></tr>
-          <tr><td><code>edpa_backlog.py tree --level epic</code></td><td>Jen epicy</td></tr>
-          <tr><td><code>edpa_backlog.py tree --iteration PI-2026-1.1</code></td><td>Filtr stories na iteraci</td></tr>
-          <tr><td><code>edpa_backlog.py show S-200</code></td><td>Detail položky</td></tr>
-          <tr><td><code>edpa_backlog.py status</code></td><td>Celkový status projektu</td></tr>
-          <tr><td><code>edpa_backlog.py wsjf</code></td><td>WSJF prioritizace (všechny úrovně)</td></tr>
-          <tr><td><code>edpa_backlog.py validate</code></td><td>Kontrola integrity backlogu</td></tr>
+          <tr><td><code>backlog.py tree</code></td><td>Zobrazí plnou hierarchii (I &rarr; E &rarr; F &rarr; S)</td></tr>
+          <tr><td><code>backlog.py tree --level epic</code></td><td>Jen epicy</td></tr>
+          <tr><td><code>backlog.py tree --iteration PI-2026-1.1</code></td><td>Filtr stories na iteraci</td></tr>
+          <tr><td><code>backlog.py show S-200</code></td><td>Detail položky</td></tr>
+          <tr><td><code>backlog.py status</code></td><td>Celkový status projektu</td></tr>
+          <tr><td><code>backlog.py wsjf</code></td><td>WSJF prioritizace (všechny úrovně)</td></tr>
+          <tr><td><code>backlog.py validate</code></td><td>Kontrola integrity backlogu</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>edpa_sync.py — Bidirekční sync</h3>
+    <h3>sync.py — Bidirekční sync</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>edpa_sync.py pull</code></td><td>GitHub Projects &rarr; item files in <code>.edpa/</code></td></tr>
-          <tr><td><code>edpa_sync.py push</code></td><td>item files in <code>.edpa/</code> &rarr; GitHub Projects</td></tr>
-          <tr><td><code>edpa_sync.py diff</code></td><td>Zobrazí rozdíly (dry-run)</td></tr>
-          <tr><td><code>edpa_sync.py status</code></td><td>Stav poslední synchronizace</td></tr>
-          <tr><td><code>edpa_sync.py conflicts</code></td><td>Nevyřešené konflikty</td></tr>
+          <tr><td><code>sync.py pull</code></td><td>GitHub Projects &rarr; item files in <code>.edpa/</code></td></tr>
+          <tr><td><code>sync.py push</code></td><td>item files in <code>.edpa/</code> &rarr; GitHub Projects</td></tr>
+          <tr><td><code>sync.py diff</code></td><td>Zobrazí rozdíly (dry-run)</td></tr>
+          <tr><td><code>sync.py status</code></td><td>Stav poslední synchronizace</td></tr>
+          <tr><td><code>sync.py conflicts</code></td><td>Nevyřešené konflikty</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>edpa_issue_types.py — Issue Types (org-level)</h3>
+    <h3>issue_types.py — Issue Types (org-level)</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>edpa_issue_types.py list --org ORG</code></td><td>Zobrazí aktuální typy</td></tr>
-          <tr><td><code>edpa_issue_types.py setup --org ORG</code></td><td>Vytvoří EDPA sadu Issue Types</td></tr>
-          <tr><td><code>edpa_issue_types.py setup --org ORG --dry-run</code></td><td>Dry-run setup</td></tr>
-          <tr><td><code>edpa_issue_types.py migrate --org ORG --repo REPO</code></td><td>Migruje labels &rarr; Issue Types</td></tr>
+          <tr><td><code>issue_types.py list --org ORG</code></td><td>Zobrazí aktuální typy</td></tr>
+          <tr><td><code>issue_types.py setup --org ORG</code></td><td>Vytvoří EDPA sadu Issue Types</td></tr>
+          <tr><td><code>issue_types.py setup --org ORG --dry-run</code></td><td>Dry-run setup</td></tr>
+          <tr><td><code>issue_types.py migrate --org ORG --repo REPO</code></td><td>Migruje labels &rarr; Issue Types</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>edpa_project_setup.py — Inicializace GitHub Projectu</h3>
+    <h3>project_setup.py — Inicializace GitHub Projectu</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>edpa_project_setup.py --org ORG --repo REPO</code></td><td>Vytvoří kompletní Project</td></tr>
-          <tr><td><code>edpa_project_setup.py --org ORG --repo REPO --dry-run</code></td><td>Jen ukáže co by udělal</td></tr>
+          <tr><td><code>project_setup.py --org ORG --repo REPO</code></td><td>Vytvoří kompletní Project</td></tr>
+          <tr><td><code>project_setup.py --org ORG --repo REPO --dry-run</code></td><td>Jen ukáže co by udělal</td></tr>
         </tbody>
       </table>
     </div>
@@ -934,7 +931,7 @@ python3 .claude/edpa/scripts/sync.py diff</code></pre>
 
     <h3>GitHub Project — custom fields chybí</h3>
     <pre><code>ERROR: Field "Job Size" not found on project</code></pre>
-    <p><strong>Řešení:</strong> spustit znovu <code>edpa_project_setup.py</code> nebo ručně: Settings &rarr; Custom fields &rarr; Add field.</p>
+    <p><strong>Řešení:</strong> spustit znovu <code>project_setup.py</code> nebo ručně: Settings &rarr; Custom fields &rarr; Add field.</p>
 
     <h3>Branch naming CI failure</h3>
     <pre><code>Branch name does not follow EDPA convention.
