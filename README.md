@@ -2,7 +2,7 @@
 
 **Derive hours from Git evidence. No timesheets.**
 
-[![EDPA](https://img.shields.io/badge/EDPA-v1.0.0-beta-34d399)](docs/methodology.md)
+[![EDPA](https://img.shields.io/badge/EDPA-v2.2-34d399)](docs/methodology.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/Made_for-GitHub-181717?logo=github)](https://github.com)
 
@@ -29,15 +29,18 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 ```
 $ python3 .claude/edpa/scripts/engine.py --demo
 
-EDPA v1.0.0-beta — Iteration DEMO-1.1 (simple mode)
+EDPA v2.2 — Iteration DEMO-1.1 (simple mode)
 ======================================================================
-Person                    Role     Capacity  Derived  Items    OK
+Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
-Alice (Arch)              Arch         40h      40h      4    OK
-Bob (Dev)                 Dev          80h      80h      5    OK
-Carol (Dev)               Dev          60h      60h      5    OK
+Alice (Arch)              Arch          40h   40.01h      4   OK
+Alice (PM)                PM            20h    20.0h      2   OK
+Bob (Dev)                 Dev           80h    80.0h      4   OK
+Carol (Dev)               Dev           60h   59.99h      3   OK
 ----------------------------------------------------------------------
-TEAM TOTAL                            180h     180h
+TEAM TOTAL                             200h   200.0h
+PLANNING CAPACITY                    160.0h  (factor: 0.8)
+
 All invariants passed: YES
 ```
 
@@ -141,7 +144,8 @@ After installation, your project will have:
 │       │   ├── sync.py            # GitHub Projects <-> Git sync
 │       │   ├── issue_types.py     # GitHub Issue Types management
 │       │   ├── project_setup.py   # GitHub Project initialization
-│       │   └── project_views.py   # GitHub Project view setup
+│       │   ├── project_views.py   # GitHub Project view setup
+│       │   └── create_project_views.py
 │       ├── templates/             # Config templates (.tmpl)
 │       └── workflows/             # GitHub Actions workflows
 ├── .edpa/                         # Project governance data
@@ -149,6 +153,7 @@ After installation, your project will have:
 │   │   ├── capacity.yaml          # Team members, FTE, capacity
 │   │   └── heuristics.yaml        # Evidence scoring weights (CW)
 │   ├── backlog/                   # Work items (file-per-item)
+│   ├── iterations/                # Iteration definitions
 │   ├── reports/                   # Generated timesheets & exports
 │   ├── snapshots/                 # Frozen iteration snapshots
 │   └── data/                      # Raw evidence data
