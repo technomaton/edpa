@@ -20,7 +20,7 @@ metadata:
 
 ## What this does
 
-Initializes complete EDPA v2.2 governance infrastructure for a GitHub-based project.
+Initializes complete EDPA governance infrastructure for a GitHub-based project.
 
 ## Arguments
 
@@ -92,7 +92,7 @@ people:
 
 Create `.edpa/config/heuristics.yaml`:
 ```yaml
-version: "2.2.0"
+version: "1.0.0-beta"
 evidence_threshold: 1.0
 role_weights:
   owner: 1.0

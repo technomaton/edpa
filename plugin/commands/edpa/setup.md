@@ -6,5 +6,5 @@ model: sonnet
 
 # EDPA Setup
 
-Invoke the `edpa-setup` skill to initialize EDPA v2.2 governance infrastructure.
+Invoke the `edpa-setup` skill to initialize EDPA governance infrastructure.
 Pass the project name as argument.

@@ -21,7 +21,7 @@ metadata:
 
 ## What this does
 
-Generates all EDPA v2.2 output artifacts from engine results: per-person timesheets (MD+JSON),
+Generates all EDPA output artifacts from engine results: per-person timesheets (MD+JSON),
 per-item cost allocation, frozen snapshots, PI summaries, and Excel exports.
 
 ## Arguments
@@ -69,7 +69,7 @@ Projekt: {project_name}
 Registrace: {registration}
 Období: {iteration} ({dates})
 Kapacita: {capacity}h ({fte} FTE)
-Metodika: EDPA v2.2 ({mode})
+Metodika: EDPA 1.0.0-beta ({mode})
 
 | Item | Typ | JS | CW | Score | Podíl | Hodiny |
 |------|-----|----|----|-------|-------|--------|
@@ -98,11 +98,11 @@ Write to `.edpa/reports/iteration-{ID}/item-costs.xlsx`.
 Write to `.edpa/snapshots/iteration-{ID}.json`:
 ```json
 {
-  "snapshot_version": "2.2",
+  "snapshot_version": "1.0.0-beta",
   "iteration": "{id}",
   "generated_at": "ISO-8601",
   "frozen": true,
-  "methodology": "EDPA v2.2",
+  "methodology": "EDPA 1.0.0-beta",
   "capacity_registry": { "...from config..." },
   "edpa_results": { "...from engine..." },
   "signature_status": "pending"

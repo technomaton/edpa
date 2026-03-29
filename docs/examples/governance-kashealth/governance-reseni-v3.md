@@ -28,7 +28,7 @@ Určeno pro: Vedení projektu, ČVUT FBMI, IT ČVUT, Medicalc
 
 ## 1. Shrnutí a doporučení
 
-> *Tento dokument definuje kompletní governance řešení pro projekt Medical Platform a Datový e-shop: tooling stack (M365 Teams + GitHub), identitu (kashealth.cz), metodiku vykazování (EDPA v2.2), SAFe 6 governance framework a implementační plán. Celkové náklady: ~1 520 Kč/měsíc za základní stack + volitelně AI API.*
+> *Tento dokument definuje kompletní governance řešení pro projekt Medical Platform a Datový e-shop: tooling stack (M365 Teams + GitHub), identitu (kashealth.cz), metodiku vykazování (EDPA), SAFe 6 governance framework a implementační plán. Celkové náklady: ~1 520 Kč/měsíc za základní stack + volitelně AI API.*
 
 Projekt zahrnuje týmy z ČVUT FBMI a Medicalc software s.r.o. se zaměřením budoucího spin-offu. Model stojí na pěti principech:
 
@@ -45,7 +45,7 @@ Projekt zahrnuje týmy z ČVUT FBMI a Medicalc software s.r.o. se zaměřením b
 | **M365 licence** | 5x @kashealth.cz | Koordinátoři + reserve |
 | **GitHub Team** | 8 vývojářů | 4 $/user/měs. |
 | **Čas nasazení** | 1–2 dny | Vč. integrací a EDPA setup |
-| **Metodika vykazování** | EDPA v2.2 | Dual-view: per-person + per-item |
+| **Metodika vykazování** | EDPA 1.0.0-beta | Dual-view: per-person + per-item |
 | **Governance framework** | SAFe 6 inspired | Epic Hypothesis, WSJF, Predictability |
 
 ---
@@ -701,7 +701,7 @@ Průkaznost stojí na 5 pilířích:
 
 ## 16. Srovnání s alternativami
 
-| Vlastnost | Fixed Split v1 | EDPA v2.2 (tento model) | Ruční timesheets |
+| Vlastnost | Fixed Split v1 | EDPA 1.0.0-beta (tento model) | Ruční timesheets |
 |---|---|---|---|
 | **Předem fixované koše** | Ano | Ne | Ne |
 | **Prázdné úrovně** | Problém | Neexistují | N/A |

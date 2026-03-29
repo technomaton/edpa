@@ -5,7 +5,7 @@ This directory contains a real-world governance document for the
 
 ## What this demonstrates
 
-A complete EDPA v2.2 deployment for a cross-organizational team comprising
+A complete EDPA deployment for a cross-organizational team comprising
 CVUT FBMI and Partner s.r.o., covering:
 
 - **Tooling** -- Microsoft 365 Teams + GitHub (no Jira, no Confluence)
@@ -27,7 +27,7 @@ This governance document can serve as a **template** for:
 
 - EU-funded projects (OP TAK or similar programmes) needing auditable time allocation
 - Cross-organizational teams that want GitHub-only governance without Jira/Confluence
-- Any project adopting EDPA v2.2 with SAFe 6 inspired practices
+- Any project adopting EDPA with SAFe 6 inspired practices
 
 Adapt the identity model, team roster, and cadence configuration to your context.
 

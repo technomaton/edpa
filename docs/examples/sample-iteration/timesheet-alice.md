@@ -3,7 +3,7 @@
 **Project:** Sample Project
 **Period:** PI-2026-1.3 (2026-03-31 — 2026-04-13)
 **Capacity:** 40h (0.5 FTE)
-**Methodology:** EDPA v2.2 (simple mode)
+**Methodology:** EDPA 1.0.0-beta (simple mode)
 
 | Item | Level | JS | CW | Score | Ratio | Hours |
 |------|-------|----|----|-------|-------|-------|

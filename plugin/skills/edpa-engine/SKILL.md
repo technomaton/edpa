@@ -21,7 +21,7 @@ metadata:
 
 ## What this does
 
-Computes derived hours for all team members for a given iteration using EDPA v2.2 formula.
+Computes derived hours for all team members for a given iteration using EDPA formula.
 
 ## Arguments
 

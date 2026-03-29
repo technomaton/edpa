@@ -32,7 +32,7 @@ Each revision includes: reason for correction, diff from previous, timestamp, au
   "iteration": "PI-2026-1.3",
   "generated_at": "2026-05-12T18:00:00Z",
   "frozen": true,
-  "methodology": "EDPA v2.2",
+  "methodology": "EDPA 1.0.0-beta",
   "mode": "simple",
   "capacity_registry": { "...": "copy from .edpa/config/capacity.yaml at computation time" },
   "items": [

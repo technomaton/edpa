@@ -373,7 +373,7 @@ Auditability rests on: GitHub delivery evidence + capacity registry + frozen sna
 
 ## 12. Comparison with Alternatives
 
-| Property | Fixed Split v1 | Evidence-Driven v2.2 | Manual Timesheets |
+| Property | Fixed Split v1 | Evidence-Driven 1.0 | Manual Timesheets |
 |---|---|---|---|
 | Pre-fixed buckets | Yes | No | No |
 | Empty levels | Problem | Don't exist | N/A |
@@ -387,7 +387,7 @@ Auditability rests on: GitHub delivery evidence + capacity registry + frozen sna
 
 ## 13. Conclusion
 
-The final v2.2 methodology rests on the principle:
+The final methodology rests on the principle:
 
 > **A person declares capacity for a period.**
 > **The system identifies work items they demonstrably contributed to.**
