@@ -3,9 +3,13 @@
   "title": "EDPA Commit Info",
   "description": "Schema for EDPA commit info output",
   "type": "object",
-  "required": ["branch", "diff"],
+  "required": ["schema", "branch", "diff"],
   "additionalProperties": false,
   "properties": {
+    "schema": {
+      "const": "edpa-commit-info/1.0",
+      "description": "Schema version identifier"
+    },
     "branch": {
       "type": ["string", "null"],
       "description": "Current git branch name"
