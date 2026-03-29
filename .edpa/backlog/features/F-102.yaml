@@ -9,7 +9,7 @@ wsjf: 2.62
 status: Active
 parent: E-10
 owner: urbanek
-contributions:
+contributors:
 - person: urbanek
   role: architect
   cw: 0.35

@@ -466,7 +466,7 @@ def cmd_show(backlog, args, root=None):
         print(f"    {color(item['hypothesis'], C.MUTED)}")
 
     # Contributors
-    contribs = item.get("contributors") or item.get("contributions") or []
+    contribs = item.get("contributors") or []
     if contribs:
         print()
         print(f"  {bold('Contributors:')}")

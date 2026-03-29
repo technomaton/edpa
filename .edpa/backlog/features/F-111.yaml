@@ -9,7 +9,7 @@ wsjf: 4.6
 status: Active
 parent: E-11
 owner: d1
-contributions:
+contributors:
 - person: d1
   role: owner
   cw: 0.4

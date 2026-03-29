@@ -41,7 +41,7 @@ epic_hypothesis:
     - Marketplace platforma (AWS Data Exchange) — omezení na formáty
     - Vlastní e-shop — plná kontrola, integrace s anonymizací
     - Do nothing — data zůstanou nevyužitá
-contributions:
+contributors:
 - person: urbanek
   role: architect
   cw: 0.15

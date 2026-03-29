@@ -104,7 +104,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
                   <td><code>{w.id}</code> {w.title}</td>
                   <td class="td-js">{w.js}</td>
                   {people.map(p => {
-                    const cn = w.contributions.find(c => c.personId === p.id);
+                    const cn = w.contributors.find(c => c.personId === p.id);
                     return (
                       <td class={cn ? 'td-cw-active' : 'td-cw-empty'}>
                         {cn ? (

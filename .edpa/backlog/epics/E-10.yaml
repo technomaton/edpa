@@ -43,7 +43,7 @@ epic_hypothesis:
     - 'Buy: komerční řešení (ARX, Privitar) — drahé, vendor lock-in'
     - 'Build: vlastní pipeline — kontrola, integrace s platformou'
     - 'Do nothing: bez anonymizace žádné datové produkty'
-contributions:
+contributors:
 - person: urbanek
   role: architect
   cw: 0.2

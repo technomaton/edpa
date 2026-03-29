@@ -27,7 +27,7 @@ export interface WorkItem {
   parentId: string | null;
   status: string;
   iteration: string | null;
-  contributions: Contribution[];
+  contributors: Contribution[];
 }
 
 export interface Iteration {
@@ -95,7 +95,7 @@ export function wsjf(item: WorkItem): number {
  * Relevant items:
  *  - Stories: must be in the iteration AND status === 'Done'
  *  - Features / Epics: must not be 'Planned'
- *  - The person must appear in the item's contributions
+ *  - The person must appear in the item's contributors
  *
  * Score formula:
  *  - Simple mode: Score = JS * CW
@@ -115,7 +115,7 @@ export function edpa(
   if (!person) return null;
 
   const relevant = items.filter((w) => {
-    if (!w.contributions || !w.contributions.some((c) => c.personId === personId))
+    if (!w.contributors || !w.contributors.some((c) => c.personId === personId))
       return false;
     if (w.level === 'Story') return w.iteration === iterationId && w.status === 'Done';
     if (w.level === 'Feature' || w.level === 'Epic') return w.status !== 'Planned';
@@ -123,7 +123,7 @@ export function edpa(
   });
 
   const scored: ScoredItem[] = relevant.map((w) => {
-    const cn = w.contributions.find((c) => c.personId === personId);
+    const cn = w.contributors.find((c) => c.personId === personId);
     const cw = cn ? cn.cw : 0;
     const rs = cn ? cn.rs : 1;
     const score = mode === 'full' ? w.js * cw * rs : w.js * cw;
@@ -164,12 +164,12 @@ export function itemView(
   mode: 'simple' | 'full'
 ): ItemViewResult | null {
   const item = items.find((w) => w.id === itemId);
-  if (!item || !item.contributions) return null;
+  if (!item || !item.contributors) return null;
 
   const itId = iterationId || item.iteration;
   if (!itId) return null;
 
-  const contributors = item.contributions.map((cn) => {
+  const contributors = item.contributors.map((cn) => {
     const person = people.find((p) => p.id === cn.personId);
     if (!person) return { person: { id: '', name: '?', role: '', team: '', fte: 0, capacity: 0 }, cw: cn.cw, rs: cn.rs, hours: 0 };
     const d = edpa(cn.personId, itId, people, items, mode);
