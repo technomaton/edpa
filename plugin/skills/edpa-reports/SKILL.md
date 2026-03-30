@@ -7,7 +7,7 @@ description: >
   user asks for "reports", "výkazy", "export", "snapshot", or "per-item analysis".
   Requires edpa-engine results (edpa_results.json) as input.
 license: MIT
-compatibility: Python 3.10+ (openpyxl for XLSX), .edpa/config/capacity.yaml
+compatibility: Python 3.10+ (openpyxl for XLSX), .edpa/config/people.yaml
 allowed-tools: Read Write Bash(python3 *) Bash(cp *) Bash(mkdir *)
 metadata:
   author: Jaroslav Urbánek
@@ -54,7 +54,7 @@ If `$ARGUMENTS` is empty, blank, or "help":
 ## Prerequisites
 
 - `.edpa/reports/iteration-{ID}/edpa_results.json` exists (run edpa-engine first)
-- `.edpa/config/capacity.yaml` exists
+- `.edpa/config/people.yaml` exists
 
 ## Output artifacts
 

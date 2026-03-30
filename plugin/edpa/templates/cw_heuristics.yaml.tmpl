@@ -37,7 +37,7 @@ role_weights:
 
 # Per-role koeficienty — APLIKOVÁNY enginem v2.0+
 # (V v1.x byly deklarovány ale engine je ignoroval — opraveno v v2.0)
-# compute_cw() čte person.role z capacity.yaml a aplikuje příslušný override.
+# compute_cw() čte person.role z people.yaml a aplikuje příslušný override.
 role_overrides:
 
   # ═══ STRATEGICKÉ ROLE (Git je podhodnocuje) ═══
@@ -114,7 +114,7 @@ signals:
 # ─────────────────────────────────────────────────────────────────────
 rules:
   - "Nejvyšší signál určuje evidence_role (nesčítá se)"
-  - "role_overrides se aplikují podle role osoby z capacity.yaml"
+  - "role_overrides se aplikují podle role osoby z people.yaml"
   - "Manuální override (/contribute) má přednost před auto-detekcí"
   - "Počet commitů se NEPŘEVÁDÍ na čas — jen signalizuje relevanci"
   - "In Progress items se vylučují z EDPA výpočtu"
@@ -134,7 +134,7 @@ rules:
 # Proto:
 #   Commit na .edpa/backlog.yaml  = práce na projektu ✓
 #   Commit na src/parser.py       = práce na projektu ✓
-#   Commit na config/capacity.yaml = práce na projektu ✓
+#   Commit na config/people.yaml = práce na projektu ✓
 #
 # CW matice per role zajistí správný poměr:
 #   PM commit na backlog  → CW dle role_overrides (PM consulted=0.20)

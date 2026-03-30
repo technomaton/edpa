@@ -19,7 +19,7 @@ Initialize governance for your project:
 ```
 
 This will:
-1. Create `.edpa/config/capacity.yaml` from template
+1. Create `.edpa/config/people.yaml` from template
 2. Create `.edpa/config/heuristics.yaml` from template
 3. Set up GitHub Project with custom fields (Job Size, WSJF, etc.)
 4. Configure branch naming enforcement via GitHub Actions
@@ -31,7 +31,7 @@ If you prefer to configure manually instead of using `/edpa setup`:
 
 ### Team capacity
 
-Edit `.edpa/config/capacity.yaml`:
+Edit `.edpa/config/people.yaml`:
 
 ```yaml
 cadence:
@@ -87,7 +87,7 @@ If upgrading from the old GitHub template approach:
 | Old path | New path |
 |----------|----------|
 | `scripts/edpa_engine.py` | `.claude/edpa/scripts/engine.py` |
-| `config/capacity.yaml` | `.edpa/config/capacity.yaml` |
+| `config/capacity.yaml` | `.edpa/config/people.yaml` |
 | `config/cw_heuristics.yaml` | `.edpa/config/heuristics.yaml` |
 | `config/project.yaml` | `.edpa/config/project.yaml` |
 | `reports/` | `.edpa/reports/` |

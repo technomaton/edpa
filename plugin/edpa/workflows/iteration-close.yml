@@ -37,7 +37,7 @@ jobs:
 
       - name: Verify configuration
         run: |
-          test -f .edpa/config/capacity.yaml || (echo "ERROR: Run /edpa setup first." && exit 1)
+          test -f .edpa/config/people.yaml || (echo "ERROR: Run /edpa setup first." && exit 1)
           test -f .edpa/config/heuristics.yaml || (echo "ERROR: Run /edpa setup first." && exit 1)
 
       - name: Run EDPA Engine
@@ -47,7 +47,7 @@ jobs:
           python3 .claude/edpa/scripts/engine.py \
             --iteration "${{ inputs.iteration_id }}" \
             --mode "${{ inputs.mode }}" \
-            --capacity .edpa/config/capacity.yaml \
+            --capacity .edpa/config/people.yaml \
             --heuristics .edpa/config/heuristics.yaml
 
       - name: Verify invariants

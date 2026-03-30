@@ -26,10 +26,10 @@ curl -fsSL https://edpa.technomaton.com/install.sh | sh
 
 Copy and edit the capacity registry:
 ```bash
-cp .claude/edpa/templates/capacity.yaml.tmpl .edpa/config/capacity.yaml
+cp .claude/edpa/templates/people.yaml.tmpl .edpa/config/people.yaml
 ```
 
-Edit `.edpa/config/capacity.yaml` with your team:
+Edit `.edpa/config/people.yaml` with your team:
 ```yaml
 cadence:
   iteration_weeks: 2        # 2-week iterations
@@ -102,7 +102,7 @@ Close iteration PI-2026-1.1
 Or manually:
 ```bash
 python .claude/edpa/scripts/engine.py --iteration PI-2026-1.1 \
-  --capacity .edpa/config/capacity.yaml \
+  --capacity .edpa/config/people.yaml \
   --heuristics .edpa/config/heuristics.yaml
 ```
 

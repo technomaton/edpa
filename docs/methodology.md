@@ -77,7 +77,7 @@ Granularity rules: Story max 8 SP (2/10) or 5 SP (1/5), Feature max 13, Epic max
 
 Before EDPA derives hours (ex-post), the team must plan the iteration (ex-ante). Planning requires confirmed capacity as input.
 
-**Step 1 — Confirm Capacity.** Each team member confirms availability for the iteration. This is a commitment, not an estimate. External collaborators negotiate allocation explicitly. Result: `Capacity[P, I]` in `.edpa/config/capacity.yaml` with `availability: confirmed`.
+**Step 1 — Confirm Capacity.** Each team member confirms availability for the iteration. This is a commitment, not an estimate. External collaborators negotiate allocation explicitly. Result: `Capacity[P, I]` in `.edpa/config/people.yaml` with `availability: confirmed`.
 
 **Step 2 — Calculate Planning Capacity.**
 
@@ -86,7 +86,7 @@ Team_Total_Capacity = Σ Capacity[P, I]
 Team_Planning_Capacity = Team_Total_Capacity × planning_factor (default 0.8)
 ```
 
-The `planning_factor` is a **team-level** property (configured per team in `.edpa/config/capacity.yaml` under `teams:`). Different teams may choose different factors based on their support load, maturity, and risk tolerance. It reserves a buffer for support, maintenance, incidents, and unplanned work.
+The `planning_factor` is a **team-level** property (configured per team in `.edpa/config/people.yaml` under `teams:`). Different teams may choose different factors based on their support load, maturity, and risk tolerance. It reserves a buffer for support, maintenance, incidents, and unplanned work.
 
 **Step 3 — Select Work.** Pull stories from the prioritized backlog (WSJF order) until `Σ JobSize` approaches historical velocity scaled by `planning_factor`. Do not plan to 100% of capacity.
 

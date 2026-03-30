@@ -9,7 +9,48 @@ TARGET=".claude"
 echo "EDPA Installer"
 echo "=============="
 
-# Warn if .claude/edpa already exists
+# --- Dependency checks ---
+echo ""
+echo "Checking prerequisites..."
+
+# Python 3.10+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: Python 3 not found. Install Python 3.10+ first."
+  exit 1
+fi
+PY_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+PY_OK=$(python3 -c 'import sys; print("yes" if sys.version_info >= (3, 10) else "no")')
+if [ "$PY_OK" = "no" ]; then
+  echo "ERROR: Python 3.10+ required (found $PY_VERSION)."
+  exit 1
+fi
+echo "  Python $PY_VERSION ✓"
+
+# PyYAML
+if python3 -c 'import yaml' 2>/dev/null; then
+  echo "  PyYAML ✓"
+else
+  echo "  PyYAML not found — installing..."
+  pip3 install pyyaml --quiet --break-system-packages 2>/dev/null || pip3 install pyyaml --quiet
+fi
+
+# git
+if command -v git >/dev/null 2>&1; then
+  echo "  git ✓"
+else
+  echo "WARNING: git not found. EDPA requires git for evidence detection."
+fi
+
+# gh (optional but recommended)
+if command -v gh >/dev/null 2>&1; then
+  echo "  GitHub CLI ✓"
+else
+  echo "  GitHub CLI not found (optional — needed for /edpa setup and sync)"
+fi
+
+echo ""
+
+# --- Warn if already installed ---
 if [ -d "$TARGET/edpa" ]; then
   printf "Warning: %s/edpa/ already exists. Overwrite? [y/N] " "$TARGET"
   read -r answer
@@ -73,18 +114,28 @@ for dir in config backlog/initiatives backlog/epics backlog/features backlog/sto
   mkdir -p ".edpa/$dir"
 done
 
+# Copy default config templates (if not already present)
+if [ ! -f ".edpa/config/heuristics.yaml" ] && [ -f "$TARGET/edpa/templates/cw_heuristics.yaml.tmpl" ]; then
+  cp "$TARGET/edpa/templates/cw_heuristics.yaml.tmpl" ".edpa/config/heuristics.yaml"
+  echo "Created .edpa/config/heuristics.yaml from template"
+fi
+if [ ! -f ".edpa/config/people.yaml" ] && [ -f "$TARGET/edpa/templates/people.yaml.tmpl" ]; then
+  cp "$TARGET/edpa/templates/people.yaml.tmpl" ".edpa/config/people.yaml"
+  echo "Created .edpa/config/people.yaml from template (edit with your team)"
+fi
+
 # Show installed version
 if [ -f "$TARGET/.claude-plugin/plugin.json" ]; then
   VERSION=$(python3 -c "import json; print(json.load(open('$TARGET/.claude-plugin/plugin.json'))['version'])" 2>/dev/null || echo "unknown")
   echo ""
-  echo "EDPA $VERSION installed successfully into $TARGET/edpa/"
+  echo "EDPA $VERSION installed successfully!"
 else
   echo ""
-  echo "EDPA installed successfully into $TARGET/edpa/"
+  echo "EDPA installed successfully!"
 fi
 
 echo ""
 echo "Next steps:"
-echo "  1. Open Claude Code in this directory"
-echo "  2. Run:  /edpa setup \"Project Name\""
+echo "  1. Edit .edpa/config/people.yaml with your team"
+echo "  2. Open Claude Code and run:  /edpa setup \"Project Name\""
 echo ""

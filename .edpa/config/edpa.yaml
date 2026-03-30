@@ -1,5 +1,5 @@
 templates:
-  capacity: .claude/edpa/templates/capacity.yaml.tmpl
+  people: .claude/edpa/templates/people.yaml.tmpl
   heuristics: .claude/edpa/templates/cw_heuristics.yaml.tmpl
   project: .claude/edpa/templates/project.yaml.tmpl
 backlog_dir: .edpa/backlog/

@@ -37,8 +37,8 @@ jobs:
 
       - name: Verify configuration
         run: |
-          if [ ! -f .edpa/config/capacity.yaml ]; then
-            echo "ERROR: .edpa/config/capacity.yaml not found. Run /edpa setup first."
+          if [ ! -f .edpa/config/people.yaml ]; then
+            echo "ERROR: .edpa/config/people.yaml not found. Run /edpa setup first."
             exit 1
           fi
           if [ ! -f .edpa/config/heuristics.yaml ]; then
@@ -56,7 +56,7 @@ jobs:
           python3 .claude/edpa/scripts/engine.py \
             --iteration "$ITERATION_ID" \
             --mode "$MODE" \
-            --capacity .edpa/config/capacity.yaml \
+            --capacity .edpa/config/people.yaml \
             --heuristics .edpa/config/heuristics.yaml
 
       - name: Verify invariants

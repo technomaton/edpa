@@ -109,7 +109,7 @@ my-project/
     config/
       edpa.yaml          # Hlavni konfigurace
       people.yaml        # tym a projekt
-      capacity.yaml      # Kapacitni registr
+      people.yaml      # Kapacitni registr
       heuristics.yaml    # CW heuristiky
       project.yaml       # Projektova konfigurace
     backlog/
@@ -136,7 +136,7 @@ my-project/
       create_project_views.py  # Playwright automatizace views (volitelne)
       evaluate_cw.py     # CW kalibrace (MAD evaluator)
     templates/
-      capacity.yaml.tmpl      # Sablona kapacitniho registru
+      people.yaml.tmpl      # Sablona kapacitniho registru
       heuristics.yaml.tmpl    # Sablona CW heuristik
       project.yaml.tmpl       # Sablona projektove konfigurace
   .github/workflows/
@@ -147,13 +147,13 @@ my-project/
   docs/                  # Dokumentace
 ```
 
-### 1.2 Nakonfigurovat tym (capacity.yaml)
+### 1.2 Nakonfigurovat tym (people.yaml)
 
 ```bash
-cp .claude/edpa/templates/capacity.yaml.tmpl .edpa/config/capacity.yaml
+cp .claude/edpa/templates/people.yaml.tmpl .edpa/config/people.yaml
 ```
 
-Upravit `.edpa/config/capacity.yaml`:
+Upravit `.edpa/config/people.yaml`:
 
 ```yaml
 cadence:
@@ -343,7 +343,7 @@ EDPA pouziva file-per-item strukturu -- kazdy work item je samostatny YAML soubo
   config/
     edpa.yaml                    # hlavni konfigurace
     people.yaml                  # tym a projekt
-    capacity.yaml                # kapacitni registr
+    people.yaml                # kapacitni registr
     heuristics.yaml              # CW heuristiky
     project.yaml                 # projektova konfigurace
   backlog/
@@ -508,7 +508,7 @@ python .claude/edpa/scripts/sync.py status
 ### 1.11 Commitnout zakladni konfiguraci
 
 ```bash
-git add .edpa/config/capacity.yaml .edpa/config/project.yaml .edpa/config/heuristics.yaml
+git add .edpa/config/people.yaml .edpa/config/project.yaml .edpa/config/heuristics.yaml
 git add .edpa/
 git commit -m "feat(edpa): initial EDPA setup for my-project"
 git push origin main
@@ -633,7 +633,7 @@ Claude Code stahne evidenci, spusti EDPA engine a vygeneruje reporty automaticky
 ```bash
 python .claude/edpa/scripts/engine.py \
   --iteration PI-2026-1.1 \
-  --capacity .edpa/config/capacity.yaml \
+  --capacity .edpa/config/people.yaml \
   --heuristics .edpa/config/heuristics.yaml
 ```
 
@@ -750,7 +750,7 @@ records:
     evidence_role: reviewer          # Co engine detekoval
     auto_cw: 0.25                    # CW z heuristik
     confirmed_cw: 0.35               # Co tym potvrdil
-    person_role: Arch                # Role z capacity.yaml
+    person_role: Arch                # Role z people.yaml
     notes: "Alice delala design review + architektonicke rozhodnuti"
 
   - item_id: S-200
@@ -817,7 +817,7 @@ Pokud MAD > 0.06, analyzovat kde jsou nejvetsi odchylky:
 python .claude/edpa/scripts/backlog.py wsjf
 ```
 
-3. **Kapacitni planovani** -- aktualizovat `.edpa/config/capacity.yaml` (zmeny FTE, dostupnost)
+3. **Kapacitni planovani** -- aktualizovat `.edpa/config/people.yaml` (zmeny FTE, dostupnost)
 4. **Aktualizovat `.edpa/config/edpa.yaml`** -- novy PI, iterace, datumy
 
 ```yaml
@@ -893,7 +893,7 @@ python .claude/edpa/scripts/backlog.py status
 ### Den 1
 
 - [ ] Repo vytvorene s EDPA strukturou
-- [ ] `.edpa/config/capacity.yaml` -- tym s rolemi, FTE, kapacitami
+- [ ] `.edpa/config/people.yaml` -- tym s rolemi, FTE, kapacitami
 - [ ] `.edpa/config/project.yaml` -- nazev projektu, metadata
 - [ ] `.edpa/config/heuristics.yaml` -- vychozi heuristiky (skopirovano ze sablony)
 - [ ] `.edpa/config/edpa.yaml` -- PI, iterace, datumy, sync konfigurace
@@ -954,7 +954,7 @@ python .claude/edpa/scripts/backlog.py status
 | Prikaz | Popis |
 |--------|-------|
 | `engine.py --demo` | Demo s ukázkovymi daty (3 osoby, 5 polozek) |
-| `engine.py --iteration PI-2026-1.3 --capacity .edpa/config/capacity.yaml --heuristics .edpa/config/heuristics.yaml` | Plny EDPA vypocet pro iteraci |
+| `engine.py --iteration PI-2026-1.3 --capacity .edpa/config/people.yaml --heuristics .edpa/config/heuristics.yaml` | Plny EDPA vypocet pro iteraci |
 | `engine.py --iteration ID --mode full ...` | Vypocet s Role Strength (JS x CW x RS) |
 | `engine.py --output cesta/vysledek.json ...` | Vlastni vystupni cesta |
 
@@ -1163,7 +1163,7 @@ All invariants passed: NO
 **Reseni:**
 - Overit ze kazda osoba ma alespon 1 prirazeny work item
 - Overit ze commity/PR referuji spravne item ID (S-XXX, F-XXX)
-- Overit `.edpa/config/capacity.yaml` -- kapacity > 0
+- Overit `.edpa/config/people.yaml` -- kapacity > 0
 
 ### Sync -- konflikty
 
@@ -1237,14 +1237,14 @@ pip install pyyaml
 ### Iteration close -- "config not found"
 
 ```
-ERROR: .edpa/config/capacity.yaml not found. Run EDPA setup first.
+ERROR: .edpa/config/people.yaml not found. Run EDPA setup first.
 ```
 
 **Reseni:**
 - Templates jsou v `.claude/edpa/templates/*.tmpl` -- musi se zkopirovat:
 
 ```bash
-cp .claude/edpa/templates/capacity.yaml.tmpl .edpa/config/capacity.yaml
+cp .claude/edpa/templates/people.yaml.tmpl .edpa/config/people.yaml
 cp .claude/edpa/templates/heuristics.yaml.tmpl .edpa/config/heuristics.yaml
 cp .claude/edpa/templates/project.yaml.tmpl .edpa/config/project.yaml
 ```

@@ -7,7 +7,7 @@ description: >
   DerivedHours, validates invariants. Use when closing an iteration, computing derived hours,
   or running "EDPA výpočet". Produces per-person allocation data for the reports skill.
 license: MIT
-compatibility: GitHub CLI (gh), Python 3.10+, .edpa/config/capacity.yaml, .edpa/config/heuristics.yaml
+compatibility: GitHub CLI (gh), Python 3.10+, .edpa/config/people.yaml, .edpa/config/heuristics.yaml
 allowed-tools: Read Bash(gh *) Bash(git *) Bash(python3 *) Grep
 metadata:
   author: Jaroslav Urbánek
@@ -47,7 +47,7 @@ If `$ARGUMENTS` is empty, blank, or "help":
 
 ## Prerequisites
 
-- `.edpa/config/capacity.yaml` exists (run edpa-setup first)
+- `.edpa/config/people.yaml` exists (run edpa-setup first)
 - `.edpa/config/heuristics.yaml` exists
 - GitHub issues have Job Size field populated
 - Iteration has closed stories (status: Done)
@@ -58,7 +58,7 @@ If `$ARGUMENTS` is empty, blank, or "help":
 
 ```python
 import yaml
-with open('.edpa/config/capacity.yaml') as f:
+with open('.edpa/config/people.yaml') as f:
     config = yaml.safe_load(f)
 with open('.edpa/config/heuristics.yaml') as f:
     heuristics = yaml.safe_load(f)

@@ -123,7 +123,7 @@ rm -rf /tmp/edpa</code></pre>
     sync-projects-to-git.yml   # Cron: Projects -&gt; Git (15 min)
     sync-git-to-projects.yml   # Push trigger: Git -&gt; Projects
   .claude/edpa/templates/
-    capacity.yaml.tmpl   # Šablona kapacitního registru
+    people.yaml.tmpl   # Šablona kapacitního registru
     cw_heuristics.yaml.tmpl    # Šablona CW heuristik
     project.yaml.tmpl    # Šablona projektové konfigurace
   .claude/edpa/scripts/
@@ -140,9 +140,9 @@ rm -rf /tmp/edpa</code></pre>
   .edpa/snapshots/         # Zmrazené snapshoty iterací
   docs/                  # Dokumentace</code></pre>
 
-    <h3>1.2 Nakonfigurovat tým (capacity.yaml)</h3>
-    <pre><code># /edpa setup generates .edpa/config/capacity.yaml automatically</code></pre>
-    <p>Upravit <code>.edpa/config/capacity.yaml</code>:</p>
+    <h3>1.2 Nakonfigurovat tým (people.yaml)</h3>
+    <pre><code># /edpa setup generates .edpa/config/people.yaml automatically</code></pre>
+    <p>Upravit <code>.edpa/config/people.yaml</code>:</p>
     <pre><code>cadence:
   iteration_weeks: 2                    # 1 (AI-native) nebo 2 (classic)
   pi_weeks: 10                          # 5 nebo 10
@@ -405,7 +405,7 @@ python3 .claude/edpa/scripts/backlog.py status
 python3 .claude/edpa/scripts/sync.py status</code></pre>
 
     <h3>1.11 Commitnout základní konfiguraci</h3>
-    <pre><code>git add .edpa/config/capacity.yaml .edpa/config/project.yaml .edpa/config/heuristics.yaml
+    <pre><code>git add .edpa/config/people.yaml .edpa/config/project.yaml .edpa/config/heuristics.yaml
 git add .edpa/
 git commit -m "feat(edpa): initial EDPA setup for my-project"
 git push origin main</code></pre>
@@ -618,7 +618,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
     <ol>
       <li><strong>Nové epicy/features</strong> — přidat jako soubory do <code>.edpa/backlog/epics/</code> a <code>.edpa/backlog/features/</code></li>
       <li><strong>WSJF prioritizace:</strong> <code>python3 .claude/edpa/scripts/backlog.py wsjf</code></li>
-      <li><strong>Kapacitní plánování</strong> — aktualizovat <code>.edpa/config/capacity.yaml</code></li>
+      <li><strong>Kapacitní plánování</strong> — aktualizovat <code>.edpa/config/people.yaml</code></li>
       <li><strong>Aktualizovat <code>.edpa/config/edpa.yaml</code></strong> — nový PI, iterace, datumy</li>
     </ol>
   </section>
@@ -675,7 +675,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
     <h3>Den 1</h3>
     <ul class="checklist">
       <li>Repo vytvořené s EDPA strukturou</li>
-      <li><code>.edpa/config/capacity.yaml</code> — tým s rolemi, FTE, kapacitami</li>
+      <li><code>.edpa/config/people.yaml</code> — tým s rolemi, FTE, kapacitami</li>
       <li><code>.edpa/config/project.yaml</code> — název projektu, metadata</li>
       <li><code>.edpa/config/heuristics.yaml</code> — výchozí heuristiky</li>
       <li><code>.edpa/config/edpa.yaml</code> — PI, iterace, datumy, sync</li>
@@ -932,7 +932,7 @@ All invariants passed: NO</code></pre>
       <li>Všechny CW jsou 0</li>
       <li>Kapacita je 0</li>
     </ul>
-    <p><strong>Řešení:</strong> ověřit že každá osoba má alespoň 1 přiřazený work item, commity/PR referují správné item ID, kapacity &gt; 0 v <code>.edpa/config/capacity.yaml</code>.</p>
+    <p><strong>Řešení:</strong> ověřit že každá osoba má alespoň 1 přiřazený work item, commity/PR referují správné item ID, kapacity &gt; 0 v <code>.edpa/config/people.yaml</code>.</p>
 
     <h3>Sync — konflikty</h3>
     <pre><code>CONFLICT: S-200 modified in both Git and Projects</code></pre>
@@ -973,9 +973,9 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
     </ol>
 
     <h3>Iteration close — "config not found"</h3>
-    <pre><code>ERROR: .edpa/config/capacity.yaml not found. Run EDPA setup first.</code></pre>
+    <pre><code>ERROR: .edpa/config/people.yaml not found. Run EDPA setup first.</code></pre>
     <p><strong>Řešení:</strong></p>
-    <pre><code># /edpa setup generates .edpa/config/capacity.yaml automatically
+    <pre><code># /edpa setup generates .edpa/config/people.yaml automatically
 # /edpa setup generates .edpa/config/heuristics.yaml automatically
 # /edpa setup generates .edpa/config/project.yaml automatically</code></pre>
   </section>

@@ -35,9 +35,9 @@ Create these on your GitHub Project:
 ## Fields NOT to put in GitHub Projects
 
 These belong in the Evidence & Reporting layer, not operational metadata:
-- Iteration Capacity (hours) → `.edpa/config/capacity.yaml`
+- Iteration Capacity (hours) → `.edpa/config/people.yaml`
 - Derived Hours → `.edpa/reports/` snapshots
-- FTE → `.edpa/config/capacity.yaml`
+- FTE → `.edpa/config/people.yaml`
 - Signature status → `.edpa/snapshots/` + `.edpa/reports/signed/`
 
 ## Hierarchy via sub-issues and native Issue Types

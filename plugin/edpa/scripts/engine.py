@@ -535,6 +535,75 @@ def print_summary(results, mode, iteration_id, planning_factor=0.8):
                 print(f"  {item['id']:<10} {item['level']:<8} {item['js']:>4} {item['cw']:>6.2f} {item['score']:>7.2f} {item['ratio']:>6.1%} {item['hours']:>6.1f}h")
 
 
+def show_status(edpa_root):
+    """Show EDPA setup status — config, team, iterations."""
+    print(f"EDPA {VERSION} — Status")
+    print("=" * 40)
+
+    if not edpa_root.exists():
+        print(f"\n✗ .edpa/ not found at {edpa_root}")
+        print("  Run: /edpa setup \"Project Name\"")
+        return
+
+    print(f"✓ .edpa/ found at {edpa_root}")
+
+    # People config
+    people_path = edpa_root / "config" / "people.yaml"
+    if people_path.exists():
+        people = load_yaml(people_path) or {}
+        team = people.get("people", [])
+        total_fte = sum(p.get("fte", 0) for p in team)
+        total_cap = sum(p.get("capacity_per_iteration", p.get("capacity", 0)) for p in team)
+        print(f"✓ people.yaml — {len(team)} members, {total_fte:.1f} FTE, {total_cap:.0f}h/iteration")
+        for p in team:
+            cap = p.get("capacity_per_iteration", p.get("capacity", 0))
+            print(f"    {p.get('name', p.get('id', '?')):<25} {p.get('role', '?'):<8} {p.get('fte', 0):.1f} FTE  {cap:.0f}h")
+    else:
+        print("✗ people.yaml not found")
+
+    # Heuristics
+    heuristics = load_heuristics(edpa_root)
+    if heuristics:
+        print("✓ heuristics loaded")
+    else:
+        print("✗ heuristics not found (will use defaults)")
+
+    # Iterations from edpa.yaml
+    edpa_cfg_path = edpa_root / "config" / "edpa.yaml"
+    if edpa_cfg_path.exists():
+        edpa_cfg = load_yaml(edpa_cfg_path) or {}
+        pi = edpa_cfg.get("pi", {})
+        iterations = pi.get("iterations", [])
+        if iterations:
+            print(f"✓ {len(iterations)} iterations defined (PI: {pi.get('current', '?')})")
+            for it in iterations:
+                status = it.get("status", "?")
+                marker = "→" if status == "active" else " "
+                print(f"  {marker} {it.get('id', '?'):<16} {it.get('dates', ''):<20} [{status}]")
+    else:
+        print("✗ edpa.yaml not found")
+
+    # Backlog
+    backlog_dir = edpa_root / "backlog"
+    if backlog_dir.exists():
+        story_count = len(list((backlog_dir / "stories").glob("*.yaml"))) if (backlog_dir / "stories").exists() else 0
+        feature_count = len(list((backlog_dir / "features").glob("*.yaml"))) if (backlog_dir / "features").exists() else 0
+        print(f"✓ backlog — {feature_count} features, {story_count} stories")
+    else:
+        print("✗ backlog/ not found")
+
+    # Reports
+    reports_dir = edpa_root / "reports"
+    if reports_dir.exists():
+        report_dirs = [d for d in reports_dir.iterdir() if d.is_dir()]
+        if report_dirs:
+            print(f"✓ {len(report_dirs)} iteration report(s)")
+        else:
+            print("  reports/ empty (no iterations closed yet)")
+
+    print()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=f"EDPA {VERSION} — Evidence-Driven Proportional Allocation Engine",
@@ -548,9 +617,15 @@ def main():
     parser.add_argument("--heuristics", help="Path to cw_heuristics.yaml (legacy mode)")
     parser.add_argument("--output", help="Output path for edpa_results.json")
     parser.add_argument("--version", action="version", version=f"EDPA {VERSION}")
+    parser.add_argument("--status", action="store_true",
+                        help="Show EDPA setup status and exit")
     parser.add_argument("--demo", action="store_true",
                         help="Run with built-in sample data")
     args = parser.parse_args()
+
+    if args.status:
+        show_status(Path(args.edpa_root) if args.edpa_root else Path(".edpa"))
+        sys.exit(0)
 
     if args.demo:
         print("Running EDPA demo with sample data...\n")

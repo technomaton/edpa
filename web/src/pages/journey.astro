@@ -64,7 +64,7 @@ const S=[
 <div class="s-sub fade d2">Repo, t\u00fdm, backlog &mdash; v\u0161e nastav\u00edte b\u011bhem jedn\u00e9 k\u00e1vy.</div>
 <div class="sg sg3 fade d3">
 <div class="sc a" style="min-height:170px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">1. Install</div><div class="sc-l"><code>curl edpa.technomaton.com/install.sh | sh</code><br><br>Instalace EDPA pluginu. V\u0161echny skripty a konfigurace jsou p\u0159ipraveny.</div></div>
-<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F465;</div><div class="sc-t">2. T\u00fdm</div><div class="sc-l"><code>.edpa/config/capacity.yaml</code><br><br>Definujte \u010dleny t\u00fdmu, role, kapacitu. Jeden YAML soubor.</div></div>
+<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F465;</div><div class="sc-t">2. T\u00fdm</div><div class="sc-l"><code>.edpa/config/people.yaml</code><br><br>Definujte \u010dleny t\u00fdmu, role, kapacitu. Jeden YAML soubor.</div></div>
 <div class="sc g" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">3. Backlog</div><div class="sc-l"><code>.edpa/backlog/*.yaml</code><br><br>Vytvo\u0159te polo\u017eky backlogu. Ka\u017ed\u00e1 polo\u017eka = 1 YAML soubor.</div></div>
 </div>
 <div class="s-note fade d4"><b>V\u00fdsledek:</b> B\u011b\u017e\u00edc\u00ed repo s t\u00fdmem a backlogem. Za 15 minut.</div>`,
@@ -163,7 +163,7 @@ assignee: urbanek</div>
 <div class="sc-t">P\u0159\u00edkaz</div>
 <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gn);line-height:2;white-space:pre">$ python3 .claude/edpa/scripts/engine.py \\
     --iteration PI1-I2 \\
-    --team .edpa/config/capacity.yaml \\
+    --team .edpa/config/people.yaml \\
     --output .edpa/reports/</div>
 </div>
 </div>

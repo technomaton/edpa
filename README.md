@@ -69,7 +69,7 @@ This installs the EDPA plugin into `.claude/` in your project.
 /edpa setup "My Project"
 ```
 
-Or manually edit `.edpa/config/capacity.yaml`:
+Or manually edit `.edpa/config/people.yaml`:
 ```yaml
 cadence:
   iteration_weeks: 2    # 1 (AI-native) or 2 (classic)
@@ -102,7 +102,7 @@ With Claude Code:
 Or with the Python CLI:
 ```bash
 python3 .claude/edpa/scripts/engine.py --iteration PI-2026-1.3 \
-  --capacity .edpa/config/capacity.yaml \
+  --capacity .edpa/config/people.yaml \
   --heuristics .edpa/config/heuristics.yaml
 ```
 
@@ -150,7 +150,7 @@ After installation, your project will have:
 │       └── workflows/             # GitHub Actions workflows
 ├── .edpa/                         # Project governance data
 │   ├── config/
-│   │   ├── capacity.yaml          # Team members, FTE, capacity
+│   │   ├── people.yaml             # Team members, FTE, capacity
 │   │   └── heuristics.yaml        # Evidence scoring weights (CW)
 │   ├── backlog/                   # Work items (file-per-item)
 │   ├── iterations/                # Iteration definitions

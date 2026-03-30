@@ -3,7 +3,7 @@
 ## Five pillars of audit compliance
 
 1. **GitHub delivery evidence** — commits, PRs, reviews, comments (living data)
-2. **Capacity registry** — `.edpa/config/capacity.yaml` (versioned in git)
+2. **Capacity registry** — `.edpa/config/people.yaml` (versioned in git)
 3. **Frozen snapshot** — `.edpa/snapshots/iteration-{ID}.json` (immutable)
 4. **Reproducible calculation** — Score = JS × CW (× RS), DerivedHours = (Score/ΣScores) × Capacity
 5. **Signed output** — BankID electronic signature (Czech law 21/2020 Sb.)
@@ -34,7 +34,7 @@ Each revision includes: reason for correction, diff from previous, timestamp, au
   "frozen": true,
   "methodology": "EDPA 1.0.0-beta",
   "mode": "simple",
-  "capacity_registry": { "...": "copy from .edpa/config/capacity.yaml at computation time" },
+  "capacity_registry": { "...": "copy from .edpa/config/people.yaml at computation time" },
   "items": [
     {
       "id": "S-200",

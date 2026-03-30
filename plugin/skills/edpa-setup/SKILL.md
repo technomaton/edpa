@@ -64,7 +64,7 @@ cp .claude/edpa/workflows/*.yml .github/workflows/ 2>/dev/null || true
 
 ### 3. Initialize capacity registry
 
-Create `.edpa/config/capacity.yaml` with project name from $ARGUMENTS.
+Create `.edpa/config/people.yaml` with project name from $ARGUMENTS.
 Ask user for: team members (name, role, FTE, team/organization).
 Calculate capacity_per_iteration based on FTE × hours_per_week × iteration_weeks.
 

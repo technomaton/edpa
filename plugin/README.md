@@ -25,7 +25,7 @@ plugin/
 │   │   ├── project_views.py       # GitHub Project view configuration
 │   │   └── create_project_views.py
 │   ├── templates/                 # Config templates
-│   │   ├── capacity.yaml.tmpl     # Team members, FTE, capacity
+│   │   ├── people.yaml.tmpl       # Team members, FTE, capacity
 │   │   ├── cw_heuristics.yaml.tmpl # Evidence scoring weights
 │   │   └── project.yaml.tmpl     # Project metadata
 │   └── workflows/                 # GitHub Actions
@@ -86,7 +86,7 @@ After installation, the plugin creates this structure in the target project:
 └── .mcp.json           # MCP config
 
 .edpa/
-├── config/             # capacity.yaml, heuristics.yaml
+├── config/             # people.yaml, heuristics.yaml
 ├── backlog/            # Work items (file-per-item)
 ├── iterations/         # Iteration definitions
 ├── reports/            # Generated timesheets

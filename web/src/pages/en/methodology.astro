@@ -147,8 +147,8 @@ Computed per level independently.</div>
     <p>Before EDPA derives hours (ex-post), the team must plan the iteration (ex-ante). Planning requires confirmed capacity as input.</p>
     <div class="card">
       <ol>
-        <li><strong>Confirm Capacity</strong> &mdash; Each team member confirms availability. This is a commitment, not an estimate. External collaborators negotiate allocation explicitly. Result: <code>availability: confirmed</code> in <code>capacity.yaml</code>.</li>
-        <li><strong>Calculate Planning Capacity</strong> &mdash; <code>Planning_Capacity = &Sigma; Capacity[P, I] &times; planning_factor</code>. The <code>planning_factor</code> is a <strong>team-level property</strong> (configured per team in <code>capacity.yaml</code> under <code>teams:</code>). Default: 0.8.</li>
+        <li><strong>Confirm Capacity</strong> &mdash; Each team member confirms availability. This is a commitment, not an estimate. External collaborators negotiate allocation explicitly. Result: <code>availability: confirmed</code> in <code>people.yaml</code>.</li>
+        <li><strong>Calculate Planning Capacity</strong> &mdash; <code>Planning_Capacity = &Sigma; Capacity[P, I] &times; planning_factor</code>. The <code>planning_factor</code> is a <strong>team-level property</strong> (configured per team in <code>people.yaml</code> under <code>teams:</code>). Default: 0.8.</li>
         <li><strong>Select Work</strong> &mdash; Pull stories from the prioritized backlog (WSJF order) until <code>&Sigma; JobSize</code> approaches historical velocity &times; <code>planning_factor</code>. Do not plan to 100%.</li>
         <li><strong>Buffer</strong> &mdash; The remaining ~20% absorbs support, maintenance, incidents, and unplanned work. If buffer items generate evidence, EDPA allocates them normally.</li>
         <li><strong>Edge case</strong> &mdash; If no unplanned work occurs, all capacity goes to planned items. The guarantee <code>&Sigma; = Capacity</code> holds regardless.</li>
