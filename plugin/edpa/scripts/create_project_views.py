@@ -68,17 +68,41 @@ async def wait_for_login(page, timeout=300):
     return False
 
 
+async def dismiss_modal(page):
+    """Close any open modal dialog (e.g. 'Save filters?' confirmation)."""
+    for selector in [
+        'button:has-text("Save"):visible',       # Confirm save in modal
+        'button:has-text("Cancel"):visible',      # Cancel modal
+        'button[aria-label="Close"]:visible',     # Close button
+    ]:
+        btn = page.locator(selector)
+        if await btn.count() > 0:
+            # Check if it's inside a dialog/modal
+            dialog = page.locator('[role="dialog"], [class*="Dialog"], [class*="Backdrop"]')
+            if await dialog.count() > 0:
+                # Click the Save button inside the dialog
+                modal_save = dialog.locator('button:has-text("Save")')
+                if await modal_save.count() > 0 and await modal_save.first.is_visible():
+                    await modal_save.first.click()
+                    await page.wait_for_timeout(1500)
+                    return True
+    return False
+
+
 async def save_view(page):
-    """Try to save the current view."""
+    """Try to save the current view, handling confirmation modals."""
     save = page.locator('button:has-text("Save")')
     for i in range(await save.count()):
         btn = save.nth(i)
         if await btn.is_visible():
             await btn.click()
-            await page.wait_for_timeout(1500)
+            await page.wait_for_timeout(2000)
+            # Handle "Save filters?" confirmation modal
+            await dismiss_modal(page)
             return
     await page.keyboard.press("Meta+s")
-    await page.wait_for_timeout(1500)
+    await page.wait_for_timeout(2000)
+    await dismiss_modal(page)
 
 
 async def rename_tab(page, index, new_name):
@@ -104,12 +128,22 @@ async def rename_tab(page, index, new_name):
 
 async def create_view(page, name, filter_text=""):
     """Create a new table view with optional filter."""
+    # Dismiss any lingering modal from previous operation
+    await dismiss_modal(page)
+    await page.wait_for_timeout(500)
+
     # Click + New view
     btn = page.locator('button:has-text("New view")')
     if await btn.count() == 0:
         print(f"    ✗ Cannot find 'New view' button")
         return False
-    await btn.first.click()
+    try:
+        await btn.first.click(timeout=10000)
+    except Exception:
+        # Modal might still be blocking — try to dismiss and retry
+        await dismiss_modal(page)
+        await page.wait_for_timeout(1000)
+        await btn.first.click(timeout=10000)
     await page.wait_for_timeout(2000)
 
     # If layout picker appears, click Table
@@ -174,11 +208,21 @@ async def main(project_url: str):
 
         print("  ✓ Logged in")
         print(f"  Loading project: {project_url}")
-        await page.goto(project_url)
-        await page.wait_for_load_state("domcontentloaded", timeout=15000)
+        try:
+            await page.goto(project_url, wait_until="domcontentloaded", timeout=30000)
+        except Exception:
+            # SPA may abort navigation — check if we're on the right page
+            await page.wait_for_timeout(3000)
         await page.wait_for_timeout(3000)
 
-        # Verify we see the project
+        # Verify we see the project (allow for SPA redirects)
+        if "projects" not in page.url:
+            # Try one more time
+            try:
+                await page.goto(project_url, wait_until="commit", timeout=15000)
+                await page.wait_for_timeout(3000)
+            except Exception:
+                pass
         if "projects" not in page.url:
             print("  ✗ Could not load project")
             await ctx.close()
