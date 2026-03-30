@@ -142,17 +142,24 @@ async def main(project_url: str):
     PROFILE.mkdir(parents=True, exist_ok=True)
 
     async with async_playwright() as p:
-        ctx = await p.chromium.launch_persistent_context(
-            str(PROFILE),
-            headless=False,
-            slow_mo=300,
-            viewport={"width": 1400, "height": 900},
-        )
+        try:
+            ctx = await p.chromium.launch_persistent_context(
+                str(PROFILE),
+                headless=False,
+                slow_mo=300,
+                viewport={"width": 1400, "height": 900},
+            )
+        except Exception as e:
+            print(f"\n  ✗ Cannot launch browser: {e}")
+            print("  Install: pip install playwright && playwright install chromium")
+            print(f"\n  Alternative: open the project in browser and create views manually:")
+            print(f"  {project_url}")
+            return
         page = ctx.pages[0] if ctx.pages else await ctx.new_page()
 
         # Check login state
         await page.goto("https://github.com")
-        await page.wait_for_load_state("networkidle")
+        await page.wait_for_load_state("domcontentloaded", timeout=15000)
         await page.wait_for_timeout(1500)
 
         if await page.locator('img.avatar-user, [data-login]').count() == 0:
@@ -168,7 +175,7 @@ async def main(project_url: str):
         print("  ✓ Logged in")
         print(f"  Loading project: {project_url}")
         await page.goto(project_url)
-        await page.wait_for_load_state("networkidle")
+        await page.wait_for_load_state("domcontentloaded", timeout=15000)
         await page.wait_for_timeout(3000)
 
         # Verify we see the project

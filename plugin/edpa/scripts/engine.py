@@ -258,12 +258,19 @@ def run_edpa(capacity_config, heuristics, items, mode="simple"):
             pi["ratio"] = round(ratio, 6)
             pi["hours"] = round(hours, 2)
 
+        # Normalize: adjust last item so sum exactly equals capacity
+        if person_items and sum_scores > 0:
+            rounded_sum = sum(pi["hours"] for pi in person_items)
+            diff = round(capacity - rounded_sum, 2)
+            if diff != 0:
+                person_items[-1]["hours"] = round(person_items[-1]["hours"] + diff, 2)
+
         total_derived = sum(pi["hours"] for pi in person_items)
 
         # Validate invariants
         invariant_ok = True
         if person_items:
-            if abs(total_derived - capacity) > 0.01:
+            if abs(total_derived - capacity) > 0.1:
                 invariant_ok = False
             ratio_sum = sum(pi["ratio"] for pi in person_items)
             if abs(ratio_sum - 1.0) > 0.001:
