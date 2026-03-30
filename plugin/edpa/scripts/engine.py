@@ -547,6 +547,7 @@ def main():
     parser.add_argument("--capacity", help="Path to capacity.yaml (legacy mode)")
     parser.add_argument("--heuristics", help="Path to cw_heuristics.yaml (legacy mode)")
     parser.add_argument("--output", help="Output path for edpa_results.json")
+    parser.add_argument("--version", action="version", version=f"EDPA {VERSION}")
     parser.add_argument("--demo", action="store_true",
                         help="Run with built-in sample data")
     args = parser.parse_args()
