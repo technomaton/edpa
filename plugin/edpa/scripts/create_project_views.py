@@ -2,11 +2,12 @@
 """
 EDPA GitHub Project Views — Automated setup via Playwright.
 
-Creates 6 views: All Items, Board, Epics, Features, Stories, WSJF Ranking.
+Creates views: Epics, Features, Stories, WSJF Ranking.
 Uses persistent browser profile — log in once, then it remembers.
 
 Usage:
-    python scripts/create_project_views.py
+    python scripts/create_project_views.py --url URL
+    python scripts/create_project_views.py  # reads from .edpa/config/edpa.yaml
 
 First run: browser opens → log in to GitHub → views created automatically.
 Next runs: uses saved session, no login needed.
@@ -46,60 +47,52 @@ async def wait_for_login(page, timeout=300):
     """Wait until user is logged in (max timeout seconds)."""
     for _ in range(timeout):
         try:
-            # page might navigate during login — catch context destruction
             await page.wait_for_load_state("domcontentloaded", timeout=2000)
             url = page.url
-            # After login, GitHub redirects to dashboard or previous page
             if "github.com/login" not in url and "github.com/session" not in url:
-                # Check for any sign of being logged in
                 try:
                     count = await page.locator('img.avatar-user, [data-login], .Header-link--profile').count()
                     if count > 0:
                         return True
-                except:
+                except Exception:
                     pass
-                # If we're on github.com but not login page, probably logged in
                 if "github.com" in url and "/login" not in url:
                     await page.wait_for_timeout(2000)
                     return True
-        except:
+        except Exception:
             pass
         await page.wait_for_timeout(1000)
     return False
 
 
 async def dismiss_modal(page):
-    """Close any open modal dialog (e.g. 'Save filters?' confirmation)."""
-    for selector in [
-        'button:has-text("Save"):visible',       # Confirm save in modal
-        'button:has-text("Cancel"):visible',      # Cancel modal
-        'button[aria-label="Close"]:visible',     # Close button
-    ]:
-        btn = page.locator(selector)
-        if await btn.count() > 0:
-            # Check if it's inside a dialog/modal
-            dialog = page.locator('[role="dialog"], [class*="Dialog"], [class*="Backdrop"]')
-            if await dialog.count() > 0:
-                # Click the Save button inside the dialog
-                modal_save = dialog.locator('button:has-text("Save")')
-                if await modal_save.count() > 0 and await modal_save.first.is_visible():
-                    await modal_save.first.click()
-                    await page.wait_for_timeout(1500)
-                    return True
+    """Confirm any 'Save filters?' modal dialog."""
+    dialog = page.locator('[role="dialog"], [class*="Dialog-Backdrop"]')
+    if await dialog.count() > 0:
+        save_btn = dialog.locator('button:has-text("Save")')
+        if await save_btn.count() > 0 and await save_btn.first.is_visible():
+            await save_btn.first.click()
+            await page.wait_for_timeout(1500)
+            return True
+        cancel_btn = dialog.locator('button:has-text("Cancel")')
+        if await cancel_btn.count() > 0 and await cancel_btn.first.is_visible():
+            await cancel_btn.first.click()
+            await page.wait_for_timeout(1500)
+            return True
     return False
 
 
 async def save_view(page):
-    """Try to save the current view, handling confirmation modals."""
-    save = page.locator('button:has-text("Save")')
+    """Click the green Save button, then confirm any modal."""
+    save = page.locator('button:has-text("Save"):not([role="tab"])')
     for i in range(await save.count()):
         btn = save.nth(i)
         if await btn.is_visible():
             await btn.click()
             await page.wait_for_timeout(2000)
-            # Handle "Save filters?" confirmation modal
             await dismiss_modal(page)
             return
+    # Fallback: Cmd+S
     await page.keyboard.press("Meta+s")
     await page.wait_for_timeout(2000)
     await dismiss_modal(page)
@@ -111,9 +104,14 @@ async def rename_tab(page, index, new_name):
     if await tabs.count() <= index:
         return False
     tab = tabs.nth(index)
+    await tab.click()
+    await page.wait_for_timeout(500)
     await tab.dblclick()
-    await page.wait_for_timeout(800)
-    inp = page.locator('input[aria-label="View name"]')
+    await page.wait_for_timeout(1500)
+    # GitHub uses aria-label="Change view name" for the rename input
+    inp = page.locator('input[aria-label="Change view name"]')
+    if await inp.count() == 0:
+        inp = page.locator('input[aria-label="View name"]')
     if await inp.count() == 0:
         inp = page.locator('[role="tab"] input')
     if await inp.count() > 0:
@@ -128,40 +126,42 @@ async def rename_tab(page, index, new_name):
 
 async def create_view(page, name, filter_text=""):
     """Create a new table view with optional filter."""
-    # Dismiss any lingering modal from previous operation
     await dismiss_modal(page)
     await page.wait_for_timeout(500)
 
-    # Click + New view
-    btn = page.locator('button:has-text("New view")')
-    if await btn.count() == 0:
-        print(f"    ✗ Cannot find 'New view' button")
+    # Click "+ New view" (it's the last tab)
+    new_view_tab = page.locator('[role="tab"]:has-text("New view")')
+    if await new_view_tab.count() == 0:
+        print(f"    ✗ Cannot find 'New view' tab")
         return False
     try:
-        await btn.first.click(timeout=10000)
+        await new_view_tab.first.click(timeout=10000)
     except Exception:
-        # Modal might still be blocking — try to dismiss and retry
         await dismiss_modal(page)
         await page.wait_for_timeout(1000)
-        await btn.first.click(timeout=10000)
+        await new_view_tab.first.click(timeout=10000)
     await page.wait_for_timeout(2000)
 
-    # If layout picker appears, click Table
-    tbl = page.locator('button:has-text("Table")')
+    # Layout picker may appear — click Table
+    tbl = page.locator('button:has-text("Table"), [data-testid="table-layout"]')
     if await tbl.count() > 0 and await tbl.first.is_visible():
         await tbl.first.click()
-        await page.wait_for_timeout(1500)
+        await page.wait_for_timeout(2000)
 
-    # Rename the new tab (it's the last one)
+    # The new tab is second-to-last (last is always "+ New view")
     tabs = page.locator('[role="tab"]')
-    last_index = await tabs.count() - 1
-    ok = await rename_tab(page, last_index, name)
+    new_tab_index = await tabs.count() - 2
+    if new_tab_index < 0:
+        new_tab_index = 0
+
+    # Rename
+    ok = await rename_tab(page, new_tab_index, name)
     if not ok:
         print(f"    ⚠ Could not rename tab to '{name}'")
 
     # Apply filter
     if filter_text:
-        fi = page.locator('input[placeholder*="Filter"], input[placeholder*="filter"]')
+        fi = page.locator('input[placeholder*="Filter"], input[name*="filter"]')
         if await fi.count() > 0 and await fi.first.is_visible():
             await fi.first.click()
             await fi.first.fill(filter_text)
@@ -211,13 +211,10 @@ async def main(project_url: str):
         try:
             await page.goto(project_url, wait_until="domcontentloaded", timeout=30000)
         except Exception:
-            # SPA may abort navigation — check if we're on the right page
             await page.wait_for_timeout(3000)
         await page.wait_for_timeout(3000)
 
-        # Verify we see the project (allow for SPA redirects)
         if "projects" not in page.url:
-            # Try one more time
             try:
                 await page.goto(project_url, wait_until="commit", timeout=15000)
                 await page.wait_for_timeout(3000)
@@ -229,32 +226,23 @@ async def main(project_url: str):
             return
         print("  ✓ Project loaded\n")
 
-        # Step 1: Rename existing views
-        print("  [1/6] Renaming 'View 1' → 'All Items'")
+        # Rename default view
+        print("  [1] Renaming default view → 'All Items'")
         if await rename_tab(page, 0, "All Items"):
             print("    ✓ Done")
         else:
-            print("    ⚠ Skipped")
+            print("    ⚠ Skipped (may already be named)")
 
-        tabs = page.locator('[role="tab"]')
-        if await tabs.count() >= 2:
-            print("  [2/6] Renaming 'View 2' → 'Board'")
-            await tabs.nth(1).click()
-            await page.wait_for_timeout(1000)
-            if await rename_tab(page, 1, "Board"):
-                print("    ✓ Done")
-            else:
-                print("    ⚠ Skipped")
-
-        # Step 2: Create new views
+        # Create filtered views
         views = [
             ("Epics", "type:Epic"),
             ("Features", "type:Feature"),
             ("Stories", "type:Story"),
             ("WSJF Ranking", ""),
         ]
-        for i, (name, filt) in enumerate(views, 3):
-            print(f"  [{i}/6] Creating '{name}'" + (f" (filter: {filt})" if filt else ""))
+        for i, (name, filt) in enumerate(views, 2):
+            desc = f" (filter: {filt})" if filt else ""
+            print(f"  [{i}] Creating '{name}'{desc}")
             ok = await create_view(page, name, filt)
             print(f"    {'✓ Done' if ok else '✗ Failed'}")
 
@@ -263,10 +251,9 @@ async def main(project_url: str):
         print(f"  Keep the browser open to verify, then close it.")
         print(f"  {'═' * 50}\n")
 
-        # Keep open for verification
         try:
             await page.wait_for_timeout(120000)
-        except:
+        except Exception:
             pass
         await ctx.close()
 
@@ -280,7 +267,7 @@ if __name__ == "__main__":
     url = args.url or get_project_url()
     if not url:
         print("  Error: No project URL. Pass --url or configure .edpa/config/edpa.yaml")
-        print("  Example: python scripts/create_project_views.py --url https://github.com/orgs/ORG/projects/N")
+        print("  Example: python create_project_views.py --url https://github.com/orgs/ORG/projects/N")
         sys.exit(1)
 
     asyncio.run(main(url))
