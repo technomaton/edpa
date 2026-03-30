@@ -98,13 +98,16 @@ else
 fi
 
 # Copy plugin contents into .claude/ (including hidden files like .mcp.json, .claude-plugin/)
-if [ -d "$TMPDIR/edpa/plugin" ]; then
-  cp -R "$TMPDIR/edpa/plugin/"* "$TARGET/"
-  cp -R "$TMPDIR/edpa/plugin/".* "$TARGET/" 2>/dev/null || true
-else
-  cp -R "$TMPDIR/edpa/"* "$TARGET/"
-  cp -R "$TMPDIR/edpa/".* "$TARGET/" 2>/dev/null || true
+PLUGIN_SRC="$TMPDIR/edpa/plugin"
+if [ ! -d "$PLUGIN_SRC" ]; then
+  PLUGIN_SRC="$TMPDIR/edpa"
 fi
+# Copy visible files
+cp -R "$PLUGIN_SRC/"* "$TARGET/" 2>/dev/null || true
+# Copy hidden files (but not . and ..)
+for f in "$PLUGIN_SRC"/.[!.]* "$PLUGIN_SRC"/..?*; do
+  [ -e "$f" ] && cp -R "$f" "$TARGET/" 2>/dev/null || true
+done
 
 # Make hook scripts executable
 chmod +x "$TARGET/edpa/scripts/hooks/"* 2>/dev/null || true
