@@ -116,6 +116,41 @@ async def rename_tab(page, index, new_name):
     return False
 
 
+async def delete_view(page, tab_index):
+    """Delete a view by clicking its ▾ dropdown → Delete view → Confirm."""
+    tabs = page.locator('[role="tab"]')
+    name = (await tabs.nth(tab_index).text_content()).strip()
+    await tabs.nth(tab_index).click()
+    await page.wait_for_timeout(1000)
+    await tabs.nth(tab_index).hover()
+    await page.wait_for_timeout(500)
+
+    # Click the ▾ caret (hidden until hover, requires force click)
+    caret = page.locator('.selected[class*="view-tab"] [class*="viewOptionsPlaceholder"]')
+    if await caret.count() == 0:
+        return False
+    await caret.first.click(force=True)
+    await page.wait_for_timeout(1500)
+
+    # Click "Delete view" (it's a <li>, not role=menuitem)
+    delete_li = page.locator('li:has-text("Delete view"):visible')
+    if await delete_li.count() == 0:
+        await page.keyboard.press("Escape")
+        return False
+    await delete_li.first.click()
+    await page.wait_for_timeout(2000)
+
+    # Confirm deletion dialog
+    dialog = page.locator('[role="alertdialog"]')
+    if await dialog.count() > 0:
+        confirm = dialog.locator('button:has-text("Delete")')
+        if await confirm.count() > 0:
+            await confirm.first.click()
+            await page.wait_for_timeout(2000)
+            return True
+    return False
+
+
 async def create_view(page, name, filter_text="", layout="table"):
     """Create a new view with name, optional filter, and layout (table/board/roadmap)."""
     await close_dialogs(page)
