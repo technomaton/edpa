@@ -199,10 +199,13 @@ def cmd_verify(args):
 
     expected_views = {
         "All Items": {"layout": "TABLE_LAYOUT", "sort": "WSJF Score", "fields": ["Issue Type", "Job Size", "WSJF Score"]},
+        "Board": {"layout": "BOARD_LAYOUT"},
         "Epics": {"layout": "TABLE_LAYOUT", "fields": ["Issue Type", "Job Size", "WSJF Score"]},
         "Features": {"layout": "TABLE_LAYOUT", "fields": ["Job Size", "WSJF Score"]},
-        "Stories": {"layout": "TABLE_LAYOUT", "fields": ["Job Size"]},
-        "Board": {"layout": "BOARD_LAYOUT"},
+        "WSJF Ranking": {"layout": "TABLE_LAYOUT", "fields": ["Job Size", "WSJF Score"]},
+        "Current Iteration": {"layout": "BOARD_LAYOUT"},
+        "My Work": {"layout": "TABLE_LAYOUT", "fields": ["Job Size"]},
+        "Roadmap": {"layout": "ROADMAP_LAYOUT"},
     }
 
     found_views = {v["name"]: v for v in views}
@@ -276,6 +279,14 @@ def cmd_instructions(args):
             "filter": None,
         },
         {
+            "name": "Board",
+            "type": "Board",
+            "columns": None,
+            "sort": None,
+            "group": "Status (automatic: Todo / In Progress / In Review / Done)",
+            "filter": None,
+        },
+        {
             "name": "Epics",
             "type": "Table",
             "columns": ["Title", "Issue Type", "Status", "Job Size",
@@ -296,28 +307,36 @@ def cmd_instructions(args):
             "filter": 'type:Feature',
         },
         {
-            "name": "Stories",
-            "type": "Table",
-            "columns": ["Title", "Status", "Assignees", "Job Size", "Team"],
-            "sort": "Status",
-            "group": "Status",
-            "filter": 'type:Story',
-        },
-        {
-            "name": "Board",
-            "type": "Board",
-            "columns": None,
-            "sort": None,
-            "group": "Status (automatic for Board)",
-            "filter": None,
-        },
-        {
             "name": "WSJF Ranking",
             "type": "Table",
             "columns": ["Title", "Issue Type", "Job Size", "Business Value",
                          "Time Criticality", "Risk Reduction", "WSJF Score"],
             "sort": "WSJF Score ↓",
             "group": "Issue Type",
+            "filter": None,
+        },
+        {
+            "name": "Current Iteration",
+            "type": "Board",
+            "columns": None,
+            "sort": None,
+            "group": "Status (automatic: Todo / In Progress / In Review / Done)",
+            "filter": "iteration:@current (or specific PI-YYYY-N.X)",
+        },
+        {
+            "name": "My Work",
+            "type": "Table",
+            "columns": ["Title", "Status", "Job Size", "WSJF Score", "Team"],
+            "sort": "Status",
+            "group": "Status",
+            "filter": "assignee:@me",
+        },
+        {
+            "name": "Roadmap",
+            "type": "Roadmap",
+            "columns": None,
+            "sort": None,
+            "group": "Planning Interval (date range for timeline)",
             "filter": None,
         },
     ]
@@ -331,7 +350,16 @@ def cmd_instructions(args):
 
         if view["type"] == "Board":
             print(f"  {C.BOLD}3.{C.RESET} Zvol layout: {C.YELLOW}Board{C.RESET}")
-            print(f"  {C.GRAY}   Board automaticky seskupí podle Status (Todo/In Progress/Done){C.RESET}")
+            print(f"  {C.GRAY}   Board automaticky seskupí podle Status (Todo/In Progress/In Review/Done){C.RESET}")
+        elif view["type"] == "Roadmap":
+            print(f"  {C.BOLD}3.{C.RESET} Zvol layout: {C.YELLOW}Roadmap{C.RESET}")
+            print(f"  {C.GRAY}   Roadmap zobrazí timeline podle Iteration/Planning Interval{C.RESET}")
+            if view["group"]:
+                print(f"  {C.BOLD}4.{C.RESET} Date field: {view['group']}")
+            if view["filter"]:
+                print(f"  {C.BOLD}5.{C.RESET} Filtr: {C.YELLOW}{view['filter']}{C.RESET}")
+            print(f"  {C.BOLD}→{C.RESET} Ulož view (Ctrl+S nebo klikni 'Save changes')")
+            continue
         else:
             print(f"  {C.BOLD}3.{C.RESET} Zvol layout: {C.YELLOW}Table{C.RESET}")
 

@@ -1028,9 +1028,9 @@ def cmd_status(root, sync_config, args):
 
     print()
     print(f"  {bold('By status:')}")
-    for status in ("Done", "In Progress", "Active", "Planned"):
+    for status in ("Done", "In Review", "In Progress", "Active", "Planned"):
         count = statuses.get(status, 0)
-        sc = {"Done": C.DONE, "In Progress": C.PROGRESS, "Active": C.ACTIVE, "Planned": C.PLANNED}.get(status, C.RESET)
+        sc = {"Done": C.DONE, "In Review": C.SYNC, "In Progress": C.PROGRESS, "Active": C.ACTIVE, "Planned": C.PLANNED}.get(status, C.RESET)
         print(f"    {color(f'{status}:', sc):22s} {count}")
 
     print()

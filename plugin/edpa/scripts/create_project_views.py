@@ -2,8 +2,8 @@
 """
 EDPA GitHub Project Views — Automated setup via Playwright.
 
-Creates views (Epics, Features, Stories, WSJF Ranking) with filters
-and adds EDPA custom field columns to all views.
+Creates 8 views: All Items, Board, Epics, Features, WSJF Ranking,
+Current Iteration, My Work, Roadmap. Adds EDPA custom field columns.
 
 Uses persistent browser profile — log in once, then it remembers.
 
@@ -23,11 +23,16 @@ except ImportError:
 
 PROFILE = Path.home() / ".edpa" / "playwright-profile"
 
+# Views to create after renaming the default view to "All Items".
+# Format: (name, filter, layout). Layout: "table" (default) or "board" or "roadmap".
 VIEWS = [
-    ("Epics", "type:Epic"),
-    ("Features", "type:Feature"),
-    ("Stories", "type:Story"),
-    ("WSJF Ranking", ""),
+    ("Board", "", "board"),
+    ("Epics", "type:Epic", "table"),
+    ("Features", "type:Feature", "table"),
+    ("WSJF Ranking", "", "table"),
+    ("Current Iteration", "", "board"),
+    ("My Work", "assignee:@me", "table"),
+    ("Roadmap", "", "roadmap"),
 ]
 
 COLUMNS = ["Job Size", "Business Value", "Time Criticality",
@@ -111,8 +116,8 @@ async def rename_tab(page, index, new_name):
     return False
 
 
-async def create_view(page, name, filter_text=""):
-    """Create a new table view with name and optional filter."""
+async def create_view(page, name, filter_text="", layout="table"):
+    """Create a new view with name, optional filter, and layout (table/board/roadmap)."""
     await close_dialogs(page)
 
     # Click "+ New view" tab — opens a popover menu
@@ -120,13 +125,14 @@ async def create_view(page, name, filter_text=""):
     await new_view.first.click(timeout=10000)
     await page.wait_for_timeout(1500)
 
-    # Click "Table" in the popover menu
-    menu_table = page.locator('[role="menuitem"]:has-text("Table")')
-    if await menu_table.count() > 0:
-        await menu_table.first.click()
+    # Click the desired layout in the popover menu
+    layout_label = {"table": "Table", "board": "Board", "roadmap": "Roadmap"}.get(layout, "Table")
+    menu_item = page.locator(f'[role="menuitem"]:has-text("{layout_label}")')
+    if await menu_item.count() > 0:
+        await menu_item.first.click()
         await page.wait_for_timeout(3000)
     else:
-        print(f"    ✗ No Table option in popover")
+        print(f"    ✗ No {layout_label} option in popover")
         return False
 
     # Rename the new tab (second-to-last; last is always "+ New view")
@@ -249,15 +255,21 @@ async def main(project_url: str):
         else:
             print("    ⚠ Skipped")
 
-        # Step 2: Create filtered views
-        for i, (name, filt) in enumerate(VIEWS, 2):
-            desc = f" (filter: {filt})" if filt else ""
+        # Step 2: Create views
+        for i, (name, filt, layout) in enumerate(VIEWS, 2):
+            parts = []
+            if filt:
+                parts.append(f"filter: {filt}")
+            if layout != "table":
+                parts.append(f"layout: {layout}")
+            desc = f" ({', '.join(parts)})" if parts else ""
             print(f"  [{i}] Creating '{name}'{desc}")
-            ok = await create_view(page, name, filt)
+            ok = await create_view(page, name, filt, layout)
             print(f"    {'✓ Done' if ok else '✗ Failed'}")
 
-        # Step 3: Add columns to all views
-        all_views = ["All Items"] + [v[0] for v in VIEWS]
+        # Step 3: Add columns to table views only (board/roadmap don't have custom columns)
+        table_views = ["All Items"] + [v[0] for v in VIEWS if v[2] == "table"]
+        all_views = table_views
         print(f"\n  Adding columns to {len(all_views)} views...")
         for view in all_views:
             print(f"  [{view}]")

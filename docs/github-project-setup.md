@@ -66,11 +66,13 @@ python .claude/edpa/scripts/project_setup.py \
 |------|------|--------|
 | **[1]** | Ověří Issue Types | Native GitHub Issue Types (org-level): Initiative, Epic, Feature, Story, Defect, Task — vytvořeny přes `issue_types.py setup` |
 | **[2]** | Vytvoří GitHub Project | Projects v2 na org úrovni |
-| **[3]** | Vytvoří custom fields | Job Size, Business Value, Time Criticality, Risk Reduction, WSJF Score (NUMBER), Issue Type, Team (SINGLE_SELECT) |
+| **[3]** | Vytvoří custom fields | Job Size, Business Value, Time Criticality, Risk Reduction, WSJF Score (NUMBER), Team (SINGLE_SELECT), Status options (Todo, In Progress, In Review, Done) |
 | **[4]** | Linkuje projekt k repo | Projekt viditelný v repo Projects tabu |
-| **[5]** | Vytvoří issues | Ze `.edpa/backlog/`, s Issue Types podle úrovně (Epic, Feature, Story) |
-| **[6]** | Nastaví field values | JS, BV, TC, RR, WSJF, Issue Type, Status na všech project items |
-| **[7]** | Aktualizuje config | `.edpa/config/edpa.yaml` — uloží project number a ID pro sync |
+| **[5]** | Dotáže Issue Types | Native Issue Types z organizace (Initiative, Epic, Feature, Story, Defect, Task) |
+| **[6]** | Vytvoří issues | Ze `.edpa/backlog/`, s Issue Types podle úrovně |
+| **[7]** | Nastaví field values | JS, BV, TC, RR, WSJF, Status na všech project items |
+| **[8]** | Propojí sub-issues | Parent-child hierarchie (Initiative→Epic→Feature→Story) přes GitHub Sub-issues API |
+| **[9]** | Aktualizuje config | `.edpa/config/edpa.yaml` — uloží project number a ID pro sync |
 
 ### Dry-run
 

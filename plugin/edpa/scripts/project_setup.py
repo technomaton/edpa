@@ -132,6 +132,7 @@ def main():
                 "assignee": raw.get("assignee", ""),
                 "iteration": raw.get("iteration", ""),
                 "type": raw.get("epic_type", ""),
+                "parent": raw.get("parent", ""),
             }
             items.append(entry)
 
@@ -198,7 +199,8 @@ def main():
         f'--single-select-options "Core,Platform,Management"')
     ok("Team (SINGLE_SELECT)")
 
-    # Get field IDs
+    # Add "In Review" status option (Status is a built-in field with Todo, In Progress, Done)
+    # GraphQL mutation to add the missing status option
     field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json')
     fields = json.loads(field_json).get("fields", [])
     field_ids = {f["name"]: f["id"] for f in fields}
@@ -206,6 +208,39 @@ def main():
     for f in fields:
         for opt in f.get("options", []):
             option_ids[f"{f['name']}:{opt['name']}"] = opt["id"]
+
+    # Ensure "In Review" exists as a Status option
+    status_field_id = field_ids.get("Status")
+    if status_field_id and "Status:In Review" not in option_ids:
+        mutation = f'''mutation {{
+          updateProjectV2Field(input: {{
+            projectId: "{project_id}"
+            fieldId: "{status_field_id}"
+            singleSelectOptions: [
+              {{name: "Todo", color: GRAY, description: "Not started"}},
+              {{name: "In Progress", color: YELLOW, description: "Active development"}},
+              {{name: "In Review", color: PURPLE, description: "PR open, awaiting review"}},
+              {{name: "Done", color: GREEN, description: "Accepted, merged"}}
+            ]
+          }}) {{
+            projectV2Field {{ ... on ProjectV2SingleSelectField {{ id }} }}
+          }}
+        }}'''
+        result = gh_graphql(mutation)
+        if result and "errors" not in result:
+            ok("Status options: Todo, In Progress, In Review, Done")
+        else:
+            info("Could not update Status options (may need manual configuration)")
+        # Refresh field IDs after status update
+        field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json')
+        fields = json.loads(field_json).get("fields", [])
+        field_ids = {f["name"]: f["id"] for f in fields}
+        option_ids = {}
+        for f in fields:
+            for opt in f.get("options", []):
+                option_ids[f"{f['name']}:{opt['name']}"] = opt["id"]
+    else:
+        info("Status field already has In Review option")
 
     info(f"Fields: {len(field_ids)}, Options: {len(option_ids)}")
 
@@ -263,6 +298,7 @@ def main():
             ok(f"{title} → #{issue_num}")
 
             # Assign native Issue Type via GraphQL
+            issue_node_id = None
             type_id = issue_type_ids.get(item["level"])
             if type_id:
                 node_query = (
@@ -286,7 +322,16 @@ def main():
             if add_result:
                 item_data = json.loads(add_result)
                 project_item_id = item_data.get("id", "")
-                issue_map[item["id"]] = (issue_num, project_item_id)
+                # Resolve issue node ID if not already resolved (needed for sub-issue linking)
+                if not issue_node_id:
+                    node_query = (
+                        f'{{ repository(owner: "{args.org}", name: "{args.repo}") '
+                        f'{{ issue(number: {issue_num}) {{ id }} }} }}'
+                    )
+                    node_result = gh_graphql(node_query)
+                    if node_result and node_result.get("data"):
+                        issue_node_id = node_result["data"]["repository"]["issue"]["id"]
+                issue_map[item["id"]] = (issue_num, project_item_id, issue_node_id)
 
                 # Close done items
                 if item["status"] == "Done":
@@ -303,6 +348,7 @@ def main():
         "Done": option_ids.get("Status:Done"),
         "In Progress": option_ids.get("Status:In Progress"),
         "Active": option_ids.get("Status:In Progress"),
+        "In Review": option_ids.get("Status:In Review"),
         "Planned": option_ids.get("Status:Todo"),
         "Todo": option_ids.get("Status:Todo"),
     }
@@ -312,7 +358,7 @@ def main():
         mapping = issue_map.get(item["id"])
         if not mapping:
             continue
-        _, proj_item_id = mapping
+        _, proj_item_id, _ = mapping
 
         def set_field(field_name, number=None, option_id=None):
             nonlocal set_count
@@ -349,9 +395,60 @@ def main():
     ok(f"{set_count} field values set")
 
     # ═══════════════════════════════════════════════════════════
-    # STEP 8: Update config
+    # STEP 8: Link sub-issues (parent-child hierarchy)
     # ═══════════════════════════════════════════════════════════
-    step(8, "Updating .edpa/config/edpa.yaml")
+    step(8, "Linking sub-issues (parent-child hierarchy)")
+
+    link_count = 0
+    link_errors = 0
+    for item in items:
+        parent_id = item.get("parent")
+        if not parent_id:
+            continue
+
+        child_mapping = issue_map.get(item["id"])
+        parent_mapping = issue_map.get(parent_id)
+        if not child_mapping or not parent_mapping:
+            if parent_id:
+                info(f"  {item['id']} → {parent_id} (skipped, parent not in issue_map)")
+            continue
+
+        _, _, child_node_id = child_mapping
+        _, _, parent_node_id = parent_mapping
+
+        if not child_node_id or not parent_node_id:
+            info(f"  {item['id']} → {parent_id} (skipped, missing node ID)")
+            continue
+
+        mutation = (
+            f'mutation {{ addSubIssue(input: {{ '
+            f'issueId: "{parent_node_id}", subIssueId: "{child_node_id}" }}) '
+            f'{{ issue {{ id }} subIssue {{ id }} }} }}'
+        )
+        result = gh_graphql(mutation)
+        if result and "errors" not in result:
+            link_count += 1
+        else:
+            link_errors += 1
+            errors = result.get("errors", []) if result else []
+            # "already a sub-issue" is not a real error
+            if any("already" in str(e).lower() for e in errors):
+                link_count += 1
+                link_errors -= 1
+            else:
+                info(f"  {item['id']} → {parent_id} (failed: {errors})")
+
+    if link_count:
+        ok(f"{link_count} sub-issue links created")
+    if link_errors:
+        info(f"{link_errors} links failed (see above)")
+    if not link_count and not link_errors:
+        info("No parent references found in backlog items")
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 9: Update config
+    # ═══════════════════════════════════════════════════════════
+    step(9, "Updating .edpa/config/edpa.yaml")
     config_path = Path(".edpa/config/edpa.yaml")
     if config_path.exists():
         with open(config_path) as f:
@@ -373,11 +470,12 @@ def main():
     print(f"  Project: https://github.com/orgs/{args.org}/projects/{project_num}")
     print(f"  Issues:  {len(issue_map)} created")
     print(f"  Fields:  {set_count} values set")
-    print(f"\n  {C.YELLOW}{C.BOLD}Manual step required:{C.RESET}")
-    print(f"  GitHub Projects v2 API does not support view column configuration.")
-    print(f"  Open the project in browser and click '+' in the table header to add:")
-    print(f"    Job Size, Business Value, Time Criticality,")
-    print(f"    Risk Reduction, WSJF Score, Team")
+    print(f"  Links:   {link_count} sub-issue links")
+    print(f"\n  {C.YELLOW}{C.BOLD}Next steps:{C.RESET}")
+    print(f"  1. Configure views: python .claude/edpa/scripts/create_project_views.py")
+    print(f"  2. Enable automations in GitHub UI (Settings → Workflows):")
+    print(f"     - Item added to project → Set status to Todo")
+    print(f"     - Auto-add issues from linked repository")
     print(f"{'═' * 70}\n")
 
 
