@@ -346,14 +346,16 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
   --org my-org \
   --repo my-project \
   --project-title "EDPA -- Muj Projekt"</code></pre>
-    <p>Skript provede 7 kroků:</p>
+    <p>Skript provede 9 kroků:</p>
     <ol>
-      <li>Ověří Issue Types na org</li>
+      <li>Vytvoří labels (Enabler)</li>
       <li>Vytvoří GitHub Project v2 na org úrovni</li>
-      <li>Vytvoří custom fields: Job Size, BV, TC, RR, WSJF Score, Team</li>
+      <li>Vytvoří custom fields: Job Size, BV, TC, RR, WSJF Score, Team + Status options (Todo, In Progress, In Review, Done)</li>
       <li>Linkuje projekt k repozitáři</li>
+      <li>Dotáže nativní Issue Types z organizace</li>
       <li>Vytvoří issues z item files v <code>.edpa/</code> s nativními Issue Types</li>
       <li>Nastaví field values na všech project items</li>
+      <li>Propojí sub-issues (parent-child hierarchie Initiative&rarr;Epic&rarr;Feature&rarr;Story)</li>
       <li>Aktualizuje <code>.edpa/config/edpa.yaml</code> s číslem projektu</li>
     </ol>
 
@@ -369,12 +371,14 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
           <tr><th>View</th><th>Typ</th><th>Filtr/Řazení</th></tr>
         </thead>
         <tbody>
-          <tr><td>All Items</td><td>Table</td><td>Všechny položky</td></tr>
-          <tr><td>Board</td><td>Board</td><td>To Do / In Progress / In Review / Done</td></tr>
+          <tr><td>All Items</td><td>Table</td><td>Všechny položky, řazeno WSJF</td></tr>
+          <tr><td>Board</td><td>Board</td><td>Todo / In Progress / In Review / Done</td></tr>
           <tr><td>Epics</td><td>Table</td><td><code>type:Epic</code>, řazeno WSJF</td></tr>
           <tr><td>Features</td><td>Table</td><td><code>type:Feature</code>, řazeno WSJF</td></tr>
-          <tr><td>Stories</td><td>Table</td><td><code>type:Story</code>, filtrováno iterací</td></tr>
-          <tr><td>WSJF Ranking</td><td>Table</td><td>Řazeno WSJF sestupně</td></tr>
+          <tr><td>WSJF Ranking</td><td>Table</td><td>Seskupeno Issue Type, řazeno WSJF</td></tr>
+          <tr><td>Current Iteration</td><td>Board</td><td>Filtr aktuální iterace, denní standup view</td></tr>
+          <tr><td>My Work</td><td>Table</td><td><code>assignee:@me</code>, osobní přehled</td></tr>
+          <tr><td>Roadmap</td><td>Roadmap</td><td>Timeline podle Planning Interval</td></tr>
         </tbody>
       </table>
     </div>
@@ -387,7 +391,70 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     <p><strong>Ověření:</strong></p>
     <pre><code>python3 .claude/edpa/scripts/project_views.py verify --org my-org --project 1</code></pre>
 
-    <h3>1.10 Ověřit setup</h3>
+    <h3>1.10 Nastavit automatizace a Status field</h3>
+    <p><strong>Status field (4 hodnoty):</strong></p>
+    <p><code>project_setup.py</code> automaticky vytvoří 4 statusy na GitHub Projects:</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Status</th><th>Barva</th><th>Význam</th><th>EDPA YAML</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Todo</strong></td><td>Gray</td><td>Commitnutý do iterace, nezačatý</td><td><code>Planned</code></td></tr>
+          <tr><td><strong>In Progress</strong></td><td>Yellow</td><td>Aktivní vývoj</td><td><code>Active</code></td></tr>
+          <tr><td><strong>In Review</strong></td><td>Purple</td><td>PR otevřený, čeká na review</td><td><code>In Review</code></td></tr>
+          <tr><td><strong>Done</strong></td><td>Green</td><td>Přijato, mergnuto</td><td><code>Done</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Proč "In Review"?</strong> PR reviews jsou evidence signály &mdash; EDPA engine přiděluje Contribution Weight za <code>pr_reviewer</code>. Viditelnost na boardu podporuje review kulturu.</p>
+    <p><strong>Blocked = label, ne status.</strong> Blokovaný item je stále "In Progress". Label umožňuje filtrovat bez narušení lineární status progression.</p>
+
+    <p><strong>GitHub Projects Automations &mdash; co zapnout:</strong></p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Automatizace</th><th>Doporučení</th><th>Důvod</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Item added to project &rarr; Set status "Todo"</td><td><strong>Zapnout</strong></td><td>Nové issues mají výchozí status</td></tr>
+          <tr><td>Auto-add issues from linked repo</td><td><strong>Zapnout</strong></td><td>Issues z repo automaticky v projektu</td></tr>
+          <tr><td>PR merged &rarr; Set status "Done"</td><td>Nezapínat</td><td>Předčasné &mdash; item může potřebovat QA</td></tr>
+          <tr><td>Item closed &rarr; Auto-archive</td><td><strong style="color: var(--error)">NIKDY</strong></td><td>Archivované items zmizí z API &rarr; sync.py je ztratí &rarr; EDPA engine přijde o data</td></tr>
+          <tr><td>Item reopened &rarr; Set status "In Progress"</td><td>Nezapínat</td><td>Koliduje se sync &mdash; reopened item může potřebovat jiný status</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Konfigurace: projekt &rarr; <strong>...</strong> menu &rarr; <strong>Workflows</strong> &rarr; zapnout jen doporučené.</p>
+
+    <p><strong>Granularity guardrails:</strong></p>
+    <ul>
+      <li>Story: max Job Size <strong>8</strong> (classic 2/10) nebo <strong>5</strong> (AI-native 1/5)</li>
+      <li>Feature: max Job Size <strong>13</strong></li>
+      <li>Epic: max Job Size <strong>20</strong></li>
+      <li>Překročení limitu &rarr; rozdělit na menší položky</li>
+    </ul>
+
+    <p><strong>Definition of Ready</strong> &mdash; žádná položka nevstupuje do delivery bez:</p>
+    <ul>
+      <li>Issue Type nastaven</li>
+      <li>Parent issue propojen (sub-issue)</li>
+      <li>Job Size odhadnut</li>
+      <li>BV + TC + RR vyplněny</li>
+      <li>Primary Owner přiřazen</li>
+      <li>Iteration nebo Planning Interval přiřazen</li>
+    </ul>
+
+    <p><strong>Doporučené Insights grafy</strong> (projekt &rarr; <strong>Insights</strong> tab &rarr; <strong>New chart</strong>):</p>
+    <ul>
+      <li><strong>Burn-down</strong> &mdash; X: čas, Y: počet items, Group: Status</li>
+      <li><strong>Items by Status</strong> &mdash; sloupcový graf</li>
+      <li><strong>Items by Team</strong> &mdash; rozložení zátěže</li>
+      <li><strong>Items by Issue Type</strong> &mdash; balance hierarchie</li>
+    </ul>
+    <p>Insights = real-time dashboardy. EDPA engine = governance-grade kalkulace (derived hours, CW). Doplňují se.</p>
+
+    <h3>1.11 Ověřit setup</h3>
     <p><strong>Claude Code (doporučeno):</strong></p>
     <pre><code>/edpa close-iteration    # demo ověření engine
 /edpa sync status        # ověření sync</code></pre>
@@ -404,7 +471,7 @@ python3 .claude/edpa/scripts/backlog.py status
 # Sync status
 python3 .claude/edpa/scripts/sync.py status</code></pre>
 
-    <h3>1.11 Commitnout základní konfiguraci</h3>
+    <h3>1.12 Commitnout základní konfiguraci</h3>
     <pre><code>git add .edpa/config/people.yaml .edpa/config/project.yaml .edpa/config/heuristics.yaml
 git add .edpa/
 git commit -m "feat(edpa): initial EDPA setup for my-project"

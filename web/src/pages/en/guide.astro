@@ -128,17 +128,17 @@ python3 .claude/edpa/scripts/backlog.py add \\
     num: 7,
     title: 'Create GitHub Project',
     color: 'var(--ac)',
-    desc: 'Automatically create a GitHub Project Board with the EDPA column layout — Backlog, Ready, In Progress, Review, Done.',
+    desc: 'Automatically create a GitHub Project with 8 views, 4 statuses (Todo, In Progress, In Review, Done), custom fields, and sub-issue hierarchy. NEVER enable auto-archive!',
     claude: `/edpa setup
-# Claude Code creates the GitHub Project automatically`,
+# Claude Code creates the GitHub Project automatically (9 steps)`,
     code: `python3 .claude/edpa/scripts/project_setup.py \\
   --org ORG \\
-  --repo project-name \\
-  --iteration PI-2026-1.1`,
-    result: `✓ Created project: "EDPA — PI-2026-1.1"
-✓ Columns: Backlog | Ready | In Progress | Review | Done
-✓ Linked 12 issues to project
-✓ Custom fields: Story Points, WSJF Score, Type`,
+  --repo project-name`,
+    result: `✓ Created project: "EDPA — My Project"
+✓ Status: Todo | In Progress | In Review | Done
+✓ Fields: Job Size, BV, TC, RR, WSJF Score, Team
+✓ 12 issues created, 11 sub-issue links
+✓ 8 views: All Items, Board, Epics, Features, WSJF, Current Iteration, My Work, Roadmap`,
   },
   {
     num: 8,

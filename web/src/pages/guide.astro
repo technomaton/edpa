@@ -128,17 +128,17 @@ python3 .claude/edpa/scripts/backlog.py add \\
     num: 7,
     title: 'Vytvořit GitHub Project',
     color: 'var(--ac)',
-    desc: 'Automaticky vytvořte GitHub Project Board s EDPA sloupcovým layoutem — Backlog, Ready, In Progress, Review, Done.',
+    desc: 'Automaticky vytvořte GitHub Project s 8 views, 4 statusy (Todo, In Progress, In Review, Done), custom fields a sub-issue hierarchií. NIKDY nezapínejte auto-archive!',
     claude: `/edpa setup
-# Claude Code vytvori GitHub Project automaticky`,
+# Claude Code vytvori GitHub Project automaticky (9 kroku)`,
     code: `python3 .claude/edpa/scripts/project_setup.py \\
   --org ORG \\
-  --repo project-name \\
-  --iteration PI-2026-1.1`,
-    result: `✓ Created project: "EDPA — PI-2026-1.1"
-✓ Columns: Backlog | Ready | In Progress | Review | Done
-✓ Linked 12 issues to project
-✓ Custom fields: Story Points, WSJF Score, Type`,
+  --repo project-name`,
+    result: `✓ Created project: "EDPA — My Project"
+✓ Status: Todo | In Progress | In Review | Done
+✓ Fields: Job Size, BV, TC, RR, WSJF Score, Team
+✓ 12 issues created, 11 sub-issue links
+✓ 8 views: All Items, Board, Epics, Features, WSJF, Current Iteration, My Work, Roadmap`,
   },
   {
     num: 8,
