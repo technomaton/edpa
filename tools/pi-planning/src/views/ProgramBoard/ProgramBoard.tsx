@@ -78,16 +78,21 @@ function buildBoard(
   // Milestones & Events from backlog
   const backlogMilestones = piItems.filter(i => i.type === 'Milestone' || i.type === 'Event');
   // Synthetic milestones from PI events config
-  const syntheticMilestones: WorkItem[] = piEvents.map((evt, i) => ({
-    id: `EVT-${i + 1}`,
-    type: 'Event' as const,
-    title: evt.title,
-    js: 0,
-    status: 'Planned' as const,
-    parent: null,
-    iteration: evt.iteration,
-    contributors: [],
-  }));
+  // Only show events that have an iteration within this PI.
+  // Events without iteration (e.g. PI Planning) happen in the *previous* PI's
+  // IP iteration, so they don't belong on this PI's board.
+  const syntheticMilestones: WorkItem[] = piEvents
+    .filter(evt => evt.iteration && iterationIds.has(evt.iteration))
+    .map((evt, i) => ({
+      id: `EVT-${i + 1}`,
+      type: 'Event' as const,
+      title: evt.title,
+      js: 0,
+      status: 'Planned' as const,
+      parent: null,
+      iteration: evt.iteration,
+      contributors: [],
+    }));
   const milestones = [...backlogMilestones, ...syntheticMilestones];
   // Features/Stories for the board
   const features = piItems.filter(i => i.type === 'Feature' || i.type === 'Story');
