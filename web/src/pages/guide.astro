@@ -6,17 +6,19 @@ const steps = [
     num: 1,
     title: 'Prerekvizity',
     color: 'var(--ac)',
-    desc: 'Nainstalujte GitHub CLI, Python 3.10+ a PyYAML. Ověřte přihlášení do GitHub, abyste mohli automatizovat práci s repozitáři a projekty.',
-    code: `# GitHub CLI — přihlášení
+    desc: 'Nainstalujte GitHub CLI, Python 3.10+ a PyYAML. Ověřte přihlášení do GitHub s project scope.',
+    code: `# GitHub CLI — přihlášení s project scope
 gh auth login
+gh auth refresh -s project,read:project
 
-# Python závislo­sti
+# Python závislosti
 pip install pyyaml
 
-# Ověření verzí
+# Ověření
 python3 --version   # >= 3.10
-gh --version`,
+gh --version        # >= 2.40`,
     result: `✓ Logged in to github.com as your-user
+✓ Token scopes: repo, project, read:project
 ✓ pyyaml installed
 Python 3.12.1
 gh version 2.44.1`,
@@ -25,8 +27,8 @@ gh version 2.44.1`,
     num: 2,
     title: 'Vytvořit repo',
     color: 'var(--cy)',
-    desc: 'Vytvořte nový GitHub repozitář pro váš projekt. Repo bude obsahovat veškerou konfiguraci, skripty a data EDPA frameworku.',
-    code: `# Vytvořit privátní repo a naklonovat
+    desc: 'Vytvořte nový GitHub repozitář v organizaci. EDPA vyžaduje organizační repo (ne personal) pro Issue Types a GitHub Projects.',
+    code: `# Vytvořit privátní repo v organizaci
 gh repo create ORG/project-name \\
   --private --clone
 
@@ -36,122 +38,94 @@ cd project-name`,
   },
   {
     num: 3,
-    title: 'Zkopírovat EDPA',
+    title: 'Nainstalovat EDPA',
     color: 'var(--gn)',
-    desc: 'Překopírujte EDPA adresářovou strukturu — skripty, šablony a konfigurační soubory. Toto je základ celého frameworku.',
-    code: `# Struktura EDPA v repozitáři
-├── .claude/edpa/
-│   ├── scripts/           # engine, sync, backlog, ...
-│   └── templates/         # YAML šablony
-├── .edpa/
-│   ├── config/            # capacity, project, heuristics
-│   ├── data/              # ground truth
-│   ├── reports/           # generované výkazy
-│   └── snapshots/         # zmrazené snapshoty
-└── docs/examples/         # ukázkové konfigurace`,
-    result: `project-name/
-├── .claude/edpa/  ← skripty a šablony (plugin)
-├── .edpa/config/  ← konfigurace týmu a iterací
-├── .edpa/data/    ← snapshoty a surová data
-└── .edpa/reports/ ← generované výkazy`,
+    desc: 'Jeden příkaz nainstaluje EDPA plugin do .claude/edpa/ a vytvoří .edpa/ adresářovou strukturu. Žádné manuální kopírování.',
+    code: `curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
+    result: `EDPA Installer
+==============
+Downloading EDPA plugin...
+✓ Plugin installed to .claude/edpa/
+✓ Created .edpa/ structure:
+  .claude/edpa/    ← skripty, skills, hooks
+  .edpa/config/    ← konfigurace týmu a iterací
+  .edpa/backlog/   ← work items (per-item YAML)
+  .edpa/reports/   ← generované výkazy
+
+Next: open Claude Code and run /edpa setup`,
   },
   {
     num: 4,
-    title: 'Nastavit tým',
+    title: '/edpa setup',
     color: 'var(--yl)',
-    desc: 'Upravte people.yaml — definujte členy týmu, jejich role, FTE úvazky a GitHub uživatelská jména. Toto je klíčový vstup pro alokaci.',
-    code: `# .edpa/config/people.yaml
-team:
-  - name: "Jan Novák"
-    github: "jnovak"
-    role: "developer"
-    fte: 1.0
+    desc: 'Jeden příkaz nakonfiguruje celý projekt — tým, Issue Types, GitHub Project s 8 views, 4 statusy, custom fields, sub-issue hierarchii a CI workflows.',
+    claude: `/edpa setup "Název projektu"
+# Claude Code provede vše interaktivně`,
+    code: `# Manuální alternativa (pokud nepoužíváte Claude Code):
+# 1. Upravit .edpa/config/people.yaml (tým, role, FTE, kapacity)
+# 2. Issue Types:
+python3 .claude/edpa/scripts/issue_types.py setup --org ORG
+# 3. GitHub Project:
+python3 .claude/edpa/scripts/project_setup.py --org ORG --repo project-name
+# 4. Views:
+python3 .claude/edpa/scripts/create_project_views.py`,
+    result: `✓ Team: 3 members configured (2.8 FTE)
+✓ Issue Types: Initiative, Epic, Feature, Story, Defect, Task
+✓ GitHub Project created (#4)
+✓ Status: Todo | In Progress | In Review | Done
+✓ Fields: Job Size, BV, TC, RR, WSJF Score, Team
+✓ 8 views: All Items, Board, Epics, Features, WSJF,
+           Current Iteration, My Work, Roadmap
+✓ Branch-check CI workflow installed
+✓ Config saved to .edpa/config/edpa.yaml
 
-  - name: "Eva Malá"
-    github: "emala"
-    role: "developer"
-    fte: 0.8
-
-  - name: "Petr Král"
-    github: "pkral"
-    role: "tech-lead"
-    fte: 1.0`,
-    result: `Tým: 3 členové
-Celková kapacita: 2.8 FTE
-Role: 2× developer, 1× tech-lead`,
+⚠ Enable in GitHub Project → Workflows:
+  ✓ Item added → Set status "Todo"
+  ✓ Auto-add issues from linked repo
+  ✗ NEVER enable auto-archive!`,
   },
   {
     num: 5,
-    title: 'Nastavit Issue Types',
+    title: 'Naplnit backlog',
     color: 'var(--or)',
-    desc: 'Spusťte skript pro konfiguraci typů issues v GitHub. EDPA rozlišuje hierarchii: Initiative > Epic > Feature > Story > Task.',
-    claude: `/edpa setup
-# Claude Code nastavi Issue Types automaticky`,
-    code: `python3 .claude/edpa/scripts/issue_types.py setup \\
-  --org ORG \\
-  --repo project-name
+    desc: 'Vytvořte YAML soubory v .edpa/backlog/ — jeden soubor per item. Hierarchie: Initiative > Epic > Feature > Story. WSJF se počítá automaticky.',
+    code: `# .edpa/backlog/stories/S-200.yaml
+id: S-200
+type: Story
+title: "Implementovat login endpoint"
+js: 5              # Job Size (Fibonacci)
+bv: 8              # Business Value
+tc: 5              # Time Criticality
+rr: 3              # Risk Reduction
+status: Planned
+parent: F-100      # Rodičovská Feature
+assignee: jnovak
+iteration: PI-2026-1.1
 
-# Ověření
-python3 .claude/edpa/scripts/issue_types.py list \\
-  --org ORG --repo project-name`,
-    result: `✓ Created label: initiative  (color: #f472b6)
-✓ Created label: epic        (color: #818cf8)
-✓ Created label: feature     (color: #22d3ee)
-✓ Created label: story       (color: #f97316)
-✓ Created label: task        (color: #fbbf24)
-5 issue types configured.`,
+# Validace backlogu
+python3 .claude/edpa/scripts/backlog.py validate
+python3 .claude/edpa/scripts/backlog.py tree`,
+    result: `✓ Backlog valid (12 items, 0 errors)
+
+I-1: Medical Platform
+└── E-10: Data Processing Pipeline
+    ├── F-100: Authentication (JS=8, WSJF=2.0)
+    │   ├── S-200: Login endpoint (JS=5) ← jnovak
+    │   └── S-201: Token refresh (JS=3) ← emala
+    └── F-101: Data Import (JS=13, WSJF=1.8)
+        ├── S-210: CSV parser (JS=5) ← emala
+        └── S-211: Validation (JS=3) ← pkral`,
   },
   {
     num: 6,
-    title: 'Naplnit backlog',
-    color: 'var(--pk)',
-    desc: 'Přidejte první work items do backlogu — Stories a Tasky s odhadem story pointů. Backlog je vstupem pro WSJF prioritizaci.',
-    code: `# Přidat Story
-python3 .claude/edpa/scripts/backlog.py add \\
-  --type Story \\
-  --title "Implementovat login endpoint" \\
-  --points 5 \\
-  --feature F-100-auth
-
-# Přidat Task
-python3 .claude/edpa/scripts/backlog.py add \\
-  --type Task \\
-  --title "Napsat unit testy pro auth" \\
-  --points 3 \\
-  --parent S-200-login`,
-    result: `✓ Created: S-200 "Implementovat login endpoint" [5 SP]
-  → linked to F-100-auth
-✓ Created: T-301 "Napsat unit testy pro auth" [3 SP]
-  → linked to S-200-login`,
-  },
-  {
-    num: 7,
-    title: 'Vytvořit GitHub Project',
-    color: 'var(--ac)',
-    desc: 'Automaticky vytvořte GitHub Project s 8 views, 4 statusy (Todo, In Progress, In Review, Done), custom fields a sub-issue hierarchií. NIKDY nezapínejte auto-archive!',
-    claude: `/edpa setup
-# Claude Code vytvori GitHub Project automaticky (9 kroku)`,
-    code: `python3 .claude/edpa/scripts/project_setup.py \\
-  --org ORG \\
-  --repo project-name`,
-    result: `✓ Created project: "EDPA — My Project"
-✓ Status: Todo | In Progress | In Review | Done
-✓ Fields: Job Size, BV, TC, RR, WSJF Score, Team
-✓ 12 issues created, 11 sub-issue links
-✓ 8 views: All Items, Board, Epics, Features, WSJF, Current Iteration, My Work, Roadmap`,
-  },
-  {
-    num: 8,
     title: 'Tým začne pracovat',
-    color: 'var(--cy)',
-    desc: 'Tým pracuje standardním GitHub flow — branch naming konvence, commity, pull requesty a code review. EDPA vše sleduje automaticky.',
-    code: `# Branch naming konvence
+    color: 'var(--pk)',
+    desc: 'Tým pracuje standardním GitHub flow — branch naming konvence, commity s referencemi na items, PR a code review. EDPA vše sleduje automaticky.',
+    code: `# Branch naming (CI kontroluje formát)
 git checkout -b feature/S-200-login-endpoint
 
-# Commit s referencí na issue
-git commit -m "feat(auth): implement JWT login
-
-Resolves #200"
+# Commit s referencí na item
+git commit -m "feat(S-200): implement JWT login"
 
 # Pull Request
 gh pr create \\
@@ -162,15 +136,19 @@ gh pr create \\
 Commits: 4 (linked to S-200)
 PR #42: "S-200: Login endpoint"
   → Review requested: pkral
-  → Status: Approved ✓ → Merged`,
+  → Status: Approved ✓ → Merged
+
+Evidence detekována:
+  jnovak: assignee (+4), PR author (+2), commits (+1)
+  pkral:  PR reviewer (+1)`,
   },
   {
-    num: 9,
+    num: 7,
     title: 'Konec iterace',
-    color: 'var(--gn)',
-    desc: 'Na konci iterace spusťte EDPA engine. Ten načte evidenci z .edpa/backlog/ YAML souborů (naplněných přes /edpa sync pull) a proporcionálně alokuje hodiny podle skutečné práce.',
+    color: 'var(--ac)',
+    desc: 'Na konci iterace EDPA engine načte evidenci z backlog YAML souborů a proporcionálně alokuje hodiny podle skutečné práce.',
     claude: `/edpa close-iteration PI-2026-1.1
-# Claude Code stahne evidenci a spocita alokaci`,
+# Claude Code stáhne evidenci a spočítá alokaci`,
     code: `python3 .claude/edpa/scripts/engine.py \\
   --edpa-root .edpa \\
   --iteration PI-2026-1.1
@@ -178,11 +156,10 @@ PR #42: "S-200: Login endpoint"
 # Engine automaticky:
 # 1. Načte evidenci z .edpa/backlog/ YAML souborů
 # 2. Spočítá contribution weight (CW)
-# 3. Alokuje hodiny: hours = CW × capacity
+# 3. Alokuje hodiny: Score / Total × Capacity
 # 4. Vygeneruje reporty`,
     result: `EDPA Engine v1.0.0-beta — PI-2026-1.1
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Loaded:   47 commits, 12 PRs, 8 reviews
 Team:     3 members, 2.8 FTE
 Capacity: 448 hours (2 weeks)
 
@@ -190,50 +167,49 @@ Allocation:
   jnovak  │████████████████░░│ 178.2h (39.8%)
   emala   │█████████████░░░░░│ 142.6h (31.8%)
   pkral   │████████████░░░░░░│ 127.2h (28.4%)
-                        Total: 448.0h ✓`,
+                        Total: 448.0h ✓
+Invariants: ALL PASSED`,
   },
   {
-    num: 10,
+    num: 8,
     title: 'Výkazy a reporty',
-    color: 'var(--yl)',
-    desc: 'EDPA generuje per-person markdown reporty, JSON export a frozen snapshot. Výkazy jsou auditovatelné a reprodukovatelné.',
+    color: 'var(--cy)',
+    desc: 'EDPA generuje per-person výkazy, per-item cost allocation, JSON export a frozen snapshot. Vše auditovatelné a reprodukovatelné.',
     claude: `/edpa reports
-# Claude Code vygeneruje vsechny reporty a vykazy`,
+# Claude Code vygeneruje všechny reporty a výkazy`,
     code: `# Vygenerované soubory
 .edpa/reports/
 ├── iteration-PI-2026-1.1/
-│   ├── summary.md           # souhrnný report
-│   ├── jnovak.md            # per-person výkaz
-│   ├── emala.md
-│   ├── pkral.md
-│   ├── allocation.json      # strojově čitelný
-│   └── evidence.json        # surová evidence
+│   ├── vykaz-jnovak.md      # per-person výkaz
+│   ├── vykaz-emala.md
+│   ├── vykaz-pkral.md
+│   ├── edpa_results.json    # strojově čitelný
+│   └── summary.xlsx         # Excel export
 .edpa/snapshots/
-└── PI-2026-1.1.json         # frozen snapshot`,
-    result: `.edpa/reports/iteration-PI-2026-1.1/summary.md:
-┌─────────┬────────┬────────┬────────┐
-│ Person  │ Hours  │ Share  │ Items  │
-├─────────┼────────┼────────┼────────┤
-│ jnovak  │ 178.2  │ 39.8%  │ 7      │
-│ emala   │ 142.6  │ 31.8%  │ 5      │
-│ pkral   │ 127.2  │ 28.4%  │ 6      │
-├─────────┼────────┼────────┼────────┤
-│ TOTAL   │ 448.0  │ 100%   │ 18     │
-└─────────┴────────┴────────┴────────┘`,
+└── iteration-PI-2026-1.1.json  # frozen snapshot`,
+    result: `Per-person výkaz (vykaz-jnovak.md):
+┌──────────┬────────┬────────┬────────┐
+│ Person   │ Hours  │ Share  │ Items  │
+├──────────┼────────┼────────┼────────┤
+│ jnovak   │ 178.2  │ 39.8%  │ 7      │
+│ emala    │ 142.6  │ 31.8%  │ 5      │
+│ pkral    │ 127.2  │ 28.4%  │ 6      │
+├──────────┼────────┼────────┼────────┤
+│ TOTAL    │ 448.0  │ 100%   │ 18     │
+└──────────┴────────┴────────┴────────┘`,
   },
   {
-    num: 11,
+    num: 9,
     title: 'Retrospektiva + kalibrace',
-    color: 'var(--or)',
-    desc: 'Porovnejte EDPA výstupy se skutečností (ground truth). Skript evaluate_cw.py počítá MAD, korelaci a identifikuje outliers.',
+    color: 'var(--gn)',
+    desc: 'Porovnejte EDPA výstupy se skutečností (ground truth). evaluate_cw.py počítá MAD, korelaci a identifikuje outliers.',
     claude: `/edpa calibrate
-# Claude Code spusti kalibraci a zobrazi MAD vysledky`,
+# Claude Code spustí kalibraci a zobrazí MAD výsledky`,
     code: `# Ground truth srovnání
 python3 .claude/edpa/scripts/evaluate_cw.py \\
   --iteration PI-2026-1.1 \\
   --ground-truth .edpa/data/ground_truth.csv
 
-# Výstup: korelace, MAD, scatter plot
 # MAD < 0.05 → výborná kalibrace
 # MAD 0.05-0.10 → dobrá kalibrace
 # MAD > 0.10 → vyžaduje úpravu vah`,
@@ -247,12 +223,12 @@ Verdict: EXCELLENT
 No weight adjustment needed.`,
   },
   {
-    num: 12,
+    num: 10,
     title: 'Další PI',
-    color: 'var(--pk)',
+    color: 'var(--yl)',
     desc: 'Opakujte pro každou iteraci. S každým cyklem se kalibrace zpřesňuje. Cíl: prediktabilita > 80 %, MAD < 0.05 do třetího PI.',
     claude: `/edpa close-iteration PI-2026-1.2
-# Dalsi iterace — stejny postup`,
+# Další iterace — stejný postup`,
     code: `# Nová iterace
 python3 .claude/edpa/scripts/engine.py \\
   --edpa-root .edpa \\
@@ -271,9 +247,9 @@ Status: Mature — framework calibrated.`,
 
 const phases = [
   { label: 'Setup', steps: [1,2,3], color: 'var(--ac)' },
-  { label: 'Config', steps: [4,5,6], color: 'var(--cy)' },
-  { label: 'Run', steps: [7,8,9], color: 'var(--gn)' },
-  { label: 'Report', steps: [10,11,12], color: 'var(--yl)' },
+  { label: 'Config', steps: [4,5], color: 'var(--cy)' },
+  { label: 'Run', steps: [6,7,8], color: 'var(--gn)' },
+  { label: 'Report', steps: [9,10], color: 'var(--yl)' },
 ];
 ---
 
@@ -304,8 +280,8 @@ const phases = [
       <p class="tag">Step-by-Step Guide</p>
       <h1 class="guide-title">Od nuly k prvnímu reportu</h1>
       <p class="guide-subtitle">
-        12 kroků, které vás provedou celým EDPA frameworkem —
-        od instalace nástrojů po kalibrovaný výkaz hodin.
+        10 kroků, které vás provedou celým EDPA frameworkem —
+        od instalace po kalibrovaný výkaz hodin.
       </p>
       <a href="#step-1" class="btn btn-primary">Začít průvodce</a>
     </div>
@@ -387,7 +363,7 @@ const phases = [
         if (entry.isIntersecting) {
           const id = entry.target.id;
           const num = parseInt(id.replace('step-', ''));
-          const pct = (num / 12) * 100;
+          const pct = (num / 10) * 100;
           fill.style.width = pct + '%';
           dots.forEach(d => {
             const ds = parseInt(d.getAttribute('data-step') || '0');

@@ -6,17 +6,19 @@ const steps = [
     num: 1,
     title: 'Prerequisites',
     color: 'var(--ac)',
-    desc: 'Install GitHub CLI, Python 3.10+, and PyYAML. Verify your GitHub login so you can automate repository and project operations.',
-    code: `# GitHub CLI — authenticate
+    desc: 'Install GitHub CLI, Python 3.10+, and PyYAML. Verify your GitHub login with project scope.',
+    code: `# GitHub CLI — authenticate with project scope
 gh auth login
+gh auth refresh -s project,read:project
 
 # Python dependencies
 pip install pyyaml
 
-# Verify versions
+# Verify
 python3 --version   # >= 3.10
-gh --version`,
+gh --version        # >= 2.40`,
     result: `✓ Logged in to github.com as your-user
+✓ Token scopes: repo, project, read:project
 ✓ pyyaml installed
 Python 3.12.1
 gh version 2.44.1`,
@@ -25,8 +27,8 @@ gh version 2.44.1`,
     num: 2,
     title: 'Create Repository',
     color: 'var(--cy)',
-    desc: 'Create a new GitHub repository for your project. The repo will contain all EDPA configuration, scripts, and data.',
-    code: `# Create a private repo and clone it
+    desc: 'Create a new GitHub repository in your organization. EDPA requires an org repo (not personal) for Issue Types and GitHub Projects.',
+    code: `# Create a private org repo
 gh repo create ORG/project-name \\
   --private --clone
 
@@ -36,122 +38,94 @@ cd project-name`,
   },
   {
     num: 3,
-    title: 'Copy EDPA Framework',
+    title: 'Install EDPA',
     color: 'var(--gn)',
-    desc: 'Copy the EDPA directory structure into your repo — scripts, templates, and configuration files. This is the foundation of the entire framework.',
-    code: `# EDPA structure in the repository
-├── .claude/edpa/
-│   ├── scripts/           # engine, sync, backlog, ...
-│   └── templates/         # YAML templates
-├── .edpa/
-│   ├── config/            # capacity, project, heuristics
-│   ├── data/              # ground truth
-│   ├── reports/           # generated reports
-│   └── snapshots/         # frozen snapshots
-└── docs/examples/         # example configurations`,
-    result: `project-name/
-├── .claude/edpa/  ← scripts and templates (plugin)
-├── .edpa/config/  ← team and iteration config
-├── .edpa/data/    ← snapshots and raw data
-└── .edpa/reports/ ← generated reports`,
+    desc: 'One command installs the EDPA plugin into .claude/edpa/ and creates the .edpa/ directory structure. No manual copying needed.',
+    code: `curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
+    result: `EDPA Installer
+==============
+Downloading EDPA plugin...
+✓ Plugin installed to .claude/edpa/
+✓ Created .edpa/ structure:
+  .claude/edpa/    ← scripts, skills, hooks
+  .edpa/config/    ← team and iteration config
+  .edpa/backlog/   ← work items (per-item YAML)
+  .edpa/reports/   ← generated reports
+
+Next: open Claude Code and run /edpa setup`,
   },
   {
     num: 4,
-    title: 'Configure Team',
+    title: '/edpa setup',
     color: 'var(--yl)',
-    desc: 'Edit people.yaml — define team members, their roles, FTE allocations, and GitHub usernames. This is the key input for hour allocation.',
-    code: `# .edpa/config/people.yaml
-team:
-  - name: "Jan Novak"
-    github: "jnovak"
-    role: "developer"
-    fte: 1.0
+    desc: 'One command configures everything — team, Issue Types, GitHub Project with 8 views, 4 statuses, custom fields, sub-issue hierarchy, and CI workflows.',
+    claude: `/edpa setup "Project Name"
+# Claude Code handles everything interactively`,
+    code: `# Manual alternative (if not using Claude Code):
+# 1. Edit .edpa/config/people.yaml (team, roles, FTE, capacity)
+# 2. Issue Types:
+python3 .claude/edpa/scripts/issue_types.py setup --org ORG
+# 3. GitHub Project:
+python3 .claude/edpa/scripts/project_setup.py --org ORG --repo project-name
+# 4. Views:
+python3 .claude/edpa/scripts/create_project_views.py`,
+    result: `✓ Team: 3 members configured (2.8 FTE)
+✓ Issue Types: Initiative, Epic, Feature, Story, Defect, Task
+✓ GitHub Project created (#4)
+✓ Status: Todo | In Progress | In Review | Done
+✓ Fields: Job Size, BV, TC, RR, WSJF Score, Team
+✓ 8 views: All Items, Board, Epics, Features, WSJF,
+           Current Iteration, My Work, Roadmap
+✓ Branch-check CI workflow installed
+✓ Config saved to .edpa/config/edpa.yaml
 
-  - name: "Eva Mala"
-    github: "emala"
-    role: "developer"
-    fte: 0.8
-
-  - name: "Petr Kral"
-    github: "pkral"
-    role: "tech-lead"
-    fte: 1.0`,
-    result: `Team: 3 members
-Total capacity: 2.8 FTE
-Roles: 2x developer, 1x tech-lead`,
+⚠ Enable in GitHub Project → Workflows:
+  ✓ Item added → Set status "Todo"
+  ✓ Auto-add issues from linked repo
+  ✗ NEVER enable auto-archive!`,
   },
   {
     num: 5,
-    title: 'Set Up Issue Types',
+    title: 'Populate Backlog',
     color: 'var(--or)',
-    desc: 'Run the script to configure issue types in GitHub. EDPA uses a hierarchy: Initiative > Epic > Feature > Story > Task.',
-    claude: `/edpa setup
-# Claude Code sets up Issue Types automatically`,
-    code: `python3 .claude/edpa/scripts/issue_types.py setup \\
-  --org ORG \\
-  --repo project-name
+    desc: 'Create YAML files in .edpa/backlog/ — one file per item. Hierarchy: Initiative > Epic > Feature > Story. WSJF is calculated automatically.',
+    code: `# .edpa/backlog/stories/S-200.yaml
+id: S-200
+type: Story
+title: "Implement login endpoint"
+js: 5              # Job Size (Fibonacci)
+bv: 8              # Business Value
+tc: 5              # Time Criticality
+rr: 3              # Risk Reduction
+status: Planned
+parent: F-100      # Parent Feature
+assignee: jnovak
+iteration: PI-2026-1.1
 
-# Verify
-python3 .claude/edpa/scripts/issue_types.py list \\
-  --org ORG --repo project-name`,
-    result: `✓ Created label: initiative  (color: #f472b6)
-✓ Created label: epic        (color: #818cf8)
-✓ Created label: feature     (color: #22d3ee)
-✓ Created label: story       (color: #f97316)
-✓ Created label: task        (color: #fbbf24)
-5 issue types configured.`,
+# Validate backlog
+python3 .claude/edpa/scripts/backlog.py validate
+python3 .claude/edpa/scripts/backlog.py tree`,
+    result: `✓ Backlog valid (12 items, 0 errors)
+
+I-1: Medical Platform
+└── E-10: Data Processing Pipeline
+    ├── F-100: Authentication (JS=8, WSJF=2.0)
+    │   ├── S-200: Login endpoint (JS=5) ← jnovak
+    │   └── S-201: Token refresh (JS=3) ← emala
+    └── F-101: Data Import (JS=13, WSJF=1.8)
+        ├── S-210: CSV parser (JS=5) ← emala
+        └── S-211: Validation (JS=3) ← pkral`,
   },
   {
     num: 6,
-    title: 'Populate Backlog',
-    color: 'var(--pk)',
-    desc: 'Add your first work items to the backlog — Stories and Tasks with story point estimates. The backlog feeds into WSJF prioritization.',
-    code: `# Add a Story
-python3 .claude/edpa/scripts/backlog.py add \\
-  --type Story \\
-  --title "Implement login endpoint" \\
-  --points 5 \\
-  --feature F-100-auth
-
-# Add a Task
-python3 .claude/edpa/scripts/backlog.py add \\
-  --type Task \\
-  --title "Write unit tests for auth" \\
-  --points 3 \\
-  --parent S-200-login`,
-    result: `✓ Created: S-200 "Implement login endpoint" [5 SP]
-  → linked to F-100-auth
-✓ Created: T-301 "Write unit tests for auth" [3 SP]
-  → linked to S-200-login`,
-  },
-  {
-    num: 7,
-    title: 'Create GitHub Project',
-    color: 'var(--ac)',
-    desc: 'Automatically create a GitHub Project with 8 views, 4 statuses (Todo, In Progress, In Review, Done), custom fields, and sub-issue hierarchy. NEVER enable auto-archive!',
-    claude: `/edpa setup
-# Claude Code creates the GitHub Project automatically (9 steps)`,
-    code: `python3 .claude/edpa/scripts/project_setup.py \\
-  --org ORG \\
-  --repo project-name`,
-    result: `✓ Created project: "EDPA — My Project"
-✓ Status: Todo | In Progress | In Review | Done
-✓ Fields: Job Size, BV, TC, RR, WSJF Score, Team
-✓ 12 issues created, 11 sub-issue links
-✓ 8 views: All Items, Board, Epics, Features, WSJF, Current Iteration, My Work, Roadmap`,
-  },
-  {
-    num: 8,
     title: 'Team Starts Working',
-    color: 'var(--cy)',
-    desc: 'The team works using standard GitHub flow — branch naming conventions, commits, pull requests, and code review. EDPA tracks everything automatically.',
-    code: `# Branch naming convention
+    color: 'var(--pk)',
+    desc: 'The team works using standard GitHub flow — branch naming conventions, commits referencing items, PRs and code review. EDPA tracks everything automatically.',
+    code: `# Branch naming (CI enforces format)
 git checkout -b feature/S-200-login-endpoint
 
-# Commit referencing the issue
-git commit -m "feat(auth): implement JWT login
-
-Resolves #200"
+# Commit referencing item
+git commit -m "feat(S-200): implement JWT login"
 
 # Pull Request
 gh pr create \\
@@ -162,13 +136,17 @@ gh pr create \\
 Commits: 4 (linked to S-200)
 PR #42: "S-200: Login endpoint"
   → Review requested: pkral
-  → Status: Approved ✓ → Merged`,
+  → Status: Approved ✓ → Merged
+
+Evidence detected:
+  jnovak: assignee (+4), PR author (+2), commits (+1)
+  pkral:  PR reviewer (+1)`,
   },
   {
-    num: 9,
+    num: 7,
     title: 'End of Iteration',
-    color: 'var(--gn)',
-    desc: 'At the end of the iteration, run the EDPA engine. It reads evidence from .edpa/backlog/ YAML files (populated by /edpa sync pull) and proportionally allocates hours based on actual work.',
+    color: 'var(--ac)',
+    desc: 'At iteration end, the EDPA engine reads evidence from backlog YAML files and proportionally allocates hours based on actual work.',
     claude: `/edpa close-iteration PI-2026-1.1
 # Claude Code fetches evidence and computes allocation`,
     code: `python3 .claude/edpa/scripts/engine.py \\
@@ -178,11 +156,10 @@ PR #42: "S-200: Login endpoint"
 # The engine automatically:
 # 1. Reads evidence from .edpa/backlog/ YAML files
 # 2. Computes contribution weight (CW)
-# 3. Allocates hours: hours = CW × capacity
+# 3. Allocates hours: Score / Total × Capacity
 # 4. Generates reports`,
     result: `EDPA Engine v1.0.0-beta — PI-2026-1.1
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Loaded:   47 commits, 12 PRs, 8 reviews
 Team:     3 members, 2.8 FTE
 Capacity: 448 hours (2 weeks)
 
@@ -190,42 +167,42 @@ Allocation:
   jnovak  │████████████████░░│ 178.2h (39.8%)
   emala   │█████████████░░░░░│ 142.6h (31.8%)
   pkral   │████████████░░░░░░│ 127.2h (28.4%)
-                        Total: 448.0h ✓`,
+                        Total: 448.0h ✓
+Invariants: ALL PASSED`,
   },
   {
-    num: 10,
+    num: 8,
     title: 'Reports & Timesheets',
-    color: 'var(--yl)',
-    desc: 'EDPA generates per-person markdown reports, JSON exports, and frozen snapshots. All reports are auditable and reproducible.',
+    color: 'var(--cy)',
+    desc: 'EDPA generates per-person timesheets, per-item cost allocation, JSON exports, and frozen snapshots. All auditable and reproducible.',
     claude: `/edpa reports
 # Claude Code generates all reports and timesheets`,
     code: `# Generated files
 .edpa/reports/
 ├── iteration-PI-2026-1.1/
-│   ├── summary.md           # summary report
-│   ├── jnovak.md            # per-person timesheet
-│   ├── emala.md
-│   ├── pkral.md
-│   ├── allocation.json      # machine-readable
-│   └── evidence.json        # raw evidence
+│   ├── vykaz-jnovak.md      # per-person timesheet
+│   ├── vykaz-emala.md
+│   ├── vykaz-pkral.md
+│   ├── edpa_results.json    # machine-readable
+│   └── summary.xlsx         # Excel export
 .edpa/snapshots/
-└── PI-2026-1.1.json         # frozen snapshot`,
-    result: `.edpa/reports/iteration-PI-2026-1.1/summary.md:
-┌─────────┬────────┬────────┬────────┐
-│ Person  │ Hours  │ Share  │ Items  │
-├─────────┼────────┼────────┼────────┤
-│ jnovak  │ 178.2  │ 39.8%  │ 7      │
-│ emala   │ 142.6  │ 31.8%  │ 5      │
-│ pkral   │ 127.2  │ 28.4%  │ 6      │
-├─────────┼────────┼────────┼────────┤
-│ TOTAL   │ 448.0  │ 100%   │ 18     │
-└─────────┴────────┴────────┴────────┘`,
+└── iteration-PI-2026-1.1.json  # frozen snapshot`,
+    result: `Per-person timesheet (vykaz-jnovak.md):
+┌──────────┬────────┬────────┬────────┐
+│ Person   │ Hours  │ Share  │ Items  │
+├──────────┼────────┼────────┼────────┤
+│ jnovak   │ 178.2  │ 39.8%  │ 7      │
+│ emala    │ 142.6  │ 31.8%  │ 5      │
+│ pkral    │ 127.2  │ 28.4%  │ 6      │
+├──────────┼────────┼────────┼────────┤
+│ TOTAL    │ 448.0  │ 100%   │ 18     │
+└──────────┴────────┴────────┴────────┘`,
   },
   {
-    num: 11,
+    num: 9,
     title: 'Retrospective + Calibration',
-    color: 'var(--or)',
-    desc: 'Compare EDPA outputs against ground truth. The evaluate_cw.py script computes MAD, correlation, and identifies outliers.',
+    color: 'var(--gn)',
+    desc: 'Compare EDPA outputs against ground truth. evaluate_cw.py computes MAD, correlation, and identifies outliers.',
     claude: `/edpa calibrate
 # Claude Code runs calibration and shows MAD results`,
     code: `# Ground truth comparison
@@ -233,7 +210,6 @@ python3 .claude/edpa/scripts/evaluate_cw.py \\
   --iteration PI-2026-1.1 \\
   --ground-truth .edpa/data/ground_truth.csv
 
-# Output: correlation, MAD, scatter plot
 # MAD < 0.05 → excellent calibration
 # MAD 0.05-0.10 → good calibration
 # MAD > 0.10 → weight adjustment needed`,
@@ -247,9 +223,9 @@ Verdict: EXCELLENT
 No weight adjustment needed.`,
   },
   {
-    num: 12,
+    num: 10,
     title: 'Next PI',
-    color: 'var(--pk)',
+    color: 'var(--yl)',
     desc: 'Repeat for each iteration. With every cycle, calibration improves. Target: predictability > 80%, MAD < 0.05 by the third PI.',
     claude: `/edpa close-iteration PI-2026-1.2
 # Next iteration — same workflow`,
@@ -271,13 +247,13 @@ Status: Mature — framework calibrated.`,
 
 const phases = [
   { label: 'Setup', steps: [1,2,3], color: 'var(--ac)' },
-  { label: 'Config', steps: [4,5,6], color: 'var(--cy)' },
-  { label: 'Run', steps: [7,8,9], color: 'var(--gn)' },
-  { label: 'Report', steps: [10,11,12], color: 'var(--yl)' },
+  { label: 'Config', steps: [4,5], color: 'var(--cy)' },
+  { label: 'Run', steps: [6,7,8], color: 'var(--gn)' },
+  { label: 'Report', steps: [9,10], color: 'var(--yl)' },
 ];
 ---
 
-<Layout title="Guide — Zero to First Report" lang="en" description="Interactive EDPA framework guide: 12 steps from installation to your first timesheet report.">
+<Layout title="Guide — Zero to First Report" lang="en" description="Interactive EDPA framework guide: 10 steps from installation to your first timesheet report.">
 
   <!-- Progress bar -->
   <div class="guide-progress" id="guideProgress">
@@ -304,7 +280,7 @@ const phases = [
       <p class="tag">Step-by-Step Guide</p>
       <h1 class="guide-title">Zero to First Report</h1>
       <p class="guide-subtitle">
-        12 steps that walk you through the entire EDPA framework —
+        10 steps that walk you through the entire EDPA framework —
         from tool installation to a calibrated hour allocation report.
       </p>
       <a href="#step-1" class="btn btn-primary">Start the guide</a>
@@ -387,7 +363,7 @@ const phases = [
         if (entry.isIntersecting) {
           const id = entry.target.id;
           const num = parseInt(id.replace('step-', ''));
-          const pct = (num / 12) * 100;
+          const pct = (num / 10) * 100;
           fill.style.width = pct + '%';
           dots.forEach(d => {
             const ds = parseInt(d.getAttribute('data-step') || '0');
