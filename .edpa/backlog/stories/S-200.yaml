@@ -10,12 +10,13 @@ parent: F-100
 assignee: turyna
 iteration: PI-2026-1.1
 contributors:
-- person: turyna
-  role: owner
-  cw: 1.0
-- person: tuma
-  role: key
-  cw: 0.6
-- person: urbanek
-  role: reviewer
-  cw: 0.3
+  - person: turyna
+    role: owner
+    cw: 1
+  - person: tuma
+    role: key
+    cw: 0.6
+  - person: urbanek
+    role: reviewer
+    cw: 0.3
+iteration_half: 1

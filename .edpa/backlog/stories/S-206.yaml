@@ -10,12 +10,14 @@ parent: F-102
 assignee: urbanek
 iteration: PI-2026-1.2
 contributors:
-- person: urbanek
-  role: owner
-  cw: 1.0
-- person: turyna
-  role: key
-  cw: 0.6
-- person: d1
-  role: consulted
-  cw: 0.15
+  - person: urbanek
+    role: owner
+    cw: 1
+  - person: turyna
+    role: key
+    cw: 0.6
+  - person: d1
+    role: consulted
+    cw: 0.15
+depends_on:
+  - S-200

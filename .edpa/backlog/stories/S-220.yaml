@@ -7,12 +7,12 @@ tc: 3
 rr: 3
 status: Done
 parent: F-111
-assignee: d1
+assignee: turyna
 iteration: PI-2026-1.4
 contributors:
-- person: d1
-  role: owner
-  cw: 1.0
-- person: tuma
-  role: consulted
-  cw: 0.25
+  - person: d1
+    role: owner
+    cw: 1
+  - person: tuma
+    role: consulted
+    cw: 0.25

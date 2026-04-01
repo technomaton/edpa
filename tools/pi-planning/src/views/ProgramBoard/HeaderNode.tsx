@@ -14,11 +14,15 @@ function HeaderNodeInner({ data }: NodeProps) {
     <div className={`rf-header rf-header--${variant}`}>
       <span className="rf-header__label">{label}</span>
       {sublabel && <span className="rf-header__sub">{sublabel}</span>}
-      {badge && <span className="rf-header__badge">{badge}</span>}
-      {status && (
-        <span className={`rf-header__status rf-header__status--${status}`}>
-          {status}
-        </span>
+      {(status || badge) && (
+        <div className="rf-header__tags">
+          {status && (
+            <span className={`rf-header__status rf-header__status--${status}`}>
+              {status}
+            </span>
+          )}
+          {badge && <span className="rf-header__badge">{badge}</span>}
+        </div>
       )}
     </div>
   );

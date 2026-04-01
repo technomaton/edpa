@@ -47,9 +47,12 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
       api.getPeople(),
     ]);
     const pis = configData.pis || [];
-    // Select the active PI by default, or the first one
-    const activePI = pis.find(p => p.status === 'active') || pis[0];
-    const selectedPI = activePI?.id || null;
+    // Default: planning PI > active PI > first PI
+    // (PI Planning tool is primarily for planning the next PI)
+    const defaultPI = pis.find(p => p.status === 'planning')
+      || pis.find(p => p.status === 'active')
+      || pis[0];
+    const selectedPI = defaultPI?.id || null;
 
     set({
       pis,
@@ -57,7 +60,7 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
       people: peopleData.people,
       teams: peopleData.teams,
       selectedPI,
-      isReadonly: activePI?.status === 'closed',
+      isReadonly: defaultPI?.status === 'closed',
     });
   },
 

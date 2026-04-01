@@ -8,8 +8,9 @@ rr: 5
 status: Done
 parent: F-120
 assignee: tuma
-iteration: PI-2026-1.3
+iteration: PI-2026-1.2
 contributors:
-- person: tuma
-  role: owner
-  cw: 1.0
+  - person: tuma
+    role: owner
+    cw: 1
+iteration_half: 2

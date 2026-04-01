@@ -19,4 +19,5 @@ contributors:
   - person: d1
     role: key
     cw: 0.3
-iteration: PI-2026-1.2
+iteration: PI-2026-1.1
+iteration_half: 1

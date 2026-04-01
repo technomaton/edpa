@@ -54,4 +54,5 @@ contributors:
     role: owner
     cw: 0.25
     rs: 0.8
-iteration: PI-2026-1.3
+iteration: PI-2026-2.1
+iteration_half: 1

@@ -23,6 +23,7 @@ export interface WorkItem {
   assignee?: string;
   owner?: string;
   contributors: Contributor[];
+  iteration_half?: 1 | 2;
   depends_on?: string[];
   epic_type?: 'Business' | 'Enabler';
 }

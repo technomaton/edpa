@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -20,14 +20,15 @@ import type { WorkItem, Person, Iteration } from '../../types/edpa';
 
 // -- Layout constants ---------------------------------------------------------
 
-const COL_W = 300;
+const COL_W = 400;
+const HALF_W = COL_W / 2;
 const ROW_H = 280;
 const HEADER_H = 80;
 const ROW_HEADER_W = 140;
-const CARD_W = 260;
+const CARD_W = HALF_W - 24;  // fit in half-cell with padding
 const CARD_H = 90;
 const CARD_GAP = 8;
-const CARD_PAD = 12;
+const CARD_PAD = 8;
 
 const nodeTypes = {
   featureCard: FeatureCard,
@@ -58,11 +59,49 @@ function buildBoard(
   planningFactors: Record<string, number>,
   onSelectItem: (item: WorkItem) => void,
   dropTarget: string | null,
-): { nodes: Node[]; edges: Edge[] } {
+): { nodes: Node[]; edges: Edge[]; rowYOffsets: Record<string, number>; rowHeights: Record<string, number> } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  const features = items.filter(i => i.type === 'Feature' || i.type === 'Epic');
+  // Only show Features/Stories on the board (Epics span PIs, not iterations)
+  const allFeatures = items.filter(i => i.type === 'Feature' || i.type === 'Story');
+  // Filter to items belonging to this PI's iterations or unassigned
+  const iterationIds = new Set(iterations.map(it => it.id));
+  const features = allFeatures.filter(i => {
+    if (!i.iteration) return true; // unassigned — show in backlog
+    return iterationIds.has(i.iteration) || iterations.some(it => i.iteration!.startsWith(it.id));
+  });
+
+  // Pre-compute items per half-cell to determine dynamic row heights
+  const halfCellCounts: Record<string, number> = {};
+  features.forEach(item => {
+    const iterId = iterationForItem(item, iterations);
+    const team = getTeamForItem(item, personTeam);
+    if (iterId && teamIds.includes(team)) {
+      const half = item.iteration_half || 1;
+      const key = `${team}::${iterId}::W${half}`;
+      halfCellCounts[key] = (halfCellCounts[key] || 0) + 1;
+    }
+  });
+
+  // Max items in any half-cell per team row → dynamic row height
+  const rowHeights: Record<string, number> = {};
+  const rowYOffsets: Record<string, number> = {};
+  let yAccum = HEADER_H;
+  teamIds.forEach(teamId => {
+    let maxInRow = 1;
+    iterations.forEach(iter => {
+      const w1 = halfCellCounts[`${teamId}::${iter.id}::W1`] || 0;
+      const w2 = halfCellCounts[`${teamId}::${iter.id}::W2`] || 0;
+      const maxInCell = Math.max(w1, w2);
+      if (maxInCell > maxInRow) maxInRow = maxInCell;
+    });
+    const h = Math.max(ROW_H, CARD_PAD * 2 + 24 + maxInRow * (CARD_H + CARD_GAP));
+    rowHeights[teamId] = h;
+    rowYOffsets[teamId] = yAccum;
+    yAccum += h;
+  });
+  const totalGridHeight = yAccum;
 
   // Corner node
   nodes.push({
@@ -82,9 +121,8 @@ function buildBoard(
       type: 'headerNode',
       position: { x: ROW_HEADER_W + colIdx * COL_W, y: 0 },
       data: {
-        label: iter.id.split('.').pop() || iter.id,
+        label: iter.id,
         sublabel: iter.dates,
-        badge: iter.type || undefined,
         variant: 'column',
         status: iter.status,
       },
@@ -97,10 +135,12 @@ function buildBoard(
   // Row headers (teams) + cells
   teamIds.forEach((teamId, rowIdx) => {
     const memberCount = people.filter(p => p.team === teamId).length;
+    const rowH = rowHeights[teamId];
+    const rowY = rowYOffsets[teamId];
     nodes.push({
       id: `row-${teamId}`,
       type: 'headerNode',
-      position: { x: 0, y: HEADER_H + rowIdx * ROW_H },
+      position: { x: 0, y: rowY },
       data: {
         label: teamId,
         sublabel: `${memberCount} members`,
@@ -108,7 +148,7 @@ function buildBoard(
       },
       draggable: false,
       selectable: false,
-      style: { width: ROW_HEADER_W - 4, height: ROW_H - 4 },
+      style: { width: ROW_HEADER_W - 4, height: rowH - 4 },
     });
 
     iterations.forEach((iter, colIdx) => {
@@ -125,48 +165,50 @@ function buildBoard(
       nodes.push({
         id: cellId,
         type: 'cellNode',
-        position: { x: ROW_HEADER_W + colIdx * COL_W, y: HEADER_H + rowIdx * ROW_H },
+        position: { x: ROW_HEADER_W + colIdx * COL_W, y: rowY },
         data: {
           teamId,
           iterationId: iter.id,
           used,
           available,
           isActive: iter.status === 'active',
-          isDropTarget: dropTarget === cellId,
+          dropHalf: dropTarget === `${cellId}-W1` ? 1 : dropTarget === `${cellId}-W2` ? 2 : 0,
         },
         draggable: false,
         selectable: false,
-        style: { width: COL_W - 4, height: ROW_H - 4, zIndex: -1 },
+        style: { width: COL_W - 4, height: rowH - 4, zIndex: -1 },
       });
     });
   });
 
-  // Feature cards
-  const cellCount: Record<string, number> = {};
+  // Feature cards — positioned in W1 or W2 half of each cell
+  const halfCount: Record<string, number> = {};
 
   features.forEach(item => {
     const iterId = iterationForItem(item, iterations);
     const colIdx = iterId ? iterations.findIndex(it => it.id === iterId) : -1;
     const team = getTeamForItem(item, personTeam);
     const rowIdx = teamIds.indexOf(team);
+    const half = item.iteration_half || 1;
 
     let x: number, y: number;
 
     if (colIdx >= 0 && rowIdx >= 0) {
-      const cellKey = `${colIdx}-${rowIdx}`;
-      const stackIdx = cellCount[cellKey] || 0;
-      cellCount[cellKey] = stackIdx + 1;
-      x = ROW_HEADER_W + colIdx * COL_W + CARD_PAD;
-      y = HEADER_H + rowIdx * ROW_H + CARD_PAD + stackIdx * (CARD_H + CARD_GAP);
+      const halfKey = `${colIdx}-${rowIdx}-W${half}`;
+      const stackIdx = halfCount[halfKey] || 0;
+      halfCount[halfKey] = stackIdx + 1;
+      const cellX = ROW_HEADER_W + colIdx * COL_W;
+      x = cellX + (half === 2 ? HALF_W : 0) + CARD_PAD;
+      y = rowYOffsets[team] + 24 + CARD_PAD + stackIdx * (CARD_H + CARD_GAP);
     } else {
       // Unassigned — place below grid
-      const unIdx = cellCount['unassigned'] || 0;
-      cellCount['unassigned'] = unIdx + 1;
+      const unIdx = halfCount['unassigned'] || 0;
+      halfCount['unassigned'] = unIdx + 1;
       const cols = Math.floor((iterations.length * COL_W) / (CARD_W + CARD_GAP));
       const uCol = unIdx % Math.max(1, cols);
       const uRow = Math.floor(unIdx / Math.max(1, cols));
       x = ROW_HEADER_W + uCol * (CARD_W + CARD_GAP);
-      y = HEADER_H + teamIds.length * ROW_H + 60 + uRow * (CARD_H + CARD_GAP);
+      y = totalGridHeight + 60 + uRow * (CARD_H + CARD_GAP);
     }
 
     nodes.push({
@@ -198,7 +240,7 @@ function buildBoard(
     nodes.push({
       id: 'unassigned-header',
       type: 'headerNode',
-      position: { x: 0, y: HEADER_H + teamIds.length * ROW_H + 20 },
+      position: { x: 0, y: totalGridHeight + 20 },
       data: { label: `Backlog (${unassignedCount})`, variant: 'row' },
       draggable: false,
       selectable: false,
@@ -206,7 +248,7 @@ function buildBoard(
     });
   }
 
-  return { nodes, edges };
+  return { nodes, edges, rowYOffsets, rowHeights };
 }
 
 // -- Detail Panel (overlay) ---------------------------------------------------
@@ -283,11 +325,16 @@ export function ProgramBoard() {
     return m;
   }, [teams]);
 
+  const layoutRef = useRef<{ rowYOffsets: Record<string, number>; rowHeights: Record<string, number> }>({
+    rowYOffsets: {}, rowHeights: {},
+  });
+
   const { builtNodes, builtEdges } = useMemo(
     () => {
-      const { nodes, edges } = buildBoard(
+      const { nodes, edges, rowYOffsets: ryo, rowHeights: rh } = buildBoard(
         items, iterations, teamIds, people, personTeam, planningFactors, setSelectedItem, dropTarget,
       );
+      layoutRef.current = { rowYOffsets: ryo, rowHeights: rh };
       return { builtNodes: nodes, builtEdges: edges };
     },
     [items, iterations, teamIds, people, personTeam, planningFactors, dropTarget],
@@ -300,46 +347,60 @@ export function ProgramBoard() {
   useEffect(() => { setNodes(builtNodes); }, [builtNodes, setNodes]);
   useEffect(() => { setEdges(builtEdges); }, [builtEdges, setEdges]);
 
-  // Highlight target cell during drag
-  const onNodeDrag = useCallback(
-    (_: unknown, node: Node) => {
-      if (node.type !== 'featureCard') return;
+  // Detect which cell + half the node is over (use card center, not left edge)
+  const detectCellHalf = useCallback(
+    (nodeX: number, nodeY: number) => {
+      const centerX = nodeX + CARD_W / 2;
+      const centerY = nodeY + CARD_H / 2;
       const colIdx = Math.max(0, Math.min(
         iterations.length - 1,
-        Math.round((node.position.x - ROW_HEADER_W) / COL_W),
+        Math.floor((centerX - ROW_HEADER_W) / COL_W),
       ));
-      const rowIdx = Math.max(0, Math.min(
-        teamIds.length - 1,
-        Math.round((node.position.y - HEADER_H) / ROW_H),
-      ));
-      const cellId = `cell-${teamIds[rowIdx]}-${iterations[colIdx]?.id}`;
-      setDropTarget(prev => prev === cellId ? prev : cellId);
+      const { rowYOffsets: ryo, rowHeights: rh } = layoutRef.current;
+      let matchedTeam = teamIds[0];
+      for (const tid of teamIds) {
+        const rowTop = ryo[tid] || 0;
+        const rowBot = rowTop + (rh[tid] || ROW_H);
+        if (centerY >= rowTop && centerY < rowBot) {
+          matchedTeam = tid;
+          break;
+        }
+      }
+      const xInCell = centerX - (ROW_HEADER_W + colIdx * COL_W);
+      const half: 1 | 2 = xInCell < HALF_W ? 1 : 2;
+      return { colIdx, team: matchedTeam, half, iteration: iterations[colIdx]?.id };
     },
     [iterations, teamIds],
   );
 
-  // Snap to cell on drag stop
+  // Highlight target half-cell during drag
+  const onNodeDrag = useCallback(
+    (_: unknown, node: Node) => {
+      if (node.type !== 'featureCard') return;
+      const { team, iteration, half } = detectCellHalf(node.position.x, node.position.y);
+      const targetId = `cell-${team}-${iteration}-W${half}`;
+      setDropTarget(prev => prev === targetId ? prev : targetId);
+    },
+    [detectCellHalf],
+  );
+
+  // Snap to cell on drag stop — save iteration + half
   const onNodeDragStop = useCallback(
     (_: unknown, node: Node) => {
       setDropTarget(null);
       if (node.type !== 'featureCard') return;
       const item = node.data.item as WorkItem;
+      const { iteration, half } = detectCellHalf(node.position.x, node.position.y);
 
-      const colIdx = Math.max(0, Math.min(
-        iterations.length - 1,
-        Math.round((node.position.x - ROW_HEADER_W) / COL_W),
-      ));
-      const newIteration = iterations[colIdx]?.id;
-
-      if (newIteration && newIteration !== item.iteration) {
-        updateItem(item.id, { iteration: newIteration });
+      if (iteration && (iteration !== item.iteration || half !== item.iteration_half)) {
+        updateItem(item.id, { iteration, iteration_half: half });
         saveItem(item.id);
       }
     },
-    [iterations, updateItem, saveItem],
+    [detectCellHalf, updateItem, saveItem],
   );
 
-  // Connect edges (draw new dependency)
+  // Connect edges (draw new dependency) and persist to YAML
   const onConnect: OnConnect = useCallback(
     (connection) => {
       if (connection.source && connection.target) {
@@ -349,10 +410,18 @@ export function ProgramBoard() {
           style: { stroke: '#6366f1', strokeWidth: 2 },
           type: 'smoothstep',
         }, eds));
-        // TODO: persist depends_on to YAML
+        // Persist: add target to source's depends_on
+        const targetItem = items.find(i => i.id === connection.target);
+        if (targetItem) {
+          const currentDeps = targetItem.depends_on || [];
+          if (!currentDeps.includes(connection.source)) {
+            updateItem(connection.target, { depends_on: [...currentDeps, connection.source] });
+            saveItem(connection.target);
+          }
+        }
       }
     },
-    [setEdges],
+    [setEdges, items, updateItem, saveItem],
   );
 
   return (

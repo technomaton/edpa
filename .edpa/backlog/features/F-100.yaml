@@ -7,7 +7,7 @@ tc: 5
 rr: 5
 wsjf: 2.25
 status: Done
-iteration: PI-2026-1.5
+iteration: PI-2026-2.1
 parent: E-10
 owner: urbanek
 contributors:
@@ -23,3 +23,4 @@ contributors:
   - person: pm
     role: consulted
     cw: 0.2
+iteration_half: 2

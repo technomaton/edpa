@@ -1,10 +1,10 @@
 # Iteration PI-2026-1.1 -- Plan & Results
-# Closed iteration: 1.4. –14.4.2026
+# Closed iteration: 1.4.–14.4.2026
 
 iteration:
   id: PI-2026-1.1
   pi: PI-2026-1
-  dates: "1.4. –14.4.2026"
+  dates: "1.4.–14.4.2026"
   status: closed
   cadence: "2/10"  # 2-week iteration, 10-week PI
 

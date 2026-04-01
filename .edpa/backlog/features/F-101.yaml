@@ -7,7 +7,7 @@ tc: 8
 rr: 3
 wsjf: 3.2
 status: Done
-iteration: PI-2026-1.1
+iteration: PI-2026-2.2
 parent: E-10
 owner: tuma
 contributors:
@@ -23,3 +23,4 @@ contributors:
   - person: pm
     role: consulted
     cw: 0.2
+iteration_half: 1
