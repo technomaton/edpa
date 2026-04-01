@@ -87,7 +87,7 @@ GitHub Projects Status field must have exactly these 4 options:
 
 > **Why "In Review"?** PR reviews are evidence signals — the EDPA engine assigns Contribution Weight for `pr_reviewer`. Making review visible on the board encourages reviews and provides evidence.
 
-> **Blocked is a label, not a status.** A blocked item is still "In Progress" — it has not moved backwards. Use the `Blocked` label to filter without breaking the linear status progression.
+> **No "Blocked" status.** If an item is blocked, either resolve the blocker immediately (if it has priority) or close the item, split it, and create new work. Don't accumulate stuck items — keep the flow moving.
 
 `project_setup.py` creates these 4 status options automatically.
 

@@ -79,6 +79,31 @@ CROSS = "\u2717"
 SYNC_ICON = "\u21c4"  # bidirectional arrow
 
 
+# -- Validation ---------------------------------------------------------------
+
+FIBONACCI = {1, 2, 3, 5, 8, 13, 20}
+FIBONACCI_FIELDS = {"js", "bv", "tc", "rr"}
+
+
+def validate_fibonacci(items):
+    """Validate that JS, BV, TC, RR use Fibonacci values. Returns list of warnings."""
+    warnings = []
+    for item_id, item in items.items():
+        for field in FIBONACCI_FIELDS:
+            val = item.get(field)
+            if val is not None and val != "" and val != 0:
+                try:
+                    num = float(val)
+                    if num > 0 and int(num) == num and int(num) not in FIBONACCI:
+                        warnings.append(
+                            f"{item_id}: {field}={int(num)} is not Fibonacci "
+                            f"(valid: {', '.join(str(f) for f in sorted(FIBONACCI))})"
+                        )
+                except (ValueError, TypeError):
+                    pass
+    return warnings
+
+
 # -- Path Resolution ----------------------------------------------------------
 
 def find_repo_root():
@@ -636,6 +661,14 @@ def cmd_pull(root, sync_config, args):
 
     print(color(f"  Remote items: {len(remote_items)}", C.MUTED))
     print(color(f"  Local items:  {len(local_items)}", C.MUTED))
+
+    # Validate Fibonacci values
+    fib_warnings = validate_fibonacci(remote_items)
+    if fib_warnings:
+        print()
+        print(color(f"  {CROSS} Fibonacci validation warnings ({len(fib_warnings)}):", C.WARN))
+        for w in fib_warnings:
+            print(color(f"    {DOT} {w}", C.WARN))
     print()
 
     # Compute diff

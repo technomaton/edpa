@@ -60,7 +60,7 @@ python .claude/edpa/scripts/project_setup.py \
   --project-title "EDPA Simulation — Medical Platform"
 ```
 
-### Co skript udělá (7 kroků)
+### Co skript udělá (9 kroků)
 
 | Krok | Akce | Detail |
 |------|------|--------|

@@ -776,6 +776,22 @@ def cmd_validate(backlog, args):
                     f"{actual_parent_type}, expected {expected_parent_type}"
                 )
 
+    # 11. Validate Fibonacci values for JS, BV, TC, RR
+    fibonacci = {1, 2, 3, 5, 8, 13, 20}
+    for item in items:
+        for field in ("js", "bv", "tc", "rr"):
+            val = item.get(field)
+            if val is not None and val != 0:
+                try:
+                    num = int(float(val))
+                    if num > 0 and num not in fibonacci:
+                        warnings.append(
+                            f"{item.get('id', '?')}: {field}={num} is not Fibonacci "
+                            f"(valid: {', '.join(str(f) for f in sorted(fibonacci))})"
+                        )
+                except (ValueError, TypeError):
+                    pass
+
     # Print results
     checks = [
         ("Story assignees present", not any("missing assignee" in e for e in errors)),
@@ -788,6 +804,7 @@ def cmd_validate(backlog, args):
         ("No duplicate IDs", not any("Duplicate ID" in e for e in errors)),
         ("CW values valid", not any("unusual cw" in w for w in warnings)),
         ("Type fields present", not any("missing 'type'" in e for e in errors)),
+        ("Fibonacci values", not any("not Fibonacci" in w for w in warnings)),
     ]
 
     for label, passed in checks:
