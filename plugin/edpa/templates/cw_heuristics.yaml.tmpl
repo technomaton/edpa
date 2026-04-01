@@ -83,11 +83,11 @@ role_overrides:
   DevSecOps:                   # DevSecOps Engineer
     owner: 1.00                # MC: median=1.00, n=2152, 10% corrections ✓
     key: 0.60                  # MC: median=0.60, n=1234, 20% corrections ✓
-    reviewer: 0.25             # MC: median=0.25, n=1275, 40% corrections (borderline)
+    reviewer: 0.30             # MC: 0.25 → kashealth calibration: 0.30 (62% corrections, MAD→0)
     consulted: 0.15            # fallback
     #
     # DevSecOps infra work (CI/CD, security) is mostly visible in Git.
-    # Reviewer CW borderline (40% corrections), but median = 0.25 → kept.
+    # Reviewer CW updated from 0.25→0.30 based on kashealth ground truth (22 records).
 
   QA:                          # QA / Test Engineer
     owner: 1.00                # MC: stable (25% corrections down, but median holds)
