@@ -579,10 +579,15 @@ def show_status(edpa_root):
     edpa_cfg_path = edpa_root / "config" / "edpa.yaml"
     if edpa_cfg_path.exists():
         edpa_cfg = load_yaml(edpa_cfg_path) or {}
-        pi = edpa_cfg.get("pi", {})
-        iterations = pi.get("iterations", [])
+        # Support new pis[] array and legacy pi:{} format
+        pis = edpa_cfg.get("pis", [])
+        if not pis and edpa_cfg.get("pi"):
+            legacy = edpa_cfg["pi"]
+            pis = [{"id": legacy.get("current", "?"), "iterations": legacy.get("iterations", []), "status": "active"}]
+        active_pi = next((p for p in pis if p.get("status") == "active"), pis[0] if pis else {})
+        iterations = active_pi.get("iterations", [])
         if iterations:
-            print(f"✓ {len(iterations)} iterations defined (PI: {pi.get('current', '?')})")
+            print(f"✓ {len(iterations)} iterations defined (PI: {active_pi.get('id', '?')})")
             for it in iterations:
                 status = it.get("status", "?")
                 marker = "→" if status == "active" else " "

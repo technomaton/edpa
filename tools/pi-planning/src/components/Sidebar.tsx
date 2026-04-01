@@ -16,12 +16,12 @@ const PI_STATUS_LABELS: Record<string, string> = {
 
 export function Sidebar() {
   const project = useConfigStore(s => s.project);
+  const pis = useConfigStore(s => s.pis);
   const selectedPI = useConfigStore(s => s.selectedPI);
-  const availablePIs = useConfigStore(s => s.availablePIs);
   const isReadonly = useConfigStore(s => s.isReadonly);
   const selectPI = useConfigStore(s => s.selectPI);
 
-  const currentInfo = availablePIs.find(p => p.id === selectedPI);
+  const currentInfo = pis.find(p => p.id === selectedPI);
   const activeIter = currentInfo?.iterations.find(it => it.status === 'active');
   const closedCount = currentInfo?.iterations.filter(it => it.status === 'closed').length || 0;
   const totalCount = currentInfo?.iterations.length || 0;
@@ -44,7 +44,7 @@ export function Sidebar() {
       <div className="pi-selector">
         <div className="pi-selector__label">Planning Interval</div>
         <div className="pi-selector__list">
-          {availablePIs.map(pi => (
+          {pis.map(pi => (
             <button
               key={pi.id}
               className={`pi-selector__item ${pi.id === selectedPI ? 'pi-selector__item--active' : ''}`}

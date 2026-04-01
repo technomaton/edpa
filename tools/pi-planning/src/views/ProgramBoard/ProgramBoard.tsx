@@ -262,7 +262,7 @@ export function ProgramBoard() {
   const items = useBacklogStore(s => s.items);
   const updateItem = useBacklogStore(s => s.updateItem);
   const saveItem = useBacklogStore(s => s.saveItem);
-  const pi = useConfigStore(s => s.pi);
+  const pi = useConfigStore(s => s.currentPI());
   const people = useConfigStore(s => s.people);
   const teams = useConfigStore(s => s.teams);
   const isReadonly = useConfigStore(s => s.isReadonly);

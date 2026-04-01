@@ -5,7 +5,7 @@ import { useBacklogStore } from '../../store/backlog-store';
 export function People() {
   const people = useConfigStore(s => s.people);
   const teams = useConfigStore(s => s.teams);
-  const pi = useConfigStore(s => s.pi);
+  const pi = useConfigStore(s => s.currentPI());
   const items = useBacklogStore(s => s.items);
 
   const teamIds = useMemo(() => [...new Set(people.map(p => p.team))], [people]);

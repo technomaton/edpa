@@ -96,7 +96,7 @@ export function TeamBoard() {
   const updateItem = useBacklogStore(s => s.updateItem);
   const saveItem = useBacklogStore(s => s.saveItem);
   const people = useConfigStore(s => s.people);
-  const pi = useConfigStore(s => s.pi);
+  const pi = useConfigStore(s => s.currentPI());
   const teams = useConfigStore(s => s.teams);
 
   const teamIds = useMemo(() => [...new Set(people.map(p => p.team))], [people]);

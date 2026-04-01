@@ -26,7 +26,7 @@ export const api = {
 
   getConfig: () =>
     request<{
-      pi: import('../types/edpa').PIConfig;
+      pis: import('../types/edpa').PIConfig[];
       project: import('../types/edpa').ProjectConfig;
     }>('/config'),
 

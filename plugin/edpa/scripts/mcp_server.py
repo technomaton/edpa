@@ -165,8 +165,15 @@ def _handle_status(edpa_root: Path) -> list[TextContent]:
     config = load_yaml(edpa_root / "config" / "edpa.yaml") or {}
     people_cfg = load_yaml(edpa_root / "config" / "people.yaml") or {}
 
-    pi = config.get("pi", {})
-    iterations = pi.get("iterations", [])
+    # Support new pis[] array and legacy pi:{} format
+    pis = config.get("pis", [])
+    if not pis and config.get("pi"):
+        legacy = config["pi"]
+        pis = [{"id": legacy.get("current", "?"), "iterations": legacy.get("iterations", []),
+                "status": "active", "iteration_weeks": legacy.get("iteration_weeks", 2),
+                "pi_iterations": legacy.get("pi_iterations", len(legacy.get("iterations", [])))}]
+    active_pi = next((p for p in pis if p.get("status") == "active"), pis[0] if pis else {})
+    iterations = active_pi.get("iterations", [])
     active = next((i for i in iterations if i.get("status") == "active"), None)
     closed_count = sum(1 for i in iterations if i.get("status") == "closed")
 
@@ -174,24 +181,32 @@ def _handle_status(edpa_root: Path) -> list[TextContent]:
     total_capacity = sum(p.get("capacity_per_iteration") or p.get("capacity", 0) for p in people)
 
     project = people_cfg.get("project", {})
+    iter_weeks = active_pi.get("iteration_weeks", 2)
+    pi_iters = active_pi.get("pi_iterations", len(iterations))
 
     result = {
         "project": project.get("name", "unknown"),
-        "current_pi": pi.get("current", "unknown"),
+        "current_pi": active_pi.get("id", "unknown"),
         "iterations_total": len(iterations),
         "iterations_closed": closed_count,
         "active_iteration": active["id"] if active else None,
         "active_iteration_dates": active.get("dates") if active else None,
         "team_size": len(people),
         "total_capacity_per_iteration": total_capacity,
-        "cadence": f"{pi.get('iteration_weeks', 2)}-week iterations, {pi.get('pi_weeks', 10)}-week PI",
+        "cadence": f"{iter_weeks}-week iterations, {pi_iters * iter_weeks}-week PI ({pi_iters} iterations)",
     }
     return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
 
 
 def _handle_iterations(edpa_root: Path, status_filter: str | None) -> list[TextContent]:
     config = load_yaml(edpa_root / "config" / "edpa.yaml") or {}
-    iterations = config.get("pi", {}).get("iterations", [])
+    # Support new pis[] array and legacy pi:{} format
+    pis = config.get("pis", [])
+    if not pis and config.get("pi"):
+        legacy = config["pi"]
+        pis = [{"id": legacy.get("current", "?"), "iterations": legacy.get("iterations", [])}]
+    active_pi = next((p for p in pis if p.get("status") == "active"), pis[0] if pis else {})
+    iterations = active_pi.get("iterations", [])
 
     if status_filter:
         iterations = [i for i in iterations if i.get("status") == status_filter]

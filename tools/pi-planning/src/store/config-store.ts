@@ -1,67 +1,44 @@
 import { create } from 'zustand';
-import type { PIConfig, Person, Team, ProjectConfig, GitStatus, Iteration } from '../types/edpa';
+import type { PIConfig, Person, Team, ProjectConfig, GitStatus } from '../types/edpa';
 import { api } from '../lib/api';
 
-interface PIInfo {
-  id: string;           // PI-2026-1
-  iterations: Iteration[];
-  status: 'planning' | 'active' | 'closed';
-}
-
 interface ConfigStore {
-  pi: PIConfig | null;
+  pis: PIConfig[];
   project: ProjectConfig | null;
   people: Person[];
   teams: Team[];
   git: GitStatus | null;
   // PI selection
-  selectedPI: string | null;   // PI-2026-1
-  availablePIs: PIInfo[];
+  selectedPI: string | null;
   isReadonly: boolean;
   selectPI: (piId: string) => void;
+  // Derived
+  currentPI: () => PIConfig | undefined;
   // Data
   fetch: () => Promise<void>;
   fetchGit: () => Promise<void>;
 }
 
-function derivePIStatus(iterations: Iteration[]): 'planning' | 'active' | 'closed' {
-  if (iterations.every(it => it.status === 'closed')) return 'closed';
-  if (iterations.some(it => it.status === 'active')) return 'active';
-  return 'planning';
-}
-
-function groupByPI(iterations: Iteration[]): PIInfo[] {
-  const map: Record<string, Iteration[]> = {};
-  for (const it of iterations) {
-    // PI-2026-1.3 → PI-2026-1
-    const piId = it.id.replace(/\.\d+$/, '');
-    if (!map[piId]) map[piId] = [];
-    map[piId].push(it);
-  }
-  return Object.entries(map).map(([id, iters]) => ({
-    id,
-    iterations: iters,
-    status: derivePIStatus(iters),
-  }));
-}
-
 export const useConfigStore = create<ConfigStore>((set, get) => ({
-  pi: null,
+  pis: [],
   project: null,
   people: [],
   teams: [],
   git: null,
   selectedPI: null,
-  availablePIs: [],
   isReadonly: false,
 
   selectPI: (piId: string) => {
-    const pis = get().availablePIs;
-    const selected = pis.find(p => p.id === piId);
+    const pi = get().pis.find(p => p.id === piId);
     set({
       selectedPI: piId,
-      isReadonly: selected?.status === 'closed',
+      isReadonly: pi?.status === 'closed',
     });
+  },
+
+  currentPI: () => {
+    const { pis, selectedPI } = get();
+    return pis.find(p => p.id === selectedPI);
   },
 
   fetch: async () => {
@@ -69,19 +46,18 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
       api.getConfig(),
       api.getPeople(),
     ]);
-    const pi = configData.pi;
-    const availablePIs = groupByPI(pi?.iterations || []);
-    const currentPI = pi?.current || availablePIs[0]?.id || null;
-    const currentInfo = availablePIs.find(p => p.id === currentPI);
+    const pis = configData.pis || [];
+    // Select the active PI by default, or the first one
+    const activePI = pis.find(p => p.status === 'active') || pis[0];
+    const selectedPI = activePI?.id || null;
 
     set({
-      pi,
+      pis,
       project: configData.project || peopleData.project,
       people: peopleData.people,
       teams: peopleData.teams,
-      availablePIs,
-      selectedPI: currentPI,
-      isReadonly: currentInfo?.status === 'closed',
+      selectedPI,
+      isReadonly: activePI?.status === 'closed',
     });
   },
 

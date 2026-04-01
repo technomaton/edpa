@@ -82,13 +82,34 @@ export function loadPeopleConfig(edpaRoot: string): { people: Person[]; teams: T
   };
 }
 
-export function loadEdpaConfig(edpaRoot: string): { pi: PIConfig } {
+export function loadEdpaConfig(edpaRoot: string): { pis: PIConfig[] } {
   const configPath = path.join(edpaRoot, '.edpa', 'config', 'edpa.yaml');
   const data = yaml.load(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
 
-  return {
-    pi: data.pi as PIConfig,
-  };
+  // Support new `pis:` array format
+  if (data.pis) {
+    return { pis: data.pis as PIConfig[] };
+  }
+
+  // Legacy: convert old `pi:` single object to array
+  const legacyPi = data.pi as Record<string, unknown> | undefined;
+  if (legacyPi) {
+    const piId = (legacyPi.current as string) || 'PI-unknown';
+    const iterations = (legacyPi.iterations || []) as PIConfig['iterations'];
+    const allClosed = iterations.every(it => it.status === 'closed');
+    const hasActive = iterations.some(it => it.status === 'active');
+    return {
+      pis: [{
+        id: piId,
+        status: allClosed ? 'closed' : hasActive ? 'active' : 'planning',
+        pi_iterations: iterations.length,
+        iteration_weeks: (legacyPi.iteration_weeks as number) || 2,
+        iterations,
+      }],
+    };
+  }
+
+  return { pis: [] };
 }
 
 export function nextId(edpaRoot: string, type: string): string {

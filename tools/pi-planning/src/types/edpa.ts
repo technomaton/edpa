@@ -49,11 +49,10 @@ export interface Iteration {
 }
 
 export interface PIConfig {
-  current: string;
-  year: number;
-  num: number;
+  id: string;
+  status: 'active' | 'planning' | 'closed';
+  pi_iterations: number;
   iteration_weeks: number;
-  pi_weeks: number;
   iterations: Iteration[];
 }
 
