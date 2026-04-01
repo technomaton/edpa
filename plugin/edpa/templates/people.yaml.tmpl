@@ -37,42 +37,42 @@ people:
     availability: confirmed
 
 # ─────────────────────────────────────────────────────────────────────
-# MULTI-ROLE: Jeden člověk, více smluv/rolí
+# MULTI-ROLE: One person, multiple contracts/roles
 # ─────────────────────────────────────────────────────────────────────
-# Pokud má člověk více smluv (např. HPP + DPČ) s různými rolemi,
-# vytvořte pro každou smlouvu samostatný záznam s unikátním ID:
+# If a person has multiple contracts (e.g., full-time + part-time) with
+# different roles, create a separate entry for each contract:
 #
-#   - id: urbanek-arch           # Smlouva 1: HPP, Architekt
-#     name: "Jaroslav Urbánek"
+#   - id: smith-arch              # Contract 1: Full-time, Architect
+#     name: "John Smith"
 #     role: Arch
-#     contract: HPP
+#     contract: "Full-time"
 #     fte: 1.0
 #     capacity_per_iteration: 40
-#     evidence_default: true     # Default pro Git auto-detection
-#     evidence_scope: ["S-*", "F-*"]  # fnmatch patterns pro item IDs (v2.0)
+#     evidence_default: true      # Default for Git auto-detection
+#     evidence_scope: ["S-*", "F-*"]  # fnmatch patterns for item IDs (v2.0)
 #
-#   - id: urbanek-pm             # Smlouva 2: DPČ, PM
-#     name: "Jaroslav Urbánek"
+#   - id: smith-pm                # Contract 2: Part-time, PM
+#     name: "John Smith"
 #     role: PM
-#     contract: DPČ
+#     contract: "Part-time"
 #     fte: 0.2
 #     capacity_per_iteration: 8
 #     evidence_default: false
-#     evidence_scope: ["E-*", "I-*"]  # PM vidí Epics/Initiatives
+#     evidence_scope: ["E-*", "I-*"]  # PM sees Epics/Initiatives
 #
 # evidence_scope (v2.0):
-#   Seznam fnmatch patterns pro item IDs.
-#   Pouze items matchující tyto patterns generují evidence pro tento kontrakt.
-#   evidence_default: true = fallback pro items bez matchujícího scope.
+#   List of fnmatch patterns for item IDs.
+#   Only items matching these patterns generate evidence for this contract.
+#   evidence_default: true = fallback for items without matching scope.
 #
-# EDPA garance platí per záznam:
-#   Σ DerivedHours[urbanek-arch] = 40h
-#   Σ DerivedHours[urbanek-pm] = 8h
+# EDPA guarantee holds per entry:
+#   Σ DerivedHours[smith-arch] = 40h
+#   Σ DerivedHours[smith-pm] = 8h
 #
-# Evidence přiřazení:
-#   V backlogu explicitně: contributors.person = "urbanek-arch"
-#   Nebo: /contribute @urbanek-pm weight:0.4 v issue komentáři
-#   Default: evidence_default=true záznam dostane nespecifikované commity
+# Evidence assignment:
+#   Explicit in backlog: contributors.person = "smith-arch"
+#   Or: /contribute @smith-pm weight:0.4 in issue comment
+#   Default: evidence_default=true entry receives unspecified commits
 
 # Calculated at runtime by EDPA engine:
 # total_fte: sum of people[].fte
