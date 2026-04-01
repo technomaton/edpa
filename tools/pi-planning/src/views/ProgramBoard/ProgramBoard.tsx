@@ -53,7 +53,8 @@ function iterationForItem(item: WorkItem, iterations: Iteration[]): string | nul
 function buildBoard(
   items: WorkItem[],
   iterations: Iteration[],
-  teamIds: string[],
+  internalTeamIds: string[],
+  externalTeamIds: string[],
   people: Person[],
   personTeam: Record<string, string>,
   planningFactors: Record<string, number>,
@@ -63,42 +64,68 @@ function buildBoard(
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  // Only show Features/Stories on the board (Epics span PIs, not iterations)
-  const allFeatures = items.filter(i => i.type === 'Feature' || i.type === 'Story');
-  // Filter to items belonging to this PI's iterations or unassigned
+  // All team IDs in order: milestones row + internal + external
+  const allRowIds = ['__milestones__', ...internalTeamIds, ...externalTeamIds];
+
+  // Filter items for this PI
   const iterationIds = new Set(iterations.map(it => it.id));
-  const features = allFeatures.filter(i => {
-    if (!i.iteration) return true; // unassigned — show in backlog
+  const piItems = items.filter(i => {
+    if (!i.iteration) return true;
     return iterationIds.has(i.iteration) || iterations.some(it => i.iteration!.startsWith(it.id));
+  });
+
+  // Milestones & Events
+  const milestones = piItems.filter(i => i.type === 'Milestone' || i.type === 'Event');
+  // Features/Stories for the board
+  const features = piItems.filter(i => i.type === 'Feature' || i.type === 'Story');
+
+  // Build dependency lookup for color coding
+  const hasIncomingDep = new Set<string>();
+  const hasOutgoingDep = new Set<string>();
+  [...features, ...milestones].forEach(item => {
+    if (item.depends_on) {
+      item.depends_on.forEach(depId => {
+        hasOutgoingDep.add(depId);
+        hasIncomingDep.add(item.id);
+      });
+    }
   });
 
   // Pre-compute items per half-cell to determine dynamic row heights
   const halfCellCounts: Record<string, number> = {};
-  features.forEach(item => {
+  const allBoardItems = [...features, ...milestones];
+  const teamIds = [...internalTeamIds, ...externalTeamIds];
+
+  allBoardItems.forEach(item => {
     const iterId = iterationForItem(item, iterations);
-    const team = getTeamForItem(item, personTeam);
-    if (iterId && teamIds.includes(team)) {
+    const rowId = (item.type === 'Milestone' || item.type === 'Event')
+      ? '__milestones__'
+      : getTeamForItem(item, personTeam);
+    if (iterId && allRowIds.includes(rowId)) {
       const half = item.iteration_half || 1;
-      const key = `${team}::${iterId}::W${half}`;
+      const key = `${rowId}::${iterId}::W${half}`;
       halfCellCounts[key] = (halfCellCounts[key] || 0) + 1;
     }
   });
 
-  // Max items in any half-cell per team row → dynamic row height
+  // Dynamic row heights for all rows (milestones + internal + external)
+  const MILESTONE_MIN_H = 120;
   const rowHeights: Record<string, number> = {};
   const rowYOffsets: Record<string, number> = {};
   let yAccum = HEADER_H;
-  teamIds.forEach(teamId => {
+
+  allRowIds.forEach(rowId => {
     let maxInRow = 1;
     iterations.forEach(iter => {
-      const w1 = halfCellCounts[`${teamId}::${iter.id}::W1`] || 0;
-      const w2 = halfCellCounts[`${teamId}::${iter.id}::W2`] || 0;
+      const w1 = halfCellCounts[`${rowId}::${iter.id}::W1`] || 0;
+      const w2 = halfCellCounts[`${rowId}::${iter.id}::W2`] || 0;
       const maxInCell = Math.max(w1, w2);
       if (maxInCell > maxInRow) maxInRow = maxInCell;
     });
-    const h = Math.max(ROW_H, CARD_PAD * 2 + 24 + maxInRow * (CARD_H + CARD_GAP));
-    rowHeights[teamId] = h;
-    rowYOffsets[teamId] = yAccum;
+    const minH = rowId === '__milestones__' ? MILESTONE_MIN_H : ROW_H;
+    const h = Math.max(minH, CARD_PAD * 2 + 24 + maxInRow * (CARD_H + CARD_GAP));
+    rowHeights[rowId] = h;
+    rowYOffsets[rowId] = yAccum;
     yAccum += h;
   });
   const totalGridHeight = yAccum;
@@ -132,19 +159,23 @@ function buildBoard(
     });
   });
 
-  // Row headers (teams) + cells
-  teamIds.forEach((teamId, rowIdx) => {
-    const memberCount = people.filter(p => p.team === teamId).length;
-    const rowH = rowHeights[teamId];
-    const rowY = rowYOffsets[teamId];
+  // Row headers + cells for all rows
+  allRowIds.forEach((rowId) => {
+    const isMilestoneRow = rowId === '__milestones__';
+    const isExternal = externalTeamIds.includes(rowId);
+    const memberCount = isMilestoneRow ? 0 : people.filter(p => p.team === rowId).length;
+    const rowH = rowHeights[rowId];
+    const rowY = rowYOffsets[rowId];
+    const rowLabel = isMilestoneRow ? 'Milestones & Events' : rowId;
+    const rowSub = isMilestoneRow ? '' : isExternal ? `${memberCount} ext` : `${memberCount} members`;
     nodes.push({
-      id: `row-${teamId}`,
+      id: `row-${rowId}`,
       type: 'headerNode',
       position: { x: 0, y: rowY },
       data: {
-        label: teamId,
-        sublabel: `${memberCount} members`,
-        variant: 'row',
+        label: rowLabel,
+        sublabel: rowSub,
+        variant: isMilestoneRow ? 'milestone-row' : isExternal ? 'external-row' : 'row',
       },
       draggable: false,
       selectable: false,
@@ -152,22 +183,21 @@ function buildBoard(
     });
 
     iterations.forEach((iter, colIdx) => {
-      // Capacity calc
-      const teamPeople = people.filter(p => p.team === teamId);
-      const available = teamPeople.reduce((s, p) => s + p.capacity, 0) * (planningFactors[teamId] || 0.8);
-      const cellFeatures = features.filter(
-        f => getTeamForItem(f, personTeam) === teamId &&
-             iterationForItem(f, iterations) === iter.id,
-      );
-      const used = cellFeatures.reduce((s, f) => s + (f.js || 0), 0);
+      // Capacity calc (skip for milestone row)
+      const teamPeople = isMilestoneRow ? [] : people.filter(p => p.team === rowId);
+      const available = isMilestoneRow ? 0 : teamPeople.reduce((s, p) => s + p.capacity, 0) * (planningFactors[rowId] || 0.8);
+      const cellItems = isMilestoneRow
+        ? milestones.filter(m => iterationForItem(m, iterations) === iter.id)
+        : features.filter(f => getTeamForItem(f, personTeam) === rowId && iterationForItem(f, iterations) === iter.id);
+      const used = cellItems.reduce((s, f) => s + (f.js || 0), 0);
 
-      const cellId = `cell-${teamId}-${iter.id}`;
+      const cellId = `cell-${rowId}-${iter.id}`;
       nodes.push({
         id: cellId,
         type: 'cellNode',
         position: { x: ROW_HEADER_W + colIdx * COL_W, y: rowY },
         data: {
-          teamId,
+          teamId: rowId,
           iterationId: iter.id,
           used,
           available,
@@ -181,14 +211,15 @@ function buildBoard(
     });
   });
 
-  // Feature cards — positioned in W1 or W2 half of each cell
+  // All board cards — features + milestones
   const halfCount: Record<string, number> = {};
 
-  features.forEach(item => {
+  [...features, ...milestones].forEach(item => {
     const iterId = iterationForItem(item, iterations);
     const colIdx = iterId ? iterations.findIndex(it => it.id === iterId) : -1;
-    const team = getTeamForItem(item, personTeam);
-    const rowIdx = teamIds.indexOf(team);
+    const isMilestone = item.type === 'Milestone' || item.type === 'Event';
+    const rowId = isMilestone ? '__milestones__' : getTeamForItem(item, personTeam);
+    const rowIdx = allRowIds.indexOf(rowId);
     const half = item.iteration_half || 1;
 
     let x: number, y: number;
@@ -199,7 +230,7 @@ function buildBoard(
       halfCount[halfKey] = stackIdx + 1;
       const cellX = ROW_HEADER_W + colIdx * COL_W;
       x = cellX + (half === 2 ? HALF_W : 0) + CARD_PAD;
-      y = rowYOffsets[team] + 24 + CARD_PAD + stackIdx * (CARD_H + CARD_GAP);
+      y = rowYOffsets[rowId] + 24 + CARD_PAD + stackIdx * (CARD_H + CARD_GAP);
     } else {
       // Unassigned — place below grid
       const unIdx = halfCount['unassigned'] || 0;
@@ -211,11 +242,16 @@ function buildBoard(
       y = totalGridHeight + 60 + uRow * (CARD_H + CARD_GAP);
     }
 
+    // Color: yellow = milestone/event, red = has dependency, blue = independent
+    const depColor = isMilestone ? 'milestone'
+      : hasIncomingDep.has(item.id) ? 'dependent'
+      : 'independent';
+
     nodes.push({
       id: item.id,
       type: 'featureCard',
       position: { x, y },
-      data: { item, onSelect: onSelectItem },
+      data: { item, onSelect: onSelectItem, depColor },
       style: { width: CARD_W, zIndex: 10 },
     });
 
@@ -313,7 +349,16 @@ export function ProgramBoard() {
   const [dropTarget, setDropTarget] = useState<string | null>(null); // "cell-TEAM-ITER"
 
   const iterations = pi?.iterations || [];
-  const teamIds = useMemo(() => [...new Set(people.map(p => p.team))], [people]);
+  const sharedServiceIds = useMemo(() => new Set(pi?.shared_services || []), [pi]);
+  const allTeamIds = useMemo(() => [...new Set(people.map(p => p.team))], [people]);
+  const internalTeamIds = useMemo(
+    () => allTeamIds.filter(t => !sharedServiceIds.has(t) && !teams.find(tm => tm.id === t && tm.type === 'external')),
+    [allTeamIds, sharedServiceIds, teams],
+  );
+  const externalTeamIds = useMemo(
+    () => allTeamIds.filter(t => sharedServiceIds.has(t) || teams.find(tm => tm.id === t && tm.type === 'external')),
+    [allTeamIds, sharedServiceIds, teams],
+  );
   const personTeam = useMemo(() => {
     const m: Record<string, string> = {};
     people.forEach(p => { m[p.id] = p.team; });
@@ -332,12 +377,12 @@ export function ProgramBoard() {
   const { builtNodes, builtEdges } = useMemo(
     () => {
       const { nodes, edges, rowYOffsets: ryo, rowHeights: rh } = buildBoard(
-        items, iterations, teamIds, people, personTeam, planningFactors, setSelectedItem, dropTarget,
+        items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, setSelectedItem, dropTarget,
       );
       layoutRef.current = { rowYOffsets: ryo, rowHeights: rh };
       return { builtNodes: nodes, builtEdges: edges };
     },
-    [items, iterations, teamIds, people, personTeam, planningFactors, dropTarget],
+    [items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, dropTarget],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(builtNodes);
@@ -357,8 +402,9 @@ export function ProgramBoard() {
         Math.floor((centerX - ROW_HEADER_W) / COL_W),
       ));
       const { rowYOffsets: ryo, rowHeights: rh } = layoutRef.current;
-      let matchedTeam = teamIds[0];
-      for (const tid of teamIds) {
+      const allRowIds = ['__milestones__', ...internalTeamIds, ...externalTeamIds];
+      let matchedTeam = allRowIds[0];
+      for (const tid of allRowIds) {
         const rowTop = ryo[tid] || 0;
         const rowBot = rowTop + (rh[tid] || ROW_H);
         if (centerY >= rowTop && centerY < rowBot) {
@@ -370,7 +416,7 @@ export function ProgramBoard() {
       const half: 1 | 2 = xInCell < HALF_W ? 1 : 2;
       return { colIdx, team: matchedTeam, half, iteration: iterations[colIdx]?.id };
     },
-    [iterations, teamIds],
+    [iterations, internalTeamIds, externalTeamIds],
   );
 
   // Highlight target half-cell during drag

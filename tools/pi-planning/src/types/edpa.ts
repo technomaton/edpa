@@ -5,7 +5,7 @@ export interface Contributor {
   rs?: number;
 }
 
-export type ItemType = 'Initiative' | 'Epic' | 'Feature' | 'Story' | 'Defect';
+export type ItemType = 'Initiative' | 'Epic' | 'Feature' | 'Story' | 'Defect' | 'Milestone' | 'Event';
 export type ItemStatus = 'Planned' | 'In Progress' | 'Active' | 'Done';
 
 export interface WorkItem {
@@ -40,6 +40,7 @@ export interface Person {
 export interface Team {
   id: string;
   planning_factor: number;
+  type?: 'internal' | 'external' | 'shared_service';
 }
 
 export interface Iteration {
@@ -55,6 +56,7 @@ export interface PIConfig {
   pi_iterations: number;
   iteration_weeks: number;
   iterations: Iteration[];
+  shared_services?: string[];  // team IDs of external/shared service teams for this PI
 }
 
 export interface ProjectConfig {

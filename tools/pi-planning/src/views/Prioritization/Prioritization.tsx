@@ -40,7 +40,6 @@ export function Prioritization() {
           value={filterType}
           onChange={e => setFilterType(e.target.value)}
         >
-          <option value="">All types</option>
           <option value="Feature">Features</option>
           <option value="Epic">Epics</option>
           <option value="Story">Stories</option>

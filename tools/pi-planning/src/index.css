@@ -447,6 +447,30 @@ body {
   background: var(--s2);
 }
 
+.rf-header--milestone-row {
+  background: rgba(245, 158, 11, 0.06);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.rf-header--milestone-row .rf-header__label {
+  color: var(--yl);
+  font-size: 0.65rem;
+}
+
+.rf-header--external-row {
+  background: var(--s2);
+  border-style: dashed;
+}
+
+.rf-header--external-row .rf-header__label {
+  font-size: 0.75rem;
+}
+
+.rf-header--external-row .rf-header__sub {
+  color: var(--or);
+  font-size: 0.5rem;
+}
+
 .rf-header__label {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
