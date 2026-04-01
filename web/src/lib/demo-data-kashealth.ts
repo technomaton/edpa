@@ -32,11 +32,11 @@ export const people: Person[] = [
 ];
 
 export const iterations: Iteration[] = [
-  { id: 'PI-2026-1.1', name: 'PI-2026-1.1', dates: '1.4.--14.4.2026', status: 'closed' },
-  { id: 'PI-2026-1.2', name: 'PI-2026-1.2', dates: '15.4.--28.4.2026', status: 'closed' },
-  { id: 'PI-2026-1.3', name: 'PI-2026-1.3', dates: '29.4.--12.5.2026', status: 'closed' },
-  { id: 'PI-2026-1.4', name: 'PI-2026-1.4', dates: '13.5.--26.5.2026', status: 'active' },
-  { id: 'PI-2026-1.5', name: 'PI-2026-1.5 (IP)', dates: '27.5.--9.6.2026', status: 'planned' },
+  { id: 'PI-2026-1.1', name: 'PI-2026-1.1', dates: '1.4. –14.4.2026', status: 'closed' },
+  { id: 'PI-2026-1.2', name: 'PI-2026-1.2', dates: '15.4. –28.4.2026', status: 'closed' },
+  { id: 'PI-2026-1.3', name: 'PI-2026-1.3', dates: '29.4. –12.5.2026', status: 'closed' },
+  { id: 'PI-2026-1.4', name: 'PI-2026-1.4', dates: '13.5. –26.5.2026', status: 'active' },
+  { id: 'PI-2026-1.5', name: 'PI-2026-1.5 (IP)', dates: '27.5. –9.6.2026', status: 'planned' },
 ];
 
 export const items: WorkItem[] = [

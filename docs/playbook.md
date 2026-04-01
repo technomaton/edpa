@@ -282,19 +282,19 @@ pi:
   pi_weeks: 10
   iterations:
     - id: PI-2026-1.1
-      dates: "1.4.--14.4.2026"
+      dates: "1.4. –14.4.2026"
       status: planned
     - id: PI-2026-1.2
-      dates: "15.4.--28.4.2026"
+      dates: "15.4. –28.4.2026"
       status: planned
     - id: PI-2026-1.3
-      dates: "29.4.--12.5.2026"
+      dates: "29.4. –12.5.2026"
       status: planned
     - id: PI-2026-1.4
-      dates: "13.5.--26.5.2026"
+      dates: "13.5. –26.5.2026"
       status: planned
     - id: PI-2026-1.5
-      dates: "27.5.--9.6.2026"
+      dates: "27.5. –9.6.2026"
       status: planned
       type: IP  # Innovation & Planning
 
@@ -683,7 +683,7 @@ Priklad struktury:
 iteration:
   id: PI-2026-1.1
   pi: PI-2026-1
-  dates: "1.4.--14.4.2026"
+  dates: "1.4. –14.4.2026"
   status: closed
 
 planning:
@@ -827,7 +827,7 @@ pi:
   num: 2
   iterations:
     - id: PI-2026-2.1
-      dates: "10.6.--23.6.2026"
+      dates: "10.6. –23.6.2026"
       status: planned
     # ...
 ```
