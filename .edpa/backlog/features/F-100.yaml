@@ -7,19 +7,19 @@ tc: 5
 rr: 5
 wsjf: 2.25
 status: Done
-iteration: PI-2026-1
+iteration: PI-2026-1.5
 parent: E-10
 owner: urbanek
 contributors:
-- person: urbanek
-  role: reviewer
-  cw: 0.3
-- person: tuma
-  role: key
-  cw: 0.3
-- person: turyna
-  role: owner
-  cw: 0.4
-- person: pm
-  role: consulted
-  cw: 0.2
+  - person: urbanek
+    role: reviewer
+    cw: 0.3
+  - person: tuma
+    role: key
+    cw: 0.3
+  - person: turyna
+    role: owner
+    cw: 0.4
+  - person: pm
+    role: consulted
+    cw: 0.2

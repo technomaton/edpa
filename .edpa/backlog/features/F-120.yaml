@@ -10,12 +10,13 @@ status: Active
 parent: E-12
 owner: tuma
 contributors:
-- person: tuma
-  role: key
-  cw: 0.4
-- person: do
-  role: owner
-  cw: 0.45
-- person: urbanek
-  role: consulted
-  cw: 0.15
+  - person: tuma
+    role: key
+    cw: 0.4
+  - person: do
+    role: owner
+    cw: 0.45
+  - person: urbanek
+    role: consulted
+    cw: 0.15
+iteration: PI-2026-1.2
