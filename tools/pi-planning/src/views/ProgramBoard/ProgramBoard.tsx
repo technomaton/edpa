@@ -1,7 +1,39 @@
-import { Fragment, useMemo, useState, useCallback, type DragEvent } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
+import {
+  ReactFlow,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  type Node,
+  type Edge,
+  type OnConnect,
+  addEdge,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { useBacklogStore } from '../../store/backlog-store';
 import { useConfigStore } from '../../store/config-store';
+import { FeatureCard } from './FeatureCard';
+import { CellNode } from './CellNode';
+import { HeaderNode } from './HeaderNode';
 import type { WorkItem, Person, Iteration } from '../../types/edpa';
+
+// -- Layout constants ---------------------------------------------------------
+
+const COL_W = 300;
+const ROW_H = 280;
+const HEADER_H = 80;
+const ROW_HEADER_W = 140;
+const CARD_W = 260;
+const CARD_H = 90;
+const CARD_GAP = 8;
+const CARD_PAD = 12;
+
+const nodeTypes = {
+  featureCard: FeatureCard,
+  cellNode: CellNode,
+  headerNode: HeaderNode,
+};
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -15,185 +47,198 @@ function iterationForItem(item: WorkItem, iterations: Iteration[]): string | nul
   return match?.id || null;
 }
 
-function capacityForCell(
-  teamId: string,
-  iterationId: string,
+// -- Build nodes & edges ------------------------------------------------------
+
+function buildBoard(
   items: WorkItem[],
+  iterations: Iteration[],
+  teamIds: string[],
   people: Person[],
   personTeam: Record<string, string>,
-  planningFactor: number,
-): { used: number; available: number } {
-  const teamPeople = people.filter(p => p.team === teamId);
-  const available = teamPeople.reduce((sum, p) => sum + p.capacity, 0) * planningFactor;
-  const cellItems = items.filter(
-    i => getTeamForItem(i, personTeam) === teamId &&
-         i.iteration?.startsWith(iterationId) &&
-         (i.type === 'Feature' || i.type === 'Story'),
-  );
-  const used = cellItems.reduce((sum, i) => sum + (i.js || 0), 0);
-  return { used, available };
+  planningFactors: Record<string, number>,
+  onSelectItem: (item: WorkItem) => void,
+  dropTarget: string | null,
+): { nodes: Node[]; edges: Edge[] } {
+  const nodes: Node[] = [];
+  const edges: Edge[] = [];
+
+  const features = items.filter(i => i.type === 'Feature' || i.type === 'Epic');
+
+  // Corner node
+  nodes.push({
+    id: 'corner',
+    type: 'headerNode',
+    position: { x: 0, y: 0 },
+    data: { label: 'Team / Iteration', variant: 'corner' },
+    draggable: false,
+    selectable: false,
+    style: { width: ROW_HEADER_W - 4, height: HEADER_H - 4 },
+  });
+
+  // Column headers (iterations)
+  iterations.forEach((iter, colIdx) => {
+    nodes.push({
+      id: `col-${iter.id}`,
+      type: 'headerNode',
+      position: { x: ROW_HEADER_W + colIdx * COL_W, y: 0 },
+      data: {
+        label: iter.id.split('.').pop() || iter.id,
+        sublabel: iter.dates,
+        badge: iter.type || undefined,
+        variant: 'column',
+        status: iter.status,
+      },
+      draggable: false,
+      selectable: false,
+      style: { width: COL_W - 4, height: HEADER_H - 4 },
+    });
+  });
+
+  // Row headers (teams) + cells
+  teamIds.forEach((teamId, rowIdx) => {
+    const memberCount = people.filter(p => p.team === teamId).length;
+    nodes.push({
+      id: `row-${teamId}`,
+      type: 'headerNode',
+      position: { x: 0, y: HEADER_H + rowIdx * ROW_H },
+      data: {
+        label: teamId,
+        sublabel: `${memberCount} members`,
+        variant: 'row',
+      },
+      draggable: false,
+      selectable: false,
+      style: { width: ROW_HEADER_W - 4, height: ROW_H - 4 },
+    });
+
+    iterations.forEach((iter, colIdx) => {
+      // Capacity calc
+      const teamPeople = people.filter(p => p.team === teamId);
+      const available = teamPeople.reduce((s, p) => s + p.capacity, 0) * (planningFactors[teamId] || 0.8);
+      const cellFeatures = features.filter(
+        f => getTeamForItem(f, personTeam) === teamId &&
+             iterationForItem(f, iterations) === iter.id,
+      );
+      const used = cellFeatures.reduce((s, f) => s + (f.js || 0), 0);
+
+      const cellId = `cell-${teamId}-${iter.id}`;
+      nodes.push({
+        id: cellId,
+        type: 'cellNode',
+        position: { x: ROW_HEADER_W + colIdx * COL_W, y: HEADER_H + rowIdx * ROW_H },
+        data: {
+          teamId,
+          iterationId: iter.id,
+          used,
+          available,
+          isActive: iter.status === 'active',
+          isDropTarget: dropTarget === cellId,
+        },
+        draggable: false,
+        selectable: false,
+        style: { width: COL_W - 4, height: ROW_H - 4, zIndex: -1 },
+      });
+    });
+  });
+
+  // Feature cards
+  const cellCount: Record<string, number> = {};
+
+  features.forEach(item => {
+    const iterId = iterationForItem(item, iterations);
+    const colIdx = iterId ? iterations.findIndex(it => it.id === iterId) : -1;
+    const team = getTeamForItem(item, personTeam);
+    const rowIdx = teamIds.indexOf(team);
+
+    let x: number, y: number;
+
+    if (colIdx >= 0 && rowIdx >= 0) {
+      const cellKey = `${colIdx}-${rowIdx}`;
+      const stackIdx = cellCount[cellKey] || 0;
+      cellCount[cellKey] = stackIdx + 1;
+      x = ROW_HEADER_W + colIdx * COL_W + CARD_PAD;
+      y = HEADER_H + rowIdx * ROW_H + CARD_PAD + stackIdx * (CARD_H + CARD_GAP);
+    } else {
+      // Unassigned — place below grid
+      const unIdx = cellCount['unassigned'] || 0;
+      cellCount['unassigned'] = unIdx + 1;
+      const cols = Math.floor((iterations.length * COL_W) / (CARD_W + CARD_GAP));
+      const uCol = unIdx % Math.max(1, cols);
+      const uRow = Math.floor(unIdx / Math.max(1, cols));
+      x = ROW_HEADER_W + uCol * (CARD_W + CARD_GAP);
+      y = HEADER_H + teamIds.length * ROW_H + 60 + uRow * (CARD_H + CARD_GAP);
+    }
+
+    nodes.push({
+      id: item.id,
+      type: 'featureCard',
+      position: { x, y },
+      data: { item, onSelect: onSelectItem },
+      style: { width: CARD_W, zIndex: 10 },
+    });
+
+    // Dependency edges
+    if (item.depends_on) {
+      item.depends_on.forEach(depId => {
+        edges.push({
+          id: `dep-${depId}-${item.id}`,
+          source: depId,
+          target: item.id,
+          animated: true,
+          style: { stroke: '#6366f1', strokeWidth: 2 },
+          type: 'smoothstep',
+        });
+      });
+    }
+  });
+
+  // Unassigned header (if any)
+  const unassignedCount = features.filter(f => iterationForItem(f, iterations) === null).length;
+  if (unassignedCount > 0) {
+    nodes.push({
+      id: 'unassigned-header',
+      type: 'headerNode',
+      position: { x: 0, y: HEADER_H + teamIds.length * ROW_H + 20 },
+      data: { label: `Backlog (${unassignedCount})`, variant: 'row' },
+      draggable: false,
+      selectable: false,
+      style: { width: ROW_HEADER_W - 4, height: 36 },
+    });
+  }
+
+  return { nodes, edges };
 }
 
-// -- Card Component -----------------------------------------------------------
-
-const TYPE_COLORS: Record<string, { border: string; bg: string; fg: string }> = {
-  Initiative: { border: '#db2777', bg: 'rgba(219,39,119,0.06)', fg: '#db2777' },
-  Epic:       { border: '#6366f1', bg: 'rgba(99,102,241,0.06)',  fg: '#6366f1' },
-  Feature:    { border: '#0891b2', bg: 'rgba(8,145,178,0.06)',   fg: '#0891b2' },
-  Story:      { border: '#ea580c', bg: 'rgba(234,88,12,0.06)',   fg: '#ea580c' },
-  Defect:     { border: '#dc2626', bg: 'rgba(220,38,38,0.06)',   fg: '#dc2626' },
-};
-
-function BoardCard({ item, onClick }: { item: WorkItem; onClick: () => void }) {
-  const colors = TYPE_COLORS[item.type] || TYPE_COLORS.Feature;
-  const isDone = item.status === 'Done';
-
-  const onDragStart = (e: DragEvent) => {
-    e.dataTransfer.setData('text/plain', item.id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  return (
-    <div
-      className={`board-card ${isDone ? 'board-card--done' : ''}`}
-      style={{ borderLeftColor: colors.border, backgroundColor: colors.bg }}
-      draggable
-      onDragStart={onDragStart}
-      onClick={onClick}
-    >
-      <div className="board-card__head">
-        <span className="board-card__id" style={{ color: colors.fg }}>{item.id}</span>
-        {item.js != null && <span className="board-card__js">JS {item.js}</span>}
-        {item.wsjf != null && (
-          <span className="board-card__wsjf" title="WSJF">
-            W {item.wsjf.toFixed(1)}
-          </span>
-        )}
-      </div>
-      <div className="board-card__title">{item.title}</div>
-      <div className="board-card__foot">
-        <span className="board-card__owner">{item.owner || item.assignee || ''}</span>
-        <span className={`board-card__status board-card__status--${item.status.toLowerCase().replace(' ', '-')}`}>
-          {item.status}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// -- Cell Component -----------------------------------------------------------
-
-function BoardCell({
-  teamId,
-  iterationId,
-  items,
-  capacity,
-  onDrop,
-  onCardClick,
-}: {
-  teamId: string;
-  iterationId: string;
-  items: WorkItem[];
-  capacity: { used: number; available: number };
-  onDrop: (itemId: string, iterationId: string, teamId: string) => void;
-  onCardClick: (item: WorkItem) => void;
-}) {
-  const [dragOver, setDragOver] = useState(false);
-
-  const handleDragOver = (e: DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOver(true);
-  };
-
-  const handleDrop = (e: DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const itemId = e.dataTransfer.getData('text/plain');
-    if (itemId) onDrop(itemId, iterationId, teamId);
-  };
-
-  const pct = capacity.available > 0 ? Math.min(100, (capacity.used / capacity.available) * 100) : 0;
-  const overloaded = pct > 100;
-
-  return (
-    <div
-      className={`board-cell ${dragOver ? 'board-cell--drag-over' : ''}`}
-      onDragOver={handleDragOver}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={handleDrop}
-    >
-      {items.length > 0 && (
-        <div className="board-cell__cards">
-          {items.map(item => (
-            <BoardCard key={item.id} item={item} onClick={() => onCardClick(item)} />
-          ))}
-        </div>
-      )}
-      {capacity.available > 0 && (
-        <div className="board-cell__capacity">
-          <div className="capacity-bar">
-            <div
-              className={`capacity-bar__fill ${overloaded ? 'capacity-bar__fill--over' : ''}`}
-              style={{ width: `${Math.min(100, pct)}%` }}
-            />
-          </div>
-          <span className={`capacity-label ${overloaded ? 'capacity-label--over' : ''}`}>
-            {capacity.used}/{capacity.available}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// -- Detail Panel -------------------------------------------------------------
+// -- Detail Panel (overlay) ---------------------------------------------------
 
 function DetailPanel({ item, onClose }: { item: WorkItem; onClose: () => void }) {
+  const TYPE_FG: Record<string, string> = {
+    Initiative: '#db2777', Epic: '#6366f1', Feature: '#0891b2',
+    Story: '#ea580c', Defect: '#dc2626',
+  };
   return (
     <div className="detail-panel">
       <div className="detail-panel__header">
-        <span className="detail-panel__id" style={{ color: TYPE_COLORS[item.type]?.fg }}>
-          {item.id}
-        </span>
+        <span className="detail-panel__id" style={{ color: TYPE_FG[item.type] }}>{item.id}</span>
         <button className="detail-panel__close" onClick={onClose}>X</button>
       </div>
       <h3 className="detail-panel__title">{item.title}</h3>
       <div className="detail-panel__grid">
-        <div className="detail-field">
-          <span className="detail-field__label">Type</span>
-          <span className="detail-field__value">{item.type}</span>
-        </div>
-        <div className="detail-field">
-          <span className="detail-field__label">Status</span>
-          <span className="detail-field__value">{item.status}</span>
-        </div>
-        <div className="detail-field">
-          <span className="detail-field__label">Iteration</span>
-          <span className="detail-field__value">{item.iteration || '-'}</span>
-        </div>
-        <div className="detail-field">
-          <span className="detail-field__label">Owner</span>
-          <span className="detail-field__value">{item.owner || item.assignee || '-'}</span>
-        </div>
-        <div className="detail-field">
-          <span className="detail-field__label">Job Size</span>
-          <span className="detail-field__value">{item.js ?? '-'}</span>
-        </div>
-        <div className="detail-field">
-          <span className="detail-field__label">WSJF</span>
-          <span className="detail-field__value">{item.wsjf?.toFixed(2) ?? '-'}</span>
-        </div>
-        {item.bv != null && (
-          <div className="detail-field">
-            <span className="detail-field__label">BV / TC / RR</span>
-            <span className="detail-field__value">{item.bv} / {item.tc} / {item.rr}</span>
+        {[
+          ['Type', item.type],
+          ['Status', item.status],
+          ['Iteration', item.iteration || '-'],
+          ['Owner', item.owner || item.assignee || '-'],
+          ['Job Size', String(item.js ?? '-')],
+          ['WSJF', item.wsjf?.toFixed(2) ?? '-'],
+          ...(item.bv != null ? [['BV / TC / RR', `${item.bv} / ${item.tc} / ${item.rr}`]] : []),
+          ['Parent', item.parent || '-'],
+        ].map(([label, value]) => (
+          <div key={label} className="detail-field">
+            <span className="detail-field__label">{label}</span>
+            <span className="detail-field__value">{value}</span>
           </div>
-        )}
-        <div className="detail-field">
-          <span className="detail-field__label">Parent</span>
-          <span className="detail-field__value">{item.parent || '-'}</span>
-        </div>
+        ))}
       </div>
       {item.contributors && item.contributors.length > 0 && (
         <div className="detail-panel__contributors">
@@ -207,42 +252,11 @@ function DetailPanel({ item, onClose }: { item: WorkItem; onClose: () => void })
           ))}
         </div>
       )}
-      {item.depends_on && item.depends_on.length > 0 && (
-        <div className="detail-panel__deps">
-          <span className="detail-field__label">Depends on</span>
-          <span>{item.depends_on.join(', ')}</span>
-        </div>
-      )}
     </div>
   );
 }
 
-// -- Unassigned Pool ----------------------------------------------------------
-
-function UnassignedPool({
-  items,
-  onCardClick,
-}: {
-  items: WorkItem[];
-  onCardClick: (item: WorkItem) => void;
-}) {
-  if (items.length === 0) return null;
-  return (
-    <div className="unassigned-pool">
-      <div className="unassigned-pool__header">
-        <span className="unassigned-pool__title">Unassigned / Backlog</span>
-        <span className="unassigned-pool__count">{items.length}</span>
-      </div>
-      <div className="unassigned-pool__cards">
-        {items.map(item => (
-          <BoardCard key={item.id} item={item} onClick={() => onCardClick(item)} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// -- Main Board ---------------------------------------------------------------
+// -- Main Component -----------------------------------------------------------
 
 export function ProgramBoard() {
   const items = useBacklogStore(s => s.items);
@@ -251,129 +265,142 @@ export function ProgramBoard() {
   const pi = useConfigStore(s => s.pi);
   const people = useConfigStore(s => s.people);
   const teams = useConfigStore(s => s.teams);
+  const isReadonly = useConfigStore(s => s.isReadonly);
+  const selectedPI = useConfigStore(s => s.selectedPI);
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null); // "cell-TEAM-ITER"
 
   const iterations = pi?.iterations || [];
   const teamIds = useMemo(() => [...new Set(people.map(p => p.team))], [people]);
   const personTeam = useMemo(() => {
-    const map: Record<string, string> = {};
-    people.forEach(p => { map[p.id] = p.team; });
-    return map;
+    const m: Record<string, string> = {};
+    people.forEach(p => { m[p.id] = p.team; });
+    return m;
   }, [people]);
-
   const planningFactors = useMemo(() => {
-    const map: Record<string, number> = {};
-    teams.forEach(t => { map[t.id] = t.planning_factor; });
-    return map;
+    const m: Record<string, number> = {};
+    teams.forEach(t => { m[t.id] = t.planning_factor; });
+    return m;
   }, [teams]);
 
-  // Features and epics for the board
-  const boardItems = useMemo(
-    () => items.filter(i => i.type === 'Feature' || i.type === 'Epic'),
-    [items],
+  const { builtNodes, builtEdges } = useMemo(
+    () => {
+      const { nodes, edges } = buildBoard(
+        items, iterations, teamIds, people, personTeam, planningFactors, setSelectedItem, dropTarget,
+      );
+      return { builtNodes: nodes, builtEdges: edges };
+    },
+    [items, iterations, teamIds, people, personTeam, planningFactors, dropTarget],
   );
 
-  // Items assigned to iterations
-  const assignedItems = useMemo(
-    () => boardItems.filter(i => iterationForItem(i, iterations) !== null),
-    [boardItems, iterations],
+  const [nodes, setNodes, onNodesChange] = useNodesState(builtNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(builtEdges);
+
+  // Sync when data changes
+  useEffect(() => { setNodes(builtNodes); }, [builtNodes, setNodes]);
+  useEffect(() => { setEdges(builtEdges); }, [builtEdges, setEdges]);
+
+  // Highlight target cell during drag
+  const onNodeDrag = useCallback(
+    (_: unknown, node: Node) => {
+      if (node.type !== 'featureCard') return;
+      const colIdx = Math.max(0, Math.min(
+        iterations.length - 1,
+        Math.round((node.position.x - ROW_HEADER_W) / COL_W),
+      ));
+      const rowIdx = Math.max(0, Math.min(
+        teamIds.length - 1,
+        Math.round((node.position.y - HEADER_H) / ROW_H),
+      ));
+      const cellId = `cell-${teamIds[rowIdx]}-${iterations[colIdx]?.id}`;
+      setDropTarget(prev => prev === cellId ? prev : cellId);
+    },
+    [iterations, teamIds],
   );
 
-  // Items NOT assigned to any iteration
-  const unassignedItems = useMemo(
-    () => boardItems.filter(i => iterationForItem(i, iterations) === null),
-    [boardItems, iterations],
-  );
+  // Snap to cell on drag stop
+  const onNodeDragStop = useCallback(
+    (_: unknown, node: Node) => {
+      setDropTarget(null);
+      if (node.type !== 'featureCard') return;
+      const item = node.data.item as WorkItem;
 
-  // Group items by cell
-  const cellItems = useMemo(() => {
-    const map: Record<string, WorkItem[]> = {};
-    assignedItems.forEach(item => {
-      const iterId = iterationForItem(item, iterations)!;
-      const team = getTeamForItem(item, personTeam);
-      const key = `${iterId}::${team}`;
-      if (!map[key]) map[key] = [];
-      map[key].push(item);
-    });
-    // Sort by WSJF descending within each cell
-    Object.values(map).forEach(arr => arr.sort((a, b) => (b.wsjf || 0) - (a.wsjf || 0)));
-    return map;
-  }, [assignedItems, iterations, personTeam]);
+      const colIdx = Math.max(0, Math.min(
+        iterations.length - 1,
+        Math.round((node.position.x - ROW_HEADER_W) / COL_W),
+      ));
+      const newIteration = iterations[colIdx]?.id;
 
-  const handleDrop = useCallback(
-    (itemId: string, iterationId: string, _teamId: string) => {
-      const item = items.find(i => i.id === itemId);
-      if (!item) return;
-      if (item.iteration !== iterationId) {
-        updateItem(itemId, { iteration: iterationId });
-        saveItem(itemId);
+      if (newIteration && newIteration !== item.iteration) {
+        updateItem(item.id, { iteration: newIteration });
+        saveItem(item.id);
       }
     },
-    [items, updateItem, saveItem],
+    [iterations, updateItem, saveItem],
   );
 
-  const gridCols = iterations.length;
+  // Connect edges (draw new dependency)
+  const onConnect: OnConnect = useCallback(
+    (connection) => {
+      if (connection.source && connection.target) {
+        setEdges((eds) => addEdge({
+          ...connection,
+          animated: true,
+          style: { stroke: '#6366f1', strokeWidth: 2 },
+          type: 'smoothstep',
+        }, eds));
+        // TODO: persist depends_on to YAML
+      }
+    },
+    [setEdges],
+  );
 
   return (
-    <div className="pb-container">
-      <div className="pb-board" style={{ gridTemplateColumns: `120px repeat(${gridCols}, 1fr)` }}>
-        {/* Corner */}
-        <div className="pb-corner">
-          <span className="pb-corner__label">Team / Iteration</span>
+    <div className="program-board">
+      {isReadonly && (
+        <div className="readonly-banner">
+          {selectedPI} — Closed (read-only)
         </div>
+      )}
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeDrag={isReadonly ? undefined : onNodeDrag}
+        onNodeDragStop={isReadonly ? undefined : onNodeDragStop}
+        onConnect={isReadonly ? undefined : onConnect}
+        nodesDraggable={!isReadonly}
+        nodesConnectable={!isReadonly}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.1 }}
+        minZoom={0.15}
+        maxZoom={2.5}
+        snapToGrid
+        snapGrid={[10, 10]}
+        panOnScroll
+        selectionOnDrag={false}
+      >
+        <Controls />
+        <MiniMap
+          nodeColor={(node) => {
+            if (node.type === 'cellNode') return 'rgba(99,102,241,0.08)';
+            if (node.type === 'headerNode') return '#e2e4ea';
+            const it = node.data?.item as WorkItem | undefined;
+            if (!it) return '#ddd';
+            const c: Record<string, string> = {
+              Feature: '#0891b2', Epic: '#6366f1', Story: '#ea580c',
+              Initiative: '#db2777', Defect: '#dc2626',
+            };
+            return c[it.type] || '#999';
+          }}
+          maskColor="rgba(0,0,0,0.05)"
+          pannable
+          zoomable
+        />
+      </ReactFlow>
 
-        {/* Iteration column headers */}
-        {iterations.map(iter => (
-          <div key={iter.id} className={`pb-col-header ${iter.status === 'active' ? 'pb-col-header--active' : ''}`}>
-            <span className="pb-col-header__id">{iter.id.split('.').pop()}</span>
-            <span className="pb-col-header__full">{iter.id}</span>
-            <span className="pb-col-header__dates">{iter.dates}</span>
-            {iter.type && <span className="pb-col-header__type">{iter.type}</span>}
-            <span className={`pb-col-header__status pb-col-header__status--${iter.status}`}>
-              {iter.status}
-            </span>
-          </div>
-        ))}
-
-        {/* Team rows */}
-        {teamIds.map(teamId => (
-          <Fragment key={teamId}>
-            {/* Row header */}
-            <div className="pb-row-header">
-              <span className="pb-row-header__name">{teamId}</span>
-              <span className="pb-row-header__count">
-                {people.filter(p => p.team === teamId).length} members
-              </span>
-            </div>
-
-            {/* Cells */}
-            {iterations.map(iter => {
-              const key = `${iter.id}::${teamId}`;
-              const cellItemsList = cellItems[key] || [];
-              const cap = capacityForCell(
-                teamId, iter.id, items, people, personTeam,
-                planningFactors[teamId] || 0.8,
-              );
-              return (
-                <BoardCell
-                  key={key}
-                  teamId={teamId}
-                  iterationId={iter.id}
-                  items={cellItemsList}
-                  capacity={cap}
-                  onDrop={handleDrop}
-                  onCardClick={setSelectedItem}
-                />
-              );
-            })}
-          </Fragment>
-        ))}
-      </div>
-
-      {/* Unassigned pool */}
-      <UnassignedPool items={unassignedItems} onCardClick={setSelectedItem} />
-
-      {/* Detail panel */}
       {selectedItem && (
         <DetailPanel item={selectedItem} onClose={() => setSelectedItem(null)} />
       )}
