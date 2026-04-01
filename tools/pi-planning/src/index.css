@@ -274,6 +274,23 @@ body {
   box-shadow: var(--shadow);
 }
 
+.warning-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--rd);
+  background: var(--s1);
+  border: 1px solid var(--rd);
+  padding: 6px 16px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+}
+
 .sidebar__nav {
   display: flex;
   flex-direction: column;
@@ -344,6 +361,49 @@ body {
 .rf-cell--active {
   background: rgba(99, 102, 241, 0.04);
   border-color: rgba(99, 102, 241, 0.2);
+}
+
+.rf-cell--ip {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--s2),
+    var(--s2) 8px,
+    var(--s3) 8px,
+    var(--s3) 10px
+  );
+  opacity: 0.7;
+}
+
+.rf-cell__ip-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.rf-cell--blocked {
+  background: rgba(220, 38, 38, 0.06) !important;
+  border-color: var(--rd) !important;
+}
+
+.rf-cell__blocked-msg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--rd);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 /* Half cells */
@@ -1030,6 +1090,25 @@ body {
   background: var(--s2);
 }
 
+.tb-row-header--feature {
+  align-items: flex-start;
+  padding: 8px 10px;
+  gap: 2px;
+}
+
+.tb-row-header__fid {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.tb-row-header__owner {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--t3);
+  margin-top: 2px;
+}
+
 .tb-row-header__name {
   font-weight: 700;
   font-size: 0.8rem;
@@ -1071,12 +1150,33 @@ body {
   flex: 1;
 }
 
+.tb-cell--ip {
+  background: repeating-linear-gradient(
+    -45deg, var(--s2), var(--s2) 8px, var(--s3) 8px, var(--s3) 10px
+  );
+  opacity: 0.6;
+}
+
 .tb-cell__cap {
   display: flex;
   align-items: center;
   gap: 4px;
   margin-top: auto;
   padding-top: 4px;
+}
+
+.tb-cell__summary {
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--t3);
+}
+
+.tb-cell__summary-js {
+  color: var(--yl);
 }
 
 /* Story cards */

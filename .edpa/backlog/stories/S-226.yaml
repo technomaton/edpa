@@ -8,11 +8,12 @@ rr: 3
 status: Planned
 parent: F-120
 assignee: do
-iteration: PI-2026-1.5
+iteration: PI-2026-1.4
 contributors:
-- person: do
-  role: owner
-  cw: 1.0
-- person: tuma
-  role: consulted
-  cw: 0.25
+  - person: do
+    role: owner
+    cw: 1
+  - person: tuma
+    role: consulted
+    cw: 0.25
+iteration_half: 2

@@ -148,7 +148,7 @@ function buildBoard(
       type: 'headerNode',
       position: { x: ROW_HEADER_W + colIdx * COL_W, y: 0 },
       data: {
-        label: iter.id,
+        label: iter.type ? `${iter.id} (${iter.type})` : iter.id,
         sublabel: iter.dates,
         variant: 'column',
         status: iter.status,
@@ -202,7 +202,9 @@ function buildBoard(
           used,
           available,
           isActive: iter.status === 'active',
+          isIP: iter.type === 'IP',
           dropHalf: dropTarget === `${cellId}-W1` ? 1 : dropTarget === `${cellId}-W2` ? 2 : 0,
+          dropBlocked: dropTarget === `${cellId}-BLOCKED`,
         },
         draggable: false,
         selectable: false,
@@ -346,7 +348,8 @@ export function ProgramBoard() {
   const isReadonly = useConfigStore(s => s.isReadonly);
   const selectedPI = useConfigStore(s => s.selectedPI);
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
-  const [dropTarget, setDropTarget] = useState<string | null>(null); // "cell-TEAM-ITER"
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const iterations = pi?.iterations || [];
   const sharedServiceIds = useMemo(() => new Set(pi?.shared_services || []), [pi]);
@@ -414,7 +417,8 @@ export function ProgramBoard() {
       }
       const xInCell = centerX - (ROW_HEADER_W + colIdx * COL_W);
       const half: 1 | 2 = xInCell < HALF_W ? 1 : 2;
-      return { colIdx, team: matchedTeam, half, iteration: iterations[colIdx]?.id };
+      const iter = iterations[colIdx];
+      return { colIdx, team: matchedTeam, half, iteration: iter?.id, isIP: iter?.type === 'IP' };
     },
     [iterations, internalTeamIds, externalTeamIds],
   );
@@ -423,8 +427,12 @@ export function ProgramBoard() {
   const onNodeDrag = useCallback(
     (_: unknown, node: Node) => {
       if (node.type !== 'featureCard') return;
-      const { team, iteration, half } = detectCellHalf(node.position.x, node.position.y);
-      const targetId = `cell-${team}-${iteration}-W${half}`;
+      const item = node.data.item as WorkItem;
+      const { team, iteration, half, isIP } = detectCellHalf(node.position.x, node.position.y);
+      const isMilestone = item.type === 'Milestone' || item.type === 'Event';
+      // Show blocked indicator for IP iterations (except milestones)
+      const suffix = isIP && !isMilestone ? '-BLOCKED' : `-W${half}`;
+      const targetId = `cell-${team}-${iteration}${suffix}`;
       setDropTarget(prev => prev === targetId ? prev : targetId);
     },
     [detectCellHalf],
@@ -436,7 +444,14 @@ export function ProgramBoard() {
       setDropTarget(null);
       if (node.type !== 'featureCard') return;
       const item = node.data.item as WorkItem;
-      const { iteration, half } = detectCellHalf(node.position.x, node.position.y);
+      const { iteration, half, isIP } = detectCellHalf(node.position.x, node.position.y);
+
+      // Block drop into IP iteration (Innovation & Planning — no work planned)
+      if (isIP && item.type !== 'Milestone' && item.type !== 'Event') {
+        setWarning(`IP iteration (${iteration}) is reserved for Innovation & Planning — no work items`);
+        setTimeout(() => setWarning(null), 3000);
+        return;
+      }
 
       if (iteration && (iteration !== item.iteration || half !== item.iteration_half)) {
         updateItem(item.id, { iteration, iteration_half: half });
@@ -475,6 +490,11 @@ export function ProgramBoard() {
       {isReadonly && (
         <div className="readonly-banner">
           {selectedPI} — Closed (read-only)
+        </div>
+      )}
+      {warning && (
+        <div className="warning-banner">
+          {warning}
         </div>
       )}
       <ReactFlow

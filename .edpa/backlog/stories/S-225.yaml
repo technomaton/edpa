@@ -8,11 +8,12 @@ rr: 5
 status: Planned
 parent: F-102
 assignee: turyna
-iteration: PI-2026-1.5
+iteration: PI-2026-1.4
 contributors:
-- person: turyna
-  role: owner
-  cw: 1.0
-- person: urbanek
-  role: reviewer
-  cw: 0.3
+  - person: turyna
+    role: owner
+    cw: 1
+  - person: urbanek
+    role: reviewer
+    cw: 0.3
+iteration_half: 2

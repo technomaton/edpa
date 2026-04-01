@@ -11,6 +11,8 @@ pis:
   status: active
   pi_iterations: 5
   iteration_weeks: 2
+  shared_services:
+  - UX Consultants
   iterations:
   - id: PI-2026-1.1
     dates: 1.4.–14.4.2026

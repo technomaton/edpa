@@ -58,4 +58,7 @@ teams:
   planning_factor: 0.8
 - id: Partner
   planning_factor: 0.75
+- id: UX Consultants
+  planning_factor: 0.5
+  type: external
 _note: EXAMPLE DATA — replace with your team when deploying
