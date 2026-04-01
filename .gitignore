@@ -24,8 +24,6 @@ Thumbs.db
 # Build artifacts
 web/dist/
 web/.vercel/
-*.pyc
-__pycache__/
 
 # Environment
 .env

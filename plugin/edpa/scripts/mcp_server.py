@@ -11,6 +11,7 @@ Usage:
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -29,7 +30,12 @@ from mcp.types import Resource, TextContent, Tool
 # ---------------------------------------------------------------------------
 
 def find_edpa_root() -> Path | None:
-    """Walk up from CWD to find .edpa/ directory."""
+    """Find .edpa/ directory. Checks EDPA_ROOT env var first, then walks up from CWD."""
+    env_root = os.environ.get("EDPA_ROOT")
+    if env_root:
+        p = Path(env_root)
+        if p.is_dir():
+            return p
     p = Path.cwd()
     while p != p.parent:
         if (p / ".edpa").is_dir():
