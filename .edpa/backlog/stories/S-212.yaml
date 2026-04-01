@@ -7,15 +7,15 @@ tc: 8
 rr: 3
 status: Done
 parent: F-111
-assignee: d1
+assignee: tuma
 iteration: PI-2026-1.3
 contributors:
-- person: d1
-  role: owner
-  cw: 1.0
-- person: d2
-  role: key
-  cw: 0.6
-- person: pm
-  role: consulted
-  cw: 0.2
+  - person: d1
+    role: owner
+    cw: 1
+  - person: d2
+    role: key
+    cw: 0.6
+  - person: pm
+    role: consulted
+    cw: 0.2
