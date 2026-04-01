@@ -4,16 +4,24 @@ import type { PIConfig, PIEvent } from '../../types/edpa';
 
 // -- Helpers ------------------------------------------------------------------
 
-function parseDate(d: string): Date {
-  // Handle both ISO (2026-04-28) and Czech (28.4.2026) formats
-  if (d.includes('-')) return new Date(d);
-  const parts = d.split('.');
-  return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+function parseDate(d: string, fallbackYear?: number): Date {
+  // ISO format: 2026-04-28
+  if (/^\d{4}-\d{2}-\d{2}/.test(d)) return new Date(d);
+  // Czech format: 1.4.2026 or 1.4. (without year)
+  const clean = d.replace(/\s/g, '');
+  const parts = clean.split('.').filter(Boolean);
+  const day = parseInt(parts[0]);
+  const month = parseInt(parts[1]) - 1;
+  const year = parts[2] ? parseInt(parts[2]) : (fallbackYear || new Date().getFullYear());
+  return new Date(year, month, day);
 }
 
 function parseDateRange(dates: string): { start: Date; end: Date } {
   const [s, e] = dates.split('–');
-  return { start: parseDate(s.trim()), end: parseDate(e.trim()) };
+  // Parse end first (usually has the year), then use its year as fallback for start
+  const endDate = parseDate(e.trim());
+  const startDate = parseDate(s.trim(), endDate.getFullYear());
+  return { start: startDate, end: endDate };
 }
 
 function formatMonth(d: Date): string {
@@ -74,8 +82,10 @@ function PIBlock({ pi, yearStart, weekWidth }: { pi: PIConfig; yearStart: Date; 
       <div className="cal-pi__iters">
         {iters.map(iter => {
           const { start, end } = parseDateRange(iter.dates);
-          const iterLeft = weeksBetween(yearStart, start) * weekWidth - left;
-          const iterWidth = weeksBetween(yearStart, end) * weekWidth - iterLeft - left;
+          const iterStartPx = weeksBetween(yearStart, start) * weekWidth;
+          const iterEndPx = weeksBetween(yearStart, end) * weekWidth;
+          const iterLeft = iterStartPx - left;
+          const iterWidth = iterEndPx - iterStartPx;
           const isIP = iter.type === 'IP';
           const statusCls = iter.status === 'active' ? 'cal-iter--active'
             : iter.status === 'closed' ? 'cal-iter--closed' : '';

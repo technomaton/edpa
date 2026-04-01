@@ -16,7 +16,7 @@ import { useConfigStore } from '../../store/config-store';
 import { FeatureCard } from './FeatureCard';
 import { CellNode } from './CellNode';
 import { HeaderNode } from './HeaderNode';
-import type { WorkItem, Person, Iteration } from '../../types/edpa';
+import type { WorkItem, Person, Iteration, PIEvent } from '../../types/edpa';
 
 // -- Layout constants ---------------------------------------------------------
 
@@ -58,6 +58,7 @@ function buildBoard(
   people: Person[],
   personTeam: Record<string, string>,
   planningFactors: Record<string, number>,
+  piEvents: PIEvent[],
   onSelectItem: (item: WorkItem) => void,
   dropTarget: string | null,
 ): { nodes: Node[]; edges: Edge[]; rowYOffsets: Record<string, number>; rowHeights: Record<string, number> } {
@@ -74,8 +75,20 @@ function buildBoard(
     return iterationIds.has(i.iteration) || iterations.some(it => i.iteration!.startsWith(it.id));
   });
 
-  // Milestones & Events
-  const milestones = piItems.filter(i => i.type === 'Milestone' || i.type === 'Event');
+  // Milestones & Events from backlog
+  const backlogMilestones = piItems.filter(i => i.type === 'Milestone' || i.type === 'Event');
+  // Synthetic milestones from PI events config
+  const syntheticMilestones: WorkItem[] = piEvents.map((evt, i) => ({
+    id: `EVT-${i + 1}`,
+    type: 'Event' as const,
+    title: evt.title,
+    js: 0,
+    status: 'Planned' as const,
+    parent: null,
+    iteration: evt.iteration,
+    contributors: [],
+  }));
+  const milestones = [...backlogMilestones, ...syntheticMilestones];
   // Features/Stories for the board
   const features = piItems.filter(i => i.type === 'Feature' || i.type === 'Story');
 
@@ -380,12 +393,12 @@ export function ProgramBoard() {
   const { builtNodes, builtEdges } = useMemo(
     () => {
       const { nodes, edges, rowYOffsets: ryo, rowHeights: rh } = buildBoard(
-        items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, setSelectedItem, dropTarget,
+        items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, pi?.events || [], setSelectedItem, dropTarget,
       );
       layoutRef.current = { rowYOffsets: ryo, rowHeights: rh };
       return { builtNodes: nodes, builtEdges: edges };
     },
-    [items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, dropTarget],
+    [items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, pi, dropTarget],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(builtNodes);

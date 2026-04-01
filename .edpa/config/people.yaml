@@ -53,6 +53,12 @@ people:
   team: Partner
   fte: 0.25
   capacity: 20
+- id: ux1
+  name: UX Designer
+  role: UX
+  team: UX Consultants
+  fte: 0.25
+  capacity: 20
 teams:
 - id: CVUT
   planning_factor: 0.8
