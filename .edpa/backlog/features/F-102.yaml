@@ -10,12 +10,13 @@ status: Active
 parent: E-10
 owner: urbanek
 contributors:
-- person: urbanek
-  role: architect
-  cw: 0.35
-- person: turyna
-  role: owner
-  cw: 0.35
-- person: d1
-  role: key
-  cw: 0.3
+  - person: urbanek
+    role: architect
+    cw: 0.35
+  - person: turyna
+    role: owner
+    cw: 0.35
+  - person: d1
+    role: key
+    cw: 0.3
+iteration: PI-2026-1.2

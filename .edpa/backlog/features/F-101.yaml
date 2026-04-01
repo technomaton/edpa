@@ -7,19 +7,19 @@ tc: 8
 rr: 3
 wsjf: 3.2
 status: Done
-iteration: PI-2026-1
+iteration: PI-2026-1.1
 parent: E-10
 owner: tuma
 contributors:
-- person: tuma
-  role: key
-  cw: 0.35
-- person: matousek
-  role: owner
-  cw: 0.4
-- person: d1
-  role: contributor
-  cw: 0.25
-- person: pm
-  role: consulted
-  cw: 0.2
+  - person: tuma
+    role: key
+    cw: 0.35
+  - person: matousek
+    role: owner
+    cw: 0.4
+  - person: d1
+    role: contributor
+    cw: 0.25
+  - person: pm
+    role: consulted
+    cw: 0.2
