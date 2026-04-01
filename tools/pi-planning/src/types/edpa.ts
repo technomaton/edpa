@@ -50,13 +50,22 @@ export interface Iteration {
   type?: string;
 }
 
+export interface PIEvent {
+  type: 'pi_planning' | 'system_demo' | 'inspect_adapt' | 'prioritization' | 'custom';
+  title: string;
+  date: string;
+  duration?: string;
+  iteration?: string;
+}
+
 export interface PIConfig {
   id: string;
   status: 'active' | 'planning' | 'closed';
   pi_iterations: number;
   iteration_weeks: number;
   iterations: Iteration[];
-  shared_services?: string[];  // team IDs of external/shared service teams for this PI
+  shared_services?: string[];
+  events?: PIEvent[];
 }
 
 export interface ProjectConfig {

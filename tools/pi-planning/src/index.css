@@ -1558,3 +1558,268 @@ body {
   align-items: center;
   gap: 6px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   CALENDAR — Annual timeline with PI blocks and events
+   ═══════════════════════════════════════════════════════════════════ */
+
+.cal-container {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--bd);
+}
+
+.cal-header__title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.cal-header__project {
+  font-size: 0.75rem;
+  color: var(--t3);
+}
+
+.cal-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  background: var(--s1);
+}
+
+.cal-timeline {
+  position: relative;
+  min-height: 300px;
+  padding-top: 36px;
+}
+
+/* Month headers */
+.cal-months {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: 32px;
+  background: var(--s1);
+  border-bottom: 1px solid var(--bd);
+}
+
+.cal-month {
+  position: absolute;
+  top: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--t2);
+  border-right: 1px solid var(--bd);
+}
+
+/* Week grid */
+.cal-weeks {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.cal-week-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--s3);
+}
+
+/* Today marker */
+.cal-today {
+  position: absolute;
+  top: 32px;
+  bottom: 0;
+  width: 2px;
+  background: var(--rd);
+  z-index: 4;
+  opacity: 0.6;
+}
+
+.cal-today::before {
+  content: 'today';
+  position: absolute;
+  top: -16px;
+  left: -14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.45rem;
+  font-weight: 700;
+  color: var(--rd);
+  text-transform: uppercase;
+}
+
+/* PI blocks */
+.cal-pis {
+  position: relative;
+  padding: 16px 0;
+}
+
+.cal-pi {
+  position: relative;
+  margin-bottom: 24px;
+  min-height: 100px;
+}
+
+.cal-pi__bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  border: 1px solid;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+}
+
+.cal-pi__label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.cal-pi__status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-left: auto;
+}
+
+/* Iteration blocks within PI */
+.cal-pi__iters {
+  position: relative;
+  top: 32px;
+  height: 28px;
+}
+
+.cal-iter {
+  position: absolute;
+  top: 0;
+  height: 28px;
+  background: var(--s2);
+  border: 1px solid var(--bd);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+}
+
+.cal-iter--active {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: var(--ac);
+}
+
+.cal-iter--closed {
+  background: rgba(5, 150, 105, 0.06);
+  border-color: rgba(5, 150, 105, 0.3);
+}
+
+.cal-iter--ip {
+  background: repeating-linear-gradient(
+    -45deg, var(--s2), var(--s2) 4px, var(--s3) 4px, var(--s3) 5px
+  );
+}
+
+.cal-iter__id {
+  font-weight: 700;
+  color: var(--t1);
+}
+
+.cal-iter__dates {
+  color: var(--t3);
+  font-size: 0.5rem;
+}
+
+/* Events */
+.cal-pi__events {
+  position: relative;
+  top: 36px;
+  height: 32px;
+}
+
+.cal-event {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+}
+
+.cal-event__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cal-event__title {
+  font-weight: 700;
+}
+
+.cal-event__date {
+  color: var(--t3);
+  font-size: 0.45rem;
+}
+
+/* Legend */
+.cal-legend {
+  display: flex;
+  gap: 16px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--bd);
+  flex-wrap: wrap;
+}
+
+.cal-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cal-legend__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.cal-legend__label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--t3);
+  text-transform: capitalize;
+}

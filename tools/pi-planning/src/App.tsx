@@ -6,6 +6,7 @@ import { ProgramBoard } from './views/ProgramBoard/ProgramBoard';
 import { TeamBoard } from './views/TeamBoard/TeamBoard';
 import { Prioritization } from './views/Prioritization/Prioritization';
 import { People } from './views/People/People';
+import { Calendar } from './views/Calendar/Calendar';
 import { useBacklogStore } from './store/backlog-store';
 import { useConfigStore } from './store/config-store';
 
@@ -42,6 +43,7 @@ export function App() {
             <Route path="/team" element={<TeamBoard />} />
             <Route path="/prioritize" element={<Prioritization />} />
             <Route path="/people" element={<People />} />
+            <Route path="/calendar" element={<Calendar />} />
           </Routes>
         </main>
         <GitStatusBar />

@@ -6,6 +6,7 @@ const NAV = [
   { to: '/team', label: 'Team Board', icon: '⊞' },
   { to: '/prioritize', label: 'Prioritization', icon: '⇅' },
   { to: '/people', label: 'People', icon: '⊕' },
+  { to: '/calendar', label: 'Calendar', icon: '◫' },
 ];
 
 const PI_STATUS_LABELS: Record<string, string> = {

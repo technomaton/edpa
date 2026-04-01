@@ -13,6 +13,23 @@ pis:
   iteration_weeks: 2
   shared_services:
   - UX Consultants
+  events:
+  - type: pi_planning
+    title: PI Planning 2026-1
+    date: 2026-03-30
+    duration: 2d
+  - type: system_demo
+    title: System Demo 1.2
+    iteration: PI-2026-1.2
+    date: 2026-04-28
+  - type: system_demo
+    title: System Demo 1.4
+    iteration: PI-2026-1.4
+    date: 2026-05-26
+  - type: inspect_adapt
+    title: Inspect & Adapt
+    iteration: PI-2026-1.5
+    date: 2026-06-09
   iterations:
   - id: PI-2026-1.1
     dates: 1.4.–14.4.2026
@@ -34,6 +51,21 @@ pis:
   status: planning
   pi_iterations: 5
   iteration_weeks: 1
+  shared_services:
+  - UX Consultants
+  events:
+  - type: pi_planning
+    title: PI Planning 2026-2
+    date: 2026-06-08
+    duration: 1d
+  - type: system_demo
+    title: System Demo 2.3
+    iteration: PI-2026-2.3
+    date: 2026-06-30
+  - type: inspect_adapt
+    title: Inspect & Adapt
+    iteration: PI-2026-2.5
+    date: 2026-07-14
   iterations:
   - id: PI-2026-2.1
     dates: 10.6.–16.6.2026

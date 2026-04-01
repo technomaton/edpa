@@ -8,7 +8,7 @@ rr: 3
 status: Done
 parent: F-100
 assignee: turyna
-iteration: PI-2026-1.1
+iteration: PI-2026-1.2
 contributors:
   - person: turyna
     role: owner
