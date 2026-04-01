@@ -89,8 +89,8 @@ python3 .claude/edpa/scripts/create_project_views.py`,
     title: 'Populate Backlog',
     color: 'var(--or)',
     desc: 'Create YAML files in .edpa/backlog/ — one file per item. Hierarchy: Initiative > Epic > Feature > Story. WSJF is calculated automatically.',
-    code: `# .edpa/backlog/stories/S-200.yaml
-id: S-200
+    code: `# .edpa/backlog/stories/S-1.yaml
+id: S-1
 type: Story
 title: "Implement login endpoint"
 js: 5              # Job Size (Fibonacci)
@@ -98,7 +98,7 @@ bv: 8              # Business Value
 tc: 5              # Time Criticality
 rr: 3              # Risk Reduction
 status: Planned
-parent: F-100      # Parent Feature
+parent: F-1      # Parent Feature
 assignee: jnovak
 iteration: PI-2026-1.1
 
@@ -108,13 +108,13 @@ python3 .claude/edpa/scripts/backlog.py tree`,
     result: `✓ Backlog valid (12 items, 0 errors)
 
 I-1: Medical Platform
-└── E-10: Data Processing Pipeline
-    ├── F-100: Authentication (JS=8, WSJF=2.0)
-    │   ├── S-200: Login endpoint (JS=5) ← jnovak
-    │   └── S-201: Token refresh (JS=3) ← emala
-    └── F-101: Data Import (JS=13, WSJF=1.8)
-        ├── S-210: CSV parser (JS=5) ← emala
-        └── S-211: Validation (JS=3) ← pkral`,
+└── E-1: Data Processing Pipeline
+    ├── F-1: Authentication (JS=8, WSJF=2.0)
+    │   ├── S-1: Login endpoint (JS=5) ← jnovak
+    │   └── S-2: Token refresh (JS=3) ← emala
+    └── F-2: Data Import (JS=13, WSJF=1.8)
+        ├── S-3: CSV parser (JS=5) ← emala
+        └── S-4: Validation (JS=3) ← pkral`,
   },
   {
     num: 6,
@@ -122,19 +122,19 @@ I-1: Medical Platform
     color: 'var(--pk)',
     desc: 'The team works using standard GitHub flow — branch naming conventions, commits referencing items, PRs and code review. EDPA tracks everything automatically.',
     code: `# Branch naming (CI enforces format)
-git checkout -b feature/S-200-login-endpoint
+git checkout -b feature/S-1-login-endpoint
 
 # Commit referencing item
-git commit -m "feat(S-200): implement JWT login"
+git commit -m "feat(S-1): implement JWT login"
 
 # Pull Request
 gh pr create \\
-  --title "S-200: Login endpoint" \\
+  --title "S-1: Login endpoint" \\
   --body "Implements JWT auth flow" \\
   --assignee jnovak`,
-    result: `Branch: feature/S-200-login-endpoint
-Commits: 4 (linked to S-200)
-PR #42: "S-200: Login endpoint"
+    result: `Branch: feature/S-1-login-endpoint
+Commits: 4 (linked to S-1)
+PR #42: "S-1: Login endpoint"
   → Review requested: pkral
   → Status: Approved ✓ → Merged
 

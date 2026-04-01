@@ -54,6 +54,26 @@ Initiative (top-level issue, native Issue Type = Initiative)
 
 Filter syntax: `type:Epic`, `type:Story`, etc.
 
+## Item ID convention
+
+Each work item has a unique ID with a type prefix and sequential number, starting from 1 per type:
+
+| Type | Prefix | Example IDs |
+|------|--------|-------------|
+| Initiative | `I-` | I-1, I-2, I-3 |
+| Epic | `E-` | E-1, E-2, E-3 |
+| Feature | `F-` | F-1, F-2, F-3 |
+| Story | `S-` | S-1, S-2, S-3 |
+| Defect | `D-` | D-1, D-2, D-3 |
+| Task | `T-` | T-1, T-2, T-3 |
+
+- IDs are sequential per type (not globally unique across types)
+- The prefix makes IDs globally unique: `S-1` and `F-1` are different items
+- IDs are immutable — never renumber after creation
+- YAML filename matches the ID: `.edpa/backlog/stories/S-1.yaml`
+- Branch naming uses the ID: `feature/S-1-login-endpoint`
+- Commit messages reference the ID: `feat(S-1): implement login`
+
 ## Status field (4 values)
 
 GitHub Projects Status field must have exactly these 4 options:
