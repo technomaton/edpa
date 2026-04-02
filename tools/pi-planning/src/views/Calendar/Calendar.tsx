@@ -219,13 +219,11 @@ function MonthCal({
                   let bg: string;
                   let textColor: string;
                   let borderBottom = '2px solid transparent';
-                  let outline = '';
 
                   if (isHoliday && !isWeekend) {
-                    // Holidays: dark background like reference
-                    bg = '#1f2937';
-                    textColor = '#ffffff';
-                    borderBottom = '2px solid #1f2937';
+                    bg = '#e2e8f0';
+                    textColor = '#64748b';
+                    borderBottom = '2px solid #cbd5e1';
                   } else if (isWeekend) {
                     bg = '#f9fafb';
                     textColor = '#d1d5db';
@@ -235,28 +233,25 @@ function MonthCal({
                     borderBottom = `2px solid ${IP_STYLE.border}`;
                   } else if (info) {
                     const palette = PI_PALETTE[info.piIdx % PI_PALETTE.length];
-                    bg = 'transparent';
-                    textColor = '#374151';
+                    bg = palette.bg;
+                    textColor = palette.text;
                     borderBottom = `2px solid ${palette.border}`;
                   } else {
                     bg = 'transparent';
                     textColor = '#d1d5db';
                   }
 
-                  // Today: indigo ring overlay (preserves background color)
+                  // Today: solid accent background
                   if (isToday) {
-                    outline = '2px solid #6366f1';
-                    if (!isHoliday && !info?.isIP) {
-                      bg = '#eef2ff';
-                      textColor = '#4338ca';
-                    }
+                    bg = '#6366f1';
+                    textColor = '#ffffff';
+                    borderBottom = '2px solid #4f46e5';
                   }
 
                   return (
                     <td key={di} title={HOLIDAYS[dateStr] || ''} style={{
-                      padding: '5px 2px', textAlign: 'center', fontWeight: isToday ? 700 : 500,
+                      padding: '5px 2px', textAlign: 'center', fontWeight: isToday ? 800 : 500,
                       background: bg, color: textColor, borderBottom,
-                      outline, outlineOffset: '-2px', borderRadius: outline ? 4 : 0,
                     }}>{day}</td>
                   );
                 })}
@@ -344,7 +339,7 @@ export function Calendar() {
         {/* Legend */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 14, height: 14, borderRadius: 3, background: '#1f2937' }} />
+            <div style={{ width: 14, height: 14, borderRadius: 3, background: '#e2e8f0', border: '1px solid #cbd5e1' }} />
             <span style={{ fontSize: 10, color: '#64748b' }}>Státní svátky</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -352,7 +347,7 @@ export function Calendar() {
             <span style={{ fontSize: 10, color: '#64748b' }}>IP iteration</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 14, height: 14, borderRadius: 3, background: '#eef2ff', border: '2px solid #6366f1' }} />
+            <div style={{ width: 14, height: 14, borderRadius: 3, background: '#6366f1' }} />
             <span style={{ fontSize: 10, color: '#64748b' }}>Dnes</span>
           </div>
         </div>
