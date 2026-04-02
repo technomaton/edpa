@@ -593,9 +593,42 @@ body {
   font-weight: 400;
 }
 
-.pb-section__cell--drop {
-  background: rgba(99,102,241,0.1) !important;
+.pb-section__halves {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 0;
+  min-height: 80px;
+}
+
+.pb-section__half {
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.1s;
+  position: relative;
+  min-height: 60px;
+}
+
+.pb-section__half--drop {
+  background: rgba(99,102,241,0.1);
   box-shadow: inset 0 0 0 2px var(--ac);
+}
+
+.pb-section__half-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: var(--t3);
+  opacity: 0.5;
+  text-transform: uppercase;
+  position: absolute;
+  top: 3px;
+  left: 5px;
+}
+
+.pb-section__divider {
+  background: var(--bd);
+  opacity: 0.4;
+  margin: 6px 0;
 }
 
 .pb-section__cap {

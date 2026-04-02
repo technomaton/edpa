@@ -180,16 +180,72 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
                     teamPeople.reduce((s, p) => s + p.capacity, 0) * (planningFactors[row] || 0.8);
                   const used = cellCardItems.reduce((s, i) => s + (i.js || 0), 0);
 
+                  const isSingleWeek = (pi?.iteration_weeks || 2) <= 1;
+                  const w1Items = cellCardItems.filter(i => !i.iteration_half || i.iteration_half === 1);
+                  const w2Items = cellCardItems.filter(i => i.iteration_half === 2);
+
+                  const handleHalfDrop = (e: DragEvent, half: 1 | 2) => {
+                    e.preventDefault();
+                    setDropTarget(null);
+                    if (isReadonly) return;
+                    const itemId = e.dataTransfer.getData('text/plain');
+                    if (!itemId) return;
+                    const item = items.find(i => i.id === itemId);
+                    if (!item) return;
+                    if (iter.type === 'IP' && item.type !== 'Milestone' && item.type !== 'Event') return;
+                    const changes: Partial<WorkItem> = { iteration: iter.id };
+                    if (!isSingleWeek) changes.iteration_half = half;
+                    if (item.iteration !== iter.id || item.iteration_half !== half) {
+                      updateItem(itemId, changes);
+                      saveItem(itemId);
+                    }
+                  };
+
                   return (
                     <td key={iter.id}
-                      className={`pb-section__cell ${isIP ? 'pb-section__cell--ip' : ''} ${isDrop ? 'pb-section__cell--drop' : ''}`}
-                      onDragOver={e => { e.preventDefault(); setDropTarget(cellKey); }}
-                      onDragLeave={() => setDropTarget(null)}
-                      onDrop={e => handleDrop(e, iter.id)}
+                      className={`pb-section__cell ${isIP ? 'pb-section__cell--ip' : ''}`}
                     >
-                      {cellCardItems.map(item => (
-                        <PBCard key={item.id} item={item} isReadonly={isReadonly} />
-                      ))}
+                      {isSingleWeek ? (
+                        /* Single week — one drop zone */
+                        <div
+                          className={`pb-section__half ${dropTarget === `${cellKey}::W1` ? 'pb-section__half--drop' : ''}`}
+                          onDragOver={e => { e.preventDefault(); setDropTarget(`${cellKey}::W1`); }}
+                          onDragLeave={() => setDropTarget(null)}
+                          onDrop={e => handleHalfDrop(e, 1)}
+                        >
+                          <span className="pb-section__half-label">W1</span>
+                          {w1Items.map(item => (
+                            <PBCard key={item.id} item={item} isReadonly={isReadonly} />
+                          ))}
+                        </div>
+                      ) : (
+                        /* Two halves — W1 | W2 */
+                        <div className="pb-section__halves">
+                          <div
+                            className={`pb-section__half ${dropTarget === `${cellKey}::W1` ? 'pb-section__half--drop' : ''}`}
+                            onDragOver={e => { e.preventDefault(); setDropTarget(`${cellKey}::W1`); }}
+                            onDragLeave={() => setDropTarget(null)}
+                            onDrop={e => handleHalfDrop(e, 1)}
+                          >
+                            <span className="pb-section__half-label">W1</span>
+                            {w1Items.map(item => (
+                              <PBCard key={item.id} item={item} isReadonly={isReadonly} />
+                            ))}
+                          </div>
+                          <div className="pb-section__divider" />
+                          <div
+                            className={`pb-section__half ${dropTarget === `${cellKey}::W2` ? 'pb-section__half--drop' : ''}`}
+                            onDragOver={e => { e.preventDefault(); setDropTarget(`${cellKey}::W2`); }}
+                            onDragLeave={() => setDropTarget(null)}
+                            onDrop={e => handleHalfDrop(e, 2)}
+                          >
+                            <span className="pb-section__half-label">W2</span>
+                            {w2Items.map(item => (
+                              <PBCard key={item.id} item={item} isReadonly={isReadonly} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {available > 0 && (
                         <div className="pb-section__cap">
                           <div className="pb-section__cap-bar">

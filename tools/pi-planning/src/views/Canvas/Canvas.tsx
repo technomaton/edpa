@@ -4,6 +4,7 @@ import {
   Controls,
   MiniMap,
   Background,
+  BackgroundVariant,
   useNodesState,
   type Node,
 } from '@xyflow/react';
@@ -184,7 +185,7 @@ export function Canvas() {
         panOnScroll
         defaultViewport={{ x: 0, y: 0, zoom: 0.3 }}
       >
-        <Background gap={50} color="#e2e8f0" />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#c0c4cc" />
         <Controls />
         <MiniMap
           nodeColor={(node) => {
