@@ -1,16 +1,23 @@
 import { useMemo, useState } from 'react';
 import { useBacklogStore } from '../../store/backlog-store';
+import { useConfigStore } from '../../store/config-store';
 
 type SortKey = 'wsjf' | 'bv' | 'tc' | 'rr' | 'js' | 'title';
 
 export function Prioritization() {
   const items = useBacklogStore(s => s.items);
+  const pi = useConfigStore(s => s.currentPI());
   const [sortBy, setSortBy] = useState<SortKey>('wsjf');
   const [sortAsc, setSortAsc] = useState(false);
   const [filterType, setFilterType] = useState<string>('Feature');
 
   const features = useMemo(() => {
-    const filtered = items.filter(i =>
+    const iterationIds = new Set(pi?.iterations.map(it => it.id) || []);
+    const piItems = items.filter(i => {
+      if (!i.iteration) return true; // unassigned items still show
+      return iterationIds.has(i.iteration) || (pi?.iterations || []).some(it => i.iteration!.startsWith(it.id));
+    });
+    const filtered = piItems.filter(i =>
       filterType ? i.type === filterType : true,
     );
     return [...filtered].sort((a, b) => {
@@ -21,7 +28,7 @@ export function Prioritization() {
       }
       return sortAsc ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
     });
-  }, [items, sortBy, sortAsc, filterType]);
+  }, [items, pi, sortBy, sortAsc, filterType]);
 
   const toggleSort = (key: SortKey) => {
     if (sortBy === key) setSortAsc(!sortAsc);

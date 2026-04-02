@@ -9,6 +9,7 @@ export function GitStatusBar() {
   const dirty = useBacklogStore(s => s.dirty);
   const saveAll = useBacklogStore(s => s.saveAll);
   const [committing, setCommitting] = useState(false);
+  const [committed, setCommitted] = useState(false);
   const [message, setMessage] = useState('');
 
   const handleCommit = async () => {
@@ -18,7 +19,11 @@ export function GitStatusBar() {
       await saveAll();
       await api.commit(message);
       setMessage('');
+      setCommitted(true);
+      setTimeout(() => setCommitted(false), 2000);
       await fetchGit();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Commit failed');
     } finally {
       setCommitting(false);
     }
@@ -49,7 +54,7 @@ export function GitStatusBar() {
           onClick={handleCommit}
           disabled={committing || !message.trim()}
         >
-          {committing ? '...' : 'Commit'}
+          {committing ? '...' : committed ? 'Committed!' : 'Commit'}
         </button>
       </div>
     </footer>
