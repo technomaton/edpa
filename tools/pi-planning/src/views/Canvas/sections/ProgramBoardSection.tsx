@@ -1,3 +1,4 @@
+import { ReactFlowProvider } from '@xyflow/react';
 import { ProgramBoard } from '../../ProgramBoard/ProgramBoard';
 
 interface Props {
@@ -11,10 +12,13 @@ interface Props {
 }
 
 export function ProgramBoardSection({ width, height }: Props) {
-  // ProgramBoard reads from stores directly — just give it dimensions
+  // ProgramBoard needs its own ReactFlowProvider to isolate node types
+  // from the parent canvas ReactFlow context
   return (
     <div style={{ width, height: Math.max(height, 800) }}>
-      <ProgramBoard />
+      <ReactFlowProvider>
+        <ProgramBoard />
+      </ReactFlowProvider>
     </div>
   );
 }
