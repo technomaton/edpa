@@ -5,7 +5,17 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
-  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      if (body.error) detail = body.error;
+      else if (body.message) detail = body.message;
+    } catch {
+      // body not JSON, keep statusText
+    }
+    throw new Error(`API error: ${res.status} ${detail}`);
+  }
   return res.json();
 }
 
