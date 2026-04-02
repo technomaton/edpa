@@ -58,13 +58,14 @@ const HOLIDAYS: Record<string, string> = {
 
 // -- PI Colors (matching reference) -------------------------------------------
 
+// No green — green is reserved for IP iterations
 const PI_PALETTE: { bg: string; text: string; border: string; label: string }[] = [
   { bg: '#dbeafe', text: '#1e3a8a', border: '#93c5fd', label: '#2563eb' },  // blue
-  { bg: '#d1fae5', text: '#064e3b', border: '#6ee7b7', label: '#059669' },  // green
   { bg: '#fef3c7', text: '#78350f', border: '#fcd34d', label: '#d97706' },  // amber
   { bg: '#fce7f3', text: '#831843', border: '#f9a8d4', label: '#db2777' },  // pink
   { bg: '#e0e7ff', text: '#312e81', border: '#a5b4fc', label: '#6366f1' },  // indigo
   { bg: '#fecaca', text: '#7f1d1d', border: '#fca5a5', label: '#dc2626' },  // red
+  { bg: '#cffafe', text: '#164e63', border: '#67e8f9', label: '#0891b2' },  // cyan
 ];
 
 const IP_STYLE = { bg: '#bbf7d0', text: '#14532d', border: '#86efac' };
