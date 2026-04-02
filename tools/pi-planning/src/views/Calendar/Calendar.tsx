@@ -2,12 +2,15 @@ import { useMemo } from 'react';
 import { useConfigStore } from '../../store/config-store';
 import type { PIConfig, PIEvent } from '../../types/edpa';
 
-// -- Helpers ------------------------------------------------------------------
+// -- Date helpers -------------------------------------------------------------
+
+const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
+const ds = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
+const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate();
+const dayOfWeek = (y: number, m: number, d: number) => (new Date(y, m - 1, d).getDay() + 6) % 7; // 0=Mon
 
 function parseDate(d: string, fallbackYear?: number): Date {
-  // ISO format: 2026-04-28
   if (/^\d{4}-\d{2}-\d{2}/.test(d)) return new Date(d);
-  // Czech format: 1.4.2026 or 1.4. (without year)
   const clean = d.replace(/\s/g, '');
   const parts = clean.split('.').filter(Boolean);
   const day = parseInt(parts[0]);
@@ -18,227 +21,340 @@ function parseDate(d: string, fallbackYear?: number): Date {
 
 function parseDateRange(dates: string): { start: Date; end: Date } {
   const [s, e] = dates.split('–');
-  // Parse end first (usually has the year), then use its year as fallback for start
   const endDate = parseDate(e.trim());
   const startDate = parseDate(s.trim(), endDate.getFullYear());
   return { start: startDate, end: endDate };
 }
 
-function formatMonth(d: Date): string {
-  return d.toLocaleDateString('en', { month: 'short' });
+function dateToStr(d: Date): string {
+  return ds(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
 
-function formatDay(d: Date): string {
-  return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
-}
+// -- PI Colors ----------------------------------------------------------------
 
-function weeksBetween(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / (7 * 24 * 60 * 60 * 1000));
-}
+const PI_COLORS = [
+  '#6366f1', '#2563eb', '#059669', '#d97706', '#dc2626',
+  '#7c3aed', '#0891b2', '#65a30d', '#c2410c', '#be185d',
+];
 
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
-
-const EVENT_COLORS: Record<string, { bg: string; fg: string; border: string }> = {
-  pi_planning:   { bg: 'rgba(99,102,241,0.12)', fg: '#6366f1', border: '#6366f1' },
-  system_demo:   { bg: 'rgba(8,145,178,0.12)',  fg: '#0891b2', border: '#0891b2' },
-  inspect_adapt: { bg: 'rgba(245,158,11,0.12)', fg: '#d97706', border: '#f59e0b' },
-  prioritization:{ bg: 'rgba(219,39,119,0.12)', fg: '#db2777', border: '#db2777' },
-  custom:        { bg: 'rgba(99,102,241,0.08)', fg: '#6366f1', border: '#6366f1' },
+const IP_STYLES = {
+  ip: { bg: '#bbf7d0', text: '#14532d', border: '#86efac' },
 };
 
-const PI_STATUS_COLORS: Record<string, string> = {
-  active: '#6366f1',
-  planning: '#d97706',
-  closed: '#059669',
+const CELL_STYLES = {
+  weekend: { bg: '#f9fafb', text: '#d1d5db' },
+  today: { bg: '#1e40af', text: '#ffffff' },
+  empty: { bg: 'transparent', text: '#d1d5db' },
 };
 
-// -- PI Block -----------------------------------------------------------------
+// -- Build date map from PI config --------------------------------------------
 
-function PIBlock({ pi, yearStart, weekWidth }: { pi: PIConfig; yearStart: Date; weekWidth: number }) {
-  const iters = pi.iterations;
-  if (iters.length === 0) return null;
+interface DayInfo {
+  piId: string;
+  piColor: string;
+  iterationId: string;
+  isIP: boolean;
+  iterNum: number;
+}
 
-  const firstIter = parseDateRange(iters[0].dates);
-  const lastIter = parseDateRange(iters[iters.length - 1].dates);
-  const startWeek = weeksBetween(yearStart, firstIter.start);
-  const endWeek = weeksBetween(yearStart, lastIter.end);
-  const left = startWeek * weekWidth;
-  const width = (endWeek - startWeek) * weekWidth;
-  const statusColor = PI_STATUS_COLORS[pi.status] || '#8892a8';
+interface EventInfo {
+  title: string;
+  type: string;
+  piId: string;
+  piColor: string;
+}
+
+function buildDateMaps(pis: PIConfig[]) {
+  const dayMap = new Map<string, DayInfo>();
+  const eventMap = new Map<string, EventInfo[]>();
+  let minDate: Date | null = null;
+  let maxDate: Date | null = null;
+
+  pis.forEach((pi, piIdx) => {
+    const color = PI_COLORS[piIdx % PI_COLORS.length];
+
+    pi.iterations.forEach((iter, iterIdx) => {
+      const { start, end } = parseDateRange(iter.dates);
+      if (!minDate || start < minDate) minDate = start;
+      if (!maxDate || end > maxDate) maxDate = end;
+
+      // Fill every day in the iteration
+      const cur = new Date(start);
+      while (cur <= end) {
+        const key = dateToStr(cur);
+        const dow = (cur.getDay() + 6) % 7;
+        if (dow < 5) { // weekdays only
+          dayMap.set(key, {
+            piId: pi.id,
+            piColor: color,
+            iterationId: iter.id,
+            isIP: iter.type === 'IP',
+            iterNum: iterIdx + 1,
+          });
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    });
+
+    // Events
+    (pi.events || []).forEach(evt => {
+      const key = evt.date;
+      const list = eventMap.get(key) || [];
+      list.push({ title: evt.title, type: evt.type, piId: pi.id, piColor: color });
+      eventMap.set(key, list);
+    });
+  });
+
+  return { dayMap, eventMap, minDate, maxDate };
+}
+
+// -- Week label: find events in this week -------------------------------------
+
+function getWeekEvents(
+  year: number, month: number, weekDays: (number | null)[],
+  eventMap: Map<string, EventInfo[]>,
+  dayMap: Map<string, DayInfo>,
+): { label: string; color: string } | null {
+  for (const day of weekDays) {
+    if (day === null) continue;
+    const key = ds(year, month, day);
+    const evts = eventMap.get(key);
+    if (evts && evts.length > 0) {
+      return { label: evts.map(e => e.title).join(' / '), color: evts[0].piColor };
+    }
+  }
+  // If no event, show iteration label for the week
+  for (const day of weekDays) {
+    if (day === null) continue;
+    const key = ds(year, month, day);
+    const info = dayMap.get(key);
+    if (info) {
+      const label = info.isIP ? `${info.piId} – IP` : `${info.piId} – Iter ${info.iterNum}`;
+      return { label, color: info.piColor + '80' };
+    }
+  }
+  return null;
+}
+
+// -- Month Component ----------------------------------------------------------
+
+function MonthCal({
+  year, month, label, dayMap, eventMap, todayStr,
+}: {
+  year: number; month: number; label: string;
+  dayMap: Map<string, DayInfo>;
+  eventMap: Map<string, EventInfo[]>;
+  todayStr: string;
+}) {
+  const days = daysInMonth(year, month);
+  const firstDow = dayOfWeek(year, month, 1);
+
+  // Build weeks
+  const weeks: (number | null)[][] = [];
+  let wk: (number | null)[] = new Array(7).fill(null);
+  let cur = 1;
+  for (let i = firstDow; i < 7 && cur <= days; i++) wk[i] = cur++;
+  weeks.push(wk);
+  while (cur <= days) {
+    wk = new Array(7).fill(null);
+    for (let i = 0; i < 7 && cur <= days; i++) wk[i] = cur++;
+    weeks.push(wk);
+  }
 
   return (
-    <div className="cal-pi" style={{ left, width }}>
-      {/* PI bar */}
-      <div className="cal-pi__bar" style={{ borderColor: statusColor, background: `${statusColor}08` }}>
-        <span className="cal-pi__label" style={{ color: statusColor }}>{pi.id}</span>
-        <span className="cal-pi__status" style={{ color: statusColor }}>{pi.status}</span>
-      </div>
+    <div style={{
+      background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0',
+      overflow: 'hidden', fontSize: 11,
+    }}>
+      <div style={{
+        background: '#1e293b', color: '#fff', padding: '6px 12px',
+        fontWeight: 700, fontSize: 13,
+      }}>{label}</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <thead>
+          <tr>
+            {['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'].map((d, i) => (
+              <th key={i} style={{
+                padding: '4px 2px', textAlign: 'center', fontSize: 10, fontWeight: 500,
+                borderBottom: '1px solid #e2e8f0', fontFamily: "'JetBrains Mono', monospace",
+                color: i >= 5 ? '#d1d5db' : '#64748b', background: i >= 5 ? '#f9fafb' : 'transparent',
+                width: i < 5 ? '10.5%' : '7%',
+              }}>{d}</th>
+            ))}
+            <th style={{
+              padding: '4px 4px', fontSize: 10, fontWeight: 400, color: '#94a3b8',
+              borderBottom: '1px solid #e2e8f0', width: '27%',
+            }} />
+          </tr>
+        </thead>
+        <tbody>
+          {weeks.map((wkArr, wi) => {
+            const weekEvt = getWeekEvents(year, month, wkArr, eventMap, dayMap);
+            return (
+              <tr key={wi} style={{ borderBottom: '1px solid #f8fafc' }}>
+                {wkArr.map((day, di) => {
+                  if (day === null) {
+                    return <td key={di} style={{ padding: '5px 2px', background: '#f9fafb' }} />;
+                  }
+                  const dateStr = ds(year, month, day);
+                  const isToday = dateStr === todayStr;
+                  const isWeekend = di >= 5;
+                  const info = dayMap.get(dateStr);
 
-      {/* Iteration blocks */}
-      <div className="cal-pi__iters">
-        {iters.map(iter => {
-          const { start, end } = parseDateRange(iter.dates);
-          const iterStartPx = weeksBetween(yearStart, start) * weekWidth;
-          const iterEndPx = weeksBetween(yearStart, end) * weekWidth;
-          const iterLeft = iterStartPx - left;
-          const iterWidth = iterEndPx - iterStartPx;
-          const isIP = iter.type === 'IP';
-          const statusCls = iter.status === 'active' ? 'cal-iter--active'
-            : iter.status === 'closed' ? 'cal-iter--closed' : '';
+                  let bg = 'transparent';
+                  let textColor = '#374151';
+                  let borderBottom = '2px solid transparent';
 
-          return (
-            <div
-              key={iter.id}
-              className={`cal-iter ${statusCls} ${isIP ? 'cal-iter--ip' : ''}`}
-              style={{
-                left: iterLeft,
-                width: Math.max(iterWidth, weekWidth),
-              }}
-            >
-              <span className="cal-iter__id">{iter.id.split('.').pop()}</span>
-              <span className="cal-iter__dates">{iter.dates}</span>
-            </div>
-          );
-        })}
-      </div>
+                  if (isToday) {
+                    bg = '#1e40af';
+                    textColor = '#ffffff';
+                    borderBottom = '2px solid #1e40af';
+                  } else if (isWeekend) {
+                    bg = '#f9fafb';
+                    textColor = '#d1d5db';
+                  } else if (info) {
+                    if (info.isIP) {
+                      bg = IP_STYLES.ip.bg;
+                      textColor = IP_STYLES.ip.text;
+                      borderBottom = `2px solid ${IP_STYLES.ip.border}`;
+                    } else {
+                      bg = 'transparent';
+                      textColor = '#374151';
+                      borderBottom = `2px solid ${info.piColor}`;
+                    }
+                  }
 
-      {/* Events */}
-      <div className="cal-pi__events">
-        {(pi.events || []).map((evt, i) => {
-          const evtDate = parseDate(evt.date);
-          const evtLeft = weeksBetween(yearStart, evtDate) * weekWidth - left;
-          const colors = EVENT_COLORS[evt.type] || EVENT_COLORS.custom;
-          return (
-            <div
-              key={`${evt.type}-${i}`}
-              className="cal-event"
-              style={{ left: evtLeft, borderColor: colors.border, background: colors.bg }}
-            >
-              <span className="cal-event__dot" style={{ background: colors.fg }} />
-              <span className="cal-event__title" style={{ color: colors.fg }}>{evt.title}</span>
-              <span className="cal-event__date">{formatDay(evtDate)}</span>
-            </div>
-          );
-        })}
-      </div>
+                  return (
+                    <td key={di} style={{
+                      padding: '5px 2px', textAlign: 'center', fontWeight: 500,
+                      background: bg, color: textColor, borderBottom,
+                    }}>
+                      {day}
+                    </td>
+                  );
+                })}
+                <td style={{
+                  padding: '2px 6px', textAlign: 'right', fontSize: 9, lineHeight: '1.15',
+                }}>
+                  {weekEvt && (
+                    <span style={{
+                      color: weekEvt.color,
+                      fontWeight: weekEvt.label.includes('IP') || weekEvt.label.includes('Demo') || weekEvt.label.includes('Adapt') || weekEvt.label.includes('Planning') ? 700 : 400,
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}>
+                      {weekEvt.label}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
 
 // -- Main Component -----------------------------------------------------------
 
+const MONTH_NAMES = [
+  '', 'Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen',
+  'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec',
+];
+
 export function Calendar() {
   const pis = useConfigStore(s => s.pis);
   const project = useConfigStore(s => s.project);
 
-  // Determine year range from all PIs
-  const { yearStart, totalWeeks, months } = useMemo(() => {
-    let minDate = new Date();
-    let maxDate = new Date();
+  const todayStr = dateToStr(new Date());
 
-    pis.forEach(pi => {
-      pi.iterations.forEach(iter => {
-        const { start, end } = parseDateRange(iter.dates);
-        if (start < minDate) minDate = start;
-        if (end > maxDate) maxDate = end;
-      });
-      (pi.events || []).forEach(evt => {
-        const d = parseDate(evt.date);
-        if (d < minDate) minDate = d;
-        if (d > maxDate) maxDate = d;
-      });
-    });
+  const built = useMemo(() => buildDateMaps(pis), [pis]);
+  const { dayMap, eventMap } = built;
+  const minDate = built.minDate as Date | null;
+  const maxDate = built.maxDate as Date | null;
 
-    // Extend to full months
-    const ys = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-    const ye = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0);
-    const tw = weeksBetween(ys, ye);
-
-    // Generate month markers
-    const ms: { label: string; offset: number }[] = [];
-    const cur = new Date(ys);
-    while (cur <= ye) {
-      ms.push({ label: `${formatMonth(cur)} ${cur.getFullYear()}`, offset: weeksBetween(ys, cur) });
+  // Generate months to display
+  const months = useMemo(() => {
+    if (!minDate || !maxDate) return [];
+    const result: { year: number; month: number; label: string }[] = [];
+    const cur = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    const end = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 1);
+    while (cur < end) {
+      const y = cur.getFullYear();
+      const m = cur.getMonth() + 1;
+      result.push({ year: y, month: m, label: `${MONTH_NAMES[m]} ${y}` });
       cur.setMonth(cur.getMonth() + 1);
     }
-
-    return { yearStart: ys, totalWeeks: tw, months: ms };
-  }, [pis]);
-
-  const WEEK_W = 40;
-  const totalWidth = totalWeeks * WEEK_W;
+    return result;
+  }, [minDate, maxDate]);
 
   return (
-    <div className="cal-container">
-      <div className="cal-header">
-        <h2 className="cal-header__title">Calendar</h2>
-        {project && <span className="cal-header__project">{project.name}</span>}
-      </div>
-
-      <div className="cal-scroll">
-        <div className="cal-timeline" style={{ width: totalWidth }}>
-          {/* Month headers */}
-          <div className="cal-months">
-            {months.map((m, i) => {
-              const nextOffset = months[i + 1]?.offset ?? totalWeeks;
-              const w = (nextOffset - m.offset) * WEEK_W;
-              return (
-                <div key={m.label} className="cal-month" style={{ left: m.offset * WEEK_W, width: w }}>
-                  {m.label}
-                </div>
-              );
-            })}
+    <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: 40, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>
+              {minDate?.getFullYear() || 2026}
+            </span>
           </div>
-
-          {/* Week grid lines */}
-          <div className="cal-weeks">
-            {Array.from({ length: totalWeeks }, (_, i) => (
-              <div key={i} className="cal-week-line" style={{ left: i * WEEK_W }} />
-            ))}
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b' }}>
+            {project?.name || 'EDPA'} — PI Kalendář
           </div>
+        </div>
 
-          {/* Today marker */}
-          {(() => {
-            const todayWeek = weeksBetween(yearStart, new Date());
-            if (todayWeek >= 0 && todayWeek <= totalWeeks) {
-              return <div className="cal-today" style={{ left: todayWeek * WEEK_W }} />;
-            }
-            return null;
-          })()}
-
-          {/* PI blocks */}
-          <div className="cal-pis">
-            {pis.map(pi => (
-              <PIBlock key={pi.id} pi={pi} yearStart={yearStart} weekWidth={WEEK_W} />
-            ))}
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ width: 14, height: 14, borderRadius: 3, background: IP_STYLES.ip.bg, border: `1px solid ${IP_STYLES.ip.border}` }} />
+            <span style={{ fontSize: 10, color: '#64748b' }}>IP iteration</span>
           </div>
+          {pis.map((pi, i) => (
+            <div key={pi.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{
+                width: 14, height: 14, borderRadius: 3,
+                borderBottom: `3px solid ${PI_COLORS[i % PI_COLORS.length]}`,
+                background: '#fff', border: '1px solid #e2e8f0',
+              }} />
+              <span style={{ fontSize: 10, color: '#64748b' }}>
+                {pi.id} ({pi.pi_iterations})
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="cal-legend">
-        {Object.entries(EVENT_COLORS).map(([type, colors]) => (
-          <div key={type} className="cal-legend__item">
-            <span className="cal-legend__dot" style={{ background: colors.fg }} />
-            <span className="cal-legend__label">{type.replace('_', ' ')}</span>
+      {/* PI badges */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        {pis.map((pi, i) => (
+          <div key={pi.id} style={{
+            padding: '4px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+            fontFamily: "'JetBrains Mono', monospace",
+            background: PI_COLORS[i % PI_COLORS.length],
+            color: '#fff',
+          }}>
+            {pi.id} ({pi.pi_iterations})
           </div>
         ))}
-        <div className="cal-legend__item">
-          <span className="cal-legend__dot" style={{ background: '#6366f1' }} />
-          <span className="cal-legend__label">active</span>
-        </div>
-        <div className="cal-legend__item">
-          <span className="cal-legend__dot" style={{ background: '#d97706' }} />
-          <span className="cal-legend__label">planning</span>
-        </div>
-        <div className="cal-legend__item">
-          <span className="cal-legend__dot" style={{ background: '#059669' }} />
-          <span className="cal-legend__label">closed</span>
-        </div>
+      </div>
+
+      {/* Monthly grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 16,
+      }}>
+        {months.map(m => (
+          <MonthCal
+            key={`${m.year}-${m.month}`}
+            year={m.year}
+            month={m.month}
+            label={m.label}
+            dayMap={dayMap}
+            eventMap={eventMap}
+            todayStr={todayStr}
+          />
+        ))}
       </div>
     </div>
   );
