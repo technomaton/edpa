@@ -38,6 +38,24 @@ function getMonday(y: number, m: number, d: number): string {
   return dateToStr(mon);
 }
 
+// -- Public holidays (CZ 2026) ------------------------------------------------
+
+const HOLIDAYS: Record<string, string> = {
+  '2026-01-01': 'Nový rok',
+  '2026-04-03': 'Velký pátek',
+  '2026-04-06': 'Velikonoční pondělí',
+  '2026-05-01': 'Svátek práce',
+  '2026-05-08': 'Den vítězství',
+  '2026-07-05': 'Den slovanských věrozvěstů',
+  '2026-07-06': 'Den Jana Husa',
+  '2026-09-28': 'Den české státnosti',
+  '2026-10-28': 'Den vzniku ČSR',
+  '2026-11-17': 'Den boje za svobodu',
+  '2026-12-24': 'Štědrý den',
+  '2026-12-25': '1. svátek vánoční',
+  '2026-12-26': '2. svátek vánoční',
+};
+
 // -- PI Colors (matching reference) -------------------------------------------
 
 const PI_PALETTE: { bg: string; text: string; border: string; label: string }[] = [
@@ -195,16 +213,19 @@ function MonthCal({
                   const dateStr = ds(year, month, day);
                   const isToday = dateStr === todayStr;
                   const isWeekend = di >= 5;
+                  const isHoliday = !!HOLIDAYS[dateStr];
                   const info = dayMap.get(dateStr);
 
                   let bg: string;
                   let textColor: string;
                   let borderBottom = '2px solid transparent';
+                  let outline = '';
 
-                  if (isToday) {
-                    bg = '#1e293b';
+                  if (isHoliday && !isWeekend) {
+                    // Holidays: dark background like reference
+                    bg = '#1f2937';
                     textColor = '#ffffff';
-                    borderBottom = '2px solid #1e293b';
+                    borderBottom = '2px solid #1f2937';
                   } else if (isWeekend) {
                     bg = '#f9fafb';
                     textColor = '#d1d5db';
@@ -222,10 +243,20 @@ function MonthCal({
                     textColor = '#d1d5db';
                   }
 
+                  // Today: indigo ring overlay (preserves background color)
+                  if (isToday) {
+                    outline = '2px solid #6366f1';
+                    if (!isHoliday && !info?.isIP) {
+                      bg = '#eef2ff';
+                      textColor = '#4338ca';
+                    }
+                  }
+
                   return (
-                    <td key={di} style={{
-                      padding: '5px 2px', textAlign: 'center', fontWeight: 500,
+                    <td key={di} title={HOLIDAYS[dateStr] || ''} style={{
+                      padding: '5px 2px', textAlign: 'center', fontWeight: isToday ? 700 : 500,
                       background: bg, color: textColor, borderBottom,
+                      outline, outlineOffset: '-2px', borderRadius: outline ? 4 : 0,
                     }}>{day}</td>
                   );
                 })}
@@ -313,8 +344,16 @@ export function Calendar() {
         {/* Legend */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ width: 14, height: 14, borderRadius: 3, background: '#1f2937' }} />
+            <span style={{ fontSize: 10, color: '#64748b' }}>Státní svátky</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <div style={{ width: 14, height: 14, borderRadius: 3, background: IP_STYLE.bg, border: `1px solid ${IP_STYLE.border}` }} />
             <span style={{ fontSize: 10, color: '#64748b' }}>IP iteration</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ width: 14, height: 14, borderRadius: 3, background: '#eef2ff', border: '2px solid #6366f1' }} />
+            <span style={{ fontSize: 10, color: '#64748b' }}>Dnes</span>
           </div>
         </div>
       </div>
