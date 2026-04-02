@@ -406,6 +406,17 @@ body {
   pointer-events: none;
 }
 
+/* Single-week cell — no split, single column */
+.rf-cell--single {
+  grid-template-columns: 1fr;
+}
+
+.rf-cell__half--full {
+  padding: 4px;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+
 /* Half cells */
 .rf-cell__half {
   padding: 4px;

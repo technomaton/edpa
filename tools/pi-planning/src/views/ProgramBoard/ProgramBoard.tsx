@@ -59,6 +59,7 @@ function buildBoard(
   personTeam: Record<string, string>,
   planningFactors: Record<string, number>,
   piEvents: PIEvent[],
+  pi_iteration_weeks: number,
   onSelectItem: (item: WorkItem) => void,
   dropTarget: string | null,
 ): { nodes: Node[]; edges: Edge[]; rowYOffsets: Record<string, number>; rowHeights: Record<string, number> } {
@@ -221,6 +222,7 @@ function buildBoard(
           available,
           isActive: iter.status === 'active',
           isIP: iter.type === 'IP',
+          isSingleWeek: (pi_iteration_weeks || 2) <= 1,
           dropHalf: dropTarget === `${cellId}-W1` ? 1 : dropTarget === `${cellId}-W2` ? 2 : 0,
           dropBlocked: dropTarget === `${cellId}-BLOCKED`,
         },
@@ -249,7 +251,8 @@ function buildBoard(
       const stackIdx = halfCount[halfKey] || 0;
       halfCount[halfKey] = stackIdx + 1;
       const cellX = ROW_HEADER_W + colIdx * COL_W;
-      x = cellX + (half === 2 ? HALF_W : 0) + CARD_PAD;
+      const singleWeek = (pi_iteration_weeks || 2) <= 1;
+      x = cellX + (singleWeek ? 0 : (half === 2 ? HALF_W : 0)) + CARD_PAD;
       y = rowYOffsets[rowId] + 24 + CARD_PAD + stackIdx * (CARD_H + CARD_GAP);
     } else {
       // Unassigned — place below grid
@@ -272,7 +275,7 @@ function buildBoard(
       type: 'featureCard',
       position: { x, y },
       data: { item, onSelect: onSelectItem, depColor },
-      style: { width: CARD_W, zIndex: 10 },
+      style: { width: (pi_iteration_weeks || 2) <= 1 ? COL_W - 24 : CARD_W, zIndex: 10 },
     });
 
     // Dependency edges
@@ -398,7 +401,7 @@ export function ProgramBoard() {
   const { builtNodes, builtEdges } = useMemo(
     () => {
       const { nodes, edges, rowYOffsets: ryo, rowHeights: rh } = buildBoard(
-        items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, pi?.events || [], setSelectedItem, dropTarget,
+        items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, pi?.events || [], pi?.iteration_weeks || 2, setSelectedItem, dropTarget,
       );
       layoutRef.current = { rowYOffsets: ryo, rowHeights: rh };
       return { builtNodes: nodes, builtEdges: edges };
