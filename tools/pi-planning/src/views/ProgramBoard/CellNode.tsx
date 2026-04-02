@@ -20,8 +20,10 @@ function CellNodeInner({ data }: NodeProps) {
   return (
     <div className={`rf-cell ${isActive ? 'rf-cell--active' : ''} ${isIP ? 'rf-cell--ip' : ''} ${dropBlocked ? 'rf-cell--blocked' : ''} ${isSingleWeek ? 'rf-cell--single' : ''}`}>
       {isSingleWeek ? (
-        /* Single week — no split */
-        <div className={`rf-cell__half rf-cell__half--full ${dropHalf === 1 ? 'rf-cell__half--drop' : ''}`} />
+        /* Single week — one column with W1 label */
+        <div className={`rf-cell__half rf-cell__half--full ${dropHalf === 1 ? 'rf-cell__half--drop' : ''}`}>
+          <span className="rf-cell__half-label">W1</span>
+        </div>
       ) : (
         /* Two halves — W1/W2 split */
         <>
