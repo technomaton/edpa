@@ -16,35 +16,35 @@ pis:
   events:
   - type: pi_planning
     title: PI Planning 2026-1
-    date: 2026-03-30
+    date: 2026-04-02
     duration: 2d
   - type: system_demo
     title: System Demo 1.2
     iteration: PI-2026-1.2
-    date: 2026-04-28
+    date: 2026-05-01
   - type: system_demo
     title: System Demo 1.4
     iteration: PI-2026-1.4
-    date: 2026-05-26
+    date: 2026-05-29
   - type: inspect_adapt
     title: Inspect & Adapt
     iteration: PI-2026-1.5
-    date: 2026-06-09
+    date: 2026-06-12
   iterations:
   - id: PI-2026-1.1
-    dates: 1.4.–14.4.2026
+    dates: 6.4.–17.4.2026
     status: closed
   - id: PI-2026-1.2
-    dates: 15.4.–28.4.2026
+    dates: 20.4.–1.5.2026
     status: closed
   - id: PI-2026-1.3
-    dates: 29.4.–12.5.2026
+    dates: 4.5.–15.5.2026
     status: closed
   - id: PI-2026-1.4
-    dates: 13.5.–26.5.2026
+    dates: 18.5.–29.5.2026
     status: active
   - id: PI-2026-1.5
-    dates: 27.5.–9.6.2026
+    dates: 1.6.–12.6.2026
     status: planned
     type: IP
 - id: PI-2026-2
@@ -56,31 +56,31 @@ pis:
   events:
   - type: pi_planning
     title: PI Planning 2026-2
-    date: 2026-06-08
+    date: 2026-06-11
     duration: 1d
   - type: system_demo
     title: System Demo 2.3
     iteration: PI-2026-2.3
-    date: 2026-06-30
+    date: 2026-07-03
   - type: inspect_adapt
     title: Inspect & Adapt
     iteration: PI-2026-2.5
-    date: 2026-07-14
+    date: 2026-07-17
   iterations:
   - id: PI-2026-2.1
-    dates: 10.6.–16.6.2026
+    dates: 15.6.–19.6.2026
     status: planned
   - id: PI-2026-2.2
-    dates: 17.6.–23.6.2026
+    dates: 22.6.–26.6.2026
     status: planned
   - id: PI-2026-2.3
-    dates: 24.6.–30.6.2026
+    dates: 29.6.–3.7.2026
     status: planned
   - id: PI-2026-2.4
-    dates: 1.7.–7.7.2026
+    dates: 6.7.–10.7.2026
     status: planned
   - id: PI-2026-2.5
-    dates: 8.7.–14.7.2026
+    dates: 13.7.–17.7.2026
     status: planned
     type: IP
 evidence:
