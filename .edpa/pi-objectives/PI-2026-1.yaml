@@ -1,0 +1,25 @@
+pi: PI-2026-1
+teams:
+  CVUT:
+    committed:
+      - title: "OMOP parser production-ready"
+        bv: 8
+        status: done
+      - title: "Data Upload API complete"
+        bv: 6
+        status: done
+    stretch:
+      - title: "FHIR bridge MVP"
+        bv: 5
+        status: in_progress
+    confidence: 4
+  Partner:
+    committed:
+      - title: "Katalog datasetu UI/API"
+        bv: 7
+        status: done
+    stretch:
+      - title: "Auth modul"
+        bv: 4
+        status: in_progress
+    confidence: 3

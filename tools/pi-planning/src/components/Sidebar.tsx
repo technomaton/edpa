@@ -8,6 +8,7 @@ const NAV = [
   { to: '/roam', label: 'ROAM Board', icon: '⚠' },
   { to: '/people', label: 'People', icon: '⊕' },
   { to: '/calendar', label: 'Calendar', icon: '◫' },
+  { to: '/objectives', label: 'PI Objectives', icon: '◎' },
 ];
 
 const PI_STATUS_LABELS: Record<string, string> = {

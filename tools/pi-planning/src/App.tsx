@@ -8,6 +8,7 @@ import { Prioritization } from './views/Prioritization/Prioritization';
 import { ROAM } from './views/ROAM/ROAM';
 import { People } from './views/People/People';
 import { Calendar } from './views/Calendar/Calendar';
+import { Objectives } from './views/Objectives/Objectives';
 import { useBacklogStore } from './store/backlog-store';
 import { useConfigStore } from './store/config-store';
 
@@ -46,6 +47,7 @@ export function App() {
             <Route path="/roam" element={<ROAM />} />
             <Route path="/people" element={<People />} />
             <Route path="/calendar" element={<Calendar />} />
+            <Route path="/objectives" element={<Objectives />} />
           </Routes>
         </main>
         <GitStatusBar />

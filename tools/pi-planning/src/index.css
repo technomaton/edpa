@@ -2133,3 +2133,306 @@ body {
   font-size: 0.5rem;
   color: var(--t3);
 }
+
+/* ── PI Objectives ── */
+.obj-view {
+  padding: 24px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.obj-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.obj-header__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.obj-header__pi {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--t3);
+  background: var(--s3);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.obj-header__saving {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--ac);
+}
+
+.obj-empty {
+  color: var(--t3);
+  font-size: 0.85rem;
+  padding: 32px;
+  text-align: center;
+}
+
+.obj-team {
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.obj-team__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--bd);
+  background: var(--s2);
+}
+
+.obj-team__name {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.obj-team__confidence {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.obj-confidence-btns {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.obj-confidence-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--bd);
+  border-radius: 4px;
+  background: var(--s1);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  cursor: pointer;
+  color: var(--t2);
+}
+
+.obj-confidence-btn--active {
+  background: var(--ac);
+  color: #fff;
+  border-color: var(--ac);
+}
+
+.obj-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--bd);
+}
+
+.obj-col {
+  background: var(--s1);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.obj-col__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.obj-col__label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--t3);
+}
+
+.obj-col__total {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--ac);
+}
+
+.obj-card {
+  background: var(--s2);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.obj-card__title {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 0.8rem;
+  color: var(--t1);
+  padding: 4px 0;
+  outline: none;
+}
+
+.obj-card__title:focus {
+  border-bottom: 1px solid var(--ac);
+}
+
+.obj-card__title::placeholder {
+  color: var(--t3);
+}
+
+.obj-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.obj-card__bv-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--t3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.obj-card__bv {
+  width: 40px;
+  border: 1px solid var(--bd);
+  border-radius: 4px;
+  background: var(--s1);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  padding: 2px 4px;
+  text-align: center;
+  color: var(--t1);
+  outline: none;
+}
+
+.obj-card__bv:focus {
+  border-color: var(--ac);
+}
+
+.obj-card__status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.obj-status--done {
+  background: rgba(5, 150, 105, 0.12);
+  color: var(--gn);
+}
+
+.obj-status--ip {
+  background: rgba(217, 119, 6, 0.12);
+  color: var(--yl);
+}
+
+.obj-status--planned {
+  background: var(--s3);
+  color: var(--t3);
+}
+
+.obj-card__remove {
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  border-radius: 4px;
+}
+
+.obj-card__remove:hover {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--rd);
+}
+
+.obj-add {
+  border: 1px dashed var(--bd);
+  background: transparent;
+  color: var(--t3);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.obj-add:hover {
+  border-color: var(--ac);
+  color: var(--ac);
+}
+
+.obj-add-team {
+  border: 1px dashed var(--bd);
+  background: transparent;
+  color: var(--t3);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.obj-add-team:hover {
+  border-color: var(--ac);
+  color: var(--ac);
+}
+
+.obj-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+}
+
+.obj-footer__label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--t2);
+}
+
+.obj-footer__value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.obj-footer__desc {
+  font-size: 0.7rem;
+  color: var(--t3);
+}

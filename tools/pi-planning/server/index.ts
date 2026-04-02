@@ -6,6 +6,7 @@ import { backlogRoutes } from './routes/backlog.js';
 import { peopleRoutes } from './routes/people.js';
 import { configRoutes } from './routes/config.js';
 import { gitRoutes } from './routes/git.js';
+import { objectivesRoutes } from './routes/objectives.js';
 
 const PORT = parseInt(process.env.PORT || '3001');
 const isProd = process.argv.includes('--prod');
@@ -30,6 +31,7 @@ app.use('/api/backlog', backlogRoutes(edpaRoot));
 app.use('/api/people', peopleRoutes(edpaRoot));
 app.use('/api/config', configRoutes(edpaRoot));
 app.use('/api/git', gitRoutes(edpaRoot));
+app.use('/api/objectives', objectivesRoutes(edpaRoot));
 
 // In production, serve the built frontend
 if (isProd) {
