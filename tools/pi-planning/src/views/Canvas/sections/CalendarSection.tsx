@@ -10,7 +10,7 @@ interface Props {
 export function CalendarSection({ width, height }: Props) {
   // Calendar reads from store directly, so just render it
   return (
-    <div style={{ width, height, overflow: 'auto' }}>
+    <div style={{ width }}>
       <Calendar />
     </div>
   );

@@ -36,7 +36,7 @@ export function PrioritizationSection({ items: rawItems, pi: rawPi, width, heigh
   };
 
   return (
-    <div className="prio-section" style={{ width, height, overflow: 'auto' }}>
+    <div className="prio-section" style={{ width }}>
       <table className="prio-section__table">
         <thead>
           <tr>

@@ -27,22 +27,20 @@ function SectionFrameInner({ data }: NodeProps) {
     isReadonly: boolean;
   };
 
-  const contentHeight = height - 40;
-
   return (
     <div
       className="section-frame"
-      style={{ width, height, borderColor: color }}
+      style={{ width, borderColor: color }}
     >
       <div className="section-frame__header" style={{ background: color }}>
         <span className="section-frame__title">{label}</span>
       </div>
-      <div className="section-frame__content" style={{ height: contentHeight }}>
+      <div className="section-frame__content">
         {component === 'programBoard' && (
           <ProgramBoardSection
             items={items} pi={pi} people={people} teams={teams}
             isReadonly={isReadonly}
-            width={width} height={contentHeight}
+            width={width} height={height}
           />
         )}
         {component === 'team' && teamId && (
@@ -51,26 +49,26 @@ function SectionFrameInner({ data }: NodeProps) {
             items={items} pi={pi} people={people} teams={teams}
             selectedPI={selectedPI}
             isReadonly={isReadonly}
-            width={width} height={contentHeight}
+            width={width} height={height}
           />
         )}
         {component === 'roam' && (
           <RoamSection
             items={items} selectedPI={selectedPI}
             isReadonly={isReadonly}
-            width={width} height={contentHeight}
+            width={width} height={height}
           />
         )}
         {component === 'prioritization' && (
           <PrioritizationSection
             items={items} pi={pi}
-            width={width} height={contentHeight}
+            width={width} height={height}
           />
         )}
         {component === 'calendar' && (
           <CalendarSection
             pis={pis} project={project}
-            width={width} height={contentHeight}
+            width={width} height={height}
           />
         )}
       </div>

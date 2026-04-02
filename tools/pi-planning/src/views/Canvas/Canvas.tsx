@@ -157,12 +157,11 @@ export function Canvas() {
         height: s.height,
         component: s.component,
         teamId: s.id.startsWith('team-') ? s.id.replace('team-', '') : undefined,
-        // Pass all data down
         items, pi, pis, people, teams, project, selectedPI, isReadonly,
       },
       draggable: false,
       selectable: false,
-      style: { width: s.width, height: s.height },
+      style: { width: s.width },
     }));
   }, [sections, items, pi, pis, people, teams, project, selectedPI, isReadonly]);
 

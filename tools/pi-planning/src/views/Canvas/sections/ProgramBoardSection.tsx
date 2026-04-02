@@ -76,7 +76,7 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
   const rowH = 120;
 
   return (
-    <div className="pb-section" style={{ width, height, overflow: 'auto' }}>
+    <div className="pb-section" style={{ width }}>
       <table className="pb-section__table">
         <thead>
           <tr>

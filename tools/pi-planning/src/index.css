@@ -402,7 +402,6 @@ body {
 }
 
 .section-frame__content {
-  overflow: auto;
   background: var(--s1);
 }
 
@@ -727,39 +726,41 @@ body {
   flex-shrink: 0;
 }
 
-/* ROAM Section */
+/* ROAM Section — 2×2 quadrants */
 .roam-section { padding: 8px; }
 
-.roam-section__grid {
+.roam-section__quadrants {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
   gap: 6px;
-  height: 100%;
 }
 
-.roam-section__column {
-  display: flex;
-  flex-direction: column;
+.roam-section__quad {
+  border-radius: 6px;
+  overflow: hidden;
+  min-height: 120px;
 }
 
-.roam-section__col-header {
-  padding: 4px 8px;
+.roam-section__quad-header {
+  padding: 4px 10px;
   color: #fff;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  border-radius: 4px 4px 0 0;
 }
 
-.roam-section__col-body {
-  flex: 1;
-  background: var(--s2);
-  border: 1px solid var(--bd);
-  border-radius: 0 0 4px 4px;
-  padding: 4px;
+.roam-section__quad-count {
+  opacity: 0.7;
+  font-weight: 400;
+}
+
+.roam-section__quad-body {
+  padding: 6px;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 4px;
+  align-content: flex-start;
 }
 
 .roam-section__card {

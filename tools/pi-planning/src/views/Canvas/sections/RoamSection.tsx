@@ -9,18 +9,18 @@ interface Props {
   height: number;
 }
 
-const ROAM_COLUMNS: { status: RoamStatus; label: string; color: string }[] = [
-  { status: 'resolved', label: 'Resolved', color: '#059669' },
-  { status: 'owned', label: 'Owned', color: '#6366f1' },
-  { status: 'accepted', label: 'Accepted', color: '#d97706' },
-  { status: 'mitigated', label: 'Mitigated', color: '#0891b2' },
+const QUADRANTS: { status: RoamStatus; label: string; bg: string; headerBg: string }[] = [
+  { status: 'resolved',  label: 'Resolved',  bg: 'rgba(5,150,105,0.06)',  headerBg: '#059669' },
+  { status: 'owned',     label: 'Owned',     bg: 'rgba(30,41,59,0.06)',   headerBg: '#1e293b' },
+  { status: 'accepted',  label: 'Accepted',  bg: 'rgba(234,88,12,0.06)',  headerBg: '#ea580c' },
+  { status: 'mitigated', label: 'Mitigated', bg: 'rgba(100,116,139,0.06)',headerBg: '#64748b' },
 ];
 
 const SEV_COLORS: Record<string, string> = {
   high: '#dc2626', medium: '#d97706', low: '#059669',
 };
 
-export function RoamSection({ items: rawItems, selectedPI, width, height }: Props) {
+export function RoamSection({ items: rawItems, selectedPI, width }: Props) {
   const items = rawItems as WorkItem[];
 
   const risks = useMemo(() =>
@@ -29,17 +29,17 @@ export function RoamSection({ items: rawItems, selectedPI, width, height }: Prop
   );
 
   return (
-    <div className="roam-section" style={{ width, height, overflow: 'auto' }}>
-      <div className="roam-section__grid">
-        {ROAM_COLUMNS.map(col => {
-          const colRisks = risks.filter(r => r.roam_status === col.status);
+    <div className="roam-section" style={{ width }}>
+      <div className="roam-section__quadrants">
+        {QUADRANTS.map(q => {
+          const qRisks = risks.filter(r => r.roam_status === q.status);
           return (
-            <div key={col.status} className="roam-section__column">
-              <div className="roam-section__col-header" style={{ background: col.color }}>
-                {col.label} ({colRisks.length})
+            <div key={q.status} className="roam-section__quad" style={{ background: q.bg }}>
+              <div className="roam-section__quad-header" style={{ background: q.headerBg }}>
+                {q.label} <span className="roam-section__quad-count">#{qRisks.length}</span>
               </div>
-              <div className="roam-section__col-body">
-                {colRisks.map(r => (
+              <div className="roam-section__quad-body">
+                {qRisks.map(r => (
                   <div key={r.id} className="roam-section__card">
                     <div className="roam-section__card-head">
                       <span className="roam-section__card-id">{r.id}</span>

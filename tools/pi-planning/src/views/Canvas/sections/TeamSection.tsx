@@ -80,7 +80,7 @@ export function TeamSection({ teamId, items: rawItems, pi: rawPi, people: rawPeo
   }, [teamStories, iterations]);
 
   return (
-    <div className="team-section" style={{ width, height, overflow: 'auto' }}>
+    <div className="team-section" style={{ width }}>
       {/* Top row: Members + Objectives */}
       <div className="team-section__top">
         {/* Members */}
