@@ -62,7 +62,7 @@ function buildBoard(
   pi_iteration_weeks: number,
   onSelectItem: (item: WorkItem) => void,
   dropTarget: string | null,
-): { nodes: Node[]; edges: Edge[]; rowYOffsets: Record<string, number>; rowHeights: Record<string, number> } {
+): { nodes: Node[]; edges: Edge[]; rowYOffsets: Record<string, number>; rowHeights: Record<string, number>; backwardDeps: number; sameIterCrossTeam: number } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
@@ -285,11 +285,48 @@ function buildBoard(
           id: `dep-${depId}-${item.id}`,
           source: depId,
           target: item.id,
-          animated: true,
-          style: { stroke: '#6366f1', strokeWidth: 2 },
           type: 'smoothstep',
         });
       });
+    }
+  });
+
+  // Classify edges by conflict type
+  let backwardDeps = 0;
+  let sameIterCrossTeam = 0;
+  const itemById = new Map(allBoardItems.map(i => [i.id, i]));
+
+  edges.forEach(edge => {
+    const sourceItem = itemById.get(edge.source);
+    const targetItem = itemById.get(edge.target);
+    if (!sourceItem || !targetItem) {
+      edge.style = { stroke: '#6366f1', strokeWidth: 2 };
+      edge.animated = true;
+      return;
+    }
+
+    const sourceIterIdx = iterations.findIndex(it => sourceItem.iteration?.startsWith(it.id));
+    const targetIterIdx = iterations.findIndex(it => targetItem.iteration?.startsWith(it.id));
+    const sourceTeam = getTeamForItem(sourceItem, personTeam);
+    const targetTeam = getTeamForItem(targetItem, personTeam);
+
+    if (targetIterIdx >= 0 && sourceIterIdx >= 0 && targetIterIdx < sourceIterIdx) {
+      // BACKWARD — blocker: target needed before source delivers
+      edge.style = { stroke: '#dc2626', strokeWidth: 3 };
+      edge.animated = true;
+      edge.label = '⚠ BACKWARD';
+      edge.labelStyle = { fill: '#dc2626', fontWeight: 700 };
+      backwardDeps++;
+    } else if (targetIterIdx >= 0 && sourceIterIdx >= 0 && targetIterIdx === sourceIterIdx && sourceTeam !== targetTeam) {
+      // SAME ITERATION, CROSS-TEAM — warning
+      edge.style = { stroke: '#d97706', strokeWidth: 2, strokeDasharray: '5,5' };
+      edge.label = '⚡ same iter';
+      edge.labelStyle = { fill: '#d97706' };
+      sameIterCrossTeam++;
+    } else {
+      // Normal forward dependency
+      edge.style = { stroke: '#6366f1', strokeWidth: 2 };
+      edge.animated = true;
     }
   });
 
@@ -307,7 +344,7 @@ function buildBoard(
     });
   }
 
-  return { nodes, edges, rowYOffsets, rowHeights };
+  return { nodes, edges, rowYOffsets, rowHeights, backwardDeps, sameIterCrossTeam };
 }
 
 // -- Detail Panel (overlay) ---------------------------------------------------
@@ -398,13 +435,13 @@ export function ProgramBoard() {
     rowYOffsets: {}, rowHeights: {},
   });
 
-  const { builtNodes, builtEdges } = useMemo(
+  const { builtNodes, builtEdges, backwardDeps, sameIterCrossTeam } = useMemo(
     () => {
-      const { nodes, edges, rowYOffsets: ryo, rowHeights: rh } = buildBoard(
+      const { nodes, edges, rowYOffsets: ryo, rowHeights: rh, backwardDeps: bd, sameIterCrossTeam: si } = buildBoard(
         items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, pi?.events || [], pi?.iteration_weeks || 2, setSelectedItem, dropTarget,
       );
       layoutRef.current = { rowYOffsets: ryo, rowHeights: rh };
-      return { builtNodes: nodes, builtEdges: edges };
+      return { builtNodes: nodes, builtEdges: edges, backwardDeps: bd, sameIterCrossTeam: si };
     },
     [items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, pi, dropTarget],
   );
@@ -516,6 +553,20 @@ export function ProgramBoard() {
       {warning && (
         <div className="warning-banner">
           {warning}
+        </div>
+      )}
+      {(backwardDeps > 0 || sameIterCrossTeam > 0) && (
+        <div className="conflict-banner">
+          {backwardDeps > 0 && (
+            <span className="conflict-badge conflict-badge--red">
+              {backwardDeps} backward dep{backwardDeps !== 1 ? 's' : ''}
+            </span>
+          )}
+          {sameIterCrossTeam > 0 && (
+            <span className="conflict-badge conflict-badge--yellow">
+              {sameIterCrossTeam} same-iter cross-team
+            </span>
+          )}
         </div>
       )}
       <ReactFlow

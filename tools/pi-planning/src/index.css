@@ -291,6 +291,41 @@ body {
   box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
 }
 
+/* Dependency conflict banner */
+.conflict-banner {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  padding: 4px 12px;
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+.conflict-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.conflict-badge--red {
+  color: #fff;
+  background: #dc2626;
+}
+
+.conflict-badge--yellow {
+  color: #000;
+  background: #f59e0b;
+}
+
 .sidebar__nav {
   display: flex;
   flex-direction: column;
