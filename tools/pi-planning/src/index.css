@@ -568,34 +568,49 @@ body {
   margin-top: 4px;
 }
 
-.team-section__obj-cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+.team-section__obj-section {
+  margin-bottom: 8px;
 }
 
 .team-section__obj-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.5rem;
+  font-size: 0.55rem;
   font-weight: 700;
-  color: var(--t3);
+  color: var(--gn);
   margin-bottom: 4px;
+}
+
+.team-section__obj-label--uncommitted {
+  color: var(--t3);
 }
 
 .team-section__obj-card {
   background: var(--s2);
   border: 1px solid var(--bd);
   border-left: 3px solid var(--gn);
-  border-radius: 4px;
-  padding: 4px 6px;
+  border-radius: 6px;
+  padding: 6px 8px;
   margin-bottom: 4px;
   display: flex;
-  justify-content: space-between;
-  font-size: 0.55rem;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6rem;
 }
 
-.team-section__obj-card--stretch {
-  border-left-color: var(--yl);
+.team-section__obj-card--uncommitted {
+  border-left-color: var(--t3);
+  opacity: 0.7;
+}
+
+.team-section__obj-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--t3);
+  flex-shrink: 0;
+}
+
+.team-section__obj-title {
+  flex: 1;
 }
 
 .team-section__obj-bv {

@@ -105,28 +105,30 @@ export function TeamSection({ teamId, items: rawItems, pi: rawPi, people: rawPeo
           </div>
         </div>
 
-        {/* Objectives */}
+        {/* Objectives — Committed then Uncommitted, stacked vertically */}
         <div className="team-section__objectives">
           <div className="team-section__subtitle">PI Objectives (BV: {totalBV})</div>
-          <div className="team-section__obj-cols">
-            <div className="team-section__obj-col">
-              <div className="team-section__obj-label">Committed</div>
-              {committed.map((o: PIObjective, i: number) => (
-                <div key={i} className="team-section__obj-card">
-                  <span className="team-section__obj-title">{o.title}</span>
-                  <span className="team-section__obj-bv">BV {o.bv}</span>
-                </div>
-              ))}
-            </div>
-            <div className="team-section__obj-col">
-              <div className="team-section__obj-label">Stretch</div>
-              {stretch.map((o: PIObjective, i: number) => (
-                <div key={i} className="team-section__obj-card team-section__obj-card--stretch">
-                  <span className="team-section__obj-title">{o.title}</span>
-                  <span className="team-section__obj-bv">BV {o.bv}</span>
-                </div>
-              ))}
-            </div>
+          <div className="team-section__obj-section">
+            <div className="team-section__obj-label">Committed</div>
+            {committed.map((o: PIObjective, i: number) => (
+              <div key={i} className="team-section__obj-card">
+                <span className="team-section__obj-num">{i + 1}</span>
+                <span className="team-section__obj-title">{o.title}</span>
+                <span className="team-section__obj-bv">BV {o.bv}</span>
+              </div>
+            ))}
+            {committed.length === 0 && <span className="team-section__empty">No committed objectives</span>}
+          </div>
+          <div className="team-section__obj-section">
+            <div className="team-section__obj-label team-section__obj-label--uncommitted">Uncommitted</div>
+            {stretch.map((o: PIObjective, i: number) => (
+              <div key={i} className="team-section__obj-card team-section__obj-card--uncommitted">
+                <span className="team-section__obj-num">{committed.length + i + 1}</span>
+                <span className="team-section__obj-title">{o.title}</span>
+                <span className="team-section__obj-bv">BV {o.bv}</span>
+              </div>
+            ))}
+            {stretch.length === 0 && <span className="team-section__empty">No uncommitted objectives</span>}
           </div>
         </div>
       </div>
