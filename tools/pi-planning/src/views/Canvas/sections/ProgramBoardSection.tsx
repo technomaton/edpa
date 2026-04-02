@@ -12,21 +12,25 @@ interface Props {
   height: number;
 }
 
-const TYPE_COLORS: Record<string, { border: string; bg: string }> = {
-  Feature:   { border: '#0891b2', bg: 'rgba(8,145,178,0.06)' },
-  Story:     { border: '#ea580c', bg: 'rgba(234,88,12,0.06)' },
-  Milestone: { border: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
-  Event:     { border: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
+// SAFe color coding:
+// Red = has incoming dependency (significant dependency)
+// Blue = independent / final delivery (no incoming deps)
+// Yellow/Orange = milestone or event
+const DEP_STYLES: Record<string, { border: string; bg: string; idColor: string }> = {
+  dependent:   { border: '#dc2626', bg: 'rgba(220,38,38,0.06)',  idColor: '#dc2626' },
+  independent: { border: '#2563eb', bg: 'rgba(37,99,235,0.06)',  idColor: '#2563eb' },
+  milestone:   { border: '#f59e0b', bg: 'rgba(245,158,11,0.08)', idColor: '#d97706' },
 };
 
 function getTeamForItem(item: WorkItem, personTeam: Record<string, string>): string {
   return personTeam[item.owner || ''] || personTeam[item.assignee || ''] || 'Unassigned';
 }
 
-function PBCard({ item, isReadonly }: { item: WorkItem; isReadonly: boolean }) {
-  const colors = TYPE_COLORS[item.type] || TYPE_COLORS.Feature;
+type DepCategory = 'dependent' | 'independent' | 'milestone';
+
+function PBCard({ item, isReadonly, depCategory }: { item: WorkItem; isReadonly: boolean; depCategory: DepCategory }) {
+  const style = DEP_STYLES[depCategory];
   const isDone = item.status === 'Done';
-  const hasDeps = item.depends_on && item.depends_on.length > 0;
 
   const onDragStart = (e: DragEvent) => {
     if (isReadonly) return;
@@ -36,13 +40,13 @@ function PBCard({ item, isReadonly }: { item: WorkItem; isReadonly: boolean }) {
 
   return (
     <div
-      className={`pb-section__card ${isDone ? 'pb-section__card--done' : ''} ${hasDeps ? 'pb-section__card--dep' : ''}`}
-      style={{ borderLeftColor: colors.border, background: colors.bg }}
+      className={`pb-section__card pb-section__card--${depCategory} ${isDone ? 'pb-section__card--done' : ''}`}
+      style={{ borderLeftColor: style.border, background: style.bg }}
       draggable={!isReadonly}
       onDragStart={onDragStart}
     >
       <div className="pb-section__card-head">
-        <span className="pb-section__card-id" style={{ color: colors.border }}>{item.id}</span>
+        <span className="pb-section__card-id" style={{ color: style.idColor }}>{item.id}</span>
         {item.js != null && item.js > 0 && <span className="pb-section__card-js">JS {item.js}</span>}
         {item.wsjf != null && <span className="pb-section__card-wsjf">W {item.wsjf.toFixed(1)}</span>}
       </div>
@@ -93,6 +97,27 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
       }));
     return [...filtered, ...syntheticEvents];
   }, [items, iterations, iterationIds, pi?.events]);
+
+  // Dependency analysis — classify each item
+  const depCategories = useMemo(() => {
+    const hasIncoming = new Set<string>();
+    boardItems.forEach(item => {
+      if (item.depends_on) {
+        item.depends_on.forEach(() => hasIncoming.add(item.id));
+      }
+    });
+    const map: Record<string, DepCategory> = {};
+    boardItems.forEach(item => {
+      if (item.type === 'Milestone' || item.type === 'Event') {
+        map[item.id] = 'milestone';
+      } else if (hasIncoming.has(item.id)) {
+        map[item.id] = 'dependent';
+      } else {
+        map[item.id] = 'independent';
+      }
+    });
+    return map;
+  }, [boardItems]);
 
   // Group by cell
   const cellItems = useMemo(() => {
@@ -215,7 +240,7 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
                         >
                           <span className="pb-section__half-label">W1</span>
                           {w1Items.map(item => (
-                            <PBCard key={item.id} item={item} isReadonly={isReadonly} />
+                            <PBCard key={item.id} item={item} isReadonly={isReadonly} depCategory={depCategories[item.id] || 'independent'} />
                           ))}
                         </div>
                       ) : (
@@ -229,7 +254,7 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
                           >
                             <span className="pb-section__half-label">W1</span>
                             {w1Items.map(item => (
-                              <PBCard key={item.id} item={item} isReadonly={isReadonly} />
+                              <PBCard key={item.id} item={item} isReadonly={isReadonly} depCategory={depCategories[item.id] || 'independent'} />
                             ))}
                           </div>
                           <div className="pb-section__divider" />
@@ -241,7 +266,7 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
                           >
                             <span className="pb-section__half-label">W2</span>
                             {w2Items.map(item => (
-                              <PBCard key={item.id} item={item} isReadonly={isReadonly} />
+                              <PBCard key={item.id} item={item} isReadonly={isReadonly} depCategory={depCategories[item.id] || 'independent'} />
                             ))}
                           </div>
                         </div>
