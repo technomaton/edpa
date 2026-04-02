@@ -27,18 +27,15 @@ function SectionFrameInner({ data }: NodeProps) {
     isReadonly: boolean;
   };
 
-  // Program Board needs fixed height for nested React Flow
-  const needsFixedHeight = component === 'programBoard';
-
   return (
     <div
       className="section-frame"
-      style={{ width, height: needsFixedHeight ? height : undefined, borderColor: color }}
+      style={{ width, borderColor: color }}
     >
       <div className="section-frame__header" style={{ background: color }}>
         <span className="section-frame__title">{label}</span>
       </div>
-      <div className="section-frame__content" style={needsFixedHeight ? { height: height - 40, overflow: 'hidden' } : undefined}>
+      <div className="section-frame__content">
         {component === 'programBoard' && (
           <ProgramBoardSection
             items={items} pi={pi} people={people} teams={teams}
