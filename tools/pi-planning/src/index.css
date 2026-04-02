@@ -726,8 +726,31 @@ body {
   flex-shrink: 0;
 }
 
-/* ROAM Section — 2×2 quadrants */
-.roam-section { padding: 8px; }
+/* ROAM Section — unclassified + 2×2 quadrants */
+.roam-section { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+
+.roam-section__unclassified {
+  background: rgba(220,38,38,0.04);
+  border: 2px dashed var(--rd);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.roam-section__uncl-header {
+  padding: 6px 10px;
+  background: rgba(220,38,38,0.08);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--rd);
+}
+
+.roam-section__uncl-body {
+  padding: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 
 .roam-section__quadrants {
   display: grid;

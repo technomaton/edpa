@@ -28,8 +28,32 @@ export function RoamSection({ items: rawItems, selectedPI, width }: Props) {
     [items, selectedPI],
   );
 
+  const unclassified = risks.filter(r => !r.roam_status);
+
   return (
     <div className="roam-section" style={{ width }}>
+      {/* Unclassified risks — to be sorted into quadrants */}
+      {unclassified.length > 0 && (
+        <div className="roam-section__unclassified">
+          <div className="roam-section__uncl-header">
+            Unclassified Risks ({unclassified.length})
+          </div>
+          <div className="roam-section__uncl-body">
+            {unclassified.map(r => (
+              <div key={r.id} className="roam-section__card">
+                <div className="roam-section__card-head">
+                  <span className="roam-section__card-id">{r.id}</span>
+                  <span className="roam-section__card-sev" style={{
+                    color: SEV_COLORS[r.severity || 'medium'],
+                  }}>{r.severity || 'medium'}</span>
+                </div>
+                <span className="roam-section__card-title">{r.title}</span>
+                <span className="roam-section__card-owner">{r.owner || r.assignee || '-'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="roam-section__quadrants">
         {QUADRANTS.map(q => {
           const qRisks = risks.filter(r => r.roam_status === q.status);
