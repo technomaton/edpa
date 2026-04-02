@@ -16,6 +16,7 @@ import { useConfigStore } from '../../store/config-store';
 import { FeatureCard } from './FeatureCard';
 import { CellNode } from './CellNode';
 import { HeaderNode } from './HeaderNode';
+import { ItemEditor } from '../../components/ItemEditor';
 import type { WorkItem, Person, Iteration, PIEvent } from '../../types/edpa';
 
 // -- Layout constants ---------------------------------------------------------
@@ -310,53 +311,6 @@ function buildBoard(
   return { nodes, edges, rowYOffsets, rowHeights };
 }
 
-// -- Detail Panel (overlay) ---------------------------------------------------
-
-function DetailPanel({ item, onClose }: { item: WorkItem; onClose: () => void }) {
-  const TYPE_FG: Record<string, string> = {
-    Initiative: '#db2777', Epic: '#6366f1', Feature: '#0891b2',
-    Story: '#ea580c', Defect: '#dc2626',
-  };
-  return (
-    <div className="detail-panel">
-      <div className="detail-panel__header">
-        <span className="detail-panel__id" style={{ color: TYPE_FG[item.type] }}>{item.id}</span>
-        <button className="detail-panel__close" onClick={onClose}>X</button>
-      </div>
-      <h3 className="detail-panel__title">{item.title}</h3>
-      <div className="detail-panel__grid">
-        {[
-          ['Type', item.type],
-          ['Status', item.status],
-          ['Iteration', item.iteration || '-'],
-          ['Owner', item.owner || item.assignee || '-'],
-          ['Job Size', String(item.js ?? '-')],
-          ['WSJF', item.wsjf?.toFixed(2) ?? '-'],
-          ...(item.bv != null ? [['BV / TC / RR', `${item.bv} / ${item.tc} / ${item.rr}`]] : []),
-          ['Parent', item.parent || '-'],
-        ].map(([label, value]) => (
-          <div key={label} className="detail-field">
-            <span className="detail-field__label">{label}</span>
-            <span className="detail-field__value">{value}</span>
-          </div>
-        ))}
-      </div>
-      {item.contributors && item.contributors.length > 0 && (
-        <div className="detail-panel__contributors">
-          <span className="detail-field__label">Contributors</span>
-          {item.contributors.map((c, i) => (
-            <div key={i} className="detail-contributor">
-              <span>{c.person}</span>
-              <span className="detail-contributor__role">{c.role}</span>
-              <span className="detail-contributor__cw">CW {c.cw}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // -- Main Component -----------------------------------------------------------
 
 export function ProgramBoard() {
@@ -558,7 +512,18 @@ export function ProgramBoard() {
       </ReactFlow>
 
       {selectedItem && (
-        <DetailPanel item={selectedItem} onClose={() => setSelectedItem(null)} />
+        <ItemEditor
+          item={selectedItem}
+          iterations={iterations}
+          people={people.map(p => p.id)}
+          readonly={isReadonly}
+          onClose={() => setSelectedItem(null)}
+          onSave={(updated) => {
+            updateItem(updated.id, updated);
+            saveItem(updated.id);
+            setSelectedItem(null);
+          }}
+        />
       )}
     </div>
   );
