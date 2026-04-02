@@ -56,4 +56,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name }),
     }),
+
+  getObjectives: (piId: string) =>
+    request<import('../types/edpa').ObjectivesData>(`/objectives/${piId}`),
+  saveObjectives: (piId: string, data: import('../types/edpa').ObjectivesData) =>
+    request<import('../types/edpa').ObjectivesData>(`/objectives/${piId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 };

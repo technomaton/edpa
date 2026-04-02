@@ -84,3 +84,22 @@ export interface GitStatus {
   dirty: string[];
   ahead: number;
 }
+
+export type ObjStatus = 'done' | 'in_progress' | 'planned';
+
+export interface PIObjective {
+  title: string;
+  bv: number;
+  status: ObjStatus;
+}
+
+export interface TeamObjectives {
+  committed: PIObjective[];
+  stretch: PIObjective[];
+  confidence: number;
+}
+
+export interface ObjectivesData {
+  pi: string;
+  teams: Record<string, TeamObjectives>;
+}
