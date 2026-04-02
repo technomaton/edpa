@@ -4,7 +4,7 @@ title: "OMOP schema changes may break parser"
 description: "If OMOP CDM releases v6, our parser needs major refactoring"
 roam_status: owned
 severity: high
-status: Active
+status: Implementing
 owner: urbanek
 iteration: PI-2026-1.3
 js: 0

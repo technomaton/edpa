@@ -5,7 +5,7 @@ js: 5
 bv: 5
 tc: 5
 rr: 5
-status: Planned
+status: Backlog
 parent: F-102
 assignee: turyna
 iteration: PI-2026-1.4
