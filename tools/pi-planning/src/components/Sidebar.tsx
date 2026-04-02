@@ -5,6 +5,7 @@ const NAV = [
   { to: '/', label: 'Program Board', icon: '▦' },
   { to: '/team', label: 'Team Board', icon: '⊞' },
   { to: '/prioritize', label: 'Prioritization', icon: '⇅' },
+  { to: '/roam', label: 'ROAM Board', icon: '⚠' },
   { to: '/people', label: 'People', icon: '⊕' },
   { to: '/calendar', label: 'Calendar', icon: '◫' },
 ];

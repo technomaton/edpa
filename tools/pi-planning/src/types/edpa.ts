@@ -5,8 +5,10 @@ export interface Contributor {
   rs?: number;
 }
 
-export type ItemType = 'Initiative' | 'Epic' | 'Feature' | 'Story' | 'Defect' | 'Milestone' | 'Event';
+export type ItemType = 'Initiative' | 'Epic' | 'Feature' | 'Story' | 'Defect' | 'Milestone' | 'Event' | 'Risk';
 export type ItemStatus = 'Planned' | 'In Progress' | 'Active' | 'Done';
+export type RoamStatus = 'resolved' | 'owned' | 'accepted' | 'mitigated';
+export type Severity = 'low' | 'medium' | 'high';
 
 export interface WorkItem {
   id: string;
@@ -26,6 +28,9 @@ export interface WorkItem {
   iteration_half?: 1 | 2;
   depends_on?: string[];
   epic_type?: 'Business' | 'Enabler';
+  roam_status?: RoamStatus;
+  severity?: Severity;
+  description?: string;
 }
 
 export interface Person {

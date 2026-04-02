@@ -16,6 +16,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  createItem: (type: string, data: Partial<import('../types/edpa').WorkItem>) =>
+    request<import('../types/edpa').WorkItem>(`/backlog/${type}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   getPeople: () =>
     request<{
