@@ -1923,3 +1923,213 @@ body {
   color: var(--t3);
   text-transform: capitalize;
 }
+
+/* ── ROAM Board ─────────────────────────────────────────────── */
+
+.roam-container {
+  padding: 20px;
+  overflow: auto;
+  height: 100%;
+}
+
+.roam-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.roam-header__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.roam-header__sub {
+  font-size: 0.7rem;
+  color: var(--t3);
+}
+
+.roam-add-btn {
+  margin-left: auto;
+  background: var(--ac);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.roam-add-btn:hover {
+  background: var(--ac2);
+}
+
+.roam-add-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.roam-add-form__input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  background: var(--s1);
+  color: var(--t1);
+}
+
+.roam-add-form__select {
+  padding: 6px 8px;
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  background: var(--s1);
+  color: var(--t1);
+}
+
+.roam-add-form__ok {
+  background: var(--gn);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.roam-add-form__cancel {
+  background: var(--s3);
+  color: var(--t2);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.roam-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  min-height: 400px;
+}
+
+.roam-column {
+  background: var(--s2);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 300px;
+  transition: box-shadow 0.15s;
+}
+
+.roam-column--drag-over {
+  box-shadow: inset 0 0 0 2px var(--ac);
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.roam-column__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px 8px 0 0;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: #fff;
+}
+
+.roam-column__header--resolved { background: #059669; }
+.roam-column__header--owned { background: #6366f1; }
+.roam-column__header--accepted { background: #d97706; }
+.roam-column__header--mitigated { background: #0891b2; }
+
+.roam-column__count {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 0.65rem;
+}
+
+.roam-column__body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+/* Risk cards */
+.roam-card {
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-left: 3px solid var(--bd);
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: grab;
+  user-select: none;
+  transition: box-shadow 0.12s;
+}
+
+.roam-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.roam-card:active {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+
+.roam-card__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.roam-card__id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--t2);
+}
+
+.roam-card__severity {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.45rem;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+.roam-card__title {
+  font-size: 0.65rem;
+  font-weight: 500;
+  line-height: 1.3;
+  margin-bottom: 3px;
+}
+
+.roam-card__foot {
+  display: flex;
+  justify-content: space-between;
+}
+
+.roam-card__owner {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--t3);
+}
+
+.roam-card__iter {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--t3);
+}

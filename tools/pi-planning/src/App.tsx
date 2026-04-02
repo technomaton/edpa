@@ -5,6 +5,7 @@ import { GitStatusBar } from './components/GitStatusBar';
 import { ProgramBoard } from './views/ProgramBoard/ProgramBoard';
 import { TeamBoard } from './views/TeamBoard/TeamBoard';
 import { Prioritization } from './views/Prioritization/Prioritization';
+import { ROAM } from './views/ROAM/ROAM';
 import { People } from './views/People/People';
 import { Calendar } from './views/Calendar/Calendar';
 import { useBacklogStore } from './store/backlog-store';
@@ -42,6 +43,7 @@ export function App() {
             <Route path="/" element={<ProgramBoard />} />
             <Route path="/team" element={<TeamBoard />} />
             <Route path="/prioritize" element={<Prioritization />} />
+            <Route path="/roam" element={<ROAM />} />
             <Route path="/people" element={<People />} />
             <Route path="/calendar" element={<Calendar />} />
           </Routes>

@@ -32,6 +32,7 @@ export function backlogRoutes(edpaRoot: string): Router {
       features: 'Feature',
       stories: 'Story',
       defects: 'Defect',
+      risks: 'Risk',
     };
     const itemType = typeMap[type];
     if (!itemType) return res.status(400).json({ error: `Unknown type: ${type}` });

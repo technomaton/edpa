@@ -11,6 +11,7 @@ const TYPE_DIRS: Record<string, string> = {
   Defect: 'defects',
   Milestone: 'milestones',
   Event: 'events',
+  Risk: 'risks',
 };
 
 const PREFIX_TO_DIR: Record<string, string> = {
@@ -21,6 +22,7 @@ const PREFIX_TO_DIR: Record<string, string> = {
   D: 'defects',
   M: 'milestones',
   V: 'events',
+  R: 'risks',
 };
 
 export function findEdpaRoot(startDir: string): string | null {
@@ -38,7 +40,7 @@ export function loadAllItems(edpaRoot: string): WorkItem[] {
   const backlogDir = path.join(edpaRoot, '.edpa', 'backlog');
   const items: WorkItem[] = [];
 
-  for (const typeDir of ['initiatives', 'epics', 'features', 'stories', 'defects', 'milestones', 'events']) {
+  for (const typeDir of ['initiatives', 'epics', 'features', 'stories', 'defects', 'milestones', 'events', 'risks']) {
     const dir = path.join(backlogDir, typeDir);
     if (!fs.existsSync(dir)) continue;
 

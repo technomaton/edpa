@@ -18,6 +18,7 @@ const TYPE_DIRS: Record<string, string> = {
   Feature: 'features',
   Story: 'stories',
   Defect: 'defects',
+  Risk: 'risks',
 };
 
 export const useBacklogStore = create<BacklogStore>((set, get) => ({
