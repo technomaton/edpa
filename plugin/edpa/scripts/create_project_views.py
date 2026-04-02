@@ -2,8 +2,9 @@
 """
 EDPA GitHub Project Views — Automated setup via Playwright.
 
-Creates 8 views: All Items, Board, Epics, Features, WSJF Ranking,
-Current Iteration, My Work, Roadmap. Adds EDPA custom field columns.
+Creates 8 views: All Items, Stories Board, Features Board, Epics Board,
+WSJF Ranking, Current Iteration, My Work, Roadmap. Each hierarchy level
+gets its own Board to avoid mixing types.
 
 Uses persistent browser profile — log in once, then it remembers.
 
@@ -25,12 +26,13 @@ PROFILE = Path.home() / ".edpa" / "playwright-profile"
 
 # Views to create after renaming the default view to "All Items".
 # Format: (name, filter, layout). Layout: "table" (default) or "board" or "roadmap".
+# Each hierarchy level gets its own Board to avoid mixing Epics with Stories.
 VIEWS = [
-    ("Board", "", "board"),
-    ("Epics", "type:Epic", "table"),
-    ("Features", "type:Feature", "table"),
+    ("Stories Board", "type:Story", "board"),
+    ("Features Board", "type:Feature", "board"),
+    ("Epics Board", "type:Epic", "board"),
     ("WSJF Ranking", "", "table"),
-    ("Current Iteration", "", "board"),
+    ("Current Iteration", "type:Story", "board"),
     ("My Work", "assignee:@me", "table"),
     ("Roadmap", "", "roadmap"),
 ]

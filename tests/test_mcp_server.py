@@ -78,8 +78,8 @@ def test_handle_status():
 
     assert data["project"] == "Medical Platform & Datovy e-shop"
     assert data["current_pi"] == "PI-2026-1"
-    assert data["team_size"] == 8
-    assert data["total_capacity_per_iteration"] == 380
+    assert data["team_size"] == 9
+    assert data["total_capacity_per_iteration"] == 400
     assert data["active_iteration"] == "PI-2026-1.4"
     assert data["iterations_total"] == 5
     assert data["iterations_closed"] == 3
@@ -143,9 +143,9 @@ def test_handle_iterations_has_results():
 # ---------------------------------------------------------------------------
 
 def test_handle_people_all():
-    """Returns all 8 people."""
+    """Returns all 9 people."""
     data = parse_result(_handle_people(EDPA_ROOT, None))
-    assert len(data) == 8
+    assert len(data) == 9
 
     # Verify known entries
     urbanek = next(p for p in data if p["id"] == "urbanek")

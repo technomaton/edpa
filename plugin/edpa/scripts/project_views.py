@@ -199,9 +199,9 @@ def cmd_verify(args):
 
     expected_views = {
         "All Items": {"layout": "TABLE_LAYOUT", "sort": "WSJF Score", "fields": ["Issue Type", "Job Size", "WSJF Score"]},
-        "Board": {"layout": "BOARD_LAYOUT"},
-        "Epics": {"layout": "TABLE_LAYOUT", "fields": ["Issue Type", "Job Size", "WSJF Score"]},
-        "Features": {"layout": "TABLE_LAYOUT", "fields": ["Job Size", "WSJF Score"]},
+        "Stories Board": {"layout": "BOARD_LAYOUT"},
+        "Features Board": {"layout": "BOARD_LAYOUT"},
+        "Epics Board": {"layout": "BOARD_LAYOUT"},
         "WSJF Ranking": {"layout": "TABLE_LAYOUT", "fields": ["Job Size", "WSJF Score"]},
         "Current Iteration": {"layout": "BOARD_LAYOUT"},
         "My Work": {"layout": "TABLE_LAYOUT", "fields": ["Job Size"]},

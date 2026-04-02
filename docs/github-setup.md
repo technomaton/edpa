@@ -93,12 +93,14 @@ GitHub Projects Status field must have exactly these 4 options:
 
 ## Views to create
 
-1. **All Items** — Table view, grouped by Status, sorted by WSJF
-2. **Board** — Board view (Todo / In Progress / In Review / Done)
-3. **Epics** — Table view, filter `type:Epic`, sorted by WSJF
-4. **Features** — Table view, filter `type:Feature`, sorted by WSJF
+Each hierarchy level gets its own Board — no mixing Epics with Stories:
+
+1. **All Items** — Table view, grouped by Status, sorted by WSJF (hierarchical with sub-issues)
+2. **Stories Board** — Board view, filter `type:Story` (daily work)
+3. **Features Board** — Board view, filter `type:Feature` (PI planning)
+4. **Epics Board** — Board view, filter `type:Epic` (strategic)
 5. **WSJF Ranking** — Table view, grouped by Issue Type, sorted by WSJF
-6. **Current Iteration** — Board view, filtered by current Iteration
+6. **Current Iteration** — Board view, filter `type:Story` + current iteration
 7. **My Work** — Table view, filtered by `assignee:@me`
 8. **Roadmap** — Roadmap view, grouped by Planning Interval
 
