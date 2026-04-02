@@ -1,15 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
 import { useConfigStore } from '../store/config-store';
-
-const NAV = [
-  { to: '/', label: 'Program Board', icon: '▦' },
-  { to: '/team', label: 'Team Board', icon: '⊞' },
-  { to: '/prioritize', label: 'Prioritization', icon: '⇅' },
-  { to: '/roam', label: 'ROAM Board', icon: '⚠' },
-  { to: '/people', label: 'People', icon: '⊕' },
-  { to: '/calendar', label: 'Calendar', icon: '◫' },
-  { to: '/objectives', label: 'PI Objectives', icon: '◎' },
-];
 
 const PI_STATUS_LABELS: Record<string, string> = {
   planning: 'Planning',
@@ -17,17 +7,30 @@ const PI_STATUS_LABELS: Record<string, string> = {
   closed: 'Closed',
 };
 
+function zoomTo(sectionId: string) {
+  const fn = (window as unknown as Record<string, unknown>).__piCanvasZoomTo;
+  if (typeof fn === 'function') fn(sectionId);
+}
+
 export function Sidebar() {
   const project = useConfigStore(s => s.project);
   const pis = useConfigStore(s => s.pis);
+  const people = useConfigStore(s => s.people);
   const selectedPI = useConfigStore(s => s.selectedPI);
   const isReadonly = useConfigStore(s => s.isReadonly);
   const selectPI = useConfigStore(s => s.selectPI);
+  const [activeSection, setActiveSection] = useState('program-board');
 
   const currentInfo = pis.find(p => p.id === selectedPI);
   const activeIter = currentInfo?.iterations.find(it => it.status === 'active');
   const closedCount = currentInfo?.iterations.filter(it => it.status === 'closed').length || 0;
   const totalCount = currentInfo?.iterations.length || 0;
+  const teamIds = [...new Set(people.map(p => p.team))];
+
+  const handleZoom = (id: string) => {
+    setActiveSection(id);
+    zoomTo(id);
+  };
 
   return (
     <aside className="sidebar">
@@ -36,7 +39,6 @@ export function Sidebar() {
         <span className="sidebar__sub">PI Planning</span>
       </div>
 
-      {/* Project info */}
       {project && (
         <div className="sidebar__project">
           <div className="sidebar__project-name">{project.name}</div>
@@ -61,19 +63,12 @@ export function Sidebar() {
             </button>
           ))}
         </div>
-
-        {/* Current PI details */}
         {currentInfo && (
           <div className="pi-info">
             <div className="pi-info__progress">
-              <span className="pi-info__iter-count">
-                {closedCount}/{totalCount} iterations
-              </span>
+              <span className="pi-info__iter-count">{closedCount}/{totalCount} iterations</span>
               <div className="pi-info__bar">
-                <div
-                  className="pi-info__bar-fill"
-                  style={{ width: `${totalCount > 0 ? (closedCount / totalCount) * 100 : 0}%` }}
-                />
+                <div className="pi-info__bar-fill" style={{ width: `${totalCount > 0 ? (closedCount / totalCount) * 100 : 0}%` }} />
               </div>
             </div>
             {activeIter && (
@@ -82,26 +77,51 @@ export function Sidebar() {
                 {activeIter.id.split('.').pop()} &middot; {activeIter.dates}
               </div>
             )}
-            {isReadonly && (
-              <div className="pi-info__readonly">Read-only</div>
-            )}
+            {isReadonly && <div className="pi-info__readonly">Read-only</div>}
           </div>
         )}
       </div>
 
-      {/* Navigation */}
+      {/* Canvas Navigation — zoom shortcuts */}
       <nav className="sidebar__nav">
-        {NAV.map(n => (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            end={n.to === '/'}
-            className={({ isActive }) => `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`}
+        <div className="sidebar__nav-label">Sections</div>
+        <button
+          className={`sidebar__link ${activeSection === 'program-board' ? 'sidebar__link--active' : ''}`}
+          onClick={() => handleZoom('program-board')}
+        >
+          <span className="sidebar__icon">▦</span> Program Board
+        </button>
+
+        <div className="sidebar__nav-label">Teams</div>
+        {teamIds.map(t => (
+          <button
+            key={t}
+            className={`sidebar__link ${activeSection === `team-${t}` ? 'sidebar__link--active' : ''}`}
+            onClick={() => handleZoom(`team-${t}`)}
           >
-            <span className="sidebar__icon">{n.icon}</span>
-            {n.label}
-          </NavLink>
+            <span className="sidebar__icon">⊞</span> {t}
+          </button>
         ))}
+
+        <div className="sidebar__nav-label">Tools</div>
+        <button
+          className={`sidebar__link ${activeSection === 'roam' ? 'sidebar__link--active' : ''}`}
+          onClick={() => handleZoom('roam')}
+        >
+          <span className="sidebar__icon">⚠</span> ROAM Board
+        </button>
+        <button
+          className={`sidebar__link ${activeSection === 'prioritization' ? 'sidebar__link--active' : ''}`}
+          onClick={() => handleZoom('prioritization')}
+        >
+          <span className="sidebar__icon">⇅</span> Prioritization
+        </button>
+        <button
+          className={`sidebar__link ${activeSection === 'calendar' ? 'sidebar__link--active' : ''}`}
+          onClick={() => handleZoom('calendar')}
+        >
+          <span className="sidebar__icon">◫</span> Calendar
+        </button>
       </nav>
     </aside>
   );
