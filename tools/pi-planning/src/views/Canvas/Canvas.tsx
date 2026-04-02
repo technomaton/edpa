@@ -159,8 +159,8 @@ export function Canvas() {
         teamId: s.id.startsWith('team-') ? s.id.replace('team-', '') : undefined,
         items, pi, pis, people, teams, project, selectedPI, isReadonly,
       },
-      draggable: false,
-      selectable: false,
+      draggable: true,
+      selectable: true,
       style: { width: s.width },
     }));
   }, [sections, items, pi, pis, people, teams, project, selectedPI, isReadonly]);
