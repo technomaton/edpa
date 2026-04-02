@@ -39,8 +39,18 @@ class C:
     EPIC     = "\033[38;5;93m"  # Purple -- Epic
     FEAT     = "\033[36m"       # Cyan -- Feature
     STORY    = "\033[32m"       # Green -- Story
-    # Status colors
+    # Status colors (SAFe workflow)
     DONE     = "\033[32m"       # Green
+    IMPL     = "\033[33m"       # Yellow -- implementing
+    VALIDATE = "\033[35m"       # Magenta -- validating
+    DEPLOY   = "\033[38;5;208m" # Orange -- deploying
+    RELEASE  = "\033[38;5;147m" # Light purple -- releasing
+    ANALYZE  = "\033[34m"       # Blue -- analyzing
+    BACKLOG  = "\033[37m"       # Light gray -- in backlog
+    READY    = "\033[36m"       # Cyan -- ready to pull
+    REVIEW   = "\033[38;5;81m"  # Cyan-blue -- reviewing
+    FUNNEL   = "\033[38;5;245m" # Gray -- not yet started
+    # Legacy aliases (kept for non-status uses)
     ACTIVE   = "\033[33m"       # Yellow
     PROGRESS = "\033[34m"       # Blue
     PLANNED  = "\033[37m"       # Light gray
@@ -88,6 +98,11 @@ PREFIX_TO_DIR = {
     "D": "defects",
     "T": "stories",
 }
+
+# -- SAFe Status Workflows -----------------------------------------------------
+
+PORTFOLIO_STATUSES = ["Funnel", "Reviewing", "Analyzing", "Ready", "Implementing", "Done"]
+DELIVERY_STATUSES = ["Funnel", "Analyzing", "Backlog", "Implementing", "Validating", "Deploying", "Releasing", "Done"]
 
 
 # -- Data Loading (file-per-item) ----------------------------------------------
@@ -221,16 +236,22 @@ def get_children(backlog, parent_id):
 def status_badge(status):
     """Return colored status badge."""
     s = status or "Unknown"
-    if s == "Done":
-        return color(f"[{s}]", C.DONE)
-    elif s == "Active":
-        return color(f"[{s}]", C.ACTIVE)
-    elif s == "In Progress":
-        return color(f"[{s}]", C.PROGRESS)
-    elif s == "Planned":
-        return color(f"[{s}]", C.PLANNED)
-    else:
-        return f"[{s}]"
+    status_color_map = {
+        "Done": C.DONE,
+        "Implementing": C.IMPL,
+        "Validating": C.VALIDATE,
+        "Deploying": C.DEPLOY,
+        "Releasing": C.RELEASE,
+        "Analyzing": C.ANALYZE,
+        "Backlog": C.BACKLOG,
+        "Ready": C.READY,
+        "Reviewing": C.REVIEW,
+        "Funnel": C.FUNNEL,
+    }
+    c = status_color_map.get(s)
+    if c:
+        return color(f"[{s}]", c)
+    return f"[{s}]"
 
 
 def level_color(level):
@@ -529,12 +550,12 @@ def cmd_status(backlog, args):
     epics = [i for i in items if i["level"] == "Epic"]
 
     done_stories = [s for s in stories if s.get("status") == "Done"]
-    in_progress = [s for s in stories if s.get("status") == "In Progress"]
-    planned = [s for s in stories if s.get("status") == "Planned"]
+    implementing = [s for s in stories if s.get("status") == "Implementing"]
+    not_started = [s for s in stories if s.get("status") not in ("Done", "Implementing")]
 
     total_sp = sum(s.get("js", 0) for s in stories)
     done_sp = sum(s.get("js", 0) for s in done_stories)
-    ip_sp = sum(s.get("js", 0) for s in in_progress)
+    ip_sp = sum(s.get("js", 0) for s in implementing)
 
     pct = round(done_sp / total_sp * 100) if total_sp else 0
 
@@ -554,8 +575,8 @@ def cmd_status(backlog, args):
     print(f"  {bold('Story Points:')}")
     print(f"    Total:        {total_sp} SP")
     print(f"    {color('Done:', C.DONE)}         {done_sp} SP  ({len(done_stories)} stories)")
-    print(f"    {color('In Progress:', C.PROGRESS)}  {ip_sp} SP  ({len(in_progress)} stories)")
-    print(f"    {color('Planned:', C.PLANNED)}      {sum(s.get('js', 0) for s in planned)} SP  ({len(planned)} stories)")
+    print(f"    {color('Implementing:', C.IMPL)}  {ip_sp} SP  ({len(implementing)} stories)")
+    print(f"    {color('Remaining:', C.BACKLOG)}    {sum(s.get('js', 0) for s in not_started)} SP  ({len(not_started)} stories)")
     print()
 
     print(f"  {bold('Hierarchy:')}")
@@ -792,6 +813,27 @@ def cmd_validate(backlog, args):
                 except (ValueError, TypeError):
                     pass
 
+    # 12. Validate statuses against SAFe workflows per item type
+    portfolio_types = {"Initiative", "Epic"}
+    delivery_types = {"Feature", "Story", "Defect"}
+    for item in items:
+        item_type = item.get("type") or item.get("level", "")
+        item_status = item.get("status", "")
+        if not item_status:
+            continue
+        if item_type in portfolio_types:
+            if item_status not in PORTFOLIO_STATUSES:
+                errors.append(
+                    f"{item.get('id', '?')}: status '{item_status}' is not valid for {item_type} "
+                    f"(valid: {', '.join(PORTFOLIO_STATUSES)})"
+                )
+        elif item_type in delivery_types:
+            if item_status not in DELIVERY_STATUSES:
+                errors.append(
+                    f"{item.get('id', '?')}: status '{item_status}' is not valid for {item_type} "
+                    f"(valid: {', '.join(DELIVERY_STATUSES)})"
+                )
+
     # Print results
     checks = [
         ("Story assignees present", not any("missing assignee" in e for e in errors)),
@@ -805,6 +847,7 @@ def cmd_validate(backlog, args):
         ("CW values valid", not any("unusual cw" in w for w in warnings)),
         ("Type fields present", not any("missing 'type'" in e for e in errors)),
         ("Fibonacci values", not any("not Fibonacci" in w for w in warnings)),
+        ("SAFe status values", not any("is not valid for" in e for e in errors)),
     ]
 
     for label, passed in checks:
@@ -851,7 +894,7 @@ def cmd_add(root, backlog, args):
     title = args.title
     js = args.js
     assignee = getattr(args, "assignee", None)
-    status = getattr(args, "status", None) or "Planned"
+    status = getattr(args, "status", None) or "Funnel"
     iteration = getattr(args, "iteration", None)
     bv = getattr(args, "bv", None)
     tc = getattr(args, "tc", None)
@@ -963,7 +1006,7 @@ def main():
     p_add.add_argument("--tc", type=int, help="Time Criticality")
     p_add.add_argument("--rr", type=int, help="Risk Reduction")
     p_add.add_argument("--assignee", help="Assignee (person ID)")
-    p_add.add_argument("--status", default="Planned", help="Status (default: Planned)")
+    p_add.add_argument("--status", default="Funnel", help="Status (default: Funnel)")
     p_add.add_argument("--iteration", help="Iteration ID (e.g. PI-2026-1.3)")
 
     args = parser.parse_args()

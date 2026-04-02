@@ -3,8 +3,8 @@ import Layout from '../../layouts/Layout.astro';
 import { people, items, iterations, project, config, teams } from '../../lib/demo-data-kashealth';
 const stories = items.filter(i => i.level === 'Story');
 const storiesDone = stories.filter(i => i.status === 'Done');
-const storiesIP = stories.filter(i => i.status === 'In Progress');
-const storiesPlanned = stories.filter(i => i.status === 'Planned');
+const storiesIP = stories.filter(i => i.status === 'Implementing');
+const storiesPlanned = stories.filter(i => i.status === 'Backlog');
 const features = items.filter(i => i.level === 'Feature');
 const featuresDone = features.filter(i => i.status === 'Done');
 const spDone = storiesDone.reduce((a, i) => a + i.js, 0);
@@ -23,7 +23,7 @@ const velocityData = iterations.map(it => {
     status: it.status,
     sp: doneStories.reduce((a, i) => a + i.js, 0),
     done: doneStories.length,
-    inProgress: items.filter(i => i.level === 'Story' && i.iteration === it.id && i.status === 'In Progress').length,
+    inProgress: items.filter(i => i.level === 'Story' && i.iteration === it.id && i.status === 'Implementing').length,
   };
 });
 ---
@@ -54,12 +54,12 @@ const velocityData = iterations.map(it => {
       <div class="card green text-center">
         <div class="tag">Stories Done</div>
         <div class="kpi-value" style="color: var(--gn);">{storiesDone.length}</div>
-        <div class="kpi-sub">of {stories.length} ({storiesIP.length} IP, {storiesPlanned.length} Planned)</div>
+        <div class="kpi-sub">of {stories.length} ({storiesIP.length} IP, {storiesPlanned.length} Backlog)</div>
       </div>
       <div class="card cyan text-center">
         <div class="tag">Features</div>
         <div class="kpi-value" style="color: var(--cy);">{featuresDone.length}/{features.length}</div>
-        <div class="kpi-sub">{features.filter(f => f.status === 'Active').length} Active</div>
+        <div class="kpi-sub">{features.filter(f => f.status === 'Implementing').length} Implementing</div>
       </div>
       <div class="card accent text-center">
         <div class="tag">Team</div>
@@ -103,7 +103,7 @@ const velocityData = iterations.map(it => {
       <div class="table-scroll">
         <table>
           <thead>
-            <tr><th>Iteration</th><th>Period</th><th>Status</th><th>Stories Done</th><th>In Progress</th><th>SP Done</th></tr>
+            <tr><th>Iteration</th><th>Period</th><th>Status</th><th>Stories Done</th><th>Implementing</th><th>SP Done</th></tr>
           </thead>
           <tbody>
             {velocityData.map(v => (

@@ -364,7 +364,7 @@ Priklad story souboru (`.edpa/backlog/stories/S-1.yaml`):
 id: S-1
 type: Story
 title: "Implementace parseru"
-status: Planned
+status: Backlog
 parent: F-1
 js: 5
 assignee: dev1
@@ -451,7 +451,7 @@ Skript vygeneruje presne kliknuti pro vytvoreni 6 views:
 | View | Typ | Filtr/Razeni |
 |------|-----|-------------|
 | All Items | Table | Vsechny polozky |
-| Board | Board | To Do / In Progress / In Review / Done |
+| Board | Board | Funnel / Analyzing / Backlog / Implementing / Done |
 | Epics | Table | `type:Epic`, razeno WSJF |
 | Features | Table | `type:Feature`, razeno WSJF |
 | Stories | Table | `type:Story`, filtrovano iteraci |

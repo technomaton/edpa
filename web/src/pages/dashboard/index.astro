@@ -21,7 +21,7 @@ const velocityData = iterations.map(it => {
     status: it.status,
     sp: doneStories.reduce((a, i) => a + i.js, 0),
     done: doneStories.length,
-    inProgress: items.filter(i => i.level === 'Story' && i.iteration === it.id && i.status === 'In Progress').length,
+    inProgress: items.filter(i => i.level === 'Story' && i.iteration === it.id && i.status === 'Implementing').length,
   };
 });
 ---
@@ -56,7 +56,7 @@ const velocityData = iterations.map(it => {
       <div class="card cyan text-center">
         <div class="tag">Features</div>
         <div class="kpi-value" style="color: var(--cy);">{featuresDone.length}/{features.length}</div>
-        <div class="kpi-sub">{features.filter(f => f.status === 'Active').length} Active</div>
+        <div class="kpi-sub">{features.filter(f => f.status === 'Implementing').length} Implementing</div>
       </div>
       <div class="card accent text-center">
         <div class="tag">Team</div>
@@ -100,7 +100,7 @@ const velocityData = iterations.map(it => {
       <div class="table-scroll">
         <table>
           <thead>
-            <tr><th>Iteration</th><th>Period</th><th>Status</th><th>Stories Done</th><th>In Progress</th><th>SP Done</th></tr>
+            <tr><th>Iteration</th><th>Period</th><th>Status</th><th>Stories Done</th><th>Implementing</th><th>SP Done</th></tr>
           </thead>
           <tbody>
             {velocityData.map(v => (

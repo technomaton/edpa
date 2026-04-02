@@ -66,7 +66,7 @@ python .claude/edpa/scripts/project_setup.py \
 |------|------|--------|
 | **[1]** | Ověří Issue Types | Native GitHub Issue Types (org-level): Initiative, Epic, Feature, Story, Defect, Task — vytvořeny přes `issue_types.py setup` |
 | **[2]** | Vytvoří GitHub Project | Projects v2 na org úrovni |
-| **[3]** | Vytvoří custom fields | Job Size, Business Value, Time Criticality, Risk Reduction, WSJF Score (NUMBER), Team (SINGLE_SELECT), Status options (Todo, In Progress, In Review, Done) |
+| **[3]** | Vytvoří custom fields | Job Size, Business Value, Time Criticality, Risk Reduction, WSJF Score (NUMBER), Team (SINGLE_SELECT), 4 Status fields (Initiative/Epic/Feature/Story Status with SAFe workflow options) |
 | **[4]** | Linkuje projekt k repo | Projekt viditelný v repo Projects tabu |
 | **[5]** | Dotáže Issue Types | Native Issue Types z organizace (Initiative, Epic, Feature, Story, Defect, Task) |
 | **[6]** | Vytvoří issues | Ze `.edpa/backlog/`, s Issue Types podle úrovně |
@@ -157,7 +157,7 @@ project:
 initiatives:
   - id: I-1
     title: "Název initiative"
-    status: Active
+    status: Implementing
     epics:
       - id: E-10
         title: "Název epicu"
@@ -167,7 +167,7 @@ initiatives:
         tc: 8
         rr: 8
         wsjf: 2.23              # = (bv + tc + rr) / js
-        status: Active
+        status: Implementing
         owner: urbanek
         epic_hypothesis:
           for: "cílový zákazník"

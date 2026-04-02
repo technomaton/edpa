@@ -315,7 +315,7 @@ python3 .claude/edpa/scripts/issue_types.py setup --org my-org --dry-run</code><
     <pre><code>id: S-1
 type: Story
 title: "Implementace parseru"
-status: Planned
+status: Backlog
 parent: F-1
 js: 5
 assignee: dev1
@@ -350,7 +350,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     <ol>
       <li>Vytvoří labels (Enabler)</li>
       <li>Vytvoří GitHub Project v2 na org úrovni</li>
-      <li>Vytvoří custom fields: Job Size, BV, TC, RR, WSJF Score, Team + Status options (Todo, In Progress, In Review, Done)</li>
+      <li>Vytvoří custom fields: Job Size, BV, TC, RR, WSJF Score, Team + 4 Status fields (Initiative/Epic/Feature/Story Status se SAFe workflow)</li>
       <li>Linkuje projekt k repozitáři</li>
       <li>Dotáže nativní Issue Types z organizace</li>
       <li>Vytvoří issues z item files v <code>.edpa/</code> s nativními Issue Types</li>
@@ -372,7 +372,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
         </thead>
         <tbody>
           <tr><td>All Items</td><td>Table</td><td>Všechny položky, řazeno WSJF</td></tr>
-          <tr><td>Board</td><td>Board</td><td>Todo / In Progress / In Review / Done</td></tr>
+          <tr><td>Board</td><td>Board</td><td>Funnel / Analyzing / Backlog / Implementing / Done</td></tr>
           <tr><td>Epics</td><td>Table</td><td><code>type:Epic</code>, řazeno WSJF</td></tr>
           <tr><td>Features</td><td>Table</td><td><code>type:Feature</code>, řazeno WSJF</td></tr>
           <tr><td>WSJF Ranking</td><td>Table</td><td>Seskupeno Issue Type, řazeno WSJF</td></tr>
@@ -391,24 +391,23 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     <p><strong>Ověření:</strong></p>
     <pre><code>python3 .claude/edpa/scripts/project_views.py verify --org my-org --project 1</code></pre>
 
-    <h3>1.10 Nastavit automatizace a Status field</h3>
-    <p><strong>Status field (4 hodnoty):</strong></p>
-    <p><code>project_setup.py</code> automaticky vytvoří 4 statusy na GitHub Projects:</p>
+    <h3>1.10 Nastavit automatizace a Status fields</h3>
+    <p><strong>Status fields (4 typované):</strong></p>
+    <p><code>project_setup.py</code> automaticky vytvoří 4 status fieldy na GitHub Projects &mdash; jeden per work-item level:</p>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Status</th><th>Barva</th><th>Význam</th><th>EDPA YAML</th></tr>
+          <tr><th>Field</th><th>Platí pro</th><th>Workflow</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>Todo</strong></td><td>Gray</td><td>Commitnutý do iterace, nezačatý</td><td><code>Planned</code></td></tr>
-          <tr><td><strong>In Progress</strong></td><td>Yellow</td><td>Aktivní vývoj</td><td><code>Active</code></td></tr>
-          <tr><td><strong>In Review</strong></td><td>Purple</td><td>PR otevřený, čeká na review</td><td><code>In Review</code></td></tr>
-          <tr><td><strong>Done</strong></td><td>Green</td><td>Přijato, mergnuto</td><td><code>Done</code></td></tr>
+          <tr><td><strong>Initiative Status</strong></td><td>Initiative</td><td>Funnel &rarr; Reviewing &rarr; Analyzing &rarr; Ready &rarr; Implementing &rarr; Done</td></tr>
+          <tr><td><strong>Epic Status</strong></td><td>Epic</td><td>Funnel &rarr; Reviewing &rarr; Analyzing &rarr; Ready &rarr; Implementing &rarr; Done</td></tr>
+          <tr><td><strong>Feature Status</strong></td><td>Feature</td><td>Funnel &rarr; Analyzing &rarr; Backlog &rarr; Implementing &rarr; Validating &rarr; Deploying &rarr; Releasing &rarr; Done</td></tr>
+          <tr><td><strong>Story Status</strong></td><td>Story</td><td>Funnel &rarr; Analyzing &rarr; Backlog &rarr; Implementing &rarr; Validating &rarr; Deploying &rarr; Releasing &rarr; Done</td></tr>
         </tbody>
       </table>
     </div>
-    <p><strong>Proč "In Review"?</strong> PR reviews jsou evidence signály &mdash; EDPA engine přiděluje Contribution Weight za <code>pr_reviewer</code>. Viditelnost na boardu podporuje review kulturu.</p>
-    <p><strong>Blocked = label, ne status.</strong> Blokovaný item je stále "In Progress". Label umožňuje filtrovat bez narušení lineární status progression.</p>
+    <p><strong>Engine logika:</strong> <code>status == "Done"</code> = hotovo. Vše ostatní = in-work. Žádné Blocked/Spillover labely.</p>
 
     <p><strong>GitHub Projects Automations &mdash; co zapnout:</strong></p>
     <div class="card">
@@ -417,11 +416,11 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
           <tr><th>Automatizace</th><th>Doporučení</th><th>Důvod</th></tr>
         </thead>
         <tbody>
-          <tr><td>Item added to project &rarr; Set status "Todo"</td><td><strong>Zapnout</strong></td><td>Nové issues mají výchozí status</td></tr>
+          <tr><td>Item added to project &rarr; Set status "Funnel"</td><td><strong>Zapnout</strong></td><td>Nové issues mají výchozí status</td></tr>
           <tr><td>Auto-add issues from linked repo</td><td><strong>Zapnout</strong></td><td>Issues z repo automaticky v projektu</td></tr>
           <tr><td>PR merged &rarr; Set status "Done"</td><td>Nezapínat</td><td>Předčasné &mdash; item může potřebovat QA</td></tr>
           <tr><td>Item closed &rarr; Auto-archive</td><td><strong style="color: var(--error)">NIKDY</strong></td><td>Archivované items zmizí z API &rarr; sync.py je ztratí &rarr; EDPA engine přijde o data</td></tr>
-          <tr><td>Item reopened &rarr; Set status "In Progress"</td><td>Nezapínat</td><td>Koliduje se sync &mdash; reopened item může potřebovat jiný status</td></tr>
+          <tr><td>Item reopened &rarr; Set status "Implementing"</td><td>Nezapínat</td><td>Koliduje se sync &mdash; reopened item může potřebovat jiný status</td></tr>
         </tbody>
       </table>
     </div>

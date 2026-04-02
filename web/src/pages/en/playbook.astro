@@ -316,7 +316,7 @@ python3 .claude/edpa/scripts/issue_types.py setup --org my-org --dry-run</code><
     <pre><code>id: S-1
 type: Story
 title: "Implementace parseru"
-status: Planned
+status: Backlog
 parent: F-1
 js: 5
 assignee: dev1
@@ -352,7 +352,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     <ol>
       <li>Creates labels (Enabler)</li>
       <li>Creates GitHub Project v2 at org level</li>
-      <li>Creates custom fields: Job Size, BV, TC, RR, WSJF Score, Team + Status options (Todo, In Progress, In Review, Done)</li>
+      <li>Creates custom fields: Job Size, BV, TC, RR, WSJF Score, Team + 4 Status fields (Initiative/Epic/Feature/Story Status with SAFe workflows)</li>
       <li>Links project to repository</li>
       <li>Queries native Issue Types from organization</li>
       <li>Creates issues from item files in <code>.edpa/</code> with native Issue Types</li>
@@ -375,7 +375,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
         </thead>
         <tbody>
           <tr><td>All Items</td><td>Table</td><td>All items, sorted by WSJF</td></tr>
-          <tr><td>Board</td><td>Board</td><td>Todo / In Progress / In Review / Done</td></tr>
+          <tr><td>Board</td><td>Board</td><td>Funnel / Analyzing / Backlog / Implementing / Done</td></tr>
           <tr><td>Epics</td><td>Table</td><td><code>type:Epic</code>, sorted by WSJF</td></tr>
           <tr><td>Features</td><td>Table</td><td><code>type:Feature</code>, sorted by WSJF</td></tr>
           <tr><td>WSJF Ranking</td><td>Table</td><td>Grouped by Issue Type, sorted by WSJF</td></tr>
@@ -394,24 +394,23 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     <p><strong>Ověření:</strong></p>
     <pre><code>python3 .claude/edpa/scripts/project_views.py verify --org my-org --project 1</code></pre>
 
-    <h3>1.10 Configure Automations and Status Field</h3>
-    <p><strong>Status field (4 values):</strong></p>
-    <p><code>project_setup.py</code> automatically creates 4 status options on GitHub Projects:</p>
+    <h3>1.10 Configure Automations and Status Fields</h3>
+    <p><strong>Status fields (4 typed):</strong></p>
+    <p><code>project_setup.py</code> automatically creates 4 status fields on GitHub Projects &mdash; one per work-item level:</p>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Status</th><th>Color</th><th>Meaning</th><th>EDPA YAML</th></tr>
+          <tr><th>Field</th><th>Applies to</th><th>Workflow</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>Todo</strong></td><td>Gray</td><td>Committed to iteration, not started</td><td><code>Planned</code></td></tr>
-          <tr><td><strong>In Progress</strong></td><td>Yellow</td><td>Active development</td><td><code>Active</code></td></tr>
-          <tr><td><strong>In Review</strong></td><td>Purple</td><td>PR open, awaiting review</td><td><code>In Review</code></td></tr>
-          <tr><td><strong>Done</strong></td><td>Green</td><td>Accepted, merged</td><td><code>Done</code></td></tr>
+          <tr><td><strong>Initiative Status</strong></td><td>Initiative</td><td>Funnel &rarr; Reviewing &rarr; Analyzing &rarr; Ready &rarr; Implementing &rarr; Done</td></tr>
+          <tr><td><strong>Epic Status</strong></td><td>Epic</td><td>Funnel &rarr; Reviewing &rarr; Analyzing &rarr; Ready &rarr; Implementing &rarr; Done</td></tr>
+          <tr><td><strong>Feature Status</strong></td><td>Feature</td><td>Funnel &rarr; Analyzing &rarr; Backlog &rarr; Implementing &rarr; Validating &rarr; Deploying &rarr; Releasing &rarr; Done</td></tr>
+          <tr><td><strong>Story Status</strong></td><td>Story</td><td>Funnel &rarr; Analyzing &rarr; Backlog &rarr; Implementing &rarr; Validating &rarr; Deploying &rarr; Releasing &rarr; Done</td></tr>
         </tbody>
       </table>
     </div>
-    <p><strong>Why "In Review"?</strong> PR reviews are evidence signals &mdash; the EDPA engine assigns Contribution Weight for <code>pr_reviewer</code>. Making review visible on the board encourages reviews and provides evidence.</p>
-    <p><strong>Blocked = label, not status.</strong> A blocked item is still "In Progress". Use a label to filter without breaking the linear status progression.</p>
+    <p><strong>Engine logic:</strong> <code>status == "Done"</code> = finished. Everything else = in-work. No Blocked/Spillover labels.</p>
 
     <p><strong>GitHub Projects Automations &mdash; what to enable:</strong></p>
     <div class="card">
@@ -420,11 +419,11 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
           <tr><th>Automation</th><th>Recommendation</th><th>Reason</th></tr>
         </thead>
         <tbody>
-          <tr><td>Item added to project &rarr; Set status "Todo"</td><td><strong>Enable</strong></td><td>New issues get a default status</td></tr>
+          <tr><td>Item added to project &rarr; Set status "Funnel"</td><td><strong>Enable</strong></td><td>New issues get a default status</td></tr>
           <tr><td>Auto-add issues from linked repo</td><td><strong>Enable</strong></td><td>Issues from repo automatically in project</td></tr>
           <tr><td>PR merged &rarr; Set status "Done"</td><td>Do not enable</td><td>Premature &mdash; item may still need QA</td></tr>
           <tr><td>Item closed &rarr; Auto-archive</td><td><strong style="color: var(--error)">NEVER</strong></td><td>Archived items disappear from API &rarr; sync.py loses them &rarr; EDPA engine loses data</td></tr>
-          <tr><td>Item reopened &rarr; Set status "In Progress"</td><td>Do not enable</td><td>Conflicts with sync &mdash; reopened item may need different status</td></tr>
+          <tr><td>Item reopened &rarr; Set status "Implementing"</td><td>Do not enable</td><td>Conflicts with sync &mdash; reopened item may need different status</td></tr>
         </tbody>
       </table>
     </div>

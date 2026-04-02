@@ -359,19 +359,19 @@ class TestLoadBacklogItems:
         assert "I-1" in ids, "Closed Initiative should always be included"
 
     def test_load_skips_active_items(self, tmp_path):
-        """Active items excluded from loading."""
+        """Implementing items excluded from loading."""
         edpa_root = tmp_path / ".edpa"
         backlog = edpa_root / "backlog"
 
-        self._create_item(backlog, "stories", "S-200", "Story", 5, "Active", "PI-2026-1.1", assignee="alice")
-        self._create_item(backlog, "stories", "S-201", "Story", 3, "In Progress", "PI-2026-1.1", assignee="bob")
+        self._create_item(backlog, "stories", "S-200", "Story", 5, "Implementing", "PI-2026-1.1", assignee="alice")
+        self._create_item(backlog, "stories", "S-201", "Story", 3, "Implementing", "PI-2026-1.1", assignee="bob")
         self._create_item(backlog, "stories", "S-202", "Story", 8, "Done", "PI-2026-1.1", assignee="carol")
 
         items, _ = load_backlog_items(edpa_root, iteration_id="PI-2026-1.1")
 
         ids = [i["id"] for i in items]
-        assert "S-200" not in ids, "Active story should be excluded"
-        assert "S-201" not in ids, "In Progress story should be excluded"
+        assert "S-200" not in ids, "Implementing story should be excluded"
+        assert "S-201" not in ids, "Implementing story should be excluded"
         assert "S-202" in ids, "Done story should be included"
 
     def test_contributor_to_engine_format(self, tmp_path):

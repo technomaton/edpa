@@ -58,7 +58,7 @@ Next: open Claude Code and run /edpa setup`,
     num: 4,
     title: '/edpa setup',
     color: 'var(--yl)',
-    desc: 'One command configures everything — team, Issue Types, GitHub Project with 8 views, 4 statuses, custom fields, sub-issue hierarchy, and CI workflows.',
+    desc: 'One command configures everything — team, Issue Types, GitHub Project with 8 views, SAFe status fields, custom fields, sub-issue hierarchy, and CI workflows.',
     claude: `/edpa setup "Project Name"
 # Claude Code handles everything interactively`,
     code: `# Manual alternative (if not using Claude Code):
@@ -72,7 +72,7 @@ python3 .claude/edpa/scripts/create_project_views.py`,
     result: `✓ Team: 3 members configured (2.8 FTE)
 ✓ Issue Types: Initiative, Epic, Feature, Story, Defect, Task
 ✓ GitHub Project created (#4)
-✓ Status: Todo | In Progress | In Review | Done
+✓ Status fields: Initiative, Epic, Feature, Story (SAFe workflows)
 ✓ Fields: Job Size, BV, TC, RR, WSJF Score, Team
 ✓ 8 views: All Items, Board, Epics, Features, WSJF,
            Current Iteration, My Work, Roadmap
@@ -80,7 +80,7 @@ python3 .claude/edpa/scripts/create_project_views.py`,
 ✓ Config saved to .edpa/config/edpa.yaml
 
 ⚠ Enable in GitHub Project → Workflows:
-  ✓ Item added → Set status "Todo"
+  ✓ Item added → Set status "Funnel"
   ✓ Auto-add issues from linked repo
   ✗ NEVER enable auto-archive!`,
   },
@@ -97,7 +97,7 @@ js: 5              # Job Size (Fibonacci)
 bv: 8              # Business Value
 tc: 5              # Time Criticality
 rr: 3              # Risk Reduction
-status: Planned
+status: Backlog
 parent: F-1      # Parent Feature
 assignee: jnovak
 iteration: PI-2026-1.1

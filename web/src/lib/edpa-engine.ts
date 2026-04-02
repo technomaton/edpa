@@ -118,7 +118,7 @@ export function edpa(
     if (!w.contributors || !w.contributors.some((c) => c.personId === personId))
       return false;
     if (w.level === 'Story') return w.iteration === iterationId && w.status === 'Done';
-    if (w.level === 'Feature' || w.level === 'Epic') return w.status !== 'Planned';
+    if (w.level === 'Feature' || w.level === 'Epic') return w.status !== 'Funnel';
     return false;
   });
 

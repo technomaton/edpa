@@ -199,8 +199,26 @@ def main():
         f'--single-select-options "Core,Platform,Management"')
     ok("Team (SINGLE_SELECT)")
 
-    # Add "In Review" status option (Status is a built-in field with Todo, In Progress, Done)
-    # GraphQL mutation to add the missing status option
+    # Create typed SAFe status fields (single-select per level)
+    # Portfolio: Initiative + Epic share one workflow
+    # Delivery: Feature + Story share another workflow
+    portfolio_opts = "Funnel,Reviewing,Analyzing,Ready,Implementing,Done"
+    delivery_opts = "Funnel,Analyzing,Backlog,Implementing,Validating,Deploying,Releasing,Done"
+
+    typed_status_fields = {
+        "Initiative Status": portfolio_opts,
+        "Epic Status": portfolio_opts,
+        "Feature Status": delivery_opts,
+        "Story Status": delivery_opts,
+    }
+
+    for fname, opts in typed_status_fields.items():
+        run(f'gh project field-create {project_num} --owner {args.org} '
+            f'--name "{fname}" --data-type SINGLE_SELECT '
+            f'--single-select-options "{opts}"')
+        ok(f"{fname} (SINGLE_SELECT)")
+
+    # Refresh field IDs after creating typed status fields
     field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json')
     fields = json.loads(field_json).get("fields", [])
     field_ids = {f["name"]: f["id"] for f in fields}
@@ -208,39 +226,6 @@ def main():
     for f in fields:
         for opt in f.get("options", []):
             option_ids[f"{f['name']}:{opt['name']}"] = opt["id"]
-
-    # Ensure "In Review" exists as a Status option
-    status_field_id = field_ids.get("Status")
-    if status_field_id and "Status:In Review" not in option_ids:
-        mutation = f'''mutation {{
-          updateProjectV2Field(input: {{
-            projectId: "{project_id}"
-            fieldId: "{status_field_id}"
-            singleSelectOptions: [
-              {{name: "Todo", color: GRAY, description: "Not started"}},
-              {{name: "In Progress", color: YELLOW, description: "Active development"}},
-              {{name: "In Review", color: PURPLE, description: "PR open, awaiting review"}},
-              {{name: "Done", color: GREEN, description: "Accepted, merged"}}
-            ]
-          }}) {{
-            projectV2Field {{ ... on ProjectV2SingleSelectField {{ id }} }}
-          }}
-        }}'''
-        result = gh_graphql(mutation)
-        if result and "errors" not in result:
-            ok("Status options: Todo, In Progress, In Review, Done")
-        else:
-            info("Could not update Status options (may need manual configuration)")
-        # Refresh field IDs after status update
-        field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json')
-        fields = json.loads(field_json).get("fields", [])
-        field_ids = {f["name"]: f["id"] for f in fields}
-        option_ids = {}
-        for f in fields:
-            for opt in f.get("options", []):
-                option_ids[f"{f['name']}:{opt['name']}"] = opt["id"]
-    else:
-        info("Status field already has In Review option")
 
     info(f"Fields: {len(field_ids)}, Options: {len(option_ids)}")
 
@@ -344,13 +329,12 @@ def main():
     # ═══════════════════════════════════════════════════════════
     step(7, "Setting custom field values on project items")
 
-    status_map = {
-        "Done": option_ids.get("Status:Done"),
-        "In Progress": option_ids.get("Status:In Progress"),
-        "Active": option_ids.get("Status:In Progress"),
-        "In Review": option_ids.get("Status:In Review"),
-        "Planned": option_ids.get("Status:Todo"),
-        "Todo": option_ids.get("Status:Todo"),
+    # Map item level to its typed status field name
+    level_status_field = {
+        "Initiative": "Initiative Status",
+        "Epic": "Epic Status",
+        "Feature": "Feature Status",
+        "Story": "Story Status",
     }
 
     set_count = 0
@@ -375,10 +359,12 @@ def main():
             run(cmd)
             set_count += 1
 
-        # Set Status
-        status_opt = status_map.get(item["status"])
-        if status_opt:
-            set_field("Status", option_id=status_opt)
+        # Set typed status field based on item level
+        status_field_name = level_status_field.get(item["level"])
+        if status_field_name and item.get("status"):
+            status_opt = option_ids.get(f"{status_field_name}:{item['status']}")
+            if status_opt:
+                set_field(status_field_name, option_id=status_opt)
 
         # Set number fields
         if item.get("js"):

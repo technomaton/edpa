@@ -53,6 +53,16 @@ class C:
     HEADER   = "\033[38;5;147m"
     MUTED    = "\033[38;5;245m"
     SYNC     = "\033[38;5;81m"   # Cyan-blue for sync operations
+    # SAFe status colors
+    FUNNEL   = "\033[38;5;245m"  # Gray -- not yet started
+    REVIEW   = "\033[38;5;81m"   # Cyan-blue -- reviewing
+    ANALYZE  = "\033[34m"        # Blue -- analyzing
+    READY    = "\033[36m"        # Cyan -- ready to pull
+    IMPL     = "\033[33m"        # Yellow -- implementing
+    VALIDATE = "\033[35m"        # Magenta -- validating
+    DEPLOY   = "\033[38;5;208m"  # Orange -- deploying
+    RELEASE  = "\033[38;5;147m"  # Light purple -- releasing
+    BACKLOG  = "\033[37m"        # Light gray -- in backlog
     DIFF_ADD = "\033[32m"
     DIFF_DEL = "\033[31m"
     DIFF_MOD = "\033[33m"
@@ -83,6 +93,11 @@ SYNC_ICON = "\u21c4"  # bidirectional arrow
 
 FIBONACCI = {1, 2, 3, 5, 8, 13, 20}
 FIBONACCI_FIELDS = {"js", "bv", "tc", "rr"}
+
+# -- SAFe Status Workflows -----------------------------------------------------
+
+PORTFOLIO_STATUSES = ["Funnel", "Reviewing", "Analyzing", "Ready", "Implementing", "Done"]
+DELIVERY_STATUSES = ["Funnel", "Analyzing", "Backlog", "Implementing", "Validating", "Deploying", "Releasing", "Done"]
 
 
 def validate_fibonacci(items):
@@ -1061,9 +1076,18 @@ def cmd_status(root, sync_config, args):
 
     print()
     print(f"  {bold('By status:')}")
-    for status in ("Done", "In Review", "In Progress", "Active", "Planned"):
+    status_colors = {
+        "Done": C.DONE, "Implementing": C.IMPL, "Validating": C.VALIDATE,
+        "Deploying": C.DEPLOY, "Releasing": C.RELEASE, "Analyzing": C.ANALYZE,
+        "Backlog": C.BACKLOG, "Ready": C.READY, "Reviewing": C.REVIEW,
+        "Funnel": C.FUNNEL,
+    }
+    for status in ("Done", "Implementing", "Validating", "Deploying", "Releasing",
+                    "Analyzing", "Backlog", "Ready", "Reviewing", "Funnel"):
         count = statuses.get(status, 0)
-        sc = {"Done": C.DONE, "In Review": C.SYNC, "In Progress": C.PROGRESS, "Active": C.ACTIVE, "Planned": C.PLANNED}.get(status, C.RESET)
+        if count == 0:
+            continue
+        sc = status_colors.get(status, C.RESET)
         print(f"    {color(f'{status}:', sc):22s} {count}")
 
     print()

@@ -74,22 +74,24 @@ Each work item has a unique ID with a type prefix and sequential number, startin
 - Branch naming uses the ID: `feature/S-1-login-endpoint`
 - Commit messages reference the ID: `feat(S-1): implement login`
 
-## Status field (4 values)
+## Status fields (4 typed)
 
-GitHub Projects Status field must have exactly these 4 options:
+GitHub Projects uses **4 separate Single Select fields** — one per work-item level — each with SAFe-aligned workflow steps:
 
-| Status | Color | Meaning | EDPA YAML equivalent |
-|--------|-------|---------|---------------------|
-| **Todo** | Gray | Committed to iteration, not started | `Planned` |
-| **In Progress** | Yellow | Active development | `Active` / `In Progress` |
-| **In Review** | Purple | PR open, awaiting review | `In Review` |
-| **Done** | Green | Accepted, merged | `Done` |
+| Field | Applies to | Options |
+|-------|-----------|---------|
+| **Initiative Status** | Initiative | Funnel, Reviewing, Analyzing, Ready, Implementing, Done |
+| **Epic Status** | Epic | Funnel, Reviewing, Analyzing, Ready, Implementing, Done |
+| **Feature Status** | Feature | Funnel, Analyzing, Backlog, Implementing, Validating, Deploying, Releasing, Done |
+| **Story Status** | Story | Funnel, Analyzing, Backlog, Implementing, Validating, Deploying, Releasing, Done |
 
-> **Why "In Review"?** PR reviews are evidence signals — the EDPA engine assigns Contribution Weight for `pr_reviewer`. Making review visible on the board encourages reviews and provides evidence.
+**Portfolio workflow** (Initiative + Epic): Funnel → Reviewing → Analyzing → Ready → Implementing → Done
 
-> **No "Blocked" status.** If an item is blocked, either resolve the blocker immediately (if it has priority) or close the item, split it, and create new work. Don't accumulate stuck items — keep the flow moving.
+**Delivery workflow** (Feature + Story): Funnel → Analyzing → Backlog → Implementing → Validating → Deploying → Releasing → Done
 
-`project_setup.py` creates these 4 status options automatically.
+**Engine logic:** `status == "Done"` means finished. Everything else is in-work. No Blocked/Spillover labels.
+
+`project_setup.py` creates these 4 status fields and their options automatically.
 
 ## Views to create
 
@@ -117,7 +119,7 @@ Each hierarchy level gets its own Board — no mixing Epics with Stories:
 
 | Automation | Why |
 |-----------|-----|
-| **Item added to project → Set Status to "Todo"** | New issues get a default status automatically. EDPA sync picks this up on next pull. |
+| **Item added to project → Set Status to "Funnel"** | New issues get a default status automatically. EDPA sync picks this up on next pull. |
 | **Auto-add issues from linked repository** | Issues created in the repo appear in the project automatically — no manual `Add item` needed. |
 
 ### Do NOT enable
@@ -126,7 +128,7 @@ Each hierarchy level gets its own Board — no mixing Epics with Stories:
 |-----------|---------|
 | **Pull request merged → Set Status to "Done"** | Premature — item may still need QA, documentation, or acceptance. Status should be set explicitly after verification. |
 | **Item closed → Auto-archive** | **CRITICAL:** Archived items disappear from API queries. `sync.py` stops seeing them. EDPA engine loses data for hour derivation and audit trail. **Never enable this.** |
-| **Item reopened → Set Status to "In Progress"** | Interferes with EDPA's sync — a reopened item might need a different status (e.g., Todo for next iteration). |
+| **Item reopened → Set Status to "Implementing"** | Interferes with EDPA's sync — a reopened item might need a different status (e.g., Funnel for next iteration). |
 
 ### How to configure
 

@@ -68,8 +68,8 @@ with open('.edpa/config/heuristics.yaml') as f:
 
 For each person P, identify relevant items:
 - **Stories:** Done in iteration $ARGUMENTS, where P has evidence
-- **Features:** Active in current PI, where P has evidence
-- **Epics:** Active, where P has evidence
+- **Features:** Not Done and not Funnel in current PI, where P has evidence
+- **Epics:** Not Done and not Funnel, where P has evidence
 
 **Evidence sources (hybrid — MCP preferred, gh CLI fallback):**
 
@@ -132,7 +132,7 @@ Run ALL checks — halt on failure:
 | Σ = capacity | Σ DerivedHours[P, *] = Capacity[P] ± 0.01 | HALT, report |
 | Σ ratio = 1 | Σ (Score/ΣScores) = 1.0 ± 0.001 | HALT, report |
 | No negative | DerivedHours ≥ 0 for all | HALT, report |
-| Eligibility | In Progress items excluded | WARN if included |
+| Eligibility | Non-Done items excluded from Story hours | WARN if included |
 | JS exists | All items have Job Size > 0 | WARN, skip item |
 
 ### 7. Output

@@ -41,10 +41,10 @@ export const iterations: Iteration[] = [
 
 export const items: WorkItem[] = [
   // Epics
-  { id: 'E-1', title: 'User Management', level: 'Epic', js: 13, bv: 13, tc: 8, rr: 5, parentId: null, status: 'Active', iteration: null, contributors: [
+  { id: 'E-1', title: 'User Management', level: 'Epic', js: 13, bv: 13, tc: 8, rr: 5, parentId: null, status: 'Implementing', iteration: null, contributors: [
     { personId: 'alice', cw: 0.30, rs: 1 }, { personId: 'eve', cw: 0.50, rs: 1 }, { personId: 'bob', cw: 0.15, rs: 0.6 }
   ]},
-  { id: 'E-2', title: 'Billing & Subscriptions', level: 'Epic', js: 8, bv: 8, tc: 13, rr: 8, parentId: null, status: 'Active', iteration: null, contributors: [
+  { id: 'E-2', title: 'Billing & Subscriptions', level: 'Epic', js: 8, bv: 8, tc: 13, rr: 8, parentId: null, status: 'Implementing', iteration: null, contributors: [
     { personId: 'alice', cw: 0.20, rs: 0.8 }, { personId: 'eve', cw: 0.55, rs: 1 }, { personId: 'frank', cw: 0.15, rs: 0.5 }
   ]},
 
@@ -52,15 +52,15 @@ export const items: WorkItem[] = [
   { id: 'F-10', title: 'Auth Service', level: 'Feature', js: 8, bv: 8, tc: 5, rr: 3, parentId: 'E-1', status: 'Done', iteration: null, contributors: [
     { personId: 'alice', cw: 0.35, rs: 1 }, { personId: 'bob', cw: 0.40, rs: 1 }, { personId: 'dave', cw: 0.25, rs: 0.6 }
   ]},
-  { id: 'F-11', title: 'User Profile API', level: 'Feature', js: 5, bv: 5, tc: 5, rr: 3, parentId: 'E-1', status: 'Active', iteration: null, contributors: [
+  { id: 'F-11', title: 'User Profile API', level: 'Feature', js: 5, bv: 5, tc: 5, rr: 3, parentId: 'E-1', status: 'Implementing', iteration: null, contributors: [
     { personId: 'carol', cw: 0.45, rs: 1 }, { personId: 'frank', cw: 0.35, rs: 0.8 }, { personId: 'eve', cw: 0.20, rs: 0.5 }
   ]},
 
   // Features under E-2
-  { id: 'F-20', title: 'Payment Gateway', level: 'Feature', js: 8, bv: 8, tc: 8, rr: 5, parentId: 'E-2', status: 'Active', iteration: null, contributors: [
+  { id: 'F-20', title: 'Payment Gateway', level: 'Feature', js: 8, bv: 8, tc: 8, rr: 5, parentId: 'E-2', status: 'Implementing', iteration: null, contributors: [
     { personId: 'bob', cw: 0.40, rs: 1 }, { personId: 'frank', cw: 0.35, rs: 1 }, { personId: 'dave', cw: 0.25, rs: 0.8 }
   ]},
-  { id: 'F-21', title: 'Subscription Engine', level: 'Feature', js: 5, bv: 5, tc: 13, rr: 8, parentId: 'E-2', status: 'Active', iteration: null, contributors: [
+  { id: 'F-21', title: 'Subscription Engine', level: 'Feature', js: 5, bv: 5, tc: 13, rr: 8, parentId: 'E-2', status: 'Implementing', iteration: null, contributors: [
     { personId: 'carol', cw: 0.40, rs: 1 }, { personId: 'alice', cw: 0.30, rs: 0.8 }, { personId: 'eve', cw: 0.30, rs: 0.6 }
   ]},
 
@@ -125,21 +125,21 @@ export const items: WorkItem[] = [
   { id: 'S-117', title: 'Performance tests', level: 'Story', js: 5, bv: 5, tc: 3, rr: 3, parentId: 'F-20', status: 'Done', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'bob', cw: 1, rs: 1 }, { personId: 'dave', cw: 0.25, rs: 0.6 }
   ]},
-  { id: 'S-118', title: 'Data migration scripts', level: 'Story', js: 5, bv: 5, tc: 5, rr: 5, parentId: 'F-21', status: 'In Progress', iteration: 'PI-2026-1.4', contributors: [
+  { id: 'S-118', title: 'Data migration scripts', level: 'Story', js: 5, bv: 5, tc: 5, rr: 5, parentId: 'F-21', status: 'Implementing', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'carol', cw: 1, rs: 1 }, { personId: 'frank', cw: 0.6, rs: 0.8 }
   ]},
-  { id: 'S-119', title: 'Webhook retry logic', level: 'Story', js: 3, bv: 3, tc: 3, rr: 2, parentId: 'F-20', status: 'In Progress', iteration: 'PI-2026-1.4', contributors: [
+  { id: 'S-119', title: 'Webhook retry logic', level: 'Story', js: 3, bv: 3, tc: 3, rr: 2, parentId: 'F-20', status: 'Implementing', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'frank', cw: 1, rs: 1 }, { personId: 'bob', cw: 0.25, rs: 0.6 }
   ]},
-  { id: 'S-120', title: 'Security audit', level: 'Story', js: 5, bv: 5, tc: 5, rr: 8, parentId: 'F-10', status: 'In Progress', iteration: 'PI-2026-1.4', contributors: [
+  { id: 'S-120', title: 'Security audit', level: 'Story', js: 5, bv: 5, tc: 5, rr: 8, parentId: 'F-10', status: 'Implementing', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'dave', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.6, rs: 1 }, { personId: 'bob', cw: 0.15, rs: 0.5 }
   ]},
 
   // Stories PI-2026-1.5 (IP — all Planned)
-  { id: 'S-121', title: 'Tech debt cleanup', level: 'Story', js: 5, bv: 3, tc: 2, rr: 5, parentId: 'F-11', status: 'Planned', iteration: 'PI-2026-1.5', contributors: [
+  { id: 'S-121', title: 'Tech debt cleanup', level: 'Story', js: 5, bv: 3, tc: 2, rr: 5, parentId: 'F-11', status: 'Backlog', iteration: 'PI-2026-1.5', contributors: [
     { personId: 'carol', cw: 1, rs: 1 }, { personId: 'alice', cw: 0.30, rs: 0.6 }
   ]},
-  { id: 'S-122', title: 'Monitoring setup', level: 'Story', js: 3, bv: 3, tc: 3, rr: 3, parentId: 'F-20', status: 'Planned', iteration: 'PI-2026-1.5', contributors: [
+  { id: 'S-122', title: 'Monitoring setup', level: 'Story', js: 3, bv: 3, tc: 3, rr: 3, parentId: 'F-20', status: 'Backlog', iteration: 'PI-2026-1.5', contributors: [
     { personId: 'dave', cw: 1, rs: 1 }, { personId: 'frank', cw: 0.25, rs: 0.6 }
   ]},
 ];
