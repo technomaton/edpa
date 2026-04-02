@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect, useCallback, Fragment, type DragEvent } from 'react';
+import { useMemo, useState, Fragment, type DragEvent } from 'react';
 import type { WorkItem, Person, Team, PIConfig, PIEvent } from '../../../types/edpa';
 import { useBacklogStore } from '../../../store/backlog-store';
 
@@ -148,53 +148,6 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
   // Drop handler
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
-  // SVG edges — dependency lines between cards
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState<{ x1: number; y1: number; x2: number; y2: number; sourceCategory: DepCategory; targetCategory: DepCategory }[]>([]);
-
-  const computeEdges = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const newEdges: typeof edges = [];
-
-    boardItems.forEach(item => {
-      if (!item.depends_on) return;
-      item.depends_on.forEach(depId => {
-        const sourceEl = container.querySelector(`[data-item-id="${depId}"]`);
-        const targetEl = container.querySelector(`[data-item-id="${item.id}"]`);
-        if (sourceEl && targetEl) {
-          const sr = sourceEl.getBoundingClientRect();
-          const tr = targetEl.getBoundingClientRect();
-          newEdges.push({
-            x1: sr.right - rect.left,
-            y1: sr.top + sr.height / 2 - rect.top,
-            x2: tr.left - rect.left,
-            y2: tr.top + tr.height / 2 - rect.top,
-            sourceCategory: depCategories[depId] || 'independent',
-            targetCategory: depCategories[item.id] || 'dependent',
-          });
-        }
-      });
-    });
-    setEdges(newEdges);
-  }, [boardItems, depCategories]);
-
-  useEffect(() => {
-    const timer = setTimeout(computeEdges, 100);
-    return () => clearTimeout(timer);
-  }, [computeEdges, dropTarget]);
-
-  // Edge color: source category → target category gradient
-  function edgeColor(src: DepCategory, tgt: DepCategory): { start: string; end: string } {
-    const colors: Record<DepCategory, string> = {
-      dependent: '#dc2626',
-      independent: '#2563eb',
-      milestone: '#f59e0b',
-    };
-    return { start: colors[src], end: colors[tgt] };
-  }
-
   const handleDrop = (e: DragEvent, iterationId: string) => {
     e.preventDefault();
     setDropTarget(null);
@@ -213,41 +166,7 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
   };
 
   return (
-    <div className="pb-section" style={{ width, position: 'relative' }} ref={containerRef}>
-      {/* SVG edge overlay */}
-      {edges.length > 0 && (
-        <svg className="pb-section__edges" style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-          pointerEvents: 'none', zIndex: 5, overflow: 'visible',
-        }}>
-          <defs>
-            {edges.map((_, i) => {
-              const { start, end } = edgeColor(edges[i].sourceCategory, edges[i].targetCategory);
-              return (
-                <linearGradient key={i} id={`edge-grad-${i}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor={start} />
-                  <stop offset="100%" stopColor={end} />
-                </linearGradient>
-              );
-            })}
-          </defs>
-          {edges.map((e, i) => {
-            // Curved path
-            const dx = e.x2 - e.x1;
-            const cx1 = e.x1 + dx * 0.4;
-            const cx2 = e.x2 - dx * 0.4;
-            return (
-              <path key={i}
-                d={`M ${e.x1} ${e.y1} C ${cx1} ${e.y1}, ${cx2} ${e.y2}, ${e.x2} ${e.y2}`}
-                fill="none"
-                stroke={`url(#edge-grad-${i})`}
-                strokeWidth={2}
-                opacity={0.6}
-              />
-            );
-          })}
-        </svg>
-      )}
+    <div className="pb-section" style={{ width }}>
       <table className="pb-section__table">
         <thead>
           <tr>

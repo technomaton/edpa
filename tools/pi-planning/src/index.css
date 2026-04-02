@@ -492,10 +492,17 @@ body {
 
 .pb-section__cell {
   border: 1px solid var(--bd);
-  padding: 8px;
+  padding: 0;
   vertical-align: top;
   min-height: 100px;
   background: var(--s2);
+  position: relative;
+  height: 1px; /* trick to make td children stretch to full height */
+}
+
+.pb-section__cell > div,
+.pb-section__cell > .pb-section__halves {
+  height: 100%;
 }
 
 .pb-section__cell--ip {
@@ -610,14 +617,18 @@ body {
   grid-template-columns: 1fr 1px 1fr;
   gap: 0;
   min-height: 80px;
+  height: 100%;
 }
 
 .pb-section__half {
-  padding: 4px;
+  padding: 8px;
+  padding-top: 18px;
   border-radius: 4px;
   transition: background 0.1s;
   position: relative;
   min-height: 60px;
+  display: flex;
+  flex-direction: column;
 }
 
 .pb-section__half--drop {
@@ -647,8 +658,8 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 4px;
-  padding-top: 4px;
+  margin-top: auto;
+  padding: 6px 8px 4px;
   border-top: 1px solid var(--s3);
 }
 

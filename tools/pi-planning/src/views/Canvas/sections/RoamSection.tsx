@@ -24,7 +24,13 @@ export function RoamSection({ items: rawItems, selectedPI, width }: Props) {
   const items = rawItems as WorkItem[];
 
   const risks = useMemo(() =>
-    items.filter(i => i.type === 'Risk' && i.iteration?.startsWith(selectedPI || '')),
+    items.filter(i => {
+      if (i.type !== 'Risk') return false;
+      if (!i.iteration) return true; // risks without iteration always show
+      if (!selectedPI) return true;
+      // Match: PI-2026-1 matches PI-2026-1, PI-2026-1.x matches PI-2026-1
+      return i.iteration.startsWith(selectedPI) || selectedPI.startsWith(i.iteration);
+    }),
     [items, selectedPI],
   );
 
