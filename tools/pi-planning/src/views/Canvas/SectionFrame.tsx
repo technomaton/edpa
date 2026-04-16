@@ -5,6 +5,10 @@ import { TeamSection } from './sections/TeamSection';
 import { RoamSection } from './sections/RoamSection';
 import { PrioritizationSection } from './sections/PrioritizationSection';
 import { CalendarSection } from './sections/CalendarSection';
+import { InitiativeKanbanSection } from './sections/InitiativeKanbanSection';
+import { EpicKanbanSection } from './sections/EpicKanbanSection';
+import { FeatureKanbanSection } from './sections/FeatureKanbanSection';
+import { PortfolioDashboardSection } from './sections/PortfolioDashboardSection';
 
 function SectionFrameInner({ data }: NodeProps) {
   const {
@@ -36,6 +40,31 @@ function SectionFrameInner({ data }: NodeProps) {
         <span className="section-frame__title">{label}</span>
       </div>
       <div className="section-frame__content">
+        {component === 'portfolioDashboard' && (
+          <PortfolioDashboardSection
+            items={items} people={people} project={project}
+            width={width} height={height - 40}
+          />
+        )}
+        {component === 'initiativeKanban' && (
+          <InitiativeKanbanSection
+            items={items} isReadonly={isReadonly}
+            width={width} height={height - 40}
+          />
+        )}
+        {component === 'epicKanban' && (
+          <EpicKanbanSection
+            items={items} isReadonly={isReadonly}
+            width={width} height={height - 40}
+          />
+        )}
+        {component === 'featureKanban' && (
+          <FeatureKanbanSection
+            items={items} selectedPI={selectedPI}
+            isReadonly={isReadonly}
+            width={width} height={height - 40}
+          />
+        )}
         {component === 'programBoard' && (
           <ProgramBoardSection
             items={items} pi={pi} people={people} teams={teams}

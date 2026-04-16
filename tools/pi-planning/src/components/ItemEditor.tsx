@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { WorkItem, ItemStatus, Iteration } from '../types/edpa';
+import { PORTFOLIO_STATUSES, DELIVERY_STATUSES } from '../types/edpa';
 
 interface ItemEditorProps {
   item: WorkItem;
@@ -10,7 +11,11 @@ interface ItemEditorProps {
   readonly?: boolean;
 }
 
-const STATUS_OPTIONS: ItemStatus[] = ['Planned', 'In Progress', 'Active', 'Done'];
+function getStatusOptions(type: string): ItemStatus[] {
+  if (type === 'Initiative' || type === 'Epic') return [...PORTFOLIO_STATUSES];
+  if (type === 'Feature' || type === 'Story' || type === 'Defect') return [...DELIVERY_STATUSES];
+  return ['Planned', 'In Progress', 'Active', 'Done'];
+}
 const HALF_OPTIONS: { value: 1 | 2; label: string }[] = [
   { value: 1, label: '1 (W1)' },
   { value: 2, label: '2 (W2)' },
@@ -67,7 +72,7 @@ export function ItemEditor({ item, iterations, people, onSave, onClose, readonly
             onChange={e => set('status', e.target.value as ItemStatus)}
             disabled={readonly}
           >
-            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            {getStatusOptions(draft.type).map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
 

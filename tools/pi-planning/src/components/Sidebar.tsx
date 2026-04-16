@@ -19,7 +19,7 @@ export function Sidebar() {
   const selectedPI = useConfigStore(s => s.selectedPI);
   const isReadonly = useConfigStore(s => s.isReadonly);
   const selectPI = useConfigStore(s => s.selectPI);
-  const [activeSection, setActiveSection] = useState('program-board');
+  const [activeSection, setActiveSection] = useState('portfolio-dashboard');
 
   const currentInfo = pis.find(p => p.id === selectedPI);
   const activeIter = currentInfo?.iterations.find(it => it.status === 'active');
@@ -82,9 +82,36 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Canvas Navigation — zoom shortcuts */}
+      {/* Portfolio-level views — live beyond PI */}
       <nav className="sidebar__nav">
-        <div className="sidebar__nav-label">Sections</div>
+        <div className="sidebar__nav-label">Portfolio</div>
+        <button
+          className={`sidebar__link ${activeSection === 'portfolio-dashboard' ? 'sidebar__link--active' : ''}`}
+          onClick={() => handleZoom('portfolio-dashboard')}
+        >
+          <span className="sidebar__icon">◈</span> Dashboard
+        </button>
+        <button
+          className={`sidebar__link ${activeSection === 'initiative-kanban' ? 'sidebar__link--active' : ''}`}
+          onClick={() => handleZoom('initiative-kanban')}
+        >
+          <span className="sidebar__icon">◆</span> Initiatives
+        </button>
+        <button
+          className={`sidebar__link ${activeSection === 'epic-kanban' ? 'sidebar__link--active' : ''}`}
+          onClick={() => handleZoom('epic-kanban')}
+        >
+          <span className="sidebar__icon">▦</span> Epics
+        </button>
+        <button
+          className={`sidebar__link ${activeSection === 'feature-kanban' ? 'sidebar__link--active' : ''}`}
+          onClick={() => handleZoom('feature-kanban')}
+        >
+          <span className="sidebar__icon">▧</span> Features
+        </button>
+
+        {/* PI-scoped views */}
+        <div className="sidebar__nav-label">PI Planning</div>
         <button
           className={`sidebar__link ${activeSection === 'program-board' ? 'sidebar__link--active' : ''}`}
           onClick={() => handleZoom('program-board')}

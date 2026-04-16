@@ -3102,3 +3102,926 @@ body {
   font-size: 0.7rem;
   color: var(--t3);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Kanban Board — reusable component
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.kanban-board {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kanban-board__header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--bd);
+}
+
+.kanban-board__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.kanban-board__sub {
+  font-size: 0.8rem;
+  color: var(--t3);
+}
+
+.kanban-board__total {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--t3);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.kanban-board__columns {
+  display: flex;
+  gap: 1px;
+  flex: 1;
+  overflow-x: auto;
+  background: var(--bd);
+}
+
+.kanban-col {
+  flex: 1;
+  min-width: 160px;
+  background: var(--s2);
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-col--parent {
+  flex: 1.5;
+}
+
+.kanban-col--drag-over {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.kanban-col__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--s1);
+  border-bottom: 2px solid var(--ac);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.kanban-col__header--over-wip {
+  border-bottom-color: var(--rd);
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.kanban-col__count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--t3);
+}
+
+.kanban-col__header--over-wip .kanban-col__count {
+  color: var(--rd);
+  font-weight: 700;
+}
+
+.kanban-col__body {
+  flex: 1;
+  padding: 6px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kanban-col__subs {
+  display: flex;
+  flex: 1;
+  gap: 1px;
+  background: var(--bd);
+}
+
+.kanban-col__sub {
+  flex: 1;
+  background: var(--s2);
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-col__sub-label {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--t3);
+  text-align: center;
+  border-bottom: 1px solid var(--bd);
+}
+
+/* Kanban Card */
+.kanban-card {
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-left: 3px solid;
+  border-radius: 4px;
+  padding: 8px;
+  cursor: grab;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.15s;
+}
+
+.kanban-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.kanban-card:active {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+
+.kanban-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.kanban-card__id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.kanban-card__type {
+  font-size: 0.6rem;
+  color: white;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.kanban-card__title {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--t1);
+  margin-bottom: 6px;
+}
+
+.kanban-card__foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.kanban-card__owner {
+  font-size: 0.65rem;
+  color: var(--t3);
+}
+
+.kanban-card__epic-type {
+  font-size: 0.6rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.kanban-card__epic-type--business {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--ac);
+}
+
+.kanban-card__epic-type--enabler {
+  background: rgba(234, 88, 12, 0.15);
+  color: var(--or);
+}
+
+.kanban-card__wsjf,
+.kanban-card__js {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--t3);
+}
+
+.kanban-card__iter {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--cy);
+  margin-top: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Kanban Section — Canvas-embedded mini kanban
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.kanban-section {
+  height: 100%;
+  overflow: hidden;
+}
+
+.kanban-section__columns {
+  display: flex;
+  gap: 1px;
+  height: 100%;
+  background: var(--bd);
+}
+
+.kanban-section__col {
+  flex: 1;
+  min-width: 100px;
+  background: var(--s2);
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-section__col-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--s1);
+  border-bottom: 2px solid var(--ac);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.kanban-section__col-header--over-wip {
+  border-bottom-color: var(--rd);
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.kanban-section__col-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--t3);
+}
+
+.kanban-section__col-body {
+  flex: 1;
+  padding: 4px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kanban-section__card {
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-left: 3px solid;
+  border-radius: 3px;
+  padding: 5px 6px;
+  box-shadow: var(--shadow);
+}
+
+.kanban-section__card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.kanban-section__card-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.kanban-section__card-badge {
+  font-size: 0.55rem;
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--ac);
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+
+.kanban-section__card-title {
+  display: block;
+  font-size: 0.65rem;
+  line-height: 1.2;
+  color: var(--t1);
+}
+
+.kanban-section__card-iter {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--cy);
+  margin-top: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Portfolio Dashboard — standalone view
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.portfolio-dashboard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.portfolio-dashboard__header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--bd);
+}
+
+.portfolio-dashboard__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.portfolio-dashboard__sub {
+  font-size: 0.8rem;
+  color: var(--t3);
+}
+
+.portfolio-dashboard__bands {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.dashboard-band {
+  display: flex;
+  min-height: 80px;
+}
+
+.dashboard-band--enterprise { min-height: 60px; }
+.dashboard-band--team { min-height: 100px; }
+
+.dashboard-band__label {
+  width: 120px;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 12px;
+  color: white;
+}
+
+.dashboard-band__name {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.dashboard-band__sub {
+  font-size: 0.65rem;
+  opacity: 0.8;
+}
+
+.dashboard-band__content {
+  flex: 1;
+  padding: 8px 12px;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: var(--s1);
+  overflow-x: auto;
+}
+
+/* Portfolio Cards */
+.portfolio-card {
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-radius: 4px;
+  padding: 8px 10px;
+  min-width: 160px;
+  max-width: 220px;
+  box-shadow: var(--shadow);
+}
+
+.portfolio-card--enterprise {
+  border-left: 3px solid #db2777;
+  min-width: 300px;
+}
+
+.portfolio-card--initiative {
+  border-left: 3px solid #db2777;
+}
+
+.portfolio-card--epic {
+  border-left: 3px solid #6366f1;
+}
+
+.portfolio-card--feature {
+  border-left: 3px solid #0891b2;
+  min-width: 140px;
+}
+
+.portfolio-card--story {
+  border-left: 2px solid #ea580c;
+  min-width: 100px;
+  max-width: 140px;
+  padding: 4px 6px;
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.portfolio-card--more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t3);
+  font-size: 0.7rem;
+  min-width: 60px;
+  border: 1px dashed var(--bd);
+}
+
+.portfolio-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.portfolio-card__id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--ac);
+}
+
+.portfolio-card__title {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--t1);
+  font-weight: 500;
+}
+
+.portfolio-card__title-sm {
+  font-size: 0.6rem;
+  line-height: 1.2;
+  color: var(--t2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portfolio-card__sub {
+  font-size: 0.7rem;
+  color: var(--t3);
+}
+
+.portfolio-card__foot {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.portfolio-card__status {
+  font-size: 0.6rem;
+  color: var(--t3);
+}
+
+.portfolio-card__badge {
+  font-size: 0.55rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.portfolio-card__badge--business {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--ac);
+}
+
+.portfolio-card__badge--enabler {
+  background: rgba(234, 88, 12, 0.15);
+  color: var(--or);
+}
+
+.portfolio-card__wsjf {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--t3);
+}
+
+.portfolio-card__iter {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--cy);
+}
+
+.portfolio-team-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.portfolio-team-group__label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--t2);
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--bd);
+}
+
+.portfolio-team-group__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Portfolio Section — Canvas-embedded mini portfolio
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.portfolio-section {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.portfolio-section__band {
+  display: flex;
+  min-height: 50px;
+}
+
+.portfolio-section__band-label {
+  width: 90px;
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4px 8px;
+  color: white;
+}
+
+.portfolio-section__band-name {
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.portfolio-section__band-sub {
+  font-size: 0.55rem;
+  opacity: 0.8;
+}
+
+.portfolio-section__band-content {
+  flex: 1;
+  padding: 6px 8px;
+  background: var(--s1);
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.portfolio-section__enterprise {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portfolio-section__project-name {
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.portfolio-section__org {
+  font-size: 0.65rem;
+  color: var(--t3);
+}
+
+.portfolio-section__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.portfolio-section__card {
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-left: 2px solid;
+  border-radius: 3px;
+  padding: 3px 5px;
+  min-width: 80px;
+  max-width: 140px;
+  box-shadow: var(--shadow);
+}
+
+.portfolio-section__card-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  font-weight: 700;
+  display: block;
+}
+
+.portfolio-section__card-title {
+  font-size: 0.55rem;
+  line-height: 1.2;
+  color: var(--t1);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portfolio-section__card-status {
+  font-size: 0.5rem;
+  color: var(--t3);
+  display: block;
+}
+
+.portfolio-section__teams {
+  display: flex;
+  gap: 8px;
+}
+
+.portfolio-section__team-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.portfolio-section__team-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--t2);
+}
+
+.portfolio-section__team-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.portfolio-section__mini-card {
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-left: 2px solid var(--or);
+  border-radius: 2px;
+  padding: 2px 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+}
+
+.portfolio-section__more {
+  font-size: 0.5rem;
+  color: var(--t3);
+  align-self: center;
+}
+
+.portfolio-section__program-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.portfolio-section__cards--epics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--bd);
+}
+
+.portfolio-section__cards--features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.portfolio-section__card--epic {
+  min-width: 120px;
+  max-width: 180px;
+}
+
+.portfolio-section__card--feature {
+  min-width: 90px;
+  max-width: 140px;
+}
+
+.portfolio-section__connectors {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Portfolio Tree (pt-*) — Packeta-style colored bands with SVG connectors
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pt-root {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: auto;
+}
+
+/* — Strategic Board band (yellow label, green body) — */
+.pt-strategic {
+  display: flex;
+  min-height: 100px;
+}
+
+.pt-strategic__lbl {
+  width: 100px;
+  min-width: 100px;
+  background: var(--pk);
+  color: white;
+  font-weight: 800;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+  line-height: 1.3;
+}
+
+.pt-strategic__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pt-strategic__vision {
+  background: var(--pk);
+  color: white;
+  padding: 16px 20px;
+  flex: 1;
+}
+
+.pt-strategic__vision-title {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.pt-strategic__vision-sub {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
+.pt-strategic__themes {
+  background: rgba(219, 39, 119, 0.6);
+  color: white;
+  padding: 12px 20px;
+  flex: 1;
+}
+
+.pt-strategic__themes-title {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pt-strategic__themes-sub {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+/* — Initiative Group band (yellow label, green body) — */
+.pt-initiative {
+  display: flex;
+  min-height: 80px;
+}
+
+.pt-initiative__lbl {
+  width: 100px;
+  min-width: 100px;
+  background: rgba(219, 39, 119, 0.7);
+  color: white;
+  font-weight: 800;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+  line-height: 1.3;
+}
+
+.pt-initiative__body {
+  flex: 1;
+  background: rgba(219, 39, 119, 0.12);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pt-initiative__header {
+  font-size: 0.7rem;
+  color: rgba(0,0,0,0.5);
+  font-weight: 600;
+}
+
+.pt-initiative__cards {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pt-program__content {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+/* — Bands: CSS Grid with shared rows — */
+.pt-bands {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  flex: 1;
+}
+
+.pt-bands__lbl {
+  color: white;
+  font-weight: 800;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6px 4px;
+  line-height: 1.3;
+}
+
+.pt-brow {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.pt-brow--init  { background: rgba(219,39,119,0.08); }
+.pt-brow--epic  { background: rgba(99,102,241,0.08); }
+.pt-brow--feat  { background: rgba(8,145,178,0.08); }
+.pt-brow--story { background: rgba(234,88,12,0.08); }
+
+.pt-bcell {
+  min-width: 0;
+}
+
+/* Feature group: features for one Epic, side by side */
+.pt-fgroup {
+  display: flex;
+  gap: 4px;
+}
+
+/* Story stack: stories for one Feature, vertical */
+.pt-sstack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Cards */
+.pt-card {
+  background: var(--s1);
+  border: 1px solid rgba(0,0,0,0.12);
+  border-left: 3px solid;
+  border-radius: 4px;
+  padding: 5px 7px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+
+.pt-card__id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: block;
+}
+
+.pt-card__title {
+  font-size: 0.6rem;
+  line-height: 1.2;
+  color: var(--t1);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pt-card__status {
+  font-size: 0.5rem;
+  color: var(--t3);
+  display: block;
+}

@@ -16,6 +16,14 @@ import { SectionFrame } from './SectionFrame';
 // -- Layout constants ---------------------------------------------------------
 
 const SECTION_GAP = 60;
+const PORTFOLIO_W = 2400;
+const PORTFOLIO_H = 1400;
+const INITIATIVE_KANBAN_W = 2200;
+const INITIATIVE_KANBAN_H = 500;
+const EPIC_KANBAN_W = 2200;
+const EPIC_KANBAN_H = 700;
+const FEATURE_KANBAN_W = 2200;
+const FEATURE_KANBAN_H = 700;
 const PROGRAM_BOARD_W = 2200;
 const PROGRAM_BOARD_H = 1200;
 const TEAM_SECTION_W = 1000;
@@ -46,19 +54,65 @@ interface SectionDef {
 
 function computeSections(teamIds: string[]): SectionDef[] {
   const sections: SectionDef[] = [];
+  let curY = 0;
 
-  // Program Board — top
+  // Portfolio Dashboard — top
+  sections.push({
+    id: 'portfolio-dashboard',
+    label: 'Portfolio Dashboard',
+    x: 0, y: curY,
+    width: PORTFOLIO_W, height: PORTFOLIO_H,
+    color: '#db2777',
+    component: 'portfolioDashboard',
+  });
+  curY += PORTFOLIO_H + SECTION_GAP;
+
+  // Initiative Kanban
+  sections.push({
+    id: 'initiative-kanban',
+    label: 'Initiative Kanban',
+    x: 0, y: curY,
+    width: INITIATIVE_KANBAN_W, height: INITIATIVE_KANBAN_H,
+    color: '#db2777',
+    component: 'initiativeKanban',
+  });
+  curY += INITIATIVE_KANBAN_H + SECTION_GAP;
+
+  // Epic Kanban
+  sections.push({
+    id: 'epic-kanban',
+    label: 'Epic Kanban',
+    x: 0, y: curY,
+    width: EPIC_KANBAN_W, height: EPIC_KANBAN_H,
+    color: '#6366f1',
+    component: 'epicKanban',
+  });
+  curY += EPIC_KANBAN_H + SECTION_GAP;
+
+  // Feature Kanban
+  sections.push({
+    id: 'feature-kanban',
+    label: 'Feature Kanban',
+    x: 0, y: curY,
+    width: FEATURE_KANBAN_W, height: FEATURE_KANBAN_H,
+    color: '#0891b2',
+    component: 'featureKanban',
+  });
+  curY += FEATURE_KANBAN_H + SECTION_GAP;
+
+  // Program Board
   sections.push({
     id: 'program-board',
     label: 'Program Board',
-    x: 0, y: 0,
+    x: 0, y: curY,
     width: PROGRAM_BOARD_W, height: PROGRAM_BOARD_H,
     color: '#6366f1',
     component: 'programBoard',
   });
+  curY += PROGRAM_BOARD_H + SECTION_GAP;
 
   // Team sections — below program board, side by side
-  const teamY = PROGRAM_BOARD_H + SECTION_GAP;
+  const teamY = curY;
   teamIds.forEach((teamId, idx) => {
     sections.push({
       id: `team-${teamId}`,

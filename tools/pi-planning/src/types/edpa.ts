@@ -6,7 +6,19 @@ export interface Contributor {
 }
 
 export type ItemType = 'Initiative' | 'Epic' | 'Feature' | 'Story' | 'Defect' | 'Milestone' | 'Event' | 'Risk';
-export type ItemStatus = 'Planned' | 'In Progress' | 'Active' | 'Done';
+export type PortfolioStatus = 'Funnel' | 'Reviewing' | 'Analyzing' | 'Ready' | 'Implementing' | 'Done';
+export type DeliveryStatus = 'Funnel' | 'Analyzing' | 'Backlog' | 'Implementing' | 'Validating' | 'Deploying' | 'Releasing' | 'Done';
+export type ItemStatus = PortfolioStatus | DeliveryStatus | 'Planned' | 'In Progress' | 'Active';
+
+export const PORTFOLIO_STATUSES: PortfolioStatus[] = ['Funnel', 'Reviewing', 'Analyzing', 'Ready', 'Implementing', 'Done'];
+export const DELIVERY_STATUSES: DeliveryStatus[] = ['Funnel', 'Analyzing', 'Backlog', 'Implementing', 'Validating', 'Deploying', 'Releasing', 'Done'];
+
+export interface KanbanColumnConfig {
+  status: string;
+  label: string;
+  wipLimit?: number;
+  subColumns?: { key: string; label: string }[];
+}
 export type RoamStatus = 'resolved' | 'owned' | 'accepted' | 'mitigated';
 export type Severity = 'low' | 'medium' | 'high';
 
@@ -28,6 +40,7 @@ export interface WorkItem {
   iteration_half?: 1 | 2;
   depends_on?: string[];
   epic_type?: 'Business' | 'Enabler';
+  implementing_phase?: 'MVP' | 'Persevere';
   roam_status?: RoamStatus;
   severity?: Severity;
   description?: string;
