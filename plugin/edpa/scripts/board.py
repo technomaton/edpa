@@ -34,9 +34,6 @@ def find_repo_root():
         if (p / ".edpa" / "config" / "people.yaml").exists():
             return p
         p = p.parent
-    fallback = Path("/Users/jurby/projects/edpa")
-    if (fallback / ".edpa" / "config" / "people.yaml").exists():
-        return fallback
     return None
 
 

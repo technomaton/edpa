@@ -128,9 +128,6 @@ def find_repo_root():
         if (p / ".edpa").is_dir():
             return p
         p = p.parent
-    fallback = Path("/Users/jurby/projects/edpa")
-    if (fallback / ".edpa").is_dir():
-        return fallback
     return None
 
 
