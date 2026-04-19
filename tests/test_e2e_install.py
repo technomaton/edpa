@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+"""
+EDPA E2E Install Test
+
+Verifies that a clean project can install EDPA, plant minimal data,
+and run the full pipeline (engine + traceability + pi_close + velocity)
+without any root-level pollution and without depending on the source
+repo's own .edpa/ data.
+
+Mirrors the manual /tmp/edpa-clean-test workflow as an automated check.
+
+Run: python -m pytest tests/test_e2e_install.py -v
+"""
+
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+try:
+    import yaml
+except ImportError:
+    pytest.skip("PyYAML not installed", allow_module_level=True)
+
+
+ROOT = Path(__file__).resolve().parent.parent
+PLUGIN_SRC = ROOT / "plugin"
+TEMPLATE_DIR = PLUGIN_SRC / "edpa" / "templates"
+
+ALLOWED_ROOT_ENTRIES = {".claude", ".edpa", ".git", "README.md"}
+
+
+def _install_plugin(target: Path):
+    """Replicate install.sh behaviour using local source — no network."""
+    claude = target / ".claude"
+    claude.mkdir()
+    for item in PLUGIN_SRC.iterdir():
+        dest = claude / item.name
+        if item.is_dir():
+            shutil.copytree(item, dest)
+        else:
+            shutil.copy2(item, dest)
+
+    edpa = target / ".edpa"
+    for sub in [
+        "config", "iterations", "reports", "snapshots", "data",
+        "backlog/initiatives", "backlog/epics", "backlog/features", "backlog/stories",
+    ]:
+        (edpa / sub).mkdir(parents=True, exist_ok=True)
+
+    shutil.copy(TEMPLATE_DIR / "cw_heuristics.yaml.tmpl", edpa / "config" / "heuristics.yaml")
+    shutil.copy(TEMPLATE_DIR / "people.yaml.tmpl", edpa / "config" / "people.yaml")
+
+
+def _plant_minimal_backlog(target: Path):
+    backlog = target / ".edpa" / "backlog"
+    (backlog / "initiatives" / "I-1.yaml").write_text(
+        "id: I-1\ntype: Initiative\ntitle: T\nparent: null\n"
+    )
+    (backlog / "epics" / "E-1.yaml").write_text(
+        "id: E-1\ntype: Epic\ntitle: T\nparent: I-1\n"
+    )
+    (backlog / "features" / "F-1.yaml").write_text(
+        "id: F-1\ntype: Feature\ntitle: T\nparent: E-1\njs: 5\n"
+    )
+    (backlog / "stories" / "S-1.yaml").write_text(
+        "id: S-1\ntype: Story\ntitle: T\nparent: F-1\njs: 5\n"
+        "status: Done\niteration: PI-2026-1.1\n"
+        "contributors:\n  - person: example-arch\n    role: owner\n    cw: 1\n"
+    )
+    (target / ".edpa" / "iterations" / "PI-2026-1.1.yaml").write_text(
+        "iteration:\n"
+        "  id: PI-2026-1.1\n"
+        "  pi: PI-2026-1\n"
+        "  status: closed\n"
+        "  dates: '1.1.-15.1.2026'\n"
+        "planning:\n"
+        "  capacity: 40\n"
+        "  planned_sp: 5\n"
+        "delivery:\n"
+        "  delivered_sp: 5\n"
+        "  velocity: 5\n"
+    )
+
+
+def _run(target: Path, *args):
+    return subprocess.run(
+        [sys.executable, str(target / ".claude" / "edpa" / "scripts" / args[0]), *args[1:]],
+        cwd=target, capture_output=True, text=True,
+    )
+
+
+@pytest.fixture
+def project(tmp_path):
+    proj = tmp_path / "p"
+    proj.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=proj, check=True)
+    (proj / "README.md").write_text("# Test\n")
+    _install_plugin(proj)
+    return proj
+
+
+def test_install_creates_only_dot_directories(project):
+    """install must not create any root-level non-dot entries beyond README."""
+    actual = {p.name for p in project.iterdir()}
+    extras = actual - ALLOWED_ROOT_ENTRIES
+    assert not extras, f"unexpected root entries after install: {extras}"
+
+
+def test_install_includes_all_workflow_templates(project):
+    workflows = project / ".claude" / "edpa" / "workflows"
+    expected = {
+        "branch-check.yml", "contributor-detect.yml", "iteration-close.yml",
+        "pi-close.yml", "sync-git-to-projects.yml", "sync-projects-to-git.yml",
+        "traceability-check.yml", "validate-item.yml", "velocity-track.yml",
+        "wsjf-calculate.yml",
+    }
+    actual = {p.name for p in workflows.iterdir() if p.suffix == ".yml"}
+    assert expected <= actual, f"missing workflow templates: {expected - actual}"
+
+
+def test_install_includes_new_action_scripts(project):
+    scripts = project / ".claude" / "edpa" / "scripts"
+    for name in ("traceability.py", "pi_close.py", "velocity.py"):
+        assert (scripts / name).is_file(), f"missing script: {name}"
+
+
+def test_traceability_passes_on_valid_backlog(project):
+    _plant_minimal_backlog(project)
+    r = _run(project, "traceability.py")
+    assert r.returncode == 0, r.stderr
+    assert "All parent chains valid" in r.stdout
+
+
+def test_traceability_fails_on_orphan(project):
+    _plant_minimal_backlog(project)
+    (project / ".edpa" / "backlog" / "stories" / "S-ORPHAN.yaml").write_text(
+        "id: S-ORPHAN\ntype: Story\ntitle: bad\n"
+    )
+    r = _run(project, "traceability.py")
+    assert r.returncode == 1
+    assert "S-ORPHAN" in r.stdout
+
+
+def test_pi_close_aggregates_iteration(project):
+    _plant_minimal_backlog(project)
+    r = _run(project, "pi_close.py", "--pi", "PI-2026-1")
+    assert r.returncode == 0, r.stderr
+    results = json.loads(
+        (project / ".edpa" / "reports" / "pi-PI-2026-1" / "pi_results.json").read_text()
+    )
+    assert results["summary"]["total_delivered_sp"] == 5
+    assert results["summary"]["avg_predictability_pct"] == 100.0
+
+
+def test_velocity_writes_report(project):
+    _plant_minimal_backlog(project)
+    r = _run(project, "velocity.py")
+    assert r.returncode == 0, r.stderr
+    report = json.loads(
+        (project / ".edpa" / "reports" / "velocity" / "velocity.json").read_text()
+    )
+    assert report["iteration_count"] == 1
+    assert report["average_velocity"] == 5
+
+
+def test_engine_runs_with_template_people(project):
+    _plant_minimal_backlog(project)
+    r = subprocess.run(
+        [sys.executable, str(project / ".claude" / "edpa" / "scripts" / "engine.py"),
+         "--edpa-root", str(project / ".edpa"),
+         "--iteration", "PI-2026-1.1"],
+        cwd=project, capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "All invariants passed: YES" in r.stdout
+    assert (project / ".edpa" / "reports" / "iteration-PI-2026-1.1" / "edpa_results.json").is_file()
+
+
+def test_no_root_pollution_after_full_pipeline(project):
+    _plant_minimal_backlog(project)
+    _run(project, "traceability.py")
+    _run(project, "pi_close.py", "--pi", "PI-2026-1")
+    _run(project, "velocity.py")
+    actual = {p.name for p in project.iterdir()}
+    extras = actual - ALLOWED_ROOT_ENTRIES
+    assert not extras, f"pipeline created root-level entries: {extras}"
+
+
+def test_plugin_code_does_not_reference_source_repo(project):
+    """No script may resolve paths back into the EDPA source repo."""
+    forbidden = str(ROOT.resolve())
+    scripts = project / ".claude" / "edpa" / "scripts"
+    for py in scripts.glob("*.py"):
+        text = py.read_text(encoding="utf-8", errors="ignore")
+        assert forbidden not in text, f"{py.name} references source repo path"
