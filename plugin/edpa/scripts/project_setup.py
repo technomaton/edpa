@@ -432,21 +432,43 @@ def main():
         info("No parent references found in backlog items")
 
     # ═══════════════════════════════════════════════════════════
-    # STEP 9: Update config
+    # STEP 9: Persist GitHub state for sync
     # ═══════════════════════════════════════════════════════════
-    step(9, "Updating .edpa/config/edpa.yaml")
+    step(9, "Persisting GitHub state (.edpa/config/edpa.yaml + issue_map.yaml)")
     config_path = Path(".edpa/config/edpa.yaml")
     if config_path.exists():
         with open(config_path) as f:
             config = yaml.safe_load(f) or {}
         sync = config.get("sync", {})
         sync["github_org"] = args.org
+        sync["github_repo"] = args.repo
         sync["github_project_number"] = project_num
         sync["github_project_id"] = project_id
+        sync["field_ids"] = dict(field_ids)
+        sync["option_ids"] = dict(option_ids)
         config["sync"] = sync
         with open(config_path, "w") as f:
-            yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
-        ok(f"Project #{project_num} saved to config")
+            yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        ok(f"Project #{project_num}, {len(field_ids)} fields, {len(option_ids)} options saved")
+
+    issue_map_path = Path(".edpa/config/issue_map.yaml")
+    serializable_map = {
+        "github_repo": f"{args.org}/{args.repo}",
+        "github_project_number": project_num,
+        "items": {
+            iid: {
+                "issue_number": int(num),
+                "project_item_id": pid,
+                "node_id": nid,
+            }
+            for iid, (num, pid, nid) in issue_map.items()
+            if num and pid
+        },
+    }
+    issue_map_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(issue_map_path, "w") as f:
+        yaml.dump(serializable_map, f, default_flow_style=False, allow_unicode=True, sort_keys=True)
+    ok(f"issue_map.yaml: {len(serializable_map['items'])} items mapped")
 
     # ═══════════════════════════════════════════════════════════
     # DONE
