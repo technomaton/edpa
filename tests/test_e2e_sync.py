@@ -225,10 +225,20 @@ def fresh_workspace(tmp_path, e2e_config):
         {"id": "E-200", "type": "Epic", "title": "Sample epic",
          "status": "Analyzing", "parent": "I-100", "js": 13, "bv": 8, "tc": 3, "rr": 5, "wsjf": 1.23},
         {"id": "S-300", "type": "Story", "title": "Sample story alpha",
-         "status": "Backlog", "parent": "E-200", "js": 5},
+         "status": "Backlog", "parent": "E-200", "js": 5,
+         "iteration": "PI-2026-1.1"},
         {"id": "S-301", "type": "Story", "title": "Sample story beta",
-         "status": "Implementing", "parent": "E-200", "js": 3},
+         "status": "Implementing", "parent": "E-200", "js": 3,
+         "iteration": "PI-2026-1.1"},
     ]
+    # Provide an iteration registry so project_setup creates the Iteration field
+    iters_dir = tmp_path / ".edpa/iterations"
+    iters_dir.mkdir(parents=True, exist_ok=True)
+    for iid in ("PI-2026-1.1", "PI-2026-1.2"):
+        (iters_dir / f"{iid}.yaml").write_text(yaml.dump({
+            "iteration": {"id": iid, "pi": "PI-2026-1",
+                          "dates": "1.4.–14.4.2026", "status": "closed"},
+        }))
     ws = make_workspace(tmp_path, e2e_config["org"], e2e_config["repo"], items)
     title = f"{PROJECT_TITLE_PREFIX} {int(time.time())}"
     return {"workspace": ws, "items": items, "project_title": title, **e2e_config}
@@ -386,6 +396,49 @@ def test_pull_picks_up_remote_status_change(fresh_workspace):
     changelog = (ws / ".edpa/changelog.jsonl").read_text().splitlines()
     assert any("S-300" in line and "github" in line for line in changelog), \
         f"changelog missing S-300 github entry; got: {changelog}"
+
+
+def test_iteration_field_roundtrips(fresh_workspace):
+    """Gap 1: Iteration is created as SINGLE_SELECT and pulled back correctly.
+
+    Verifies setup creates the field with options from .edpa/iterations/, that
+    items get the correct iteration option set, and that a manual change in
+    GitHub propagates back via sync pull."""
+    ws = fresh_workspace["workspace"]
+    title = fresh_workspace["project_title"]
+    org = fresh_workspace["org"]
+    repo = fresh_workspace["repo"]
+
+    setup = run_setup(ws, org, repo, title)
+    assert setup.returncode == 0, f"setup failed:\n{setup.stderr}\n{setup.stdout}"
+
+    # Iteration field exists with the right options
+    cfg = yaml.safe_load((ws / ".edpa/config/edpa.yaml").read_text())
+    field_ids = cfg["sync"]["field_ids"]
+    option_ids = cfg["sync"]["option_ids"]
+    assert "Iteration" in field_ids, f"Iteration field not created; have {list(field_ids)}"
+    assert "Iteration:PI-2026-1.1" in option_ids
+    assert "Iteration:PI-2026-1.2" in option_ids
+
+    # S-300 should have iteration set on creation
+    issue_map = yaml.safe_load((ws / ".edpa/config/issue_map.yaml").read_text())["items"]
+    s300_pid = issue_map["S-300"]["project_item_id"]
+    project_id = cfg["sync"]["github_project_id"]
+
+    # Move S-300 to a different iteration via gh CLI
+    iter2_opt = option_ids["Iteration:PI-2026-1.2"]
+    gh("project", "item-edit",
+       "--id", s300_pid,
+       "--project-id", project_id,
+       "--field-id", field_ids["Iteration"],
+       "--single-select-option-id", iter2_opt)
+
+    pull = run_sync(ws, "pull")
+    assert pull.returncode == 0, f"pull failed:\n{pull.stderr}\n{pull.stdout}"
+
+    s300_yaml = yaml.safe_load((ws / ".edpa/backlog/stories/S-300.yaml").read_text())
+    assert s300_yaml.get("iteration") == "PI-2026-1.2", \
+        f"iteration not updated; got: {s300_yaml.get('iteration')}"
 
 
 def test_engine_sees_status_transition_after_sync(fresh_workspace):

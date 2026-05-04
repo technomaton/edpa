@@ -283,16 +283,13 @@ If all five pass, the toolchain is ready for a real PI close.
 
 ## Known limitations (as of 2026-05-04)
 
-1. **`Iteration` field** is in `fields_mapping` defaults but `project_setup.py`
-   does NOT create an Iteration field on the GitHub Project. Sync will skip
-   pushing Iteration changes silently. Track manually in YAML for now.
-2. **Conflict resolution** is manual — there is no auto-merge strategy. The
-   `sync conflicts` command surfaces them; the user picks a winner by editing
-   YAML and running `push`.
-3. **`assignee` push** is best-effort — `gh issue edit --add-assignee` requires
-   the value to be a real GitHub username. Internal `people.yaml` IDs (e.g.
-   `urbanek`, `pm`) are NOT mapped to GH handles. Skip or extend `people.yaml`
-   with a `github` field if you need this.
-4. **Gates mode under-allocates without commit-recorded status changes.** Real
+1. **Gates mode under-allocates without commit-recorded status changes.** Real
    `sync pull --commit` produces them; manual YAML edits do not unless you
    commit them with a status-change message recognised by `transitions.py`.
+2. **Static-contributor model**: engine uses one contributor list per parent
+   item for *every* gate of that item. Highly specialised roles that touch
+   only some gates (e.g. Architect at LBC only) get over-attributed at the
+   other gates. Per-iteration MAD outliers up to ~47 % observed in
+   `edpa-simulation-gates`. In practice teams contribute across most gates,
+   so this is rarely a problem; address by recalibrating heuristics or
+   removing such contributors from items where they are truly absent.

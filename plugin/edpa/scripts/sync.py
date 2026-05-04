@@ -332,6 +332,25 @@ NUMBER_FIELDS = {
 }
 
 
+def load_people_handles(root):
+    """Return a dict mapping internal person IDs → GitHub handles, from people.yaml.
+
+    Internal IDs without a `github:` field are silently omitted; sync push then
+    falls back to recording the assignee in the issue body only.
+    """
+    people_path = root / ".edpa" / "config" / "people.yaml"
+    if not people_path.exists():
+        return {}
+    doc = load_yaml(people_path) or {}
+    out = {}
+    for p in doc.get("people", []) or []:
+        pid = p.get("id")
+        gh = p.get("github")
+        if pid and gh:
+            out[pid] = gh
+    return out
+
+
 def load_setup_state(root):
     """Load persisted GitHub state populated by project_setup.py.
 
@@ -437,14 +456,15 @@ def gh_set_field_value(state, project_item_id, edpa_field, value, item_level):
             return True, "ok"
         return False, result.stderr.strip()[:120] or "gh failed"
 
-    # Team
-    if edpa_field == "team":
-        fid = field_ids.get("Team")
+    # Team or Iteration (single-select)
+    if edpa_field in ("team", "iteration"):
+        gh_name = "Team" if edpa_field == "team" else "Iteration"
+        fid = field_ids.get(gh_name)
         if not fid:
-            return False, "no field_id for 'Team'"
-        opt_id = option_ids.get(f"Team:{value}")
+            return False, f"no field_id for {gh_name!r}"
+        opt_id = option_ids.get(f"{gh_name}:{value}")
         if not opt_id:
-            return False, f"no option_id for 'Team:{value}'"
+            return False, f"no option_id for {gh_name!r}:{value!r}"
         cmd = [
             "gh", "project", "item-edit",
             "--id", project_item_id,
@@ -475,6 +495,27 @@ def gh_edit_issue_title(state, issue_number, new_title):
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
     return (result.returncode == 0, result.stderr.strip()[:120] or "ok")
+
+
+def gh_set_issue_assignee(state, issue_number, gh_login, prev_login=None):
+    """Replace the issue's assignee with `gh_login` (or clear it if None).
+
+    Uses `gh issue edit --add-assignee/--remove-assignee`. Returns (ok, msg).
+    """
+    if not (state.get("org") and state.get("repo") and issue_number):
+        return False, "missing org/repo/issue_number"
+    repo = f"{state['org']}/{state['repo']}"
+    cmd = ["gh", "issue", "edit", str(issue_number), "--repo", repo]
+    if prev_login:
+        cmd += ["--remove-assignee", prev_login]
+    if gh_login:
+        cmd += ["--add-assignee", gh_login]
+    if len(cmd) == 5:  # nothing to add or remove
+        return True, "no-op"
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+    if result.returncode == 0:
+        return True, "ok"
+    return False, result.stderr.strip()[:120] or "gh failed"
 
 
 def gh_close_issue(state, issue_number):
@@ -514,10 +555,12 @@ def gh_get_issue_type_ids(org):
     return {n["name"]: n["id"] for n in nodes if n.get("name") and n.get("id")}
 
 
-def gh_create_issue(state, item, item_level):
+def gh_create_issue(state, item, item_level, people_handles=None):
     """Create a GH issue for a local-only EDPA item, add to project, set issue type.
 
-    Returns dict with issue_number, project_item_id, node_id on success, None on failure.
+    If `people_handles` maps the item's assignee to a GitHub login, the issue is
+    created with `--assignee <login>`. Otherwise the assignee is recorded in the
+    body only. Returns dict with issue_number, project_item_id, node_id on success.
     """
     repo = f"{state['org']}/{state['repo']}"
     item_id = item.get("id") or item.get("_id") or ""
@@ -543,6 +586,13 @@ def gh_create_issue(state, item, item_level):
     ]
     if item.get("epic_type") == "Enabler":
         cmd += ["--label", "Enabler"]
+
+    # Resolve internal assignee ID -> GitHub login if a mapping was supplied
+    handles = people_handles or {}
+    assignee_internal = item.get("assignee") or item.get("owner")
+    gh_login = handles.get(assignee_internal) if assignee_internal else None
+    if gh_login:
+        cmd += ["--assignee", gh_login]
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     if result.returncode != 0:
@@ -1068,6 +1118,7 @@ def cmd_push(root, sync_config, args):
 
     fields_mapping = sync_config.get("fields_mapping", DEFAULT_SYNC_CONFIG["fields_mapping"])
     setup_state = None
+    people_handles: dict[str, str] = {}
 
     if args.mock:
         print(color("  [mock] Generating simulated GitHub Project data...", C.MUTED))
@@ -1078,6 +1129,7 @@ def cmd_push(root, sync_config, args):
             print(color("  Push aborted: GitHub setup state missing or incomplete.", C.ERR))
             print(color("  Run `project_setup.py` first, or `sync setup-refresh` to rebuild IDs.", C.MUTED))
             sys.exit(1)
+        people_handles = load_people_handles(root)
         org = setup_state["org"]
         project_num = setup_state["project_number"]
         print(color(f"  Fetching current state from {org}/project#{project_num}...", C.SYNC))
@@ -1120,7 +1172,7 @@ def cmd_push(root, sync_config, args):
                 continue
             payload = dict(local)
             payload["id"] = item_id
-            result = gh_create_issue(setup_state, payload, level)
+            result = gh_create_issue(setup_state, payload, level, people_handles)
             if not result:
                 print(f"  {color('[failed]', C.ERR)}")
                 failed += 1
@@ -1132,13 +1184,16 @@ def cmd_push(root, sync_config, args):
             log_change(root, "git", "issue_created", item_id,
                        new=f"#{result['issue_number']}", actor="sync-push")
 
-            # Set initial fields on newly created item (number + status)
+            # Set initial fields on newly created item (number + status + iteration)
             proj_item_id = result.get("project_item_id", "")
             if proj_item_id:
                 for fkey in ("js", "bv", "tc", "rr", "wsjf"):
                     val = local.get(fkey)
                     if val:
                         gh_set_field_value(setup_state, proj_item_id, fkey, val, level)
+                if local.get("iteration"):
+                    gh_set_field_value(setup_state, proj_item_id, "iteration",
+                                        local["iteration"], level)
                 if local.get("status"):
                     gh_set_field_value(setup_state, proj_item_id, "status", local["status"], level)
                     if local["status"] == "Done":
@@ -1199,6 +1254,22 @@ def cmd_push(root, sync_config, args):
 
             if field == "title" and issue_num:
                 ok_, msg = gh_edit_issue_title(setup_state, issue_num, new_val)
+                if ok_:
+                    print(f"  {color('[ok]', C.OK)}")
+                    pushed += 1
+                else:
+                    print(f"  {color(f'[failed: {msg}]', C.ERR)}")
+                    failed += 1
+                continue
+
+            if field in ("assignee", "owner") and issue_num:
+                new_login = people_handles.get(str(new_val)) if new_val else None
+                old_login = people_handles.get(str(old_val)) if old_val else None
+                if not new_login and new_val:
+                    print(f"  {color(f'[skipped: no GH handle for {new_val!r} in people.yaml]', C.WARN)}")
+                    failed += 1
+                    continue
+                ok_, msg = gh_set_issue_assignee(setup_state, issue_num, new_login, old_login)
                 if ok_:
                     print(f"  {color('[ok]', C.OK)}")
                     pushed += 1
@@ -1492,11 +1563,86 @@ def cmd_log(root, _sync_config, args):
     print()
 
 
-def cmd_conflicts(root, _sync_config, args):
-    """Show items changed in both sources since last sync."""
+def resolve_conflicts(github_changes, git_changes, strategy):
+    """Pure function: choose a winner per (item, field) under the given strategy.
+
+    Inputs are dicts of item_id -> list[changelog entry], one per source.
+    Returns a list of resolution dicts:
+        {item_id, field, winner: 'local'|'remote', value, ts, reason}
+    `winner == 'local'` means the local (git/YAML) value should be pushed to
+    GitHub; `winner == 'remote'` means GitHub's value should be pulled into the
+    local YAML.
+
+    Strategies:
+        local-wins       -> always 'local' (newest local value wins)
+        remote-wins      -> always 'remote'
+        last-write-wins  -> winner is whichever side has the most recent ts
+        report           -> no winner picked; reason='manual'
+    """
+    if strategy not in ("local-wins", "remote-wins", "last-write-wins", "report"):
+        raise ValueError(f"unknown strategy: {strategy}")
+
+    plan = []
+    conflict_ids = set(github_changes) & set(git_changes)
+    for item_id in sorted(conflict_ids):
+        # Group entries per field within each source
+        gh_by_field: dict[str, list] = {}
+        for e in github_changes[item_id]:
+            gh_by_field.setdefault(e.get("field", ""), []).append(e)
+        git_by_field: dict[str, list] = {}
+        for e in git_changes[item_id]:
+            git_by_field.setdefault(e.get("field", ""), []).append(e)
+
+        all_fields = set(gh_by_field) | set(git_by_field)
+        for field in sorted(all_fields):
+            gh_es = gh_by_field.get(field, [])
+            git_es = git_by_field.get(field, [])
+            if not (gh_es and git_es):
+                # Only one side touched this field — no conflict on this field
+                continue
+            # Most-recent entry per side
+            gh_last = max(gh_es, key=lambda e: e.get("ts", ""))
+            git_last = max(git_es, key=lambda e: e.get("ts", ""))
+
+            if strategy == "report":
+                plan.append({"item_id": item_id, "field": field,
+                              "winner": None, "value": None,
+                              "ts": None, "reason": "manual"})
+                continue
+            if strategy == "local-wins":
+                winner, value, ts = "local", git_last.get("new", ""), git_last.get("ts", "")
+                reason = "strategy: local-wins"
+            elif strategy == "remote-wins":
+                winner, value, ts = "remote", gh_last.get("new", ""), gh_last.get("ts", "")
+                reason = "strategy: remote-wins"
+            else:  # last-write-wins
+                if git_last.get("ts", "") >= gh_last.get("ts", ""):
+                    winner, value, ts = "local", git_last.get("new", ""), git_last.get("ts", "")
+                else:
+                    winner, value, ts = "remote", gh_last.get("new", ""), gh_last.get("ts", "")
+                reason = "strategy: last-write-wins"
+            plan.append({"item_id": item_id, "field": field,
+                          "winner": winner, "value": value,
+                          "ts": ts, "reason": reason})
+    return plan
+
+
+def cmd_conflicts(root, sync_config, args):
+    """Show items changed in both sources, optionally auto-resolve.
+
+    --strategy report           (default)  list conflicts, do nothing
+    --strategy local-wins                  always pick local YAML value
+    --strategy remote-wins                 always pick GitHub value
+    --strategy last-write-wins             pick the most recent timestamp
+    --apply                                actually apply the chosen winners
+                                            (without --apply, shows the plan)
+    """
     print()
     print(bold(color(f"  {SYNC_ICON} EDPA Sync: Conflicts", C.HEADER)))
     print()
+
+    strategy = getattr(args, "strategy", "report") or "report"
+    apply_changes = bool(getattr(args, "apply", False))
 
     state_path = root / ".edpa" / "sync_state.json"
     if not state_path.exists():
@@ -1508,7 +1654,6 @@ def cmd_conflicts(root, _sync_config, args):
     last_pull = state.get("last_pull", "")
     last_push = state.get("last_push", "")
 
-    # Check changelog for changes from both sources since last sync
     changelog_path = root / ".edpa" / "changelog.jsonl"
     entries = load_jsonl(changelog_path)
 
@@ -1518,27 +1663,20 @@ def cmd_conflicts(root, _sync_config, args):
         print()
         return
 
-    # Find items changed from both sources
-    github_changes = {}
-    git_changes = {}
-
+    github_changes: dict[str, list] = {}
+    git_changes: dict[str, list] = {}
     for entry in entries:
         ts = entry.get("ts", "")
         if ts < last_sync:
             continue
-
         item_id = entry.get("item", "")
         source = entry.get("source", "")
-        field = entry.get("field", "")
-
         if source == "github":
             github_changes.setdefault(item_id, []).append(entry)
         elif source == "git":
             git_changes.setdefault(item_id, []).append(entry)
 
-    # Items changed in both
-    conflict_ids = set(github_changes.keys()) & set(git_changes.keys())
-
+    conflict_ids = set(github_changes) & set(git_changes)
     if not conflict_ids:
         print(color(f"  {CHECK} No conflicts detected.", C.OK))
         print(color(f"  Last sync: {last_sync}", C.MUTED))
@@ -1548,30 +1686,93 @@ def cmd_conflicts(root, _sync_config, args):
     print(color(f"  {CROSS} {len(conflict_ids)} items have changes from both sources:", C.ERR))
     print()
 
+    # Always print the raw conflicts first
     for item_id in sorted(conflict_ids):
         print(f"    {bold(color(item_id, C.WARN))}")
-
-        gh_entries = github_changes[item_id]
-        git_entries = git_changes[item_id]
-
-        print(color(f"      GitHub changes:", C.SYNC))
-        for e in gh_entries:
-            field = e.get("field", "?")
-            old = e.get("old", "")
-            new = e.get("new", "")
-            print(f"        {field}: {old} {ARROW} {new}  [{e.get('ts', '')[:19]}]")
-
-        print(color(f"      Git changes:", C.OK))
-        for e in git_entries:
-            field = e.get("field", "?")
-            old = e.get("old", "")
-            new = e.get("new", "")
-            print(f"        {field}: {old} {ARROW} {new}  [{e.get('ts', '')[:19]}]")
-
+        for label, color_code, source_changes in (("GitHub changes:", C.SYNC, github_changes),
+                                                    ("Git changes:",    C.OK,   git_changes)):
+            print(color(f"      {label}", color_code))
+            for e in source_changes[item_id]:
+                f = e.get("field", "?")
+                print(f"        {f}: {e.get('old', '')} {ARROW} {e.get('new', '')}"
+                      f"  [{e.get('ts', '')[:19]}]")
         print()
 
-    print(color("  Resolution: manually edit .edpa/backlog/ item files and run `push`.", C.MUTED))
+    if strategy == "report":
+        print(color("  Strategy: report (default). Use `--strategy "
+                    "local-wins|remote-wins|last-write-wins` to auto-resolve.",
+                    C.MUTED))
+        print()
+        return
+
+    plan = resolve_conflicts(github_changes, git_changes, strategy)
+    if not plan:
+        print(color("  No resolvable conflicts (only single-source changes).", C.MUTED))
+        print()
+        return
+
+    print(bold(color(f"  Resolution plan ({strategy}):", C.HEADER)))
+    for p in plan:
+        arrow_dir = "local→GH" if p["winner"] == "local" else "GH→local"
+        print(f"    {p['item_id']:10s}  {p['field']:12s}  "
+              f"winner: {p['winner']} ({arrow_dir})  value={p['value']!r}")
     print()
+
+    if not apply_changes:
+        print(color("  Dry-run. Re-run with --apply to execute the plan.", C.MUTED))
+        print()
+        return
+
+    # Apply: 'remote' winners write YAML; 'local' winners push to GH.
+    setup_state = load_setup_state(root)
+    applied = 0
+    failed = 0
+    items_by_id = collect_items_flat(root)
+    for p in plan:
+        item_id = p["item_id"]
+        field = p["field"]
+        value = p["value"]
+        if p["winner"] == "remote":
+            item_path = _item_file_path(root, item_id)
+            if not item_path or not item_path.exists():
+                print(f"    {color(item_id, C.WARN)}: YAML missing")
+                failed += 1
+                continue
+            doc = load_yaml(item_path) or {}
+            doc[field] = _coerce_typed(field, value)
+            save_yaml(item_path, doc)
+            log_change(root, "auto-resolve", "field_change", item_id,
+                       field=field, new=str(value), actor=p["reason"])
+            applied += 1
+        else:  # local winner pushed to GH
+            if setup_state is None or not setup_state.get("project_id"):
+                print(f"    {color(item_id, C.WARN)}: setup state missing — cannot push to GH")
+                failed += 1
+                continue
+            mapping = setup_state["issue_map"].get(item_id) or {}
+            proj_item_id = mapping.get("project_item_id", "")
+            level = items_by_id.get(item_id, {}).get("level") or "Story"
+            ok_, msg = gh_set_field_value(setup_state, proj_item_id, field, value, level)
+            if ok_:
+                log_change(root, "auto-resolve", "field_change", item_id,
+                           field=field, new=str(value), actor=p["reason"])
+                applied += 1
+            else:
+                print(f"    {color(item_id, C.ERR)}: push failed ({msg})")
+                failed += 1
+    print()
+    print(color(f"  {CHECK} Applied {applied} resolutions, {failed} failed", C.OK))
+    print()
+
+
+def _coerce_typed(field, value):
+    """Coerce a stringified changelog value back to its expected type."""
+    if field in ("js", "bv", "tc", "rr", "wsjf"):
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return value
+    return value
 
 
 def cmd_status(root, sync_config, args):
@@ -1717,7 +1918,14 @@ def main():
                        help="Number of entries to show (default: 20)")
 
     # conflicts
-    sub.add_parser("conflicts", help="Show unresolved conflicts")
+    p_conflicts = sub.add_parser("conflicts",
+                                  help="Show unresolved conflicts (optionally auto-resolve)")
+    p_conflicts.add_argument("--strategy",
+                              choices=["report", "local-wins", "remote-wins", "last-write-wins"],
+                              default="report",
+                              help="report (default) lists conflicts; the others auto-pick a winner.")
+    p_conflicts.add_argument("--apply", action="store_true",
+                              help="Apply the resolution plan. Without it, the plan is shown dry-run.")
 
     # status
     sub.add_parser("status", help="Show sync status")

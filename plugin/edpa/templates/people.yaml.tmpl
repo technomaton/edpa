@@ -25,6 +25,11 @@ people:
     fte: 0.5
     capacity_per_iteration: 40                # hours (FTE × 80 for 2-week iter)
     email: "arch@example.com"
+    github: "arch-handle"                     # OPTIONAL: GitHub login. When set,
+                                              # sync push uses `gh issue --assignee`
+                                              # so GH shows the right user. Without
+                                              # it, the assignee is recorded only in
+                                              # the issue body.
     availability: confirmed                   # confirmed, partial, unavailable
 
   - id: example-dev
@@ -34,6 +39,7 @@ people:
     fte: 1.0
     capacity_per_iteration: 80
     email: "dev@example.com"
+    github: "dev-handle"
     availability: confirmed
 
 # ─────────────────────────────────────────────────────────────────────

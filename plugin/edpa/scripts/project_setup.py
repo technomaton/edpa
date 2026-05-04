@@ -218,6 +218,29 @@ def main():
             f'--single-select-options "{opts}"')
         ok(f"{fname} (SINGLE_SELECT)")
 
+    # Iteration field — populated from .edpa/iterations/*.yaml IDs.
+    # GitHub's native ITERATION type requires a fixed cadence + duration that
+    # doesn't always match SAFe PI windows; SINGLE_SELECT is more flexible
+    # and lets sync round-trip the iteration tag verbatim.
+    iter_dir = Path(".edpa/iterations")
+    iteration_options = []
+    if iter_dir.is_dir():
+        for f in sorted(iter_dir.glob("*.yaml")):
+            try:
+                iter_doc = yaml.safe_load(open(f)) or {}
+                iid = iter_doc.get("iteration", {}).get("id") or f.stem
+                iteration_options.append(iid)
+            except (yaml.YAMLError, OSError):
+                continue
+    if iteration_options:
+        opts_str = ",".join(iteration_options)
+        run(f'gh project field-create {project_num} --owner {args.org} '
+            f'--name "Iteration" --data-type SINGLE_SELECT '
+            f'--single-select-options "{opts_str}"')
+        ok(f"Iteration (SINGLE_SELECT, {len(iteration_options)} options)")
+    else:
+        info("Iteration field skipped — no .edpa/iterations/*.yaml found")
+
     # Refresh field IDs after creating typed status fields
     field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json')
     fields = json.loads(field_json).get("fields", [])
@@ -377,6 +400,12 @@ def main():
             set_field("Risk Reduction", number=item["rr"])
         if item.get("wsjf"):
             set_field("WSJF Score", number=item["wsjf"])
+
+        # Set iteration field (single-select) when item has one assigned
+        if item.get("iteration"):
+            iter_opt = option_ids.get(f"Iteration:{item['iteration']}")
+            if iter_opt:
+                set_field("Iteration", option_id=iter_opt)
 
     ok(f"{set_count} field values set")
 
