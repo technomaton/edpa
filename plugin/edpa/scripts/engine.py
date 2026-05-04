@@ -436,6 +436,150 @@ def load_backlog_items(edpa_root, iteration_id=None):
     return items, manual_cw_overrides
 
 
+GATE_TYPE_DIRS = {
+    "Feature": "features",
+    "Epic": "epics",
+    "Initiative": "initiatives",
+}
+
+
+def _contributors_to_evidence_fields(item_data):
+    """Extract evidence-shaped fields from a backlog YAML's contributors list.
+
+    Mirrors the per-contributor mapping in load_backlog_items() so gate events
+    score with the same evidence semantics as Done items.
+    """
+    assignees = []
+    pr_author = None
+    commit_authors = []
+    pr_reviewers = []
+    commenters = []
+    body_parts = []
+
+    assignee = item_data.get("assignee") or item_data.get("owner")
+    if assignee:
+        assignees.append({"login": assignee})
+
+    for contrib in (item_data.get("contributors") or []):
+        if not isinstance(contrib, dict):
+            continue
+        person = contrib.get("person", "")
+        role = (contrib.get("role", "") or "").lower()
+        cw = contrib.get("cw")
+
+        if role == "owner":
+            if not any(a.get("login") == person for a in assignees):
+                assignees.append({"login": person})
+        elif role == "key":
+            if pr_author is None:
+                pr_author = person
+            commit_authors.append(person)
+        elif role == "reviewer":
+            pr_reviewers.append(person)
+        elif role == "consulted":
+            commenters.append(person)
+
+        if cw is not None:
+            body_parts.append(f"/contribute @{person} weight:{cw}")
+
+    return {
+        "assignees": assignees,
+        "body": "\n".join(body_parts),
+        "pr_author": pr_author,
+        "commit_authors": commit_authors,
+        "pr_reviewers": pr_reviewers,
+        "commenters": commenters,
+    }
+
+
+def load_gate_events(edpa_root, iteration_id, heuristics):
+    """Convert status transitions into scoring 'events' for mode=gates.
+
+    For Feature/Epic/Initiative parents, every status transition that occurred
+    within iteration_id's date window becomes an item-shaped event with
+    job_size = parent.js * gate_weights[type][transition]. Each event reuses
+    its parent's contributor list as evidence, so run_edpa() scores it with
+    the same math as a Done item.
+
+    Stories are NOT emitted here — they continue to flow through
+    load_backlog_items() with the Done filter.
+    """
+    edpa_root = Path(edpa_root)
+    if not iteration_id:
+        return [], []
+
+    iter_file = edpa_root / "iterations" / f"{iteration_id}.yaml"
+    if not iter_file.is_file():
+        return [], []
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    try:
+        from transitions import parse_iteration_dates, detect_transitions
+    finally:
+        sys.path.pop(0)
+
+    try:
+        start, end = parse_iteration_dates(iter_file)
+    except (ValueError, KeyError) as e:
+        print(f"WARN: cannot parse iteration dates: {e}", file=sys.stderr)
+        return [], []
+
+    transitions = detect_transitions(edpa_root, since=start, until=end)
+    gate_weights = (heuristics or {}).get("gate_weights", {}) or {}
+
+    events = []
+    audit = []
+    for t in transitions:
+        item_type = t["item_type"]
+        weights = gate_weights.get(item_type, {}) or {}
+        gate_key = f"{t['from_status']}→{t['to_status']}"
+        weight = weights.get(gate_key)
+        if weight is None and weights:
+            weight = round(1.0 / len(weights), 4)
+            print(
+                f"WARN: no gate_weight for {item_type} '{gate_key}', "
+                f"using equal-split fallback {weight}",
+                file=sys.stderr,
+            )
+        if not weight or weight <= 0:
+            continue
+
+        sub = GATE_TYPE_DIRS.get(item_type)
+        if not sub:
+            continue
+        parent_file = edpa_root / "backlog" / sub / f"{t['item_id']}.yaml"
+        if not parent_file.is_file():
+            continue
+        parent = yaml.safe_load(parent_file.read_text(encoding="utf-8")) or {}
+        parent_js = parent.get("js") or parent.get("job_size") or 0
+        if parent_js <= 0:
+            continue
+
+        effective_js = round(parent_js * weight, 6)
+        synth_id = f"{t['item_id']}@{t['from_status'] or 'init'}->{t['to_status']}"
+
+        ev_fields = _contributors_to_evidence_fields(parent)
+        events.append({
+            "id": synth_id,
+            "level": item_type,
+            "job_size": effective_js,
+            **ev_fields,
+        })
+        audit.append({
+            "synth_id": synth_id,
+            "parent_id": t["item_id"],
+            "parent_type": item_type,
+            "transition": gate_key,
+            "weight": weight,
+            "effective_js": effective_js,
+            "changed_at": t["changed_at"],
+            "changed_by": t["changed_by"],
+            "commit_hash": t["commit_hash"],
+        })
+
+    return events, audit
+
+
 def generate_demo_data():
     """Generate sample data for demonstration (multi-contract).
 
@@ -810,8 +954,10 @@ def main():
     )
     parser.add_argument("--edpa-root", help="Path to .edpa/ directory (reads backlog, config, heuristics)")
     parser.add_argument("--iteration", help="Iteration ID (e.g., PI-2026-1.3)")
-    parser.add_argument("--mode", choices=["simple", "full"], default="simple",
-                        help="Calculation mode (default: simple)")
+    parser.add_argument("--mode", choices=["simple", "full", "gates"], default="simple",
+                        help="Calculation mode: simple|full=Done items only, "
+                             "gates=credit per status transition on Feature/Epic/Initiative "
+                             "(Story stays Done-only). Default: simple")
     parser.add_argument("--capacity", help="Path to capacity.yaml (legacy mode)")
     parser.add_argument("--heuristics", help="Path to cw_heuristics.yaml (legacy mode)")
     parser.add_argument("--output", help="Output path for edpa_results.json")
@@ -826,7 +972,10 @@ def main():
         show_status(Path(args.edpa_root) if args.edpa_root else Path(".edpa"))
         sys.exit(0)
 
+    gate_audit = None
     if args.demo:
+        if args.mode == "gates":
+            parser.error("--mode gates requires --edpa-root with git history (incompatible with --demo)")
         print("Running EDPA demo with sample data...\n")
         capacity, heuristics, items = generate_demo_data()
         iteration_id = "DEMO-1.1"
@@ -841,7 +990,16 @@ def main():
         iteration_id = args.iteration
 
         items, manual_cw = load_backlog_items(edpa_root, iteration_id)
-        print(f"Loaded {len(items)} items from {edpa_root}/backlog/")
+        gate_audit = None
+        if args.mode == "gates":
+            items = [i for i in items if i.get("level") == "Story"]
+            gate_events, gate_audit = load_gate_events(edpa_root, iteration_id, heuristics)
+            items.extend(gate_events)
+            print(f"Loaded {len(items)} items "
+                  f"({len(items) - len(gate_events)} Done Stories + "
+                  f"{len(gate_events)} gate events) for mode=gates")
+        else:
+            print(f"Loaded {len(items)} items from {edpa_root}/backlog/")
         if iteration_id:
             print(f"Filtered to iteration: {iteration_id}")
         if manual_cw:
@@ -880,6 +1038,8 @@ def main():
         "team_total": round(team_total, 2),
         "all_invariants_passed": all_passed,
     }
+    if args.mode == "gates" and gate_audit is not None:
+        output["gate_events"] = gate_audit
 
     # Write output
     if args.output:

@@ -8,13 +8,14 @@ on:
         required: true
         type: string
       mode:
-        description: 'Calculation mode'
+        description: 'Calculation mode (simple/full=Done items only, gates=credit per status transition)'
         required: false
         default: 'simple'
         type: choice
         options:
           - simple
           - full
+          - gates
 
 jobs:
   close-iteration:
