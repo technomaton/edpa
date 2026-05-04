@@ -110,6 +110,58 @@ signals:
   issue_comment: 0.5        # Comment on issue/PR → consulted
 
 # ─────────────────────────────────────────────────────────────────────
+# GATE WEIGHTS  (used only when engine runs with --mode gates)
+# ─────────────────────────────────────────────────────────────────────
+# Each status transition on Feature/Epic/Initiative is a deliverable.
+# Weights split the item's Job Size across its lifecycle, so prep work
+# (LBC, decomposition, validation) is credited as it happens — not only
+# at final Done. Weights MUST sum to 1.0 per item type.
+#
+# Modes:
+#   simple / full  → ignore this section, use status==Done filter
+#   gates          → emit one scoring event per transition in iteration
+#
+gate_weights:
+  Feature:                       # 7 transitions across 8 SAFe statuses
+    "Funnel→Analyzing":         0.10   # LBC delivered
+    "Analyzing→Backlog":        0.05   # Decomposed, AC defined
+    "Backlog→Implementing":     0.05   # Sprint planning, breakdown
+    "Implementing→Validating":  0.50   # Code merged (the bulk of work)
+    "Validating→Deploying":     0.15   # QA sign-off, acceptance
+    "Deploying→Releasing":      0.05   # Deployed to prod
+    "Releasing→Done":           0.10   # Release verified, hypothesis proven
+
+  Epic:                          # 5 transitions across 6 portfolio statuses
+    "Funnel→Reviewing":         0.05   # Triage
+    "Reviewing→Analyzing":      0.10   # Accepted for LBC
+    "Analyzing→Ready":          0.25   # LBC approved, MVP scope set
+    "Ready→Implementing":       0.10   # Capacity allocated, kickoff
+    "Implementing→Done":        0.50   # MVP delivered, hypothesis tested
+
+  Initiative:                    # Same shape as Epic (portfolio level)
+    "Funnel→Reviewing":         0.05
+    "Reviewing→Analyzing":      0.10
+    "Analyzing→Ready":          0.25
+    "Ready→Implementing":       0.10
+    "Implementing→Done":        0.50
+
+# Gate role affinity — which roles typically drive each gate.
+# Used as audit hint only; does NOT affect CW math (that stays in role_overrides).
+gate_role_affinity:
+  "Funnel→Analyzing":          [BO, PM, Arch]        # Lean Business Case
+  "Analyzing→Backlog":         [PM, Arch, Dev]       # Refinement, decomposition
+  "Backlog→Implementing":      [Dev, QA]             # Kickoff
+  "Implementing→Validating":   [Dev, QA]             # Code + tests
+  "Validating→Deploying":      [QA, DevSecOps]       # Acceptance + deploy prep
+  "Deploying→Releasing":       [DevSecOps, PM]       # Deploy + release coord
+  "Releasing→Done":            [PM, BO]              # Release verification
+  "Funnel→Reviewing":          [PM, BO]              # Portfolio triage
+  "Reviewing→Analyzing":       [PM, BO]              # Accepted for LBC
+  "Analyzing→Ready":           [PM, Arch, BO]       # LBC approval
+  "Ready→Implementing":        [PM, Arch]            # Capacity/team allocation
+  "Implementing→Done":         [PM, BO, Arch]        # MVP acceptance
+
+# ─────────────────────────────────────────────────────────────────────
 # RULES
 # ─────────────────────────────────────────────────────────────────────
 rules:
@@ -117,7 +169,8 @@ rules:
   - "role_overrides are applied based on person's role from people.yaml"
   - "Manual override (/contribute) takes precedence over auto-detection"
   - "Commit count does NOT translate to time — it only signals relevance"
-  - "Items not in Done status are excluded from EDPA calculation"
+  - "mode=simple|full: only Done items are credited"
+  - "mode=gates: each status transition on Feature/Epic/Initiative is credited per gate_weight"
   - "ALL commits are delivery evidence — including governance (.edpa/, config/)"
 
 # ─────────────────────────────────────────────────────────────────────
