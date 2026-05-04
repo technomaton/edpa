@@ -294,9 +294,14 @@ def gh_fetch_project_items(sync_config):
 
 
 def gh_update_project_item(sync_config, item_id, project_id, field_id, value):
-    """Update a single field on a project item."""
+    """Update a single TEXT field on a project item.
+
+    Legacy helper kept for callers that already have project_id+field_id.
+    For typed updates (NUMBER, SINGLE_SELECT) prefer gh_set_field_value.
+    """
     cmd = [
-        "gh", "project", "item-edit", item_id,
+        "gh", "project", "item-edit",
+        "--id", item_id,
         "--project-id", project_id,
         "--field-id", field_id,
         "--text", str(value),
@@ -307,6 +312,318 @@ def gh_update_project_item(sync_config, item_id, project_id, field_id, value):
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
+
+
+# -- Real GitHub Helpers (push to live GH) ------------------------------------
+
+LEVEL_TO_STATUS_FIELD = {
+    "Initiative": "Initiative Status",
+    "Epic": "Epic Status",
+    "Feature": "Feature Status",
+    "Story": "Story Status",
+}
+
+NUMBER_FIELDS = {
+    "js": "Job Size",
+    "bv": "Business Value",
+    "tc": "Time Criticality",
+    "rr": "Risk Reduction",
+    "wsjf": "WSJF Score",
+}
+
+
+def load_setup_state(root):
+    """Load persisted GitHub state populated by project_setup.py.
+
+    Returns dict with keys: field_ids, option_ids, issue_map, project_id, project_number, repo, org.
+    Returns None if setup state is missing (push to real GH then refuses).
+    """
+    config_path = root / ".edpa" / "config" / "edpa.yaml"
+    if not config_path.exists():
+        return None
+    config = load_yaml(config_path) or {}
+    sync = config.get("sync", {}) or {}
+    field_ids = sync.get("field_ids") or {}
+    option_ids = sync.get("option_ids") or {}
+
+    issue_map = {}
+    issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
+    if issue_map_path.exists():
+        data = load_yaml(issue_map_path) or {}
+        issue_map = data.get("items") or {}
+
+    return {
+        "org": sync.get("github_org", ""),
+        "repo": sync.get("github_repo", ""),
+        "project_id": sync.get("github_project_id", ""),
+        "project_number": sync.get("github_project_number", 0),
+        "field_ids": field_ids,
+        "option_ids": option_ids,
+        "issue_map": issue_map,
+    }
+
+
+def save_issue_map(root, state):
+    """Persist issue_map back to .edpa/config/issue_map.yaml."""
+    issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
+    issue_map_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "github_repo": f"{state['org']}/{state['repo']}" if state.get("org") and state.get("repo") else "",
+        "github_project_number": state.get("project_number", 0),
+        "items": state.get("issue_map", {}),
+    }
+    save_yaml(issue_map_path, payload)
+
+
+def gh_set_field_value(state, project_item_id, edpa_field, value, item_level):
+    """Set a single field value on a project item using correct GH typing.
+
+    Routes:
+      - js/bv/tc/rr/wsjf -> --number
+      - status           -> --single-select-option-id (per-level field)
+      - title            -> not handled here (use gh issue edit)
+      - other            -> --text fallback
+    Returns (ok: bool, message: str).
+    """
+    project_id = state.get("project_id", "")
+    field_ids = state.get("field_ids") or {}
+    option_ids = state.get("option_ids") or {}
+
+    if not project_id:
+        return False, "no project_id in setup state"
+
+    # Number fields
+    if edpa_field in NUMBER_FIELDS:
+        gh_name = NUMBER_FIELDS[edpa_field]
+        fid = field_ids.get(gh_name)
+        if not fid:
+            return False, f"no field_id for '{gh_name}'"
+        try:
+            num = float(value)
+        except (TypeError, ValueError):
+            return False, f"value {value!r} not numeric"
+        cmd = [
+            "gh", "project", "item-edit",
+            "--id", project_item_id,
+            "--project-id", project_id,
+            "--field-id", fid,
+            "--number", str(num),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        if result.returncode == 0:
+            return True, "ok"
+        return False, result.stderr.strip()[:120] or "gh failed"
+
+    # Status (per-level single-select)
+    if edpa_field == "status":
+        status_field = LEVEL_TO_STATUS_FIELD.get(item_level)
+        if not status_field:
+            return False, f"unknown level {item_level!r} for status"
+        fid = field_ids.get(status_field)
+        if not fid:
+            return False, f"no field_id for '{status_field}'"
+        opt_id = option_ids.get(f"{status_field}:{value}")
+        if not opt_id:
+            return False, f"no option_id for '{status_field}:{value}'"
+        cmd = [
+            "gh", "project", "item-edit",
+            "--id", project_item_id,
+            "--project-id", project_id,
+            "--field-id", fid,
+            "--single-select-option-id", opt_id,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        if result.returncode == 0:
+            return True, "ok"
+        return False, result.stderr.strip()[:120] or "gh failed"
+
+    # Team
+    if edpa_field == "team":
+        fid = field_ids.get("Team")
+        if not fid:
+            return False, "no field_id for 'Team'"
+        opt_id = option_ids.get(f"Team:{value}")
+        if not opt_id:
+            return False, f"no option_id for 'Team:{value}'"
+        cmd = [
+            "gh", "project", "item-edit",
+            "--id", project_item_id,
+            "--project-id", project_id,
+            "--field-id", fid,
+            "--single-select-option-id", opt_id,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        if result.returncode == 0:
+            return True, "ok"
+        return False, result.stderr.strip()[:120] or "gh failed"
+
+    # title is handled at the issue level, not here
+    if edpa_field == "title":
+        return False, "use gh_edit_issue_title for titles"
+
+    return False, f"unsupported field {edpa_field!r}"
+
+
+def gh_edit_issue_title(state, issue_number, new_title):
+    """Edit issue title via gh issue edit."""
+    if not (state.get("org") and state.get("repo") and issue_number):
+        return False, "missing org/repo/issue_number"
+    cmd = [
+        "gh", "issue", "edit", str(issue_number),
+        "--repo", f"{state['org']}/{state['repo']}",
+        "--title", str(new_title),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+    return (result.returncode == 0, result.stderr.strip()[:120] or "ok")
+
+
+def gh_close_issue(state, issue_number):
+    """Close an issue."""
+    cmd = [
+        "gh", "issue", "close", str(issue_number),
+        "--repo", f"{state['org']}/{state['repo']}",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+    return result.returncode == 0
+
+
+def gh_reopen_issue(state, issue_number):
+    """Reopen a closed issue."""
+    cmd = [
+        "gh", "issue", "reopen", str(issue_number),
+        "--repo", f"{state['org']}/{state['repo']}",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+    return result.returncode == 0
+
+
+def gh_get_issue_type_ids(org):
+    """Query org-level issue type IDs (Initiative/Epic/Feature/Story)."""
+    query = f'{{ organization(login: "{org}") {{ issueTypes(first: 20) {{ nodes {{ id name }} }} }} }}'
+    result = subprocess.run(
+        ["gh", "api", "graphql", "-f", f"query={query}"],
+        capture_output=True, text=True, timeout=20,
+    )
+    if result.returncode != 0:
+        return {}
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {}
+    nodes = (((data.get("data") or {}).get("organization") or {}).get("issueTypes") or {}).get("nodes") or []
+    return {n["name"]: n["id"] for n in nodes if n.get("name") and n.get("id")}
+
+
+def gh_create_issue(state, item, item_level):
+    """Create a GH issue for a local-only EDPA item, add to project, set issue type.
+
+    Returns dict with issue_number, project_item_id, node_id on success, None on failure.
+    """
+    repo = f"{state['org']}/{state['repo']}"
+    item_id = item.get("id") or item.get("_id") or ""
+    title = item.get("title", "")
+    full_title = f"{item_id}: {title}" if item_id else title
+
+    body_parts = [item_level]
+    for k in ("js", "bv", "tc", "rr", "wsjf"):
+        v = item.get(k)
+        if v:
+            body_parts.append(f"{k.upper()}={v}")
+    if item.get("assignee"):
+        body_parts.append(f"owner={item['assignee']}")
+    if item.get("iteration"):
+        body_parts.append(f"iteration={item['iteration']}")
+    body = ", ".join(body_parts)
+
+    cmd = [
+        "gh", "issue", "create",
+        "--repo", repo,
+        "--title", full_title,
+        "--body", body,
+    ]
+    if item.get("epic_type") == "Enabler":
+        cmd += ["--label", "Enabler"]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        return None
+
+    issue_url = result.stdout.strip()
+    try:
+        issue_num = int(issue_url.rstrip("/").split("/")[-1])
+    except (ValueError, IndexError):
+        return None
+
+    # Resolve issue node_id
+    node_q = (
+        f'{{ repository(owner: "{state["org"]}", name: "{state["repo"]}") '
+        f'{{ issue(number: {issue_num}) {{ id }} }} }}'
+    )
+    node_result = subprocess.run(
+        ["gh", "api", "graphql", "-f", f"query={node_q}"],
+        capture_output=True, text=True, timeout=20,
+    )
+    node_id = ""
+    if node_result.returncode == 0:
+        try:
+            d = json.loads(node_result.stdout)
+            node_id = (((d.get("data") or {}).get("repository") or {}).get("issue") or {}).get("id", "") or ""
+        except json.JSONDecodeError:
+            pass
+
+    # Assign issue type via GraphQL
+    type_ids = gh_get_issue_type_ids(state["org"])
+    type_id = type_ids.get(item_level)
+    if type_id and node_id:
+        mutation = (
+            f'mutation {{ updateIssueIssueType(input: '
+            f'{{ issueId: "{node_id}", issueTypeId: "{type_id}" }}) '
+            f'{{ issue {{ id }} }} }}'
+        )
+        subprocess.run(
+            ["gh", "api", "graphql", "-f", f"query={mutation}"],
+            capture_output=True, text=True, timeout=20,
+        )
+
+    # Add to project
+    add_cmd = [
+        "gh", "project", "item-add", str(state["project_number"]),
+        "--owner", state["org"],
+        "--url", issue_url,
+        "--format", "json",
+    ]
+    add_result = subprocess.run(add_cmd, capture_output=True, text=True, timeout=30)
+    project_item_id = ""
+    if add_result.returncode == 0:
+        try:
+            project_item_id = (json.loads(add_result.stdout) or {}).get("id", "") or ""
+        except json.JSONDecodeError:
+            pass
+
+    return {
+        "issue_number": issue_num,
+        "project_item_id": project_item_id,
+        "node_id": node_id,
+    }
+
+
+def gh_link_subissue(state, parent_node_id, child_node_id):
+    """Link a child issue to its parent via GraphQL addSubIssue."""
+    if not (parent_node_id and child_node_id):
+        return False
+    mutation = (
+        f'mutation {{ addSubIssue(input: {{ '
+        f'issueId: "{parent_node_id}", subIssueId: "{child_node_id}" }}) '
+        f'{{ issue {{ id }} subIssue {{ id }} }} }}'
+    )
+    result = subprocess.run(
+        ["gh", "api", "graphql", "-f", f"query={mutation}"],
+        capture_output=True, text=True, timeout=20,
+    )
+    if result.returncode == 0:
+        return True
+    # "already a sub-issue" is fine
+    return "already" in result.stdout.lower() or "already" in result.stderr.lower()
 
 
 def parse_gh_item_type(item):
@@ -376,9 +693,13 @@ def map_gh_items_to_edpa(gh_data, fields_mapping):
 
         item_type = parse_gh_item_type(gh_item)
 
+        # Per-level typed status field name (e.g., "Initiative Status", "Story Status")
+        typed_status_key_lower = f"{item_type.lower()} status"
+
         entry = {
             "level": item_type,
             "title": title,
+            # Default to GH's built-in Status; will be overridden below by typed status if present
             "status": gh_item.get("status", ""),
             "_gh_item_id": gh_item.get("id", ""),
         }
@@ -389,6 +710,12 @@ def map_gh_items_to_edpa(gh_data, fields_mapping):
                 continue
 
             key_lower = gh_field_name.lower()
+
+            # Per-level typed status field overrides default Status
+            if key_lower == typed_status_key_lower and value:
+                entry["status"] = value
+                continue
+
             edpa_key = None
 
             # Check reverse mapping first (e.g., "job size" -> "js")
@@ -413,10 +740,14 @@ def map_gh_items_to_edpa(gh_data, fields_mapping):
         if isinstance(field_values, dict):
             for field_obj in field_values.get("nodes", []):
                 field_name = (field_obj.get("field", {}).get("name", "") or "").lower()
+                val = field_obj.get("text") or field_obj.get("name") or field_obj.get("number")
+                # Per-level typed status field overrides default Status
+                if field_name == typed_status_key_lower and val:
+                    entry["status"] = val
+                    continue
                 edpa_key = reverse_fields.get(field_name)
                 if not edpa_key:
                     continue
-                val = field_obj.get("text") or field_obj.get("name") or field_obj.get("number")
                 if val is not None:
                     if edpa_key in numeric_fields:
                         try:
@@ -730,27 +1061,36 @@ def cmd_pull(root, sync_config, args):
 
 
 def cmd_push(root, sync_config, args):
-    """Push changes from .edpa/ item files to GitHub Projects."""
+    """Push changes from .edpa/ item files to GitHub Projects (creates missing issues)."""
     print()
     print(bold(color(f"  {SYNC_ICON} EDPA Sync: Push (.edpa/backlog/ items {ARROW} GitHub Projects)", C.HEADER)))
     print()
 
-    # Fetch current remote state
     fields_mapping = sync_config.get("fields_mapping", DEFAULT_SYNC_CONFIG["fields_mapping"])
+    setup_state = None
+
     if args.mock:
         print(color("  [mock] Generating simulated GitHub Project data...", C.MUTED))
         gh_data = generate_mock_gh_data(root, fields_mapping)
     else:
-        org = sync_config.get("github_org", "YOUR_ORG")
-        project_num = sync_config.get("github_project_number", 1)
+        setup_state = load_setup_state(root)
+        if setup_state is None or not setup_state.get("project_id") or not setup_state.get("field_ids"):
+            print(color("  Push aborted: GitHub setup state missing or incomplete.", C.ERR))
+            print(color("  Run `project_setup.py` first, or `sync setup-refresh` to rebuild IDs.", C.MUTED))
+            sys.exit(1)
+        org = setup_state["org"]
+        project_num = setup_state["project_number"]
         print(color(f"  Fetching current state from {org}/project#{project_num}...", C.SYNC))
-        gh_data = gh_fetch_project_items(sync_config)
+        gh_data = gh_fetch_project_items({"github_org": org, "github_project_number": project_num})
         if gh_data is None:
             print(color("  Push aborted: could not fetch GitHub Project data.", C.ERR))
             sys.exit(1)
 
     remote_items = map_gh_items_to_edpa(gh_data, fields_mapping)
     local_items = collect_items_flat(root)
+    # Inject id back into each local item dict for create flow
+    for iid, it in local_items.items():
+        it["id"] = iid
 
     print(color(f"  Local items:  {len(local_items)}", C.MUTED))
     print(color(f"  Remote items: {len(remote_items)}", C.MUTED))
@@ -759,46 +1099,134 @@ def cmd_push(root, sync_config, args):
     # Compute diff (local is source of truth for push)
     changes = compute_diff(remote_items, local_items)
     field_changes = [c for c in changes if c["action"] == "field_changed"]
+    create_changes = [c for c in changes if c["action"] == "remote_only"]
+    # Note: "remote_only" from compute_diff(remote, local) means item exists in `local` but not in `remote`
 
-    if not field_changes:
+    pushed = 0
+    created = 0
+    failed = 0
+
+    # ── Create missing issues first (so subsequent field updates can target them)
+    if create_changes:
+        print(bold(color(f"  Creating {len(create_changes)} new issues on GitHub:", C.DIFF_ADD)))
+        for ch in create_changes:
+            item_id = ch["id"]
+            local = ch["remote"]   # local-only payload (lives in `remote` slot of swapped diff)
+            level = local.get("level", "Story")
+            print(f"    {color(item_id, C.SYNC):18s}  create {level:10s}  ", end="")
+            if args.mock:
+                print(f"  {color('[mock: ok]', C.MUTED)}")
+                created += 1
+                continue
+            payload = dict(local)
+            payload["id"] = item_id
+            result = gh_create_issue(setup_state, payload, level)
+            if not result:
+                print(f"  {color('[failed]', C.ERR)}")
+                failed += 1
+                continue
+            setup_state["issue_map"][item_id] = result
+            issue_label = "#" + str(result["issue_number"])
+            print(f"  {color(issue_label, C.OK)}")
+            created += 1
+            log_change(root, "git", "issue_created", item_id,
+                       new=f"#{result['issue_number']}", actor="sync-push")
+
+            # Set initial fields on newly created item (number + status)
+            proj_item_id = result.get("project_item_id", "")
+            if proj_item_id:
+                for fkey in ("js", "bv", "tc", "rr", "wsjf"):
+                    val = local.get(fkey)
+                    if val:
+                        gh_set_field_value(setup_state, proj_item_id, fkey, val, level)
+                if local.get("status"):
+                    gh_set_field_value(setup_state, proj_item_id, "status", local["status"], level)
+                    if local["status"] == "Done":
+                        gh_close_issue(setup_state, result["issue_number"])
+
+        # Persist updated issue_map after creates
+        if setup_state and not args.mock:
+            save_issue_map(root, setup_state)
+
+        # Link parent-child after all issues exist
+        if not args.mock:
+            link_count = 0
+            for ch in create_changes:
+                item_id = ch["id"]
+                local_item_path = _item_file_path(root, item_id)
+                if not local_item_path or not local_item_path.exists():
+                    continue
+                local_full = load_yaml(local_item_path) or {}
+                parent_id = local_full.get("parent")
+                if not parent_id:
+                    continue
+                child = setup_state["issue_map"].get(item_id, {})
+                parent = setup_state["issue_map"].get(parent_id, {})
+                if gh_link_subissue(setup_state, parent.get("node_id"), child.get("node_id")):
+                    link_count += 1
+            if link_count:
+                print(f"    {color(CHECK, C.OK)} {link_count} sub-issue links created")
+        print()
+
+    # ── Apply field changes
+    if field_changes:
+        print(bold(color(f"  Pushing {len(field_changes)} field changes:", C.DIFF_MOD)))
+        for ch in field_changes:
+            item_id = ch["id"]
+            field = ch["field"]
+            old_val = ch["local_val"]   # remote's current value (swapped in compute_diff arg order)
+            new_val = ch["remote_val"]  # local's value
+            level = local_items.get(item_id, {}).get("level") or ch.get("level") or "Story"
+
+            print(f"    {color(item_id, C.SYNC):18s}  "
+                  f"{field:12s}  "
+                  f"{color(str(old_val), C.DIFF_DEL)} {ARROW} {color(str(new_val), C.DIFF_ADD)}",
+                  end="")
+
+            if args.mock:
+                print(f"  {color('[mock: ok]', C.MUTED)}")
+                pushed += 1
+                continue
+
+            mapping = setup_state["issue_map"].get(item_id) or {}
+            proj_item_id = mapping.get("project_item_id", "")
+            issue_num = mapping.get("issue_number")
+
+            if not proj_item_id and not issue_num:
+                print(f"  {color('[skipped: not in issue_map]', C.WARN)}")
+                failed += 1
+                continue
+
+            if field == "title" and issue_num:
+                ok_, msg = gh_edit_issue_title(setup_state, issue_num, new_val)
+                if ok_:
+                    print(f"  {color('[ok]', C.OK)}")
+                    pushed += 1
+                else:
+                    print(f"  {color(f'[failed: {msg}]', C.ERR)}")
+                    failed += 1
+                continue
+
+            ok_, msg = gh_set_field_value(setup_state, proj_item_id, field, new_val, level)
+            if ok_:
+                print(f"  {color('[ok]', C.OK)}")
+                pushed += 1
+                # Mirror Done state to issue close/reopen
+                if field == "status" and issue_num:
+                    if str(new_val).lower() == "done":
+                        gh_close_issue(setup_state, issue_num)
+                    elif str(old_val).lower() == "done":
+                        gh_reopen_issue(setup_state, issue_num)
+            else:
+                print(f"  {color(f'[failed: {msg}]', C.ERR)}")
+                failed += 1
+        print()
+
+    if not field_changes and not create_changes:
         print(color(f"  {CHECK} No changes to push. GitHub Project is up to date.", C.OK))
         update_sync_state(root, "push", len(local_items), compute_backlog_checksum(root))
         print()
         return
-
-    print(color(f"  Changes to push: {len(field_changes)}", C.DIFF_MOD))
-    print()
-
-    pushed = 0
-    for ch in field_changes:
-        item_id = ch["id"]
-        field = ch["field"]
-        old_val = ch["local_val"]   # remote's current value
-        new_val = ch["remote_val"]  # local's value (what we want to push)
-
-        print(f"    {color(item_id, C.SYNC):18s}  "
-              f"{field:12s}  "
-              f"{color(str(old_val), C.DIFF_DEL)} {ARROW} {color(str(new_val), C.DIFF_ADD)}",
-              end="")
-
-        if args.mock:
-            print(f"  {color('[mock: ok]', C.MUTED)}")
-            pushed += 1
-        else:
-            # Find the GH item ID for this EDPA item
-            gh_item_id = remote_items.get(item_id, {}).get("_gh_item_id")
-            if gh_item_id:
-                field_gh_name = fields_mapping.get(field, field)
-                success = gh_update_project_item(sync_config, gh_item_id, "", "", new_val)
-                if success:
-                    print(f"  {color('[ok]', C.OK)}")
-                    pushed += 1
-                else:
-                    print(f"  {color('[failed]', C.ERR)}")
-            else:
-                print(f"  {color('[skipped: no GH item ID]', C.WARN)}")
-
-    print()
 
     # Log changes
     for ch in field_changes:
@@ -806,7 +1234,129 @@ def cmd_push(root, sync_config, args):
                    field=ch["field"], old=str(ch["local_val"]), new=str(ch["remote_val"]))
 
     update_sync_state(root, "push", len(local_items), compute_backlog_checksum(root))
-    print(color(f"  {CHECK} Pushed {pushed}/{len(field_changes)} changes to GitHub Project", C.OK))
+    print(color(f"  {CHECK} Pushed {pushed} field changes, {created} issues created, {failed} failed", C.OK))
+    print()
+
+
+def cmd_setup_refresh(root, _sync_config, _args):
+    """Re-discover field_ids, option_ids, and issue_map from existing GH project.
+
+    Use when: setup ran on different machine, IDs were lost, or project was modified manually.
+    Requires github_org and github_project_number already in edpa.yaml.
+    """
+    print()
+    print(bold(color(f"  {SYNC_ICON} EDPA Sync: Setup Refresh (rebuild IDs from GitHub)", C.HEADER)))
+    print()
+
+    config_path = root / ".edpa" / "config" / "edpa.yaml"
+    config = load_yaml(config_path) if config_path.exists() else {}
+    sync = (config.get("sync") or {}).copy()
+    org = sync.get("github_org")
+    project_num = sync.get("github_project_number")
+    repo = sync.get("github_repo", "")
+    if not org or not project_num:
+        print(color("  Error: github_org / github_project_number missing in edpa.yaml.", C.ERR))
+        sys.exit(1)
+
+    print(color(f"  Querying {org}/project#{project_num}...", C.SYNC))
+
+    # 1. Field IDs + option IDs
+    field_json = subprocess.run(
+        ["gh", "project", "field-list", str(project_num), "--owner", org, "--format", "json"],
+        capture_output=True, text=True, timeout=30,
+    )
+    if field_json.returncode != 0:
+        print(color(f"  Error: gh project field-list failed: {field_json.stderr.strip()}", C.ERR))
+        sys.exit(1)
+    fields = (json.loads(field_json.stdout) or {}).get("fields", [])
+    field_ids = {f["name"]: f["id"] for f in fields if f.get("name") and f.get("id")}
+    option_ids = {}
+    for f in fields:
+        for opt in f.get("options", []):
+            option_ids[f"{f['name']}:{opt['name']}"] = opt["id"]
+    print(color(f"  Fields: {len(field_ids)}, Options: {len(option_ids)}", C.MUTED))
+
+    # 2. Project ID
+    proj_q = f'{{ organization(login: "{org}") {{ projectV2(number: {project_num}) {{ id }} }} }}'
+    proj_result = subprocess.run(
+        ["gh", "api", "graphql", "-f", f"query={proj_q}"],
+        capture_output=True, text=True, timeout=20,
+    )
+    project_id = ""
+    if proj_result.returncode == 0:
+        try:
+            d = json.loads(proj_result.stdout)
+            project_id = (((d.get("data") or {}).get("organization") or {}).get("projectV2") or {}).get("id", "")
+        except json.JSONDecodeError:
+            pass
+
+    # 3. Issue map (from project items)
+    item_json = subprocess.run(
+        ["gh", "project", "item-list", str(project_num), "--owner", org, "--format", "json", "--limit", "500"],
+        capture_output=True, text=True, timeout=60,
+    )
+    issue_map = {}
+    if item_json.returncode == 0:
+        try:
+            data = json.loads(item_json.stdout) or {}
+        except json.JSONDecodeError:
+            data = {}
+        for item in data.get("items", []):
+            title = item.get("title", "")
+            edpa_id = None
+            for prefix in ("I-", "E-", "F-", "S-"):
+                if title.startswith(prefix):
+                    parts = title.split(" ", 1)
+                    candidate = parts[0].rstrip(":")
+                    if len(candidate) > 2 and candidate[2:].isdigit():
+                        edpa_id = candidate
+                        break
+            if not edpa_id:
+                continue
+            content = item.get("content", {}) or {}
+            issue_number = content.get("number")
+            if not issue_number:
+                continue
+            # Resolve issue node_id
+            node_id = ""
+            if repo:
+                node_q = (
+                    f'{{ repository(owner: "{org}", name: "{repo.split("/")[-1]}") '
+                    f'{{ issue(number: {issue_number}) {{ id }} }} }}'
+                )
+                node_r = subprocess.run(
+                    ["gh", "api", "graphql", "-f", f"query={node_q}"],
+                    capture_output=True, text=True, timeout=20,
+                )
+                if node_r.returncode == 0:
+                    try:
+                        nd = json.loads(node_r.stdout)
+                        node_id = (((nd.get("data") or {}).get("repository") or {}).get("issue") or {}).get("id", "") or ""
+                    except json.JSONDecodeError:
+                        pass
+            issue_map[edpa_id] = {
+                "issue_number": int(issue_number),
+                "project_item_id": item.get("id", ""),
+                "node_id": node_id,
+            }
+    print(color(f"  Items mapped: {len(issue_map)}", C.MUTED))
+
+    # 4. Persist
+    sync["github_project_id"] = project_id
+    sync["field_ids"] = field_ids
+    sync["option_ids"] = option_ids
+    config["sync"] = sync
+    save_yaml(config_path, config)
+
+    state = {
+        "org": org,
+        "repo": repo.split("/")[-1] if "/" in repo else repo,
+        "project_number": project_num,
+        "issue_map": issue_map,
+    }
+    save_issue_map(root, state)
+
+    print(color(f"  {CHECK} Setup state refreshed: {len(field_ids)} fields, {len(issue_map)} items mapped", C.OK))
     print()
 
 
@@ -1172,6 +1722,10 @@ def main():
     # status
     sub.add_parser("status", help="Show sync status")
 
+    # setup-refresh: re-discover field_ids/option_ids/issue_map from existing GH project
+    sub.add_parser("setup-refresh",
+                   help="Re-query GitHub to rebuild field_ids/option_ids/issue_map (recovery)")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -1212,6 +1766,7 @@ def main():
         "log": cmd_log,
         "conflicts": cmd_conflicts,
         "status": cmd_status,
+        "setup-refresh": cmd_setup_refresh,
     }
 
     cmd_func = commands.get(args.command)
