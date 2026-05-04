@@ -51,7 +51,15 @@ def run_git(args, cwd: Path):
         check=False,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+        err = result.stderr.strip()
+        # Treat "no commits yet" / "not a git repository" as empty history,
+        # not as a hard error. Lets engine --mode gates run on freshly
+        # initialized projects without crashing.
+        benign = ("does not have any commits yet", "not a git repository",
+                  "ambiguous argument 'HEAD'")
+        if any(phrase in err for phrase in benign):
+            return ""
+        raise RuntimeError(f"git {' '.join(args)} failed: {err}")
     return result.stdout
 
 

@@ -184,7 +184,7 @@ def compute_cw(evidence_entry, heuristics, person_role=None):
     return 0.15
 
 
-def run_edpa(capacity_config, heuristics, items, mode="simple"):
+def run_edpa(capacity_config, heuristics, items, mode="gates"):
     """
     Run the core EDPA calculation.
 
@@ -954,10 +954,12 @@ def main():
     )
     parser.add_argument("--edpa-root", help="Path to .edpa/ directory (reads backlog, config, heuristics)")
     parser.add_argument("--iteration", help="Iteration ID (e.g., PI-2026-1.3)")
-    parser.add_argument("--mode", choices=["simple", "full", "gates"], default="simple",
-                        help="Calculation mode: simple|full=Done items only, "
-                             "gates=credit per status transition on Feature/Epic/Initiative "
-                             "(Story stays Done-only). Default: simple")
+    parser.add_argument("--mode", choices=["simple", "full", "gates"], default="gates",
+                        help="Calculation mode: gates (default) credits per status "
+                             "transition on Feature/Epic/Initiative + Story Done; "
+                             "simple|full credit only items with status=Done. "
+                             "Use simple if your project does not record mid-life "
+                             "status transitions in git.")
     parser.add_argument("--capacity", help="Path to capacity.yaml (legacy mode)")
     parser.add_argument("--heuristics", help="Path to cw_heuristics.yaml (legacy mode)")
     parser.add_argument("--output", help="Output path for edpa_results.json")
@@ -974,8 +976,13 @@ def main():
 
     gate_audit = None
     if args.demo:
+        # Demo data has no git history — gates would have nothing to credit.
+        # Silently fall back to simple so `engine.py --demo` works out of the box
+        # even though gates is the project default.
         if args.mode == "gates":
-            parser.error("--mode gates requires --edpa-root with git history (incompatible with --demo)")
+            args.mode = "simple"
+            print("Note: --demo has no git history; using --mode simple "
+                  "(set --mode full for audit detail).\n")
         print("Running EDPA demo with sample data...\n")
         capacity, heuristics, items = generate_demo_data()
         iteration_id = "DEMO-1.1"

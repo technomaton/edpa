@@ -157,15 +157,18 @@ python3.13 plugin/edpa/scripts/engine.py \
 # (the edpa-reports skill is invoked by Claude; no separate script)
 ```
 
-**Mode choices** (current default: `simple`; planned default after Phase B
-validation: `gates`):
+**Mode choices** (current default: `gates`):
 
-- `simple` — credit only items with `status: Done`. Rough but stable.
-- `full` — adds RS/RSV detail in audit trail; same hours as `simple`.
-- `gates` — credit each status transition on Initiative/Epic/Feature as a
-  mini-deliverable using `gate_weights` from heuristics. Story stays Done-only.
-  **Requires actual git history of status changes** (sync `pull --commit`
-  produces these). Without that history, gates mode under-allocates.
+- `gates` (default) — credit each status transition on
+  Initiative/Epic/Feature as a mini-deliverable using `gate_weights` from
+  heuristics; Story stays Done-only. Validated against the
+  `edpa-simulation-gates` harness (avg MAD 7.8 %, stable to ±20 % CW
+  perturbation). **Requires git history of status changes** —
+  `sync pull --commit` produces these automatically.
+- `simple` — credit only items with `status: Done`. Use when the project
+  doesn't record mid-life status transitions in git (legacy projects,
+  pre-EDPA backlogs, archive replays).
+- `full` — same as `simple` but stores RS/RSV detail in the audit trail.
 
 **Verification:** `python3.13 -m pytest tests/test_invariants.py -v` ensures
 score formula, capacity invariant, and ratio sums hold for any output.

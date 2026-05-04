@@ -169,8 +169,8 @@ rules:
   - "role_overrides are applied based on person's role from people.yaml"
   - "Manual override (/contribute) takes precedence over auto-detection"
   - "Commit count does NOT translate to time — it only signals relevance"
-  - "mode=simple|full: only Done items are credited"
-  - "mode=gates: each status transition on Feature/Epic/Initiative is credited per gate_weight"
+  - "mode=gates (default): each status transition on Feature/Epic/Initiative is credited per gate_weight; Story stays Done-only"
+  - "mode=simple|full: only Done items are credited (use when git history doesn't record status transitions)"
   - "ALL commits are delivery evidence — including governance (.edpa/, config/)"
 
 # ─────────────────────────────────────────────────────────────────────

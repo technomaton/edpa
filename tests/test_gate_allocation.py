@@ -269,13 +269,18 @@ def test_status_revert_does_not_subtract(tmp_path):
     assert result["all_invariants_passed"]
 
 
-def test_gates_demo_rejected(tmp_path):
+def test_gates_demo_falls_back_to_simple(tmp_path):
+    """--demo has no git history; engine should silently fall back to simple
+    instead of failing, so `engine.py --demo` works out of the box even when
+    gates is the project default."""
     r = subprocess.run(
         [sys.executable, str(SCRIPTS / "engine.py"), "--demo", "--mode", "gates"],
         cwd=tmp_path, capture_output=True, text=True,
     )
-    assert r.returncode != 0
-    assert "incompatible" in r.stderr.lower() or "incompatible" in r.stdout.lower()
+    assert r.returncode == 0, r.stderr
+    # Notice should mention the fallback so the user isn't surprised
+    out = (r.stdout + r.stderr).lower()
+    assert "demo" in out and "simple" in out
 
 
 def test_unknown_gate_uses_equal_split_fallback(tmp_path):

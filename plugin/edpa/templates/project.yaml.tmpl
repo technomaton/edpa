@@ -12,7 +12,9 @@ project:
 
 governance:
   methodology: "EDPA 1.0.0-beta"
-  calculation_mode: "simple"                  # simple (JS×CW) or full (JS×CW×RS)
+  calculation_mode: "gates"                   # gates (default) | simple (JS×CW) | full (JS×CW×RS)
+                                              # gates credits each status transition; use simple
+                                              # if your project does not record mid-life transitions
   audit_mode: "full"                          # always store RS in snapshots
 
 naming:

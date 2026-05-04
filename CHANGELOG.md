@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+### Changed (BREAKING for fresh installs only)
+- **`--mode gates` is now the default** for `engine.py` and the
+  `calculation_mode` field in `project.yaml.tmpl`. Existing
+  `.edpa/config/edpa.yaml` files keep their explicit setting; only
+  newly initialized projects pick up the new default. To stay on
+  simple, set `governance.calculation_mode: simple` in
+  `.edpa/config/edpa.yaml` or pass `--mode simple` on the command
+  line.
+- Validated against `technomaton/edpa-simulation-gates` (8 iterations,
+  6-person virtual team, 156 git transitions, 30 Monte Carlo runs):
+  avg MAD 7.8 % vs ground truth, 0.3 percentage points spread under
+  ±20 % CW perturbation. See that repo's `reports/RESULTS.md` for
+  the full validation report.
+
+### Added
+- `sync setup-refresh` subcommand — re-discovers field IDs, option
+  IDs, and the issue map from an existing GitHub Project. Useful
+  when checking out the project on a new machine or after manual
+  GitHub edits.
+- `tests/test_e2e_sync.py` — five end-to-end tests against a real
+  GitHub sandbox repo (opt-in via `pytest -m e2e`). Covers the full
+  chain: project setup → push creates issues → manual GitHub UI
+  status change → pull updates YAML + commits → engine
+  `--mode gates` reads the transition.
+- `docs/RUNBOOK.md` — operational runbook for every `/edpa:*` slash
+  command with prerequisites, expected output, common failure modes,
+  and a 5-minute end-to-end smoke test.
+
+### Fixed
+- `project_setup.py` now persists `field_ids`, `option_ids`, and an
+  `issue_map.yaml` so `sync push` can target real GitHub fields.
+  Previously `gh project item-edit` was called with empty IDs.
+- `sync push` works against a real GitHub Project: creates missing
+  issues, sets fields with correct typing (NUMBER vs SINGLE_SELECT),
+  mirrors status `→ Done` to `gh issue close`, and links parent/child
+  via `addSubIssue`. Previously `push` was only validated against
+  mock data.
+- `sync pull` reads per-level typed status fields
+  (Initiative/Epic/Feature/Story Status) instead of GitHub's default
+  `Status` field, so SAFe workflow transitions actually round-trip.
+
 ## 1.0.0-beta — 2026-03-29
 
 First public beta. Plugin-first distribution, restructured directories.
