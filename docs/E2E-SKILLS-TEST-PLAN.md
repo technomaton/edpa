@@ -827,3 +827,113 @@ when the left exists, that's a regression — capture as a finding.
 | Required          | Yes (CI / regression)                  | Yes (release readiness, customer experience)|
 
 Run both. A passing release requires both green.
+
+---
+
+## Příloha D — Testing strategies for skill flows
+
+This plan exists because script tests don't cover skill orchestration.
+But the skill layer is not one thing — it has four observable surfaces,
+each with a different right tool.
+
+| What you're trying to verify                              | Right tool                                            |
+|-----------------------------------------------------------|-------------------------------------------------------|
+| Skill side-effects (filesystem, GitHub state)             | `claude -p` subprocess + outcome assertions           |
+| Skill prompts UX (readable? in the right order? skippable?) | Live human walkthrough — there is no automation here |
+| MCP tool dispatch from inside a skill (does it call `edpa_status` instead of `Bash + grep`?) | subprocess + stderr log inspection (the `INFO call_tool name=…` lines) |
+| Regression on a known-good skill flow                     | recorded transcript + semantic diff (LLM nondeterminism makes exact-match brittle) |
+
+### `claude -p` pattern (outcome-based, runnable in CI)
+
+```bash
+TEST_DIR=$(mktemp -d)
+cd "$TEST_DIR"
+git init -q
+curl -fsSL https://edpa.technomaton.com/install.sh | sh > /dev/null
+
+# Drive Claude Code in non-interactive mode. Skill side-effects land
+# on disk and on GitHub; assertions read those, not the stdout.
+claude -p "/edpa:setup TestProject" --no-interactive
+
+# Outcome assertions
+test -f .edpa/config/issue_map.yaml         # setup persisted IDs
+project_num=$(yq '.sync.github_project_number' .edpa/config/edpa.yaml)
+gh project view "$project_num" --owner "$ORG" --format json \
+  | jq -e '.title == "TestProject"'         # actually created on GH
+
+# Cleanup
+gh project delete "$project_num" --owner "$ORG"
+```
+
+**Why outcome-based, not transcript-based:** the skill's *response*
+varies (LLM nondeterminism) but its *effects* don't. Asserting on
+"the issue_map.yaml exists with these IDs" is stable across runs;
+asserting on "the assistant said 'Setup complete!'" is flaky.
+
+### `pexpect` pattern (interactive multi-turn flow)
+
+```python
+import pexpect
+c = pexpect.spawn("claude", timeout=30)
+c.sendline("/edpa:setup")
+c.expect("[Pp]roject name")           # broad regex — see catch below
+c.sendline("Demo")
+c.expect("organization|GitHub org")    # multiple phrasings tolerated
+c.sendline("technomaton")
+c.expect("Setup complete|setup done")
+c.close()
+```
+
+**Catch:** every regex you write here is a hostage to LLM phrasing
+drift. The skill could one week ask "What's the project name?" and
+another week "Project name:". `pexpect` is the right tool when you
+*need* to drive an interactive session, but treat it as a smoke test,
+not a regression suite. Outcome assertions still need to follow.
+
+### MCP dispatch verification
+
+`mcp_server.py` logs every `call_tool` invocation to stderr:
+
+```
+INFO edpa.mcp call_tool name=edpa_status args={}
+WARNING edpa.mcp edpa_item: rejected item_id='../etc/passwd'
+```
+
+To verify a skill flow uses MCP tools (instead of `Bash + grep`),
+spawn Claude Code with `EDPA_LOG_FILE=/tmp/edpa-mcp.log` set and
+grep the log after the skill completes:
+
+```bash
+EDPA_LOG_FILE=/tmp/edpa-mcp.log claude -p "Show me the active iteration's Done stories."
+grep -c "call_tool name=edpa_backlog" /tmp/edpa-mcp.log  # should be ≥ 1
+```
+
+Zero hits means the assistant fell back to `Bash + grep`, which is a
+regression even if the answer ends up correct.
+
+### Live walkthrough (UX validation)
+
+There is no shortcut here. A human types the slash command, watches
+what the skill asks, and judges whether it reads naturally. Notes go
+into the appropriate phase of this plan as findings; if they're sharp
+enough they become test cases for one of the automation tools above.
+
+The kashealth onboarding (Phase 13) is the natural first one. Phase
+13.5 reserves space for the transcript with PII redacted.
+
+### Strategy pyramid for EDPA today
+
+| Layer                                | Tool                          | EDPA today               |
+|--------------------------------------|-------------------------------|---------------------------|
+| Unit (handler functions)             | pytest                         | ✅ 48 tests in `test_mcp_server.py` |
+| Integration (MCP wire protocol)      | subprocess + JSON-RPC          | ✅ 16 tests in `test_mcp_integration.py` |
+| Integration (skill side-effects)     | `claude -p` + outcome asserts | ❌ open — TODO.md v1.5    |
+| UX / prompt readability              | live walkthrough               | kashealth onboarding      |
+| Regression on recorded session       | transcript + semantic diff     | ❌ flaky; defer            |
+
+Layers 1–2 are CI-enforceable today. Layer 3 is the next thing to
+build (see `TODO.md`). Layer 4 is human, by design — the goal is to
+keep its surface area small enough that one walkthrough per release
+covers it. Layer 5 (regression) is filed as undated; only worth
+doing once we have a stable enough skill set that exact behaviour
+matters more than outcomes.

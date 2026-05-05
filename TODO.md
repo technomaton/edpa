@@ -90,6 +90,57 @@ merged option list.
 
 ## v1.5 — Operational tooling
 
+### Skill side-effect testing via `claude -p` (P1, ~150 lines)
+
+Today: skill flows are validated only by the live walkthrough during
+release prep (and by manual kashealth onboarding). Layer 3 of the
+strategy pyramid in `docs/E2E-SKILLS-TEST-PLAN.md` Příloha D is
+unfilled — there is no automation that catches a regression where
+`/edpa:setup` stops persisting `issue_map.yaml`, or where
+`/edpa:sync push` silently dispatches to `--mock` mode.
+
+Build it as **outcome assertions over `claude -p` subprocess**:
+
+  1. New `tests/integration/` directory (kept separate from `tests/`
+     so `pytest tests/` stays fast).
+  2. Helper `claude_run(prompt, cwd, env)` that wraps
+     `subprocess.run(["claude", "-p", prompt, "--no-interactive"])`
+     with reasonable defaults and a timeout.
+  3. Per-skill test module (`test_setup_skill.py`,
+     `test_sync_skill.py`, `test_close_iteration_skill.py`) that
+     drives the skill in a tmp workspace and asserts on:
+       - filesystem state (`.edpa/config/issue_map.yaml` exists,
+         expected keys present)
+       - GitHub state (`gh project view N` returns expected fields)
+       - MCP log lines (grep `INFO call_tool name=…` from
+         `EDPA_LOG_FILE`) — proves the skill dispatched to MCP and
+         not to `Bash + grep`
+  4. Marker `@pytest.mark.skill_integration` so CI can run them
+     opt-in (they spawn real Claude Code, real GitHub API, take
+     time).
+  5. CI workflow that runs them nightly against the sandbox repo,
+     posts a status check on the latest release tag.
+
+The kashealth onboarding (Phase 13 of the skills E2E plan) gives us
+the first reference recordings — capture the actual prompts and
+outcomes there, then write the assertions to match.
+
+Why outcome-based, not transcript-based: LLM nondeterminism makes
+exact-match brittle (the skill may ask "Project name?" one week and
+"What's the project name?" the next). Asserting on filesystem +
+GitHub + log effects is stable; asserting on stdout text is not.
+
+**Acceptance:** at least three skill tests (`setup`, `sync push`,
+`close-iteration`) pass against the sandbox; nightly CI runs them;
+a deliberate regression (e.g. comment out the `issue_map.yaml`
+write in `project_setup.py`) fails the right test with a clear
+diff. Plus, layer 3 in the strategy pyramid in Příloha D moves from
+❌ to ✅.
+
+See `docs/E2E-SKILLS-TEST-PLAN.md` Příloha D for the full strategy
+breakdown and the four observable surfaces (side-effects, prompts,
+MCP dispatch, regression).
+
 ### Live integration smoke as a CI workflow (~ 1 file)
 
 Add `.github/workflows/integration.yml` that runs the e2e suite against
