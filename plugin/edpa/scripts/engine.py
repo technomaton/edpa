@@ -40,7 +40,7 @@ def get_version():
             if candidate.exists():
                 with open(candidate) as f:
                     return json.load(f).get("version", "unknown")
-        except Exception:
+        except (json.JSONDecodeError, OSError):
             continue
     return "unknown"
 
@@ -49,8 +49,20 @@ VERSION = get_version()
 
 
 def load_yaml(path):
-    with open(path) as f:
-        return yaml.safe_load(f)
+    """Load a YAML file. Returns parsed content or None on failure.
+
+    Engine callers expect None-on-error and continue past unparseable
+    files rather than crash mid-iteration. Errors go to stderr so the
+    normal stdout output (which downstream tools may parse) stays clean.
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        return None
+    except (yaml.YAMLError, OSError) as exc:
+        print(f"WARNING: load_yaml({path}) failed: {exc}", file=sys.stderr)
+        return None
 
 
 def gh_json(cmd):
@@ -343,9 +355,8 @@ def load_backlog_items(edpa_root, iteration_id=None):
             continue
 
         for yaml_file in sorted(type_dir.glob("*.yaml")):
-            try:
-                data = load_yaml(yaml_file)
-            except Exception:
+            data = load_yaml(yaml_file)
+            if data is None:
                 continue
 
             if not data or not isinstance(data, dict):
