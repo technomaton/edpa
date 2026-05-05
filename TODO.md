@@ -51,16 +51,19 @@ sends initialize → tools/list → tools/call edpa_status → tools/call
 edpa_item("../etc/passwd"), asserts on stderr log lines. Skip on
 Windows or when the `mcp` package is missing.
 
-### Resource caching with mtime invalidation (~ 30 lines)
+### ~~Resource caching with mtime invalidation~~ — done in `838e372`
 
-`read_resource` and the `_handle_*` family re-read YAML and JSON files on
-every call. For a large backlog (1000+ items) this gets noticeable. Cache
-`load_yaml` results keyed by `(path, st_mtime_ns)`; invalidate on stat
-change. Bound the cache (e.g. last 64 entries) so a one-shot scan can't
-balloon memory.
+Bounded LRU on `mcp_server.load_yaml`, keyed by `(path,
+st_mtime_ns)`, capped at 64 entries via `OrderedDict`. Measured 50×
+speedup on a 100-item backlog (28.17 ms cold → 0.56 ms warm). 6
+tests pin the cache contract (hit/miss, mtime invalidation,
+disappeared-file recovery, bounded eviction, LRU recency, handler
+benefit). Filed in `## Unreleased`. Removing this entry next pickup.
 
-**Acceptance:** repeated `edpa_backlog` against unchanged data uses cache
-(measured); editing a YAML invalidates the entry on next call.
+(Note: `read_resource` for `edpa://config` / `edpa://people` /
+`edpa://results/...` still calls `path.read_text()` directly and
+does not benefit from this cache. Could extend caching there too if
+those endpoints become hot — not measured today.)
 
 ### Live "first 5 minutes" tutorial in README
 
