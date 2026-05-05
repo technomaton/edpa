@@ -32,8 +32,8 @@ cp .claude/edpa/templates/people.yaml.tmpl .edpa/config/people.yaml
 Edit `.edpa/config/people.yaml` with your team:
 ```yaml
 cadence:
-  iteration_weeks: 2        # 2-week iterations
-  pi_weeks: 10              # 10-week planning intervals
+  iteration_weeks: 1        # 1-week iterations (AI-native default; use 2 for classic SAFe)
+  pi_weeks: 5               # 5-week planning intervals (4 delivery + 1 IP)
 
 people:
   - id: alice
@@ -41,7 +41,7 @@ people:
     role: Arch
     team: "My Org"
     fte: 0.5
-    capacity_per_iteration: 40
+    capacity_per_iteration: 20
     email: "alice@example.com"
     availability: confirmed
 
@@ -50,7 +50,7 @@ people:
     role: Dev
     team: "My Org"
     fte: 1.0
-    capacity_per_iteration: 80
+    capacity_per_iteration: 40
     email: "bob@example.com"
     availability: confirmed
 ```

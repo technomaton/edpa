@@ -2,7 +2,7 @@
 
 **Derive hours from Git evidence. No timesheets.**
 
-[![EDPA](https://img.shields.io/badge/EDPA-1.3.2--beta-34d399)](docs/methodology.md)
+[![EDPA](https://img.shields.io/badge/EDPA-1.4.0--beta-34d399)](docs/methodology.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/Made_for-GitHub-181717?logo=github)](https://github.com)
 
@@ -29,7 +29,7 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 ```
 $ python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
 
-EDPA 1.3.2-beta — Iteration PI-2026-1.3 (gates mode)
+EDPA 1.4.0-beta — Iteration PI-2026-1.3 (gates mode)
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -84,7 +84,7 @@ EDPA Installer
   mcp (MCP SDK) ✓
   openpyxl ✓
   ...
-EDPA 1.3.2-beta installed successfully!
+EDPA 1.4.0-beta installed successfully!
 ```
 
 Three config files were seeded from templates:
@@ -97,23 +97,25 @@ ls .edpa/config/
 ### 2. Edit `people.yaml` to your team (~1 min)
 
 The template ships with placeholder names. Replace them with your team
-— even one person works. Minimum example:
+— even one person works. Minimum example for the AI-native default
+(1-week iterations, 5-week PI = 4 delivery + 1 IP):
 
 ```yaml
 cadence:
-  iteration_weeks: 2
+  iteration_weeks: 1        # AI-native default; use 2 for classic SAFe
+  pi_weeks: 5               # 4 delivery iterations + 1 IP
 
 people:
   - id: alice
     name: "Alice Architect"
     role: Arch
     fte: 0.5
-    capacity_per_iteration: 40
+    capacity_per_iteration: 20    # FTE × 40 for 1-week iter
   - id: bob
     name: "Bob Developer"
     role: Dev
     fte: 1.0
-    capacity_per_iteration: 80
+    capacity_per_iteration: 40
 ```
 
 Verify the engine sees them:
@@ -123,12 +125,12 @@ python3 .claude/edpa/scripts/engine.py --status
 ```
 
 ```
-EDPA 1.3.2-beta — Status
+EDPA 1.4.0-beta — Status
 ========================================
 ✓ .edpa/ found at .edpa
-✓ people.yaml — 2 members, 1.5 FTE, 120h/iteration
-    Alice Architect           Arch     0.5 FTE  40h
-    Bob Developer             Dev      1.0 FTE  80h
+✓ people.yaml — 2 members, 1.5 FTE, 60h/iteration
+    Alice Architect           Arch     0.5 FTE  20h
+    Bob Developer             Dev      1.0 FTE  40h
 ✓ heuristics loaded
 ✓ backlog — 0 features, 0 stories
 ```
@@ -143,7 +145,7 @@ iteration:
   id: PI-2026-1.1
   pi: PI-2026-1
   status: active
-  dates: '1.1.-15.1.2026'
+  dates: '1.1.-7.1.2026'      # 1-week iteration
 YAML
 
 cat > .edpa/backlog/stories/S-1.yaml <<'YAML'
@@ -189,32 +191,32 @@ python3 .claude/edpa/scripts/engine.py \
 
 ```
 ======================================================================
-EDPA 1.3.2-beta — Iteration PI-2026-1.1 (gates mode)
+EDPA 1.4.0-beta — Iteration PI-2026-1.1 (gates mode)
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
-Alice Architect           Arch          40h    40.0h      1   OK
-Bob Developer             Dev           80h    80.0h      1   OK
+Alice Architect           Arch          20h    20.0h      1   OK
+Bob Developer             Dev           40h    40.0h      1   OK
 ----------------------------------------------------------------------
-TEAM TOTAL                             120h   120.0h
-PLANNING CAPACITY                     96.0h  (factor: 0.8)
+TEAM TOTAL                              60h    60.0h
+PLANNING CAPACITY                     48.0h  (factor: 0.8)
 
 All invariants passed: YES
 
---- Alice Architect (40h) ---
+--- Alice Architect (20h) ---
   Item       Level      JS     CW   Score   Ratio   Hours
-  S-1        Story       3   1.00    3.00 100.0%   40.0h
+  S-1        Story       3   1.00    3.00 100.0%   20.0h
 
---- Bob Developer (80h) ---
+--- Bob Developer (40h) ---
   Item       Level      JS     CW   Score   Ratio   Hours
-  S-2        Story       5   1.00    5.00 100.0%   80.0h
+  S-2        Story       5   1.00    5.00 100.0%   40.0h
 ```
 
 What just happened:
 
-- **Capacity 40h, Derived 40h**: Alice declared 40h. Story S-1 (JS=3,
-  owner role, CW=1.0) was the only thing she touched, so all 40
-  derived hours land on S-1.
+- **Capacity 20h, Derived 20h**: Alice declared 20h for the 1-week
+  iteration. Story S-1 (JS=3, owner role, CW=1.0) was the only thing
+  she touched, so all 20 derived hours land on S-1.
 - **All invariants passed**: each person's derived hours sum to their
   declared capacity, ratios sum to 1.0, no negative scores. The math
   holds — the snapshot is auditable.
@@ -263,7 +265,7 @@ calculation in under a second.
 
 ## How It Works
 
-1. **Person declares capacity** (e.g., 80h per 2-week iteration)
+1. **Person declares capacity** (e.g., 40h per 1-week iteration on the AI-native default; 80h per 2-week on classic SAFe)
 2. **System detects evidence** from GitHub (assignee, PR author, reviewer, committer, commenter)
 3. **Evidence maps to Contribution Weight** (owner=1.0, key=0.6, reviewer=0.25, consulted=0.15)
 4. **Score = JobSize x CW** for each (person, item) pair
@@ -365,7 +367,7 @@ cp -r .claude/skills/* ~/.gemini/skills/
 
 | Document | Description |
 |----------|-------------|
-| [Methodology](docs/methodology.md) | Full EDPA v1.3.2-beta specification |
+| [Methodology](docs/methodology.md) | Full EDPA v1.4.0-beta specification |
 | [Quick Start](docs/quick-start.md) | 10-minute setup guide |
 | [Evidence Detection](docs/evidence-detection.md) | How GitHub signals map to CW |
 | [Dual-View](docs/dual-view.md) | Per-person vs per-item perspectives |

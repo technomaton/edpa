@@ -2,6 +2,49 @@
 
 ## Unreleased
 
+## 1.4.0-beta — 2026-05-05
+
+Minor release. **Default cadence changes** for freshly initialized
+projects only — existing `.edpa/config/people.yaml` files keep their
+explicit `iteration_weeks` / `pi_weeks` settings; no migration is
+required. The release also bundles every `## Unreleased` change since
+1.3.2-beta (engine + plugin-wide hardening, MCP integration tests,
+`sync add-iteration`, MCP load_yaml LRU cache, README walkthrough,
+testing-strategy appendix).
+
+### Changed (BREAKING for fresh installs only)
+- **Default cadence is now AI-native: 1-week iterations, 5-week PI
+  (4 delivery + 1 IP).** The IP iteration absorbs leftover work,
+  debt, prioritization, and PI planning itself — compressible to a
+  single day with AI-assisted ceremonies. Classic SAFe (2-week
+  iteration / 10-week PI) is still fully supported; set
+  `cadence.iteration_weeks: 2` and `cadence.pi_weeks: 10` in
+  `people.yaml` to opt out. Default `capacity_per_iteration` values
+  in the template halved accordingly (FTE × 40 for 1-week instead
+  of FTE × 80 for 2-week).
+- `project_setup.py` writes `pis[0].iteration_weeks: 1` for new
+  setups (was `2`). Existing projects re-running setup keep their
+  explicit value.
+- Documentation updated: `docs/playbook.md`, `docs/quick-start.md`,
+  `README.md` walkthrough show 1-week defaults with re-captured
+  engine output (60h team total instead of 120h). The
+  `docs/examples/capacity-small-team.yaml` reference is preserved
+  as a classic-SAFe variant with a pointer to the new default.
+- `mcp_server.py` legacy fallbacks (`iteration_weeks: 2` when the
+  field is missing entirely from a v0.x bundled config) stay at
+  `2` — they protect pre-1.0 installs from invariant breaks.
+
+### Why this default
+
+5-week PI matches AI-native team velocity better than 10 weeks. A
+PM running CW analysis weekly produces tighter feedback loops than
+biweekly; the gates allocation model (default since 1.1) was
+already calibrated for high-frequency status transitions. The
+classic-SAFe default predates EDPA's gates mode and the AI Studio
+context — both push toward shorter cycles.
+
+
+
 ### Documentation
 - `README.md` — replaced the terse 5-step Quick Start with a
   guided "First 5 minutes" walkthrough: install → edit `people.yaml`

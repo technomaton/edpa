@@ -512,10 +512,13 @@ def main():
             # Derive PI id from the first iteration id (e.g. PI-2026-1.1 → PI-2026-1)
             first_iter_id = iterations_list[0]["id"]
             pi_id = first_iter_id.rsplit(".", 1)[0] if "." in first_iter_id else first_iter_id
+            # AI-native default: 1-week iterations. Classic SAFe (2-week)
+            # remains supported — set people.yaml cadence.iteration_weeks
+            # explicitly and edit pis[*].iteration_weeks if you re-run setup.
             config["pis"] = [{
                 "id": pi_id,
                 "status": "active",
-                "iteration_weeks": 2,
+                "iteration_weeks": 1,
                 "pi_iterations": len(iterations_list),
                 "iterations": iterations_list,
             }]

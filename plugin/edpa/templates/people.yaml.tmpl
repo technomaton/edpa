@@ -3,8 +3,13 @@
 # Updated at each Iteration Planning
 
 cadence:
-  iteration_weeks: 2                          # 1 (AI-native) or 2 (classic)
-  pi_weeks: 10                                # 5 or 10
+  # Default is AI-native: 5-week PI = 4× 1-week delivery iteration + 1× 1-week IP.
+  # The IP iteration absorbs leftover work, debt, prioritization, and PI planning
+  # itself (compressible to a single day with AI-assisted ceremonies).
+  # Set iteration_weeks: 2 + pi_weeks: 10 + delivery_iterations_per_pi: 4 for
+  # classic SAFe cadence on slower-moving teams.
+  iteration_weeks: 1                          # 1 (AI-native, default) or 2 (classic SAFe)
+  pi_weeks: 5                                 # 5 (AI-native, default) or 10 (classic)
   delivery_iterations_per_pi: 4               # PI minus IP iteration
   ip_iterations_per_pi: 1                     # Innovation & Planning
 
@@ -23,7 +28,8 @@ people:
     role: Arch                                # Arch, Dev, DevSecOps, PM, QA
     team: "Org A"                             # Organization name
     fte: 0.5
-    capacity_per_iteration: 40                # hours (FTE × 80 for 2-week iter)
+    capacity_per_iteration: 20                # hours: FTE × 40 for 1-week iter
+                                              # (use 40 for 2-week iter)
     email: "arch@example.com"
     github: "arch-handle"                     # OPTIONAL: GitHub login. When set,
                                               # sync push uses `gh issue --assignee`
@@ -37,7 +43,7 @@ people:
     role: Dev
     team: "Org A"
     fte: 1.0
-    capacity_per_iteration: 80
+    capacity_per_iteration: 40                # FTE × 40 for 1-week iter
     email: "dev@example.com"
     github: "dev-handle"
     availability: confirmed

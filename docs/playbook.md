@@ -157,8 +157,12 @@ Upravit `.edpa/config/people.yaml`:
 
 ```yaml
 cadence:
-  iteration_weeks: 2                    # 1 (AI-native) nebo 2 (classic)
-  pi_weeks: 10                          # 5 nebo 10
+  # AI-native default: 5-tydenni PI = 4 dodavkove iterace po 1 tydnu + 1 IP
+  # tyden na dluh, prioritizaci a PI planning (s AI zvladnutelne za den).
+  # Classic SAFe (2-tydenni iterace, 10-tydenni PI) zustava podporovany —
+  # nastav iteration_weeks: 2 + pi_weeks: 10.
+  iteration_weeks: 1                    # 1 (AI-native, default) nebo 2 (classic)
+  pi_weeks: 5                           # 5 (AI-native, default) nebo 10 (classic)
   delivery_iterations_per_pi: 4         # PI minus IP iterace
   ip_iterations_per_pi: 1              # Innovation & Planning
 
@@ -172,7 +176,8 @@ people:
     role: Arch                          # Arch, Dev, DevSecOps, PM, QA, BO
     team: "Muj Tym"
     fte: 0.5
-    capacity_per_iteration: 40          # hodiny (FTE x 80 pro 2-tydenni iter.)
+    capacity_per_iteration: 20          # hodiny: FTE x 40 pro 1-tydenni iter.
+                                        # (40 pro 2-tydenni)
     email: "alice@example.com"
     availability: confirmed             # confirmed, partial, unavailable
 
@@ -181,7 +186,7 @@ people:
     role: Dev
     team: "Muj Tym"
     fte: 1.0
-    capacity_per_iteration: 80
+    capacity_per_iteration: 40          # FTE x 40 pro 1-tydenni iter.
     email: "bob@example.com"
     availability: confirmed
 
@@ -278,25 +283,25 @@ pi:
   current: PI-2026-1
   year: 2026
   num: 1
-  iteration_weeks: 2
-  pi_weeks: 10
+  iteration_weeks: 1                      # AI-native default
+  pi_weeks: 5                             # 4 delivery + 1 IP
   iterations:
     - id: PI-2026-1.1
-      dates: "1.4.–14.4.2026"
+      dates: "1.4.–7.4.2026"
       status: planned
     - id: PI-2026-1.2
-      dates: "15.4.–28.4.2026"
+      dates: "8.4.–14.4.2026"
       status: planned
     - id: PI-2026-1.3
-      dates: "29.4.–12.5.2026"
+      dates: "15.4.–21.4.2026"
       status: planned
     - id: PI-2026-1.4
-      dates: "13.5.–26.5.2026"
+      dates: "22.4.–28.4.2026"
       status: planned
     - id: PI-2026-1.5
-      dates: "27.5.–9.6.2026"
+      dates: "29.4.–5.5.2026"
       status: planned
-      type: IP  # Innovation & Planning
+      type: IP  # Innovation & Planning (debt, prioritizace, PI planning)
 
 # Sync nastaveni
 sync:
