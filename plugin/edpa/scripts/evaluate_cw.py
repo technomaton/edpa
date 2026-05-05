@@ -33,8 +33,20 @@ except ImportError:
 
 
 def load_yaml(path):
-    with open(path) as f:
-        return yaml.safe_load(f)
+    """Load a YAML file. Returns parsed content, or None if missing/unparseable.
+
+    Helper utility only — does not affect evaluation logic. Specific
+    exceptions only so KeyboardInterrupt / SystemExit propagate. Errors
+    print to stderr to keep stdout clean for downstream calibration tooling.
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        return None
+    except (yaml.YAMLError, OSError) as exc:
+        print(f"WARNING: load_yaml({path}) failed: {exc}", file=sys.stderr)
+        return None
 
 
 def get_auto_cw(evidence_role, person_role, heuristics):

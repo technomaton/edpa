@@ -2,20 +2,28 @@
 
 ## Unreleased
 
-### Changed (engine hardening pass — backport of v1.3 MCP rigor)
-- `engine.load_yaml` now returns `None` on failure instead of letting
-  `OSError` / `yaml.YAMLError` bubble up unhandled. Errors print to
-  stderr so stdout (which downstream tools may parse) stays clean.
-  Callers that already wrapped `load_yaml` in `try/except Exception`
-  now check for `None` directly — same behavior, less catch-all.
+### Changed (plugin-wide hardening pass — backport of v1.3 MCP rigor)
+- `engine.py`, `sync.py`, `evaluate_cw.py`, and `pi_close.py` —
+  `load_yaml` / `load_json` helpers now return `None` on failure
+  instead of letting `OSError` / `yaml.YAMLError` /
+  `json.JSONDecodeError` bubble up unhandled. Errors print to stderr
+  so stdout (which downstream tools may parse) stays clean. Callers
+  that already wrapped these in `try/except Exception` now check for
+  `None` directly — same behavior, less catch-all.
 - Replaced two `except Exception` blocks in `engine.py` with specific
-  exception types (`json.JSONDecodeError`/`OSError`,
-  `yaml.YAMLError`/`OSError`). Same hardening pass MCP got in v1.3 —
+  exception types. Same hardening pass MCP got in v1.3 —
   `KeyboardInterrupt` and `SystemExit` now propagate as they should.
-- 139/139 tests still pass; behavior change is that broken YAML in
-  `.edpa/backlog/` no longer surfaces an opaque traceback — instead
-  a `WARNING` on stderr names the file and the engine continues
-  past it.
+- `validate_on_save.sh` hook — removed the `2>&1` stderr→stdout
+  redirect that was making validation errors render as if they were
+  tool output rather than diagnostics. Errors now stay on stderr;
+  Claude Code shows them as diagnostics. Internal hook errors also
+  surface on stderr now (were silently swallowed).
+- Audit passes left two `except Exception` blocks in place:
+  `mcp_server.call_tool` (intentional crash-safety wrapper around
+  every JSON-RPC dispatch) and four in `create_project_views.py`
+  (Playwright async patterns where any failure → fall through is
+  the right shape). Both documented in code.
+- 139/139 tests still pass.
 
 ## 1.3.2-beta — 2026-05-05
 

@@ -39,8 +39,14 @@ try:
     errors = validate_file(path)
     for e in errors:
         print(f'EDPA: validation error: {e}', file=sys.stderr)
-except Exception:
-    pass
-" 2>&1
+except Exception as exc:
+    # Non-blocking hook: failure to validate must not block the user's edit.
+    # Surface the cause on stderr so debugging is still possible without
+    # polluting stdout (which Claude Code may parse for hook output).
+    print(f'EDPA: validate hook internal error: {exc}', file=sys.stderr)
+"
+# stderr stays on stderr — earlier '2>&1' redirected validation errors
+# into stdout, which made Claude Code render them as if they were tool
+# output rather than diagnostics.
 
 exit 0

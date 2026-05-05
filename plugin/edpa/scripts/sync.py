@@ -134,9 +134,20 @@ def find_repo_root():
 # -- Data Loading / Writing ----------------------------------------------------
 
 def load_yaml(path):
-    """Load a YAML file."""
-    with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    """Load a YAML file. Returns parsed content, or None if missing/unparseable.
+
+    Errors print to stderr so the normal stdout output (which downstream
+    tooling may consume) stays clean. Specific exceptions only —
+    KeyboardInterrupt / SystemExit propagate.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        return None
+    except (yaml.YAMLError, OSError) as exc:
+        print(f"WARNING: load_yaml({path}) failed: {exc}", file=sys.stderr)
+        return None
 
 
 def save_yaml(path, data):
@@ -147,9 +158,15 @@ def save_yaml(path, data):
 
 
 def load_json(path):
-    """Load a JSON file."""
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    """Load a JSON file. Returns parsed content, or None if missing/unparseable."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"WARNING: load_json({path}) failed: {exc}", file=sys.stderr)
+        return None
 
 
 def save_json(path, data):

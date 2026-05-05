@@ -31,15 +31,25 @@ except ImportError:
 
 
 def load_yaml(path: Path):
+    """Returns parsed dict, empty dict for empty file, None if missing/unparseable."""
     if not path.is_file():
         return None
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (yaml.YAMLError, OSError) as exc:
+        print(f"WARNING: load_yaml({path}) failed: {exc}", file=sys.stderr)
+        return None
 
 
 def load_json(path: Path):
+    """Returns parsed content, None if missing/unparseable."""
     if not path.is_file():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"WARNING: load_json({path}) failed: {exc}", file=sys.stderr)
+        return None
 
 
 def find_iterations(edpa_root: Path, pi_id: str):
