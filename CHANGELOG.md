@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+## 1.3.1-beta — 2026-05-05
+
+Installer hot-fix on top of [v1.3.0-beta](https://github.com/technomaton/edpa/releases/tag/v1.3.0-beta).
+Tag-only patch — engine, sync, MCP server, and reports are byte-identical.
+Only `install.sh` is materially different.
+
+### Fixed
+- `install.sh` now installs the `mcp` Python SDK alongside `pyyaml`. Without
+  this the MCP server (`plugin/edpa/scripts/mcp_server.py`) failed to start
+  on a fresh `curl install.sh | sh` against the system python. The graceful
+  import error in v1.3.0-beta said "ERROR: 'mcp' package required" and
+  exited cleanly, but Claude Code clients silently fell back to `Bash + grep`
+  because the MCP tools never advertised. Caught in the synthetic
+  skill-driven E2E run on 2026-05-05; finding F1 in `docs/E2E-SKILLS-TEST-PLAN.md`.
+- `install.sh` also installs `openpyxl` so the engine's Excel export and the
+  `/edpa:reports` skill produce `item-costs.xlsx` and `pi-summary.xlsx`
+  out of the box. Without it the engine printed "Excel export skipped" on
+  every iteration close and reports lost the spreadsheet variant.
+
+### Notes
+- Both packages mirror the existing pattern: try `pip3 install ... --break-system-packages`,
+  fall back to `pip3 install ...` for venv'd environments. No new system
+  prerequisites — same Python 3.10+, same pip3 expectation.
+- `web/public/install.sh` re-synced with the repo-root version (tracked
+  drift from 2026-03-28 was fixed in 1.2.1; this release keeps them
+  in lockstep).
+
 ## 1.3.0-beta — 2026-05-05
 
 Production-quality MCP server. The server existed since 1.0.0-beta as a

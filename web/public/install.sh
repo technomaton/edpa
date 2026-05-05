@@ -26,12 +26,32 @@ if [ "$PY_OK" = "no" ]; then
 fi
 echo "  Python $PY_VERSION ✓"
 
-# PyYAML
+# PyYAML — required for every EDPA script
 if python3 -c 'import yaml' 2>/dev/null; then
   echo "  PyYAML ✓"
 else
   echo "  PyYAML not found — installing..."
   pip3 install pyyaml --quiet --break-system-packages 2>/dev/null || pip3 install pyyaml --quiet
+fi
+
+# mcp — required for MCP server (.claude/edpa/scripts/mcp_server.py)
+# Without this the MCP tools (edpa_status, edpa_backlog, ...) silently fail
+# to start and Claude Code falls back to Bash + grep for everything.
+if python3 -c 'from mcp.server import Server' 2>/dev/null; then
+  echo "  mcp (MCP SDK) ✓"
+else
+  echo "  mcp not found — installing..."
+  pip3 install mcp --quiet --break-system-packages 2>/dev/null || pip3 install mcp --quiet
+fi
+
+# openpyxl — required for Excel exports in /edpa:reports
+# Without this the engine prints "Excel export skipped" and the reports
+# skill produces only Markdown timesheets, no item-costs.xlsx.
+if python3 -c 'import openpyxl' 2>/dev/null; then
+  echo "  openpyxl ✓"
+else
+  echo "  openpyxl not found — installing..."
+  pip3 install openpyxl --quiet --break-system-packages 2>/dev/null || pip3 install openpyxl --quiet
 fi
 
 # git
