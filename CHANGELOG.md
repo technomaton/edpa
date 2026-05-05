@@ -15,6 +15,18 @@
   plugin path resolution breaks, or where the server crashes during
   initialize handshake.
 - 155 tests pass (was 139 before this entry); 6 e2e deselected.
+- `sync add-iteration <ID>` subcommand. After setup, when a new
+  iteration YAML lands in `.edpa/iterations/`, the GitHub Project
+  `Iteration` SINGLE_SELECT field doesn't know about it yet — `sync
+  push` then fails with `no option_id for 'Iteration':'<ID>'`. The
+  new subcommand fetches the field's current options, merges in the
+  new one, calls `updateProjectV2Field` GraphQL mutation, and
+  persists the new option_id back to `edpa.yaml`. Drops the `TBD`
+  placeholder automatically when the first real iteration is added.
+  Idempotent. `--color` (default GRAY), `--dry-run`. Verified live
+  against `technomaton/edpa-e2e-test`: TBD purged, push of a story
+  with `iteration: PI-2026-1.5` succeeded immediately after.
+- Docs/RUNBOOK section updated.
 
 ### Changed (plugin-wide hardening pass — backport of v1.3 MCP rigor)
 - `engine.py`, `sync.py`, `evaluate_cw.py`, and `pi_close.py` —

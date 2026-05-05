@@ -109,7 +109,19 @@ python3.13 plugin/edpa/scripts/sync.py push            # local → GH (creates n
 python3.13 plugin/edpa/scripts/sync.py log             # last 20 changelog entries
 python3.13 plugin/edpa/scripts/sync.py conflicts       # items changed on both sides
 python3.13 plugin/edpa/scripts/sync.py setup-refresh   # rebuild IDs from existing project
+python3.13 plugin/edpa/scripts/sync.py add-iteration PI-2026-1.5  # add new iteration option to GH
 ```
+
+**Adding new iterations after setup:** when you create a new
+`.edpa/iterations/PI-2026-1.5.yaml` file, the GitHub Project's
+`Iteration` SINGLE_SELECT field doesn't know about it yet. Run
+`sync add-iteration PI-2026-1.5` to append it via
+`updateProjectV2Field` GraphQL mutation. The `TBD` placeholder
+option (created by `project_setup.py` when no iterations existed
+yet) is dropped automatically the first time a real iteration is
+added. Idempotent — re-running on an iteration whose option already
+exists is a no-op. Pass `--dry-run` to see the plan without calling
+the API; `--color BLUE|GREEN|...` overrides the default `GRAY`.
 
 **Per-level typed status fields:** `pull` reads `Initiative Status` /
 `Epic Status` / `Feature Status` / `Story Status` based on the item's level

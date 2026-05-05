@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -1455,6 +1456,182 @@ def cmd_setup_refresh(root, _sync_config, _args):
     print()
 
 
+def cmd_add_iteration(root, _sync_config, args):
+    """Append a new iteration option to the GitHub Project Iteration field.
+
+    project_setup.py creates the Iteration SINGLE_SELECT field on first
+    run. As new iterations land in `.edpa/iterations/*.yaml` after
+    setup, the GitHub field needs the matching options added or
+    `sync push` of items with that iteration value will fail with
+    "option not found". This subcommand reads the iteration YAML, calls
+    GraphQL `updateProjectV2Field` with the merged option list, and
+    persists the new option_id back to `edpa.yaml`.
+
+    Usage:
+        sync add-iteration PI-2026-1.5
+        sync add-iteration PI-2026-1.5 --color BLUE
+        sync add-iteration PI-2026-1.5 --dry-run
+
+    Idempotent: running on an iteration whose option already exists is
+    a no-op (with a notice).
+    """
+    iter_id = getattr(args, "iteration_id", None)
+    color_name = (getattr(args, "color", None) or "GRAY").upper()
+    dry_run = bool(getattr(args, "dry_run", False))
+
+    print()
+    print(bold(color(f"  {SYNC_ICON} EDPA Sync: Add Iteration", C.HEADER)))
+    print()
+
+    # 1. Validate iteration ID shape — defensive, prevents user typing
+    #    "PI 2026 1.5" with spaces or similar from poisoning options.
+    if not iter_id or not re.match(r"^[A-Za-z0-9._-]+$", iter_id):
+        print(color(f"  Error: invalid iteration id {iter_id!r}", C.ERR))
+        print(color("  Expected: PI-YYYY-N.M (alphanumerics, dots, dashes only)", C.MUTED))
+        sys.exit(1)
+
+    # 2. The iteration YAML must exist on disk first — this avoids
+    #    creating GH options for iterations the engine doesn't know about.
+    iter_yaml = root / ".edpa" / "iterations" / f"{iter_id}.yaml"
+    if not iter_yaml.is_file():
+        print(color(f"  Error: {iter_yaml.relative_to(root)} not found", C.ERR))
+        print(color(f"  Create the iteration YAML first, then re-run.", C.MUTED))
+        sys.exit(1)
+
+    # 3. Load setup state from edpa.yaml.
+    config_path = root / ".edpa" / "config" / "edpa.yaml"
+    config = load_yaml(config_path) or {}
+    sync = config.get("sync") or {}
+    org = sync.get("github_org")
+    project_num = sync.get("github_project_number")
+    project_id = sync.get("github_project_id")
+    iteration_field_id = (sync.get("field_ids") or {}).get("Iteration")
+    if not all((org, project_num, project_id, iteration_field_id)):
+        print(color("  Error: setup state missing in edpa.yaml.", C.ERR))
+        print(color("  Run `project_setup.py` once or `sync setup-refresh` "
+                    "to populate field_ids.", C.MUTED))
+        sys.exit(1)
+
+    # 4. Already-known option? Idempotent fast path.
+    option_ids = sync.get("option_ids") or {}
+    key = f"Iteration:{iter_id}"
+    if key in option_ids:
+        print(color(f"  Option already exists: {key} -> {option_ids[key]}", C.MUTED))
+        print(color("  Nothing to do.", C.OK))
+        return
+
+    print(color(f"  Iteration:        {iter_id}", C.MUTED))
+    print(color(f"  Project:          {org}/project#{project_num}", C.MUTED))
+    print(color(f"  Field:            Iteration ({iteration_field_id[:12]}...)", C.MUTED))
+    print(color(f"  Color:            {color_name}", C.MUTED))
+    print()
+
+    # 5. Fetch the field's current option list. updateProjectV2Field
+    #    REPLACES the option list, so we must read-merge-write to avoid
+    #    deleting existing options.
+    fetch_query = (
+        f'query {{ node(id: "{project_id}") {{ ... on ProjectV2 {{ '
+        f'field(name: "Iteration") {{ ... on ProjectV2SingleSelectField '
+        f'{{ id options {{ id name color description }} }} }} }} }} }}'
+    )
+    res = subprocess.run(
+        ["gh", "api", "graphql", "-f", f"query={fetch_query}"],
+        capture_output=True, text=True, timeout=20,
+    )
+    if res.returncode != 0:
+        print(color(f"  Error: gh api graphql failed: {res.stderr.strip()}", C.ERR))
+        sys.exit(1)
+    try:
+        payload = json.loads(res.stdout)
+    except json.JSONDecodeError as exc:
+        print(color(f"  Error: malformed graphql response ({exc})", C.ERR))
+        sys.exit(1)
+    field = (((payload.get("data") or {}).get("node") or {}).get("field") or {})
+    existing_options = field.get("options") or []
+
+    # 6. Build the new option list. Strip "TBD" placeholder when first
+    #    real iteration lands — it has no semantic value once real
+    #    iterations exist.
+    merged = []
+    for opt in existing_options:
+        if opt.get("name") == "TBD" and existing_options:  # placeholder, drop it
+            continue
+        merged.append({
+            "name": opt.get("name"),
+            "color": (opt.get("color") or "GRAY").upper(),
+            "description": opt.get("description") or "",
+        })
+    merged.append({
+        "name": iter_id,
+        "color": color_name,
+        "description": f"Iteration {iter_id}",
+    })
+
+    if dry_run:
+        print(color("  [dry-run] Would append:", C.MUTED))
+        print(color(f"    {iter_id} ({color_name})", C.OK))
+        if any(o.get("name") == "TBD" for o in existing_options):
+            print(color("  [dry-run] Would drop placeholder option 'TBD'", C.MUTED))
+        print()
+        return
+
+    # 7. Apply via updateProjectV2Field. The API expects
+    #    `singleSelectOptions: [{ name, color, description }]` and replaces
+    #    the entire list. `gh api -f / --raw-field` can only send strings;
+    #    for the array-of-objects variable we feed the full JSON-RPC request
+    #    on stdin via `--input -`.
+    mutation = (
+        "mutation($fid:ID!,$opts:[ProjectV2SingleSelectFieldOptionInput!]!){"
+        " updateProjectV2Field(input:{fieldId:$fid,singleSelectOptions:$opts}){"
+        " projectV2Field { ... on ProjectV2SingleSelectField"
+        " { id options { id name } } } } }"
+    )
+    body = json.dumps({
+        "query": mutation,
+        "variables": {"fid": iteration_field_id, "opts": merged},
+    })
+    res = subprocess.run(
+        ["gh", "api", "graphql", "--input", "-"],
+        input=body,
+        capture_output=True, text=True, timeout=30,
+    )
+    if res.returncode != 0:
+        print(color(f"  Error: updateProjectV2Field failed: {res.stderr.strip()}", C.ERR))
+        sys.exit(1)
+    try:
+        payload = json.loads(res.stdout)
+    except json.JSONDecodeError as exc:
+        print(color(f"  Error: malformed mutation response ({exc})", C.ERR))
+        sys.exit(1)
+    err = payload.get("errors")
+    if err:
+        print(color(f"  GraphQL error: {err}", C.ERR))
+        sys.exit(1)
+
+    new_field = ((payload.get("data") or {}).get("updateProjectV2Field") or {}).get("projectV2Field") or {}
+    new_options = {opt["name"]: opt["id"] for opt in (new_field.get("options") or [])}
+    new_id = new_options.get(iter_id)
+    if not new_id:
+        print(color(f"  Warning: option {iter_id} not echoed back. Re-run "
+                    f"`sync setup-refresh` to verify.", C.WARN))
+        sys.exit(1)
+
+    # 8. Persist option_id back so subsequent `sync push` knows it.
+    sync["option_ids"] = sync.get("option_ids") or {}
+    # Refresh ALL Iteration:* options at once — TBD may have been dropped,
+    # IDs may have rotated upstream.
+    for name, oid in new_options.items():
+        sync["option_ids"][f"Iteration:{name}"] = oid
+    # Drop TBD entry if it lingers in option_ids from a previous setup.
+    sync["option_ids"].pop("Iteration:TBD", None)
+    config["sync"] = sync
+    save_yaml(config_path, config)
+
+    print(color(f"  {CHECK} Added option {iter_id} -> {new_id}", C.OK))
+    print(color(f"  Persisted option_ids[\"{key}\"] in edpa.yaml.", C.MUTED))
+    print()
+
+
 def cmd_diff(root, sync_config, args):
     """Show what would change without applying (dry-run)."""
     print()
@@ -1963,6 +2140,18 @@ def main():
     sub.add_parser("setup-refresh",
                    help="Re-query GitHub to rebuild field_ids/option_ids/issue_map (recovery)")
 
+    # add-iteration: append a new iteration option to the GH Project Iteration field
+    p_add_iter = sub.add_parser("add-iteration",
+                                help="Add a new iteration option to the GitHub Iteration field")
+    p_add_iter.add_argument("iteration_id",
+                            help="Iteration ID (e.g., PI-2026-1.5). The corresponding "
+                                 ".edpa/iterations/<ID>.yaml must exist first.")
+    p_add_iter.add_argument("--color", default="GRAY",
+                            help="Option color (GRAY, BLUE, GREEN, YELLOW, ORANGE, RED, "
+                                 "PINK, PURPLE). Default: GRAY.")
+    p_add_iter.add_argument("--dry-run", action="store_true",
+                            help="Print plan without calling the GitHub API.")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -2004,6 +2193,7 @@ def main():
         "conflicts": cmd_conflicts,
         "status": cmd_status,
         "setup-refresh": cmd_setup_refresh,
+        "add-iteration": cmd_add_iteration,
     }
 
     cmd_func = commands.get(args.command)
