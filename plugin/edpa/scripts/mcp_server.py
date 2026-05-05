@@ -21,6 +21,7 @@ import logging
 import os
 import re
 import sys
+from collections import OrderedDict
 from pathlib import Path
 
 try:
@@ -129,16 +130,63 @@ def find_edpa_root() -> Path | None:
     return None
 
 
+# Bounded LRU cache for parsed YAML, keyed by (path, st_mtime_ns).
+# Repeated `tools/call` against an unchanged backlog is the common case
+# (Claude Code asks "what's in PI-X?" then immediately "show me S-1
+# from there?"); without a cache each invocation re-parses every YAML
+# file from scratch. Bound at 64 entries — large enough for a 3-level
+# hierarchy plus per-iteration files, small enough that a one-shot
+# scan of a 1000-item backlog can't balloon resident memory.
+_LOAD_YAML_CACHE: "OrderedDict[Path, tuple[int, dict]]" = OrderedDict()
+_LOAD_YAML_CACHE_MAX = 64
+
+
+def _load_yaml_cache_clear() -> None:
+    """Test helper — drop all cached entries."""
+    _LOAD_YAML_CACHE.clear()
+
+
 def load_yaml(path: Path) -> dict | None:
-    """Load a YAML file, return None on failure (logged, not silent)."""
+    """Load a YAML file, return None on failure.
+
+    Caches parsed contents keyed by (path, st_mtime_ns). On the next
+    call against the same path:
+      - if the file's mtime hasn't changed, returns the cached dict
+      - if it has, re-reads, replaces the cache entry
+      - if the file disappeared, returns None
+    Cache is bounded; the least-recently-used entry is evicted when
+    the cap is reached. Specific exceptions only — KeyboardInterrupt
+    / SystemExit propagate.
+    """
     try:
-        with open(path, encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+        st = path.stat()
     except FileNotFoundError:
         return None
+    except OSError as exc:
+        logger.warning("load_yaml stat(%s) failed: %s", path, exc)
+        return None
+
+    cached = _LOAD_YAML_CACHE.get(path)
+    if cached is not None and cached[0] == st.st_mtime_ns:
+        # Move to end so it counts as recently-used for eviction.
+        _LOAD_YAML_CACHE.move_to_end(path)
+        return cached[1]
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
     except (yaml.YAMLError, OSError) as exc:
         logger.warning("load_yaml(%s) failed: %s", path, exc)
+        # Drop a stale cached version; next caller should re-attempt.
+        _LOAD_YAML_CACHE.pop(path, None)
         return None
+
+    # Insert / refresh; evict oldest when over the cap.
+    _LOAD_YAML_CACHE[path] = (st.st_mtime_ns, data)
+    _LOAD_YAML_CACHE.move_to_end(path)
+    while len(_LOAD_YAML_CACHE) > _LOAD_YAML_CACHE_MAX:
+        _LOAD_YAML_CACHE.popitem(last=False)
+    return data
 
 # ---------------------------------------------------------------------------
 # Server

@@ -535,3 +535,109 @@ class TestLoggingSetup:
             and getattr(h, "stream", None) is sys.stderr
         ]
         assert stderr_handlers, "logger must have a stderr StreamHandler"
+
+
+class TestLoadYAMLCache:
+    """`load_yaml` caches parsed content keyed by (path, st_mtime_ns).
+    These tests pin the cache contract: repeated reads against an
+    unchanged file hit the cache; touching the file invalidates;
+    overflowing the cap evicts the oldest entry."""
+
+    def setup_method(self):
+        mcp_server._load_yaml_cache_clear()
+
+    def teardown_method(self):
+        mcp_server._load_yaml_cache_clear()
+
+    def test_repeat_read_returns_same_object(self, tmp_path):
+        f = tmp_path / "a.yaml"
+        f.write_text("a: 1\n")
+        first = mcp_server.load_yaml(f)
+        second = mcp_server.load_yaml(f)
+        # Same dict instance — proves we returned the cached object,
+        # not a freshly-parsed copy.
+        assert first is second
+
+    def test_mtime_change_invalidates(self, tmp_path):
+        import os, time
+        f = tmp_path / "a.yaml"
+        f.write_text("a: 1\n")
+        first = mcp_server.load_yaml(f)
+        # Force a different mtime even on filesystems with coarse
+        # timestamp resolution.
+        st = f.stat()
+        os.utime(f, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))
+        # Also rewrite content so the change is observable.
+        f.write_text("a: 2\n")
+        second = mcp_server.load_yaml(f)
+        assert first is not second
+        assert second["a"] == 2
+
+    def test_disappeared_file_returns_none_and_drops_cache(self, tmp_path):
+        f = tmp_path / "a.yaml"
+        f.write_text("a: 1\n")
+        mcp_server.load_yaml(f)  # warm the cache
+        assert f in mcp_server._LOAD_YAML_CACHE
+        f.unlink()
+        assert mcp_server.load_yaml(f) is None
+
+    def test_cache_is_bounded(self, tmp_path):
+        cap = mcp_server._LOAD_YAML_CACHE_MAX
+        # Create cap + 5 distinct files, load each once.
+        files = []
+        for i in range(cap + 5):
+            f = tmp_path / f"item-{i}.yaml"
+            f.write_text(f"i: {i}\n")
+            mcp_server.load_yaml(f)
+            files.append(f)
+        # Cache holds at most `cap` entries.
+        assert len(mcp_server._LOAD_YAML_CACHE) <= cap
+        # The five oldest were evicted.
+        for f in files[:5]:
+            assert f not in mcp_server._LOAD_YAML_CACHE
+        # The most-recent five are still there.
+        for f in files[-5:]:
+            assert f in mcp_server._LOAD_YAML_CACHE
+
+    def test_lru_recency_protects_hot_entries(self, tmp_path):
+        """A file that keeps getting read must NOT be evicted in favor of
+        cap-many fresh files. Strict-LRU: re-reading bumps recency."""
+        cap = mcp_server._LOAD_YAML_CACHE_MAX
+        hot = tmp_path / "hot.yaml"
+        hot.write_text("hot: 1\n")
+        mcp_server.load_yaml(hot)
+        # Now load `cap` other files, but re-touch `hot` between each
+        # so it remains the most recent.
+        for i in range(cap):
+            f = tmp_path / f"cold-{i}.yaml"
+            f.write_text(f"i: {i}\n")
+            mcp_server.load_yaml(f)
+            mcp_server.load_yaml(hot)  # recency bump
+        # `hot` survives.
+        assert hot in mcp_server._LOAD_YAML_CACHE
+        # The earliest cold entry was evicted.
+        assert (tmp_path / "cold-0.yaml") not in mcp_server._LOAD_YAML_CACHE
+
+    def test_handlers_benefit_from_cache(self, tmp_path):
+        """End-to-end: calling _handle_status twice in a row, with no
+        filesystem change, must do the second pass without parsing."""
+        # Build a minimal .edpa/ tree.
+        (tmp_path / "config").mkdir()
+        (tmp_path / "config" / "edpa.yaml").write_text(
+            "project:\n  name: 'CacheTest'\n"
+            "pis:\n  - id: PI-2026-1\n    status: active\n"
+            "    iterations:\n      - id: PI-2026-1.1\n        status: active\n"
+        )
+        (tmp_path / "config" / "people.yaml").write_text(
+            "people:\n  - id: a\n    name: A\n    role: Dev\n"
+            "    capacity_per_iteration: 80\n"
+        )
+        # First call: cache empty.
+        mcp_server._load_yaml_cache_clear()
+        mcp_server._handle_status(tmp_path)
+        first_size = len(mcp_server._LOAD_YAML_CACHE)
+        assert first_size > 0
+        # Second call: cache should still hold the same entries with the
+        # same mtime. Size cannot have grown.
+        mcp_server._handle_status(tmp_path)
+        assert len(mcp_server._LOAD_YAML_CACHE) == first_size

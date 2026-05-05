@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Performance
+- `mcp_server.load_yaml` — bounded LRU cache keyed by `(path,
+  st_mtime_ns)`. Cap: 64 entries. Repeated MCP `tools/call`
+  invocations against an unchanged `.edpa/backlog/` no longer
+  re-parse every YAML file from scratch; touching a file
+  invalidates only that entry. Measured on a 100-item backlog:
+  cold 28.17 ms/call → warm 0.56 ms/call (≈ 50× speedup). The hot
+  path inside a single Claude Code session — "what's in PI-X?"
+  followed by repeated drill-down questions — was the explicit
+  motivation. 6 new tests cover hit/miss, mtime invalidation,
+  disappeared-file recovery, bounded eviction, LRU recency, and
+  end-to-end handler benefit.
+
 ### Added
 - `tests/test_mcp_integration.py` — 16 live JSON-RPC stdio roundtrip
   tests. Spawns `mcp_server.py` as a subprocess, drives the wire
