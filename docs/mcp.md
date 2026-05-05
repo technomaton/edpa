@@ -140,7 +140,7 @@ Validates against the regex `^[A-Z]-\d{1,9}$`. Anything else is rejected
 with `ERROR: invalid item_id ...` — the path lookup never sees raw input,
 which prevents `../` traversal and similar tricks. The handler resolves the
 type directory from the prefix (`S → stories`, `F → features`, `E → epics`,
-`I → initiatives`, `D → defects`, `T → stories`).
+`I → initiatives`, `D → defects`, `T → tasks`).
 
 ---
 

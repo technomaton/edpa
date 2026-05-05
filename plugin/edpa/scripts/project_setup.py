@@ -480,6 +480,46 @@ def main():
         sync["field_ids"] = dict(field_ids)
         sync["option_ids"] = dict(option_ids)
         config["sync"] = sync
+
+        # Persist project.name from --project-title so MCP edpa_status
+        # stops reporting "unknown" after a fresh setup. Only overwrite
+        # the placeholder; respect a name the user set by hand.
+        project = config.get("project") or {}
+        if not project.get("name") or project.get("name") in ("My Project", "", None):
+            project["name"] = args.project_title
+            config["project"] = project
+
+        # Persist pis[] from .edpa/iterations/*.yaml so MCP edpa_status
+        # and edpa_iterations have something to report immediately after
+        # setup. Without this the assistant sees iterations_total=0 even
+        # though iteration YAMLs exist on disk.
+        iter_dir = Path(".edpa/iterations")
+        iterations_list = []
+        if iter_dir.is_dir():
+            for f in sorted(iter_dir.glob("*.yaml")):
+                try:
+                    doc = yaml.safe_load(open(f)) or {}
+                    it = doc.get("iteration") or {}
+                    if it.get("id"):
+                        iterations_list.append({
+                            "id": it["id"],
+                            "status": it.get("status", "planned"),
+                            "dates": it.get("dates", ""),
+                        })
+                except (yaml.YAMLError, OSError):
+                    continue
+        if iterations_list and not config.get("pis"):
+            # Derive PI id from the first iteration id (e.g. PI-2026-1.1 → PI-2026-1)
+            first_iter_id = iterations_list[0]["id"]
+            pi_id = first_iter_id.rsplit(".", 1)[0] if "." in first_iter_id else first_iter_id
+            config["pis"] = [{
+                "id": pi_id,
+                "status": "active",
+                "iteration_weeks": 2,
+                "pi_iterations": len(iterations_list),
+                "iterations": iterations_list,
+            }]
+
         with open(config_path, "w") as f:
             yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         ok(f"Project #{project_num}, {len(field_ids)} fields, {len(option_ids)} options saved")

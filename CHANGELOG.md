@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+## 1.3.2-beta — 2026-05-05
+
+Surface fixes for `edpa_status` post-setup output. Caught in the
+synthetic skill-driven E2E run as findings F3 and F4
+(see `docs/E2E-SKILLS-TEST-PLAN.md`). Tag-only patch — engine,
+sync, and reports are byte-identical.
+
+### Fixed
+- **F3** — `mcp_server._handle_status` read `project.name` from
+  `people.yaml`, which has never had a `project:` section in any
+  shipped template. Result: `edpa_status` always reported
+  `"project": "unknown"` regardless of what `/edpa:setup` was given.
+  Now reads from `edpa.yaml` (where the setting actually lives) and
+  falls back to `people.yaml` only for legacy v0.x bundled configs.
+- **F4** — `project_setup.py` persisted `sync.field_ids` and
+  `sync.option_ids` after a successful setup but never wrote the
+  matching `pis[]` array to `edpa.yaml`. Result: `edpa_status` and
+  `edpa_iterations` reported `iterations_total: 0` immediately after
+  setup, even though `.edpa/iterations/*.yaml` files were on disk
+  the whole time. Setup now derives `pis[]` from those YAML files
+  and writes them on the same persistence pass.
+- `project_setup.py` also writes `project.name` from the
+  `--project-title` argument when the template placeholder is still
+  in place. Respects a name the user has set by hand.
+
+### Verified live
+Fresh setup → MCP `edpa_status` returns the actual project name,
+`current_pi`, `iterations_total > 0`, and `active_iteration` — no
+"unknown" fallbacks.
+
 ## 1.3.1-beta — 2026-05-05
 
 Installer hot-fix on top of [v1.3.0-beta](https://github.com/technomaton/edpa/releases/tag/v1.3.0-beta).

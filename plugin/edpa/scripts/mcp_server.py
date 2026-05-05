@@ -285,7 +285,12 @@ def _handle_status(edpa_root: Path) -> list[TextContent]:
     people = people_cfg.get("people", [])
     total_capacity = sum(p.get("capacity_per_iteration") or p.get("capacity", 0) for p in people)
 
-    project = people_cfg.get("project", {})
+    # Project name lives in edpa.yaml (project.name). Older versions of
+    # this server read it from people.yaml, which never had a project
+    # section in any shipped template, so edpa_status reported
+    # "project: unknown" forever. Fall back to people.yaml only for
+    # legacy v0.x configs that still bundled both into one file.
+    project = config.get("project") or people_cfg.get("project", {})
     iter_weeks = active_pi.get("iteration_weeks", 2)
     pi_iters = active_pi.get("pi_iterations", len(iterations))
 
