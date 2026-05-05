@@ -155,3 +155,22 @@ locations. Run the same audit; backport what fits.
 how fast does `curl install.sh` see the new bytes? Document the
 expected TTL (or set explicit `cache-control` on the deployment) so
 hot-fix turnaround time is predictable.
+
+### Make `install.sh` impossible to drift between repo root and web/public
+
+Vercel deploys `https://edpa.technomaton.com/install.sh` from
+`web/public/install.sh`, while every dev edits `./install.sh` at the
+repo root and forgets the web copy exists. The two had drifted four
+months apart before the v1.3 audit caught it. Three options:
+
+1. **Symlink** `web/public/install.sh -> ../../install.sh` —
+   simplest, works if Vercel build dereferences symlinks (verify).
+2. **Vercel rewrite** for `/install.sh` to serve the repo-root file
+   directly via a function or static rewrite — needs `vercel.json`
+   tweak.
+3. **Build step** in `web/` that copies `../install.sh` into
+   `public/install.sh` on every deploy — robust, no Vercel magic.
+
+Pick whichever survives a `vercel deploy` reliably. Add a smoke
+check to `tests/test_consistency.py` that asserts byte-equality
+between the two paths so a future drift fails CI.
