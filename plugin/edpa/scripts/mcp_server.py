@@ -8,22 +8,107 @@ iterations, people, and backlog items. Works with any MCP client
 
 Usage:
     python3 .claude/edpa/scripts/mcp_server.py
+
+Environment:
+    EDPA_ROOT       Override .edpa/ lookup (default: walk up from cwd)
+    EDPA_LOG_LEVEL  DEBUG | INFO (default) | WARNING | ERROR
+    EDPA_LOG_FILE   Optional path; falls back to stderr only
 """
+from __future__ import annotations
 
 import json
+import logging
 import os
+import re
 import sys
 from pathlib import Path
 
 try:
     import yaml
 except ImportError:
-    print("ERROR: PyYAML required. Install with: pip install pyyaml", file=sys.stderr)
+    print("ERROR: PyYAML required. Install with: pip install pyyaml",
+          file=sys.stderr)
     sys.exit(1)
 
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import Resource, TextContent, Tool
+try:
+    from mcp.server import Server
+    from mcp.server.stdio import stdio_server
+    from mcp.types import Resource, TextContent, Tool
+except ImportError:
+    print("ERROR: 'mcp' package required. Install with: pip install mcp",
+          file=sys.stderr)
+    sys.exit(1)
+
+# ---------------------------------------------------------------------------
+# Logging — stderr only (stdout is reserved for JSON-RPC)
+# ---------------------------------------------------------------------------
+
+def _setup_logging() -> logging.Logger:
+    level_name = os.environ.get("EDPA_LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+    log = logging.getLogger("edpa.mcp")
+    log.setLevel(level)
+    if log.handlers:
+        return log
+    formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s edpa.mcp %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+    stderr_handler = logging.StreamHandler(sys.stderr)
+    stderr_handler.setFormatter(formatter)
+    log.addHandler(stderr_handler)
+    log_file = os.environ.get("EDPA_LOG_FILE")
+    if log_file:
+        try:
+            file_handler = logging.FileHandler(log_file, encoding="utf-8")
+            file_handler.setFormatter(formatter)
+            log.addHandler(file_handler)
+        except OSError as exc:
+            log.warning("Could not open EDPA_LOG_FILE=%s (%s); stderr only",
+                        log_file, exc)
+    return log
+
+
+logger = _setup_logging()
+
+# ---------------------------------------------------------------------------
+# Server identity (version comes from plugin.json — single source of truth)
+# ---------------------------------------------------------------------------
+
+def _read_plugin_version() -> str:
+    """Read version from plugin.json next to the script's plugin root.
+
+    Walks up from this file: scripts/mcp_server.py -> edpa/ -> plugin root,
+    where .claude-plugin/plugin.json lives. Falls back to "unknown" if the
+    manifest is missing (e.g. running from a checkout without symlinks).
+    """
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        manifest = parent / ".claude-plugin" / "plugin.json"
+        if manifest.is_file():
+            try:
+                return json.loads(manifest.read_text()).get("version", "unknown")
+            except (OSError, ValueError):
+                return "unknown"
+    return "unknown"
+
+
+SERVER_VERSION = _read_plugin_version()
+
+# ---------------------------------------------------------------------------
+# Input validation — guards against path traversal in item_id parameter
+# ---------------------------------------------------------------------------
+
+# Item IDs are <type-prefix>-<digits>, e.g. S-200, F-12, I-1, D-3, T-99.
+ITEM_ID_RE = re.compile(r"^[A-Z]-\d{1,9}$")
+
+
+def _safe_item_id(item_id: str) -> str | None:
+    """Return item_id if it matches the allowed shape, else None."""
+    if not isinstance(item_id, str):
+        return None
+    return item_id if ITEM_ID_RE.match(item_id) else None
+
 
 # ---------------------------------------------------------------------------
 # Path resolution
@@ -45,18 +130,21 @@ def find_edpa_root() -> Path | None:
 
 
 def load_yaml(path: Path) -> dict | None:
-    """Load a YAML file, return None on failure."""
+    """Load a YAML file, return None on failure (logged, not silent)."""
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
-    except Exception:
+    except FileNotFoundError:
+        return None
+    except (yaml.YAMLError, OSError) as exc:
+        logger.warning("load_yaml(%s) failed: %s", path, exc)
         return None
 
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
 
-server = Server("edpa")
+server = Server("edpa", version=SERVER_VERSION)
 
 
 @server.list_tools()
@@ -139,22 +227,39 @@ async def list_tools() -> list[Tool]:
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    logger.info("call_tool name=%s args=%s", name, arguments)
     edpa_root = find_edpa_root()
     if edpa_root is None:
+        logger.warning("call_tool name=%s: .edpa/ not found", name)
         return [TextContent(type="text", text="ERROR: .edpa/ directory not found. Run `/edpa setup` first.")]
 
-    if name == "edpa_status":
-        return _handle_status(edpa_root)
-    elif name == "edpa_iterations":
-        return _handle_iterations(edpa_root, arguments.get("status"))
-    elif name == "edpa_people":
-        return _handle_people(edpa_root, arguments.get("team"))
-    elif name == "edpa_backlog":
-        return _handle_backlog(edpa_root, arguments.get("iteration"), arguments.get("type"), arguments.get("status"))
-    elif name == "edpa_item":
-        return _handle_item(edpa_root, arguments["item_id"])
-    else:
+    try:
+        if name == "edpa_status":
+            return _handle_status(edpa_root)
+        elif name == "edpa_iterations":
+            return _handle_iterations(edpa_root, arguments.get("status"))
+        elif name == "edpa_people":
+            return _handle_people(edpa_root, arguments.get("team"))
+        elif name == "edpa_backlog":
+            return _handle_backlog(edpa_root, arguments.get("iteration"),
+                                   arguments.get("type"), arguments.get("status"))
+        elif name == "edpa_item":
+            raw_id = arguments.get("item_id", "")
+            safe_id = _safe_item_id(raw_id)
+            if safe_id is None:
+                logger.warning("edpa_item: rejected item_id=%r", raw_id)
+                return [TextContent(type="text",
+                                    text=f"ERROR: invalid item_id {raw_id!r}. "
+                                         "Expected pattern: <type-prefix>-<digits>, "
+                                         "e.g. S-200, F-12, I-1.")]
+            return _handle_item(edpa_root, safe_id)
+        logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
+    except Exception:
+        logger.exception("call_tool name=%s raised", name)
+        return [TextContent(type="text",
+                            text=f"ERROR: internal error in {name}; "
+                                 "see server logs for details.")]
 
 
 # ---------------------------------------------------------------------------

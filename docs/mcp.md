@@ -1,0 +1,228 @@
+# EDPA MCP Server
+
+A Model Context Protocol server bundled with the EDPA plugin. It exposes
+read-only access to `.edpa/` project data — config, iterations, people,
+backlog — over the standard MCP `stdio` transport. Any MCP-aware client
+(Claude Code, Cursor, Codex CLI, custom Python/TS clients) can read it.
+
+**Production-ready as of v1.3.0-beta.** Validated handlers, schema-checked
+inputs, item-ID path-traversal guard, stderr logging, version-aware identity.
+
+---
+
+## What it does
+
+Instead of the assistant grepping `.edpa/backlog/*.yaml` itself, it calls one
+of five tools and gets a structured JSON response. That keeps the assistant's
+context tight and makes the data shape predictable.
+
+| Tool             | Purpose                                                | Input                              |
+|------------------|--------------------------------------------------------|------------------------------------|
+| `edpa_status`    | Project name, current PI, active iteration, capacity    | none                               |
+| `edpa_iterations`| List iterations of the active PI                        | optional `status` filter           |
+| `edpa_people`    | Team registry from `people.yaml`                        | optional `team` filter             |
+| `edpa_backlog`   | Backlog items from `.edpa/backlog/`                    | optional `iteration`, `type`, `status` |
+| `edpa_item`      | Detail for one item                                     | required `item_id` (e.g. `S-200`)  |
+
+It also publishes resources for whole-file reads:
+
+| Resource URI               | Content                                                |
+|----------------------------|--------------------------------------------------------|
+| `edpa://config`            | `.edpa/config/edpa.yaml`                                |
+| `edpa://people`            | `.edpa/config/people.yaml`                              |
+| `edpa://results/<iter-id>` | `edpa_results.json` for closed iteration `<iter-id>`    |
+
+---
+
+## How it gets started
+
+The plugin's `plugin/.mcp.json` registers two MCP servers — `edpa` (this one)
+and `github` (the upstream `@modelcontextprotocol/server-github` for issue
+operations during sync). When Claude Code (or another MCP client) loads the
+EDPA plugin, both servers come up automatically.
+
+Manifest excerpt:
+
+```json
+{
+  "mcpServers": {
+    "edpa": {
+      "command": "python3",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/edpa/scripts/mcp_server.py"]
+    }
+  }
+}
+```
+
+`${CLAUDE_PLUGIN_ROOT}` resolves to the installed plugin directory regardless
+of the client's working directory — important because Claude Code can be
+launched from anywhere in the repo (e.g. `web/`, `tools/pi-planning/`, …).
+
+For ad-hoc CLI use:
+
+```bash
+python3 .claude/edpa/scripts/mcp_server.py
+```
+
+Started by hand, the server reads JSON-RPC on stdin and writes responses on
+stdout. Logs go to stderr (see below).
+
+---
+
+## Environment variables
+
+| Variable          | Default       | Purpose                                                                |
+|-------------------|---------------|------------------------------------------------------------------------|
+| `EDPA_ROOT`       | walk up cwd   | Force a specific `.edpa/` directory (handy for tests, CI, multi-repo)   |
+| `EDPA_LOG_LEVEL`  | `INFO`        | `DEBUG`, `INFO`, `WARNING`, `ERROR`                                      |
+| `EDPA_LOG_FILE`   | unset         | Mirror logs to this file in addition to stderr                          |
+
+`EDPA_ROOT` precedence: env var → walk up from `cwd` looking for the nearest
+`.edpa/` directory. Returning `None` only when neither resolves.
+
+---
+
+## Tool reference
+
+### `edpa_status`
+
+```json
+{ }
+```
+
+Returns:
+
+```json
+{
+  "project": "Medical Platform & Datovy e-shop",
+  "current_pi": "PI-2026-1",
+  "iterations_total": 5,
+  "iterations_closed": 3,
+  "active_iteration": "PI-2026-1.4",
+  "active_iteration_dates": "18.3.-31.3.2026",
+  "team_size": 9,
+  "total_capacity_per_iteration": 720,
+  "cadence": "2-week iterations, 10-week PI (5 iterations)"
+}
+```
+
+### `edpa_iterations`
+
+```json
+{ "status": "closed" }
+```
+
+Returns array of `{id, status, dates, type, has_results}`.
+
+### `edpa_people`
+
+```json
+{ "team": "CVUT" }
+```
+
+Returns array of `{id, name, role, fte, capacity, team}`.
+
+### `edpa_backlog`
+
+```json
+{ "iteration": "PI-2026-1.3", "type": "Story", "status": "Done" }
+```
+
+Filters compose with AND. Returns array of items with their full YAML body.
+
+### `edpa_item`
+
+```json
+{ "item_id": "S-200" }
+```
+
+Validates against the regex `^[A-Z]-\d{1,9}$`. Anything else is rejected
+with `ERROR: invalid item_id ...` — the path lookup never sees raw input,
+which prevents `../` traversal and similar tricks. The handler resolves the
+type directory from the prefix (`S → stories`, `F → features`, `E → epics`,
+`I → initiatives`, `D → defects`, `T → stories`).
+
+---
+
+## Production hardening (v1.3-beta)
+
+What changed from the v1.0–v1.2 prototype:
+
+1. **Portable plugin path.** `${CLAUDE_PLUGIN_ROOT}/...` instead of relative
+   `.claude/edpa/...`. Working directory of the client no longer matters.
+2. **Graceful import errors.** Missing `mcp` or `pyyaml` packages exit with
+   a one-line install hint on stderr, not a stack trace.
+3. **Stderr logging.** A real `logging.Logger` named `edpa.mcp` writes to
+   stderr (and optionally `EDPA_LOG_FILE`) without polluting stdout. Every
+   `call_tool` invocation is logged with its arguments.
+4. **Server identity carries version.** `Server("edpa", version=…)` reads
+   the plugin manifest at startup and reports the same string MCP clients
+   show in their connection panel. Falls back to `"unknown"` only if the
+   manifest is unreadable.
+5. **`item_id` regex guard.** Path-shaped or empty IDs are rejected before
+   they hit the filesystem.
+6. **Specific exception handling in `load_yaml`.** Bare `except` removed —
+   only `yaml.YAMLError` and `OSError` are caught and logged; everything
+   else (`KeyboardInterrupt`, `SystemExit`) propagates.
+7. **Crash-safe dispatch.** `call_tool` wraps every handler in a `try` so
+   a handler bug returns a `TextContent` `ERROR: internal error ...`
+   instead of dropping the JSON-RPC session.
+8. **GitHub MCP token via env.** `plugin/.mcp.json` no longer ships a
+   blank `GITHUB_PERSONAL_ACCESS_TOKEN`; it reads `${GITHUB_PERSONAL_ACCESS_TOKEN}`
+   from the environment, so the user supplies it once and `gh auth` flows
+   normally.
+
+---
+
+## Troubleshooting
+
+| Symptom                                                | First check                                                                 |
+|--------------------------------------------------------|-----------------------------------------------------------------------------|
+| `ModuleNotFoundError: mcp`                             | `pip install -r requirements-dev.txt` (or `requirements.txt`).              |
+| `ModuleNotFoundError: yaml`                            | Same.                                                                       |
+| `ERROR: .edpa/ directory not found`                    | Run `/edpa setup` or `cd` into a project that has `.edpa/`.                 |
+| Client shows `version: unknown`                        | Plugin manifest missing — reinstall from latest release.                     |
+| Tool returns `ERROR: internal error ...`              | Set `EDPA_LOG_LEVEL=DEBUG` and `EDPA_LOG_FILE=/tmp/edpa-mcp.log`, retry.    |
+| Need stdout-clean logs                                 | All logs already go to stderr; stdout carries only JSON-RPC.                 |
+
+---
+
+## Security model
+
+- **Read-only.** No tool writes `.edpa/`. Bidirectional sync (`/edpa:sync`)
+  goes through the regular CLI, not MCP.
+- **Path traversal blocked.** `item_id` parameter is the only user input that
+  reaches the filesystem; the regex guard plus prefix→directory whitelist
+  means a request like `{"item_id": "../etc/passwd"}` is rejected at the
+  validator and never resolves to a path.
+- **No outbound network.** The server does not call GitHub or any external
+  service. The neighbouring `github` MCP server in `.mcp.json` does, but
+  it's a separate process under user control.
+- **Crash containment.** A handler exception is caught, logged, and surfaced
+  as a tool error. The session stays open; the client can retry.
+
+---
+
+## Tests
+
+Coverage in `tests/test_mcp_server.py`:
+
+- 36 handler tests (status, iterations, people, backlog, item, resources)
+- `TestItemIdValidation` (6 cases) — accepts canonical IDs, rejects
+  traversal/lowercase/empty/non-digit/non-string and verifies `call_tool`
+  surfaces the error
+- `TestCallToolErrorHandling` (3 cases) — handler exceptions, unknown
+  tools, missing `.edpa/` root all return TextContent errors
+- `TestServerIdentity` (2 cases) — version comes from the manifest and is
+  attached to the `Server` instance
+- `TestLoggingSetup` (1 case) — logger has a stderr handler
+
+Run them with:
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/test_mcp_server.py -v
+```
+
+The full repo suite (`pytest tests/ -m "not e2e"`) is currently **127 passed,
+0 skipped, 0 errors** with the dev dependency tree complete.

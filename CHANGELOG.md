@@ -2,19 +2,65 @@
 
 ## Unreleased
 
-### Changed (dev tooling)
-- `requirements-dev.txt` now does `-r requirements.txt` and adds
-  `jsonschema` + `openpyxl` so a fresh `pip install -r
-  requirements-dev.txt` runs the full test suite instead of skipping
-  43 tests on missing optional dependencies.
-- Default `pytest tests/ -m "not e2e"` count went from 84 passed +
-  7 skipped + 1 collection error to **127 passed**, 0 skipped, 0
-  errors. The 6 e2e tests stay opt-in (real GitHub API).
+## 1.3.0-beta — 2026-05-05
+
+Production-quality MCP server. The server existed since 1.0.0-beta as a
+prototype but had a relative plugin path, no input validation, no logging,
+and unversioned identity. v1.3 makes it usable as a real Claude Code /
+Cursor / Codex CLI tool surface against `.edpa/` data.
+
+See `docs/mcp.md` for the full reference.
+
+### Added
+- `docs/mcp.md` — operator and integrator guide for the MCP server
+  (tools, resources, env vars, security model, troubleshooting).
+- `tests/test_mcp_server.py` grew from 36 to 48 tests:
+  `TestItemIdValidation`, `TestCallToolErrorHandling`,
+  `TestServerIdentity`, `TestLoggingSetup`. Live `subprocess` smoke
+  test against the JSON-RPC stdio transport verified separately.
+
+### Changed
+- `plugin/.mcp.json` registers the EDPA server via
+  `${CLAUDE_PLUGIN_ROOT}/edpa/scripts/mcp_server.py`. Previously a
+  relative `.claude/edpa/scripts/mcp_server.py` path broke whenever
+  the MCP client launched from a subdirectory.
+- `plugin/.mcp.json` reads `GITHUB_PERSONAL_ACCESS_TOKEN` from the
+  environment instead of shipping a literal empty string.
+- `plugin/edpa/scripts/mcp_server.py`:
+  - Server identity now carries the plugin version
+    (`Server("edpa", version=…)`) read from `plugin.json`. MCP clients
+    surface this in their connection panel.
+  - Stderr `logging.Logger` named `edpa.mcp`; every `call_tool`
+    invocation logged with arguments. `EDPA_LOG_LEVEL` and
+    `EDPA_LOG_FILE` env vars control verbosity / mirroring. stdout
+    stays clean for JSON-RPC.
+  - `mcp` and `pyyaml` import errors exit with a one-line install
+    hint instead of a stack trace.
+  - `load_yaml` catches only `yaml.YAMLError` / `OSError`; bare
+    `except` removed so `KeyboardInterrupt` propagates.
+  - `call_tool` wraps every dispatch in a `try` so handler bugs
+    return a `TextContent` `ERROR: internal error ...` rather than
+    closing the JSON-RPC session.
 
 ### Fixed
-- `test_consistency.test_requirements_exist` accepted only a
-  literal `pyyaml` line in each requirements file. Now also
-  accepts a transitive `-r requirements.txt` include.
+- `edpa_item` accepted any string. A request like
+  `{"item_id": "../etc/passwd"}` would skip the prefix lookup
+  (returning "not found") rather than rejecting at the validator.
+  Now `item_id` must match `^[A-Z]-\d{1,9}$`; anything else returns
+  `ERROR: invalid item_id ...` before touching the filesystem.
+
+### Dev tooling (carried from Unreleased)
+- `requirements-dev.txt` now uses `-r requirements.txt` and adds
+  `jsonschema` + `openpyxl` so a fresh `pip install -r
+  requirements-dev.txt` runs the full test suite instead of
+  silently skipping the schema-strictness and MCP groups.
+- `pytest tests/ -m "not e2e"`: **139 passed**, 0 skipped, 0 errors
+  (was 84 passed + 7 skipped + 1 collection error in 1.2.1-beta).
+  The 6 e2e tests stay opt-in (real GitHub API, destructive
+  to sandbox).
+- `test_consistency.test_requirements_exist` now accepts a
+  transitive `-r requirements.txt` include instead of demanding a
+  literal `pyyaml` line in every requirements file.
 
 ## 1.2.1-beta — 2026-05-05
 

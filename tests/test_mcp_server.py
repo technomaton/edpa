@@ -433,3 +433,105 @@ def test_handle_backlog_no_match():
     """Returns empty list when filters match nothing."""
     data = parse_result(_handle_backlog(EDPA_ROOT, "PI-9999-9.9", None, None))
     assert data == []
+
+
+# ---------------------------------------------------------------------------
+# Production-hardening checks (added in v1.3-beta)
+# ---------------------------------------------------------------------------
+
+
+class TestItemIdValidation:
+    """`_safe_item_id` must accept only `<UPPER>-<digits>` and reject everything
+    else. Without this guard the call_tool dispatch could feed arbitrary
+    strings to the file lookup and rely on prefix_map to filter — which is
+    brittle and easy to regress."""
+
+    def test_accepts_canonical_ids(self):
+        for good in ("S-1", "F-12", "E-100", "I-9", "T-99999", "D-1"):
+            assert mcp_server._safe_item_id(good) == good
+
+    def test_rejects_path_traversal(self):
+        for bad in ("../etc/passwd", "S/../E-1", "..", "/etc/passwd"):
+            assert mcp_server._safe_item_id(bad) is None
+
+    def test_rejects_lowercase_or_empty_prefix(self):
+        for bad in ("s-1", "-1", "S1", "S-", "-S-1", " S-1", "S-1 "):
+            assert mcp_server._safe_item_id(bad) is None
+
+    def test_rejects_non_digits_after_dash(self):
+        for bad in ("S-abc", "S-1a", "S-1.0", "S-1_2"):
+            assert mcp_server._safe_item_id(bad) is None
+
+    def test_rejects_non_string(self):
+        for bad in (None, 123, [], {}):
+            assert mcp_server._safe_item_id(bad) is None
+
+    def test_call_tool_rejects_unsafe_id(self):
+        result = asyncio.run(mcp_server.call_tool(
+            "edpa_item", {"item_id": "../etc/passwd"}))
+        assert is_error(result)
+        assert "invalid item_id" in result[0].text
+
+
+class TestCallToolErrorHandling:
+    """call_tool must return a TextContent error rather than raising — a raised
+    exception would close the stdio session and look like a server crash to
+    the MCP client."""
+
+    def test_handler_exception_returns_text_error(self, monkeypatch):
+        def boom(_root):
+            raise RuntimeError("synthetic failure")
+        monkeypatch.setattr(mcp_server, "_handle_status", boom)
+        result = asyncio.run(mcp_server.call_tool("edpa_status", {}))
+        assert is_error(result)
+        assert "internal error" in result[0].text
+
+    def test_unknown_tool_returns_text_error(self):
+        result = asyncio.run(mcp_server.call_tool("not_a_real_tool", {}))
+        assert is_error(result) or "Unknown tool" in result[0].text
+
+    def test_missing_edpa_root_returns_text_error(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("EDPA_ROOT", str(tmp_path))
+        # tmp_path has no .edpa marker, find_edpa_root returns None for non-.edpa
+        # path. Make it walk up from a clean cwd.
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("EDPA_ROOT", raising=False)
+        result = asyncio.run(mcp_server.call_tool("edpa_status", {}))
+        assert is_error(result)
+        assert ".edpa/" in result[0].text
+
+
+class TestServerIdentity:
+    """Server identity should advertise the plugin version so MCP clients can
+    surface it in logs / debug output."""
+
+    def test_version_resolved_from_plugin_manifest(self):
+        # SERVER_VERSION is read at import time. If plugin.json was readable,
+        # it must match exactly. If not, the literal "unknown" is acceptable
+        # but unexpected in this checkout.
+        assert mcp_server.SERVER_VERSION
+        assert mcp_server.SERVER_VERSION != ""
+        manifest = ROOT / "plugin" / ".claude-plugin" / "plugin.json"
+        if manifest.is_file():
+            expected = json.loads(manifest.read_text())["version"]
+            assert mcp_server.SERVER_VERSION == expected, (
+                f"SERVER_VERSION={mcp_server.SERVER_VERSION!r} but "
+                f"plugin.json has {expected!r}")
+
+    def test_server_carries_version(self):
+        # mcp.server.Server stores version when constructed with it.
+        v = getattr(mcp_server.server, "version", None)
+        assert v == mcp_server.SERVER_VERSION
+
+
+class TestLoggingSetup:
+    """Logger writes to stderr (stdout is reserved for JSON-RPC)."""
+
+    def test_logger_has_stderr_handler(self):
+        log = mcp_server.logger
+        stderr_handlers = [
+            h for h in log.handlers
+            if isinstance(h, __import__("logging").StreamHandler)
+            and getattr(h, "stream", None) is sys.stderr
+        ]
+        assert stderr_handlers, "logger must have a stderr StreamHandler"
