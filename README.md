@@ -223,7 +223,7 @@ cp -r .claude/skills/* ~/.gemini/skills/
 
 | Document | Description |
 |----------|-------------|
-| [Methodology](docs/methodology.md) | Full EDPA v1.0.0-beta specification |
+| [Methodology](docs/methodology.md) | Full EDPA v1.1.0-beta specification |
 | [Quick Start](docs/quick-start.md) | 10-minute setup guide |
 | [Evidence Detection](docs/evidence-detection.md) | How GitHub signals map to CW |
 | [Dual-View](docs/dual-view.md) | Per-person vs per-item perspectives |
