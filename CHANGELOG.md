@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.1.0-beta — 2026-05-05
+
 ### Changed (BREAKING for fresh installs only)
 - **`--mode gates` is now the default** for `engine.py` and the
   `calculation_mode` field in `project.yaml.tmpl`. Existing
@@ -42,6 +44,15 @@
 - `sync pull` reads per-level typed status fields
   (Initiative/Epic/Feature/Story Status) instead of GitHub's default
   `Status` field, so SAFe workflow transitions actually round-trip.
+- `project_setup.py` always creates the `Iteration` field (with a
+  `TBD` placeholder option when no iteration YAMLs exist yet). Without
+  this, every subsequent `sync push` of an item with `iteration:` set
+  failed with `no field_id for 'Iteration'` and there was no recovery
+  path short of recreating the project.
+- `sync.compute_diff` no longer wipes a local `iteration:` value when
+  the GitHub Project has no Iteration field or no value for the item.
+  Previously every pull cleared local iteration tags whenever the
+  field was lazily missing on GH.
 
 ## 1.0.0-beta — 2026-03-29
 
