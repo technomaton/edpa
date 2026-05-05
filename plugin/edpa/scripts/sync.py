@@ -1664,29 +1664,34 @@ def cmd_conflicts(root, sync_config, args):
     changelog_path = root / ".edpa" / "changelog.jsonl"
     entries = load_jsonl(changelog_path)
 
-    last_sync = max(last_pull, last_push) if last_pull and last_push else (last_pull or last_push)
-    if not last_sync:
+    if not (last_pull or last_push):
         print(color("  No sync history. Cannot detect conflicts.", C.WARN))
         print()
         return
+
+    # A real conflict is: local changed since the last *push* AND remote
+    # changed since the last *pull*. Using max(last_pull, last_push) as the
+    # cutoff dropped any local change recorded in the window between push
+    # and the next pull, so cross-side conflicts were never detected.
+    git_cutoff = last_push or last_pull
+    github_cutoff = last_pull or last_push
 
     github_changes: dict[str, list] = {}
     git_changes: dict[str, list] = {}
     for entry in entries:
         ts = entry.get("ts", "")
-        if ts < last_sync:
-            continue
         item_id = entry.get("item", "")
         source = entry.get("source", "")
-        if source == "github":
+        if source == "github" and ts >= github_cutoff:
             github_changes.setdefault(item_id, []).append(entry)
-        elif source == "git":
+        elif source == "git" and ts >= git_cutoff:
             git_changes.setdefault(item_id, []).append(entry)
 
     conflict_ids = set(github_changes) & set(git_changes)
     if not conflict_ids:
         print(color(f"  {CHECK} No conflicts detected.", C.OK))
-        print(color(f"  Last sync: {last_sync}", C.MUTED))
+        print(color(f"  Last pull: {last_pull or '—'}", C.MUTED))
+        print(color(f"  Last push: {last_push or '—'}", C.MUTED))
         print()
         return
 
