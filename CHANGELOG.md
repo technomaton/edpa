@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added
+- `tests/test_mcp_integration.py` — 16 live JSON-RPC stdio roundtrip
+  tests. Spawns `mcp_server.py` as a subprocess, drives the wire
+  protocol Claude Code / Cursor / Codex use, asserts on serverInfo
+  version, tool advertisement (5 tools), tool dispatch (status,
+  item lookup, path-traversal rejection across 7 bad inputs), and
+  stderr log discipline (INFO call_tool / WARNING rejected). Skipped
+  on Windows and when `mcp` is missing. Default test marker — runs
+  in the normal `pytest tests/` suite. Catches regressions where
+  `Server(name, version=…)` upstream signature drifts, where the
+  plugin path resolution breaks, or where the server crashes during
+  initialize handshake.
+- 155 tests pass (was 139 before this entry); 6 e2e deselected.
+
 ### Changed (plugin-wide hardening pass — backport of v1.3 MCP rigor)
 - `engine.py`, `sync.py`, `evaluate_cw.py`, and `pi_close.py` —
   `load_yaml` / `load_json` helpers now return `None` on failure
