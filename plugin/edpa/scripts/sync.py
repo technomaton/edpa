@@ -910,6 +910,13 @@ def compute_diff(local_items, remote_items):
             elif str(local_val) == str(remote_val):
                 continue
 
+            # Optional fields not yet present on GH should not wipe local
+            # values. Iteration is created lazily during setup; without this
+            # guard, every pull would clear local iteration tags whenever the
+            # GH field is missing.
+            if field == "iteration" and not remote_val and local_val:
+                continue
+
             changes.append({
                 "id": item_id,
                 "action": "field_changed",

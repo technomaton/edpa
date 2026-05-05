@@ -232,14 +232,18 @@ def main():
                 iteration_options.append(iid)
             except (yaml.YAMLError, OSError):
                 continue
-    if iteration_options:
-        opts_str = ",".join(iteration_options)
-        run(f'gh project field-create {project_num} --owner {args.org} '
-            f'--name "Iteration" --data-type SINGLE_SELECT '
-            f'--single-select-options "{opts_str}"')
-        ok(f"Iteration (SINGLE_SELECT, {len(iteration_options)} options)")
-    else:
-        info("Iteration field skipped — no .edpa/iterations/*.yaml found")
+    # Always create the Iteration field. Without it, every subsequent push
+    # of an item with `iteration:` set fails with "no field_id for 'Iteration'"
+    # and pull wipes local iteration tags. Use a TBD placeholder when no
+    # iterations exist yet; real options are added later via setup-refresh
+    # or sync add-iteration once iteration YAMLs land.
+    if not iteration_options:
+        iteration_options = ["TBD"]
+    opts_str = ",".join(iteration_options)
+    run(f'gh project field-create {project_num} --owner {args.org} '
+        f'--name "Iteration" --data-type SINGLE_SELECT '
+        f'--single-select-options "{opts_str}"')
+    ok(f"Iteration (SINGLE_SELECT, {len(iteration_options)} options)")
 
     # Refresh field IDs after creating typed status fields
     field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json')
