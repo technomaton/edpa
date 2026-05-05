@@ -11,6 +11,39 @@ shipped.
 
 ## v1.4 — MCP & developer experience polish
 
+### Skill-first E2E test plan — `docs/E2E-SKILLS-TEST-PLAN.md` (P0)
+
+**Important, not nice-to-have.** `docs/E2E-TEST-PLAN.md` validates the
+script layer (`engine.py`, `sync.py`, `project_setup.py` invoked
+directly). That's only half the product. Customers experience EDPA
+through Claude Code skills (`/edpa:setup`, `/edpa:sync`,
+`/edpa:close-iteration`, `/edpa:reports`, `/edpa:calibrate`) — those
+have their own prompts, decision points, orchestration, and they
+call the MCP server too. Script tests pass while skill orchestration
+silently regresses.
+
+Add `docs/E2E-SKILLS-TEST-PLAN.md` that mirrors the 13 phases of the
+existing plan but every phase is driven from inside a Claude Code
+session against a real `.edpa/` project. Commands look like:
+
+  /edpa:setup "Demo Project"
+  /edpa:sync push
+  /edpa:close-iteration PI-2026-1.1
+  /edpa:reports
+
+For each skill phase, document: input prompt, what the skill should
+ask the user, what tools it should invoke (Bash subprocess vs MCP
+`edpa_*` tools), expected artifacts, pass criteria.
+
+The kashealth onboarding (deferred to 2026-05-06) is the natural
+first dogfood for this plan. Capture the run as the first concrete
+walk-through. Don't run kashealth as a script-driven setup — that
+would skip the very layer we ship.
+
+**Acceptance:** plan exists; one full skill-driven run against the
+sandbox is recorded in the plan as a worked example; identifies any
+skill prompts that read awkwardly or any MCP tool calls that fail.
+
 ### MCP integration tests in pytest (~ 50 lines)
 
 Today the JSON-RPC stdio roundtrip is verified ad-hoc by spawning a
