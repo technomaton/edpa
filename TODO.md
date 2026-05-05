@@ -11,38 +11,31 @@ shipped.
 
 ## v1.4 — MCP & developer experience polish
 
-### Skill-first E2E test plan — `docs/E2E-SKILLS-TEST-PLAN.md` (P0)
+### Skill-first E2E test plan — execute (P0, plan authored)
 
-**Important, not nice-to-have.** `docs/E2E-TEST-PLAN.md` validates the
-script layer (`engine.py`, `sync.py`, `project_setup.py` invoked
-directly). That's only half the product. Customers experience EDPA
-through Claude Code skills (`/edpa:setup`, `/edpa:sync`,
-`/edpa:close-iteration`, `/edpa:reports`, `/edpa:calibrate`) — those
-have their own prompts, decision points, orchestration, and they
-call the MCP server too. Script tests pass while skill orchestration
-silently regresses.
+**Plan exists** at `docs/E2E-SKILLS-TEST-PLAN.md` (829 lines, 13
+phases mirroring the script-level plan). Open item: actually run it
+end-to-end inside a real Claude Code session and record the
+walkthrough.
 
-Add `docs/E2E-SKILLS-TEST-PLAN.md` that mirrors the 13 phases of the
-existing plan but every phase is driven from inside a Claude Code
-session against a real `.edpa/` project. Commands look like:
+The kashealth onboarding (scheduled 2026-05-06) is the first natural
+dogfood — run kashealth setup *through* this plan, not around it.
+Phase 13 of the plan is reserved for capturing that run as a worked
+example. Findings (skill prompts that read awkwardly, MCP tool calls
+that fail, fallbacks the assistant takes when it shouldn't) feed back
+as v1.4 fixes.
 
-  /edpa:setup "Demo Project"
-  /edpa:sync push
-  /edpa:close-iteration PI-2026-1.1
-  /edpa:reports
+Why P0: customers experience EDPA through `/edpa:*` skills + MCP, not
+by invoking `engine.py` / `sync.py` / `project_setup.py` directly.
+The script-level plan keeps backend correctness; this plan keeps the
+product surface honest. Both must pass for a release to be
+production-ready.
 
-For each skill phase, document: input prompt, what the skill should
-ask the user, what tools it should invoke (Bash subprocess vs MCP
-`edpa_*` tools), expected artifacts, pass criteria.
-
-The kashealth onboarding (deferred to 2026-05-06) is the natural
-first dogfood for this plan. Capture the run as the first concrete
-walk-through. Don't run kashealth as a script-driven setup — that
-would skip the very layer we ship.
-
-**Acceptance:** plan exists; one full skill-driven run against the
-sandbox is recorded in the plan as a worked example; identifies any
-skill prompts that read awkwardly or any MCP tool calls that fail.
+**Acceptance:** complete one skill-driven run against the
+`technomaton/edpa-e2e-test` sandbox, fill the ☐ checkboxes in the
+plan's acceptance section; complete kashealth onboarding through
+the plan and record it under § 13.5 as the first customer
+walk-through.
 
 ### MCP integration tests in pytest (~ 50 lines)
 
