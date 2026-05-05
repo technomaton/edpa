@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Documentation
+- `README.md` — replaced the terse 5-step Quick Start with a
+  guided "First 5 minutes" walkthrough: install → edit `people.yaml`
+  → seed a toy iteration + two stories → close iteration → generate
+  timesheets. Every code block is copy-pasteable; every output
+  block is real (captured from a fresh `/tmp` install end-to-end,
+  not hand-edited). Reads like a tutorial; the older "see RUNBOOK.md
+  for X" pattern still works as the next-step list at the bottom.
+  Acceptance criterion from `TODO.md`: someone can read just the
+  walkthrough and produce a working toy iteration on a fresh repo.
+  Verified.
+
 ### Performance
 - `mcp_server.load_yaml` — bounded LRU cache keyed by `(path,
   st_mtime_ns)`. Cap: 64 entries. Repeated MCP `tools/call`

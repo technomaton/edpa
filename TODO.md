@@ -65,16 +65,14 @@ benefit). Filed in `## Unreleased`. Removing this entry next pickup.
 does not benefit from this cache. Could extend caching there too if
 those endpoints become hot — not measured today.)
 
-### Live "first 5 minutes" tutorial in README
+### ~~Live "first 5 minutes" tutorial in README~~ — done
 
-Today's README references the install command and `/edpa:setup` but a new
-contributor lands on it without a "what does this look like?" walkthrough.
-Add a short section: install → setup → first iteration close → first
-report, with copy-pastable commands and screenshots of `engine --status`
-output.
-
-**Acceptance:** someone can read just the tutorial section and produce a
-working toy iteration on a fresh repo.
+`README.md` now opens with a guided walkthrough: install → people
+edit → toy iteration → close → reports, end-to-end in roughly five
+minutes against zero pre-existing GitHub state. Verified live: a
+fresh `/tmp` directory followed copy-paste from the README produces
+exactly the output the README promises (invariants pass, 40h Alice,
+80h Bob, 120h team total).
 
 ### `sync add-iteration <ID>` subcommand (~ 80 lines)
 

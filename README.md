@@ -59,65 +59,207 @@ All invariants passed: YES
 - **Self-tuning** — auto-calibrates heuristics using Karpathy's autoresearch loop
 - **GitHub-native** — works with GitHub Issues, Projects, PRs, and Actions (real E2E tested against `technomaton/edpa-e2e-test` sandbox)
 
-## Quick Start
+## First 5 minutes — guided walkthrough
 
-### 1. Install the EDPA plugin
+This walkthrough takes a fresh empty repo to a closed iteration with
+derived hours and per-person reports. **No GitHub Project required** —
+the walkthrough stays local so onboarding is zero-friction. For the
+real GitHub Projects flow (push backlog, sync issue states, gate-based
+prep-work attribution) see [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+
+### 1. Install (~30 s)
 
 ```bash
+mkdir my-edpa-toy && cd my-edpa-toy
+git init -q
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 
-This installs the EDPA plugin into `.claude/` in your project.
-
-### 2. Set up governance
+You should see:
 
 ```
-/edpa setup "My Project"
+EDPA Installer
+  Python 3.X ✓
+  PyYAML ✓
+  mcp (MCP SDK) ✓
+  openpyxl ✓
+  ...
+EDPA 1.3.2-beta installed successfully!
 ```
 
-Or manually edit `.edpa/config/people.yaml`:
+Three config files were seeded from templates:
+
+```bash
+ls .edpa/config/
+# edpa.yaml  heuristics.yaml  people.yaml
+```
+
+### 2. Edit `people.yaml` to your team (~1 min)
+
+The template ships with placeholder names. Replace them with your team
+— even one person works. Minimum example:
+
 ```yaml
 cadence:
-  iteration_weeks: 2    # 1 (AI-native) or 2 (classic)
+  iteration_weeks: 2
 
 people:
   - id: alice
-    name: "Alice Smith"
+    name: "Alice Architect"
+    role: Arch
+    fte: 0.5
+    capacity_per_iteration: 40
+  - id: bob
+    name: "Bob Developer"
     role: Dev
     fte: 1.0
     capacity_per_iteration: 80
 ```
 
-### 3. Work normally
-
-Follow one rule: **branch names must reference a work item**.
-```bash
-git checkout -b feature/S-200-omop-parser
-git checkout -b bugfix/B-215-upload-validation
-```
-
-CI enforces this automatically. Everything else generates evidence.
-
-### 4. Close iterations
-
-With Claude Code:
-```
-/edpa close-iteration PI-2026-1.3
-```
-
-Or with the Python CLI:
-```bash
-python3 .claude/edpa/scripts/engine.py --iteration PI-2026-1.3 \
-  --capacity .edpa/config/people.yaml \
-  --heuristics .edpa/config/heuristics.yaml
-```
-
-### 5. Try the demo
+Verify the engine sees them:
 
 ```bash
-curl -fsSL https://edpa.technomaton.com/install.sh | sh
+python3 .claude/edpa/scripts/engine.py --status
+```
+
+```
+EDPA 1.3.2-beta — Status
+========================================
+✓ .edpa/ found at .edpa
+✓ people.yaml — 2 members, 1.5 FTE, 120h/iteration
+    Alice Architect           Arch     0.5 FTE  40h
+    Bob Developer             Dev      1.0 FTE  80h
+✓ heuristics loaded
+✓ backlog — 0 features, 0 stories
+```
+
+### 3. Add a toy iteration + backlog (~2 min)
+
+One iteration plus two stories, one per person:
+
+```bash
+cat > .edpa/iterations/PI-2026-1.1.yaml <<'YAML'
+iteration:
+  id: PI-2026-1.1
+  pi: PI-2026-1
+  status: active
+  dates: '1.1.-15.1.2026'
+YAML
+
+cat > .edpa/backlog/stories/S-1.yaml <<'YAML'
+id: S-1
+type: Story
+title: "First user-facing feature"
+parent: null
+status: Done
+js: 3
+iteration: PI-2026-1.1
+contributors:
+  - person: alice
+    role: owner
+    cw: 1.0
+YAML
+
+cat > .edpa/backlog/stories/S-2.yaml <<'YAML'
+id: S-2
+type: Story
+title: "Backend integration"
+parent: null
+status: Done
+js: 5
+iteration: PI-2026-1.1
+contributors:
+  - person: bob
+    role: owner
+    cw: 1.0
+YAML
+
+git add .
+git -c user.email="you@example.com" -c user.name="You" commit -q -m "seed"
+```
+
+### 4. Close the iteration (~30 s)
+
+```bash
+mkdir -p .edpa/reports/iteration-PI-2026-1.1
+python3 .claude/edpa/scripts/engine.py \
+  --edpa-root .edpa --iteration PI-2026-1.1 --mode gates \
+  --output .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
+```
+
+```
+======================================================================
+EDPA 1.3.2-beta — Iteration PI-2026-1.1 (gates mode)
+======================================================================
+Person                    Role     Capacity  Derived  Items   OK
+----------------------------------------------------------------------
+Alice Architect           Arch          40h    40.0h      1   OK
+Bob Developer             Dev           80h    80.0h      1   OK
+----------------------------------------------------------------------
+TEAM TOTAL                             120h   120.0h
+PLANNING CAPACITY                     96.0h  (factor: 0.8)
+
+All invariants passed: YES
+
+--- Alice Architect (40h) ---
+  Item       Level      JS     CW   Score   Ratio   Hours
+  S-1        Story       3   1.00    3.00 100.0%   40.0h
+
+--- Bob Developer (80h) ---
+  Item       Level      JS     CW   Score   Ratio   Hours
+  S-2        Story       5   1.00    5.00 100.0%   80.0h
+```
+
+What just happened:
+
+- **Capacity 40h, Derived 40h**: Alice declared 40h. Story S-1 (JS=3,
+  owner role, CW=1.0) was the only thing she touched, so all 40
+  derived hours land on S-1.
+- **All invariants passed**: each person's derived hours sum to their
+  declared capacity, ratios sum to 1.0, no negative scores. The math
+  holds — the snapshot is auditable.
+- An `item-costs.xlsx` was emitted alongside the JSON results.
+
+### 5. Generate timesheets — `/edpa:reports PI-2026-1.1` (Claude Code)
+
+If you have Claude Code running in this directory, the reports skill
+picks up the engine output and writes per-person Markdown timesheets
+plus the cost-allocation Excel. After it runs:
+
+```
+.edpa/reports/iteration-PI-2026-1.1/
+├── edpa_results.json      ← engine output
+├── item-costs.xlsx        ← per-item / per-person cost split
+├── summary.xlsx           ← team summary
+├── timesheet-alice.md     ← human-readable, ready to attach to invoice
+└── timesheet-bob.md
+```
+
+Each Markdown timesheet is a paste-able audit artefact: which items,
+which roles, which scores, how many hours.
+
+### Try the demo without your own data
+
+If you just want to see the math against a synthetic team:
+
+```bash
 python3 .claude/edpa/scripts/engine.py --demo
 ```
+
+A pre-seeded 3-person team with 4 stories runs through the full
+calculation in under a second.
+
+### What's next
+
+- **Real GitHub Projects integration** (push backlog → issues, sync
+  status changes, gate-based prep-work credit): [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
+- **Claude Code MCP layer** (5 read-only tools so the assistant
+  reads `.edpa/` structurally instead of grep): [`docs/mcp.md`](docs/mcp.md)
+- **Methodology** (CW heuristics, gate model, audit trail, Monte
+  Carlo calibration): [`docs/methodology.md`](docs/methodology.md)
+- **Repeatable E2E test**: [`docs/E2E-TEST-PLAN.md`](docs/E2E-TEST-PLAN.md)
+  (script-level) and [`docs/E2E-SKILLS-TEST-PLAN.md`](docs/E2E-SKILLS-TEST-PLAN.md)
+  (skill-level).
 
 ## How It Works
 
