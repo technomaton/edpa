@@ -1,0 +1,63 @@
+name: Notify TECHNOMATON Hub of new release
+
+# Fires after a release is published and tells the hub
+# (technomaton/technomaton-hub) to run its `sync-edpa.yml` workflow,
+# which downloads this release tarball and opens a PR bumping
+# packs/tm-edpa/.
+#
+# Requires a repo-scoped PAT stored as the secret HUB_DISPATCH_TOKEN.
+# The token must have `repo` scope (public_repo is enough if the hub
+# is public) and write access to technomaton/technomaton-hub. A
+# fine-grained token scoped to that repo with "Actions: Read & write"
+# is the recommended choice. Generate at:
+#   https://github.com/settings/tokens?type=beta
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to dispatch (default: latest release)"
+        required: false
+        default: ""
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          if [ -z "$TAG" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          if [ -z "$TAG" ]; then
+            TAG=$(gh release list --repo "${{ github.repository }}" --limit 1 \
+              --json tagName --jq '.[0].tagName')
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Dispatching tag: $TAG"
+
+      - name: Trigger hub sync workflow
+        env:
+          GH_TOKEN: ${{ secrets.HUB_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "ERROR: HUB_DISPATCH_TOKEN secret is not configured."
+            echo "Create a PAT with repo write access to"
+            echo "technomaton/technomaton-hub and add it as a secret."
+            exit 1
+          fi
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/technomaton/technomaton-hub/dispatches \
+            -f "event_type=edpa-release" \
+            -f "client_payload[tag]=${{ steps.tag.outputs.tag }}" \
+            -f "client_payload[repo]=${{ github.repository }}" \
+            -f "client_payload[release_url]=${{ github.event.release.html_url }}"
+          echo "Dispatched edpa-release event with tag ${{ steps.tag.outputs.tag }}"
