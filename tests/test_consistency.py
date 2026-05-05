@@ -255,12 +255,29 @@ def test_people_yaml_is_example():
 # ---------------------------------------------------------------------------
 
 def test_requirements_exist():
-    """requirements.txt and requirements-dev.txt must exist and list pyyaml."""
+    """requirements.txt and requirements-dev.txt must exist and resolve to pyyaml.
+
+    Accepts a literal `pyyaml` line OR an `-r requirements.txt` include that
+    transitively pulls it in.
+    """
     for fname in ("requirements.txt", "requirements-dev.txt"):
         path = ROOT / fname
         assert path.exists(), f"{fname} not found"
         content = path.read_text().lower()
-        assert "pyyaml" in content, f"{fname} must contain 'pyyaml'"
+        if "pyyaml" in content:
+            continue
+        # Accept transitive include: -r requirements.txt
+        includes = [
+            line.split(maxsplit=1)[1].strip()
+            for line in content.splitlines()
+            if line.strip().startswith("-r ")
+        ]
+        resolved = any(
+            "pyyaml" in (ROOT / inc).read_text().lower()
+            for inc in includes
+            if (ROOT / inc).exists()
+        )
+        assert resolved, f"{fname} must contain 'pyyaml' directly or via -r include"
 
 
 # ---------------------------------------------------------------------------

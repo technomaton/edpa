@@ -1,2 +1,4 @@
-pyyaml
+-r requirements.txt
 pytest
+jsonschema
+openpyxl

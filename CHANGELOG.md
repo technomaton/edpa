@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Changed (dev tooling)
+- `requirements-dev.txt` now does `-r requirements.txt` and adds
+  `jsonschema` + `openpyxl` so a fresh `pip install -r
+  requirements-dev.txt` runs the full test suite instead of skipping
+  43 tests on missing optional dependencies.
+- Default `pytest tests/ -m "not e2e"` count went from 84 passed +
+  7 skipped + 1 collection error to **127 passed**, 0 skipped, 0
+  errors. The 6 e2e tests stay opt-in (real GitHub API).
+
+### Fixed
+- `test_consistency.test_requirements_exist` accepted only a
+  literal `pyyaml` line in each requirements file. Now also
+  accepts a transitive `-r requirements.txt` include.
+
 ## 1.2.1-beta — 2026-05-05
 
 Installer hot-fix on top of 1.1.0-beta. No engine, sync, or report
