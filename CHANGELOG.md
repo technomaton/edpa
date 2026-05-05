@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+- `install.sh` now seeds `.edpa/config/edpa.yaml` from
+  `project.yaml.tmpl` alongside `heuristics.yaml` and `people.yaml`.
+  Previously the template was bundled in `plugin/edpa/templates/` but
+  never copied, so `engine --status` on a fresh install reported
+  `✗ edpa.yaml not found` until `/edpa:setup` ran. No functional
+  block — `setup` would still create the file — just a confusing
+  onboarding hint.
+
 ## 1.1.0-beta — 2026-05-05
 
 ### Changed (BREAKING for fresh installs only)

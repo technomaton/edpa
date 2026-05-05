@@ -126,6 +126,10 @@ if [ ! -f ".edpa/config/people.yaml" ] && [ -f "$TARGET/edpa/templates/people.ya
   cp "$TARGET/edpa/templates/people.yaml.tmpl" ".edpa/config/people.yaml"
   echo "Created .edpa/config/people.yaml from template (edit with your team)"
 fi
+if [ ! -f ".edpa/config/edpa.yaml" ] && [ -f "$TARGET/edpa/templates/project.yaml.tmpl" ]; then
+  cp "$TARGET/edpa/templates/project.yaml.tmpl" ".edpa/config/edpa.yaml"
+  echo "Created .edpa/config/edpa.yaml from template (run /edpa:setup to configure)"
+fi
 
 # Show installed version
 if [ -f "$TARGET/.claude-plugin/plugin.json" ]; then
