@@ -678,13 +678,14 @@ const perPersonTests = categories
   .reduce((sum, cat) => sum + cat.tests.length, 0);
 const globalTests = totalTests - perPersonTests;
 const totalChecks = (perPersonTests * teamSize) + globalTests;
+import { VERSION } from '../lib/version';
 ---
 <Layout title="Evaluace a testy" description="302 verifikačních kontrol EDPA — invarianty, evidence detection, CW heuristika, edge cases, governance audit.">
 <div class="container section evaluation-page">
 
   <div class="page-header">
     <div class="tag">Evaluace</div>
-    <h1>Testy a evaluace EDPA v1.1.0-beta</h1>
+    <h1>Testy a evaluace EDPA v{VERSION}</h1>
     <p class="subtitle">{totalChecks} verifikačních kontrol — {totalTests} scénářů × {teamSize} členů týmu</p>
   </div>
 
@@ -931,7 +932,7 @@ const totalChecks = (perPersonTests * teamSize) + globalTests;
         <thead>
           <tr>
             <th>Kritérium</th>
-            <th style="color:var(--gn)">EDPA v1.1.0-beta</th>
+            <th style="color:var(--gn)">EDPA v{VERSION}</th>
             <th>Ruční timesheets</th>
             <th>Fixní alokace</th>
           </tr>

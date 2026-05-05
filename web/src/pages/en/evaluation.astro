@@ -678,13 +678,14 @@ const perPersonTests = categories
   .reduce((sum, cat) => sum + cat.tests.length, 0);
 const globalTests = totalTests - perPersonTests;
 const totalChecks = (perPersonTests * teamSize) + globalTests;
+import { VERSION } from '../../lib/version';
 ---
 <Layout title="Evaluation and tests" lang="en">
 <div class="container section evaluation-page">
 
   <div class="page-header">
     <div class="tag">Evaluation</div>
-    <h1>Tests and evaluation of EDPA v1.1.0-beta</h1>
+    <h1>Tests and evaluation of EDPA v{VERSION}</h1>
     <p class="subtitle">{totalChecks} verification checks — {totalTests} scenarios &times; {teamSize} team members</p>
   </div>
 
@@ -917,7 +918,7 @@ const totalChecks = (perPersonTests * teamSize) + globalTests;
         <thead>
           <tr>
             <th>Criterion</th>
-            <th style="color:var(--gn)">EDPA v1.1.0-beta</th>
+            <th style="color:var(--gn)">EDPA v{VERSION}</th>
             <th>Manual timesheets</th>
             <th>Fixed allocation</th>
           </tr>

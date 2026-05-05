@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import { VERSION } from '../../lib/version';
 ---
 <Layout title="EDPA Playbook" lang="en" description="Complete guide for deploying EDPA — from empty repository to closing the first Planning Interval and calibrating heuristics.">
 <div class="container section playbook-page">
@@ -8,7 +9,7 @@ import Layout from '../../layouts/Layout.astro';
     <div class="tag">Playbook</div>
     <h1>EDPA Playbook — Od nuly po první PI</h1>
     <p class="subtitle">Kompletní příručka pro nasazení metodiky EDPA na nový projekt</p>
-    <p class="meta">EDPA v1.1.0-beta &middot; Březen 2026</p>
+    <p class="meta">EDPA v{VERSION} &middot; Březen 2026</p>
   </div>
 
   <div class="methodology-layout">
@@ -185,7 +186,7 @@ people:
   domain: "mujprojekt.cz"
 
 governance:
-  methodology: "EDPA v1.1.0-beta"
+  methodology: "EDPA v{VERSION}"
   calculation_mode: "simple"            # simple (JS x CW) nebo full (JS x CW x RS)
   audit_mode: "full"
 

@@ -1,16 +1,17 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { VERSION } from '../lib/version';
 ---
 
-<Layout title="Evidence-Driven Proportional Allocation" description="EDPA v1.1.0-beta — automatické odvození pracovních hodin z GitHub delivery evidence. Gates mode credituje každý status přechod, bidirectional sync s GitHub Projects. Bez timesheetů, s matematickou garancí.">
+<Layout title="Evidence-Driven Proportional Allocation" description={`EDPA v${VERSION} — automatické odvození pracovních hodin z GitHub delivery evidence. Gates mode credituje každý status přechod, bidirectional sync s GitHub Projects. Bez timesheetů, s matematickou garancí.`}>
 
   <!-- Hero Section -->
   <section class="hero section">
     <div class="container hero-inner">
-      <p class="tag">Evidence-Driven Proportional Allocation · v1.1.0-beta</p>
+      <p class="tag">Evidence-Driven Proportional Allocation · v{VERSION}</p>
       <h1 class="hero-headline">Čas se neměří — odvozuje se</h1>
       <p class="hero-subtitle">
-        EDPA v1.1.0-beta nahrazuje ruční timesheety automatickým odvozením hodin
+        EDPA v{VERSION} nahrazuje ruční timesheety automatickým odvozením hodin
         z GitHub delivery evidence. <strong>Gates mode</strong> credituje každý
         status přechod (LBC, design, refinement) — ne jen finální Done.
         <strong>Bidirectional sync</strong> mezi GitHub Projects a lokálními YAMLy.
@@ -45,10 +46,10 @@ import Layout from '../layouts/Layout.astro';
     </div>
   </section>
 
-  <!-- What's New v1.1.0-beta -->
+  <!-- What's New v{VERSION} -->
   <section class="section" id="whats-new">
     <div class="container">
-      <p class="tag">Novinky v1.1.0-beta</p>
+      <p class="tag">Novinky v{VERSION}</p>
       <h2 class="section-title">Co přibylo v této verzi</h2>
       <div class="grid grid-3">
         <div class="card cyan">

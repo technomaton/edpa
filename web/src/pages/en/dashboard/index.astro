@@ -24,6 +24,7 @@ const velocityData = iterations.map(it => {
     inProgress: items.filter(i => i.level === 'Story' && i.iteration === it.id && i.status === 'Implementing').length,
   };
 });
+import { VERSION } from '../../../lib/version';
 ---
 
 <Layout title="Dashboard — SaaS Platform" description="Interactive EDPA dashboard demo — per-person and per-item analytics with derived hours calculation." lang="en">
@@ -43,7 +44,7 @@ const velocityData = iterations.map(it => {
           <span class="badge badge-yellow" style="cursor: pointer;" id="modeLabel">Operational (Simple): JS × CW</span>
         </div>
       </div>
-      <div class="dash-meta" style="margin-top: 6px;">{project.organization} | {project.registration} | EDPA v1.1.0-beta</div>
+      <div class="dash-meta" style="margin-top: 6px;">{project.organization} | {project.registration} | EDPA v{VERSION}</div>
     </div>
 
     <!-- KPI row -->

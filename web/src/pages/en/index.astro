@@ -1,8 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import { VERSION } from '../../lib/version';
 ---
 
-<Layout title="Evidence-Driven Proportional Allocation" description="EDPA v1.1.0-beta — automatic working hour derivation from GitHub delivery evidence. Zero timesheets, mathematical guarantee." lang="en">
+<Layout title="Evidence-Driven Proportional Allocation" description={`EDPA v${VERSION} — automatic working hour derivation from GitHub delivery evidence. Zero timesheets, mathematical guarantee.`} lang="en">
 
   <!-- Hero Section -->
   <section class="hero section">
@@ -10,7 +11,7 @@ import Layout from '../../layouts/Layout.astro';
       <p class="tag">Evidence-Driven Proportional Allocation</p>
       <h1 class="hero-headline">Time is not measured — it is derived</h1>
       <p class="hero-subtitle">
-        EDPA v1.1.0-beta replaces manual timesheets with automatic hour derivation
+        EDPA v{VERSION} replaces manual timesheets with automatic hour derivation
         from GitHub delivery evidence. Mathematical guarantee, zero administration.
       </p>
       <div class="grid grid-4 hero-stats">
