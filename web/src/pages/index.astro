@@ -2,16 +2,18 @@
 import Layout from '../layouts/Layout.astro';
 ---
 
-<Layout title="Evidence-Driven Proportional Allocation" description="EDPA v1.0.0-beta — automatické odvození pracovních hodin z GitHub delivery evidence. Bez timesheetů, s matematickou garancí.">
+<Layout title="Evidence-Driven Proportional Allocation" description="EDPA v1.1.0-beta — automatické odvození pracovních hodin z GitHub delivery evidence. Gates mode credituje každý status přechod, bidirectional sync s GitHub Projects. Bez timesheetů, s matematickou garancí.">
 
   <!-- Hero Section -->
   <section class="hero section">
     <div class="container hero-inner">
-      <p class="tag">Evidence-Driven Proportional Allocation</p>
+      <p class="tag">Evidence-Driven Proportional Allocation · v1.1.0-beta</p>
       <h1 class="hero-headline">Čas se neměří — odvozuje se</h1>
       <p class="hero-subtitle">
-        EDPA v1.0.0-beta nahrazuje ruční timesheety automatickým odvozením hodin
-        z GitHub delivery evidence. Matematická garance, nulová administrativa.
+        EDPA v1.1.0-beta nahrazuje ruční timesheety automatickým odvozením hodin
+        z GitHub delivery evidence. <strong>Gates mode</strong> credituje každý
+        status přechod (LBC, design, refinement) — ne jen finální Done.
+        <strong>Bidirectional sync</strong> mezi GitHub Projects a lokálními YAMLy.
       </p>
       <div class="grid grid-4 hero-stats">
         <div class="card accent">
@@ -20,14 +22,14 @@ import Layout from '../layouts/Layout.astro';
           <p class="stat-desc">Žádné ruční logování</p>
         </div>
         <div class="card green">
-          <p class="stat-label">Garance</p>
-          <p class="stat-value">Sum = Capacity</p>
-          <p class="stat-desc">Matematicky zaručeno</p>
+          <p class="stat-label">Gates stabilita</p>
+          <p class="stat-value">0.35 pp</p>
+          <p class="stat-desc">spread pod ±20 % CW (100 MC runs)</p>
         </div>
         <div class="card cyan">
-          <p class="stat-label">Analytika</p>
-          <p class="stat-value">Dual-view</p>
-          <p class="stat-desc">Per-person i per-item</p>
+          <p class="stat-label">Sync</p>
+          <p class="stat-value">Bidirectional</p>
+          <p class="stat-desc">push + pull + auto-resolve konfliktů</p>
         </div>
         <div class="card yellow">
           <p class="stat-label">Kalibrace</p>
@@ -39,6 +41,43 @@ import Layout from '../layouts/Layout.astro';
         <a href="/dashboard/" class="btn btn-primary">Dashboard demo</a>
         <a href="/calculator/" class="btn btn-secondary">Kalkulator</a>
         <a href="/presentation/" class="btn btn-secondary">Prezentace</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- What's New v1.1.0-beta -->
+  <section class="section" id="whats-new">
+    <div class="container">
+      <p class="tag">Novinky v1.1.0-beta</p>
+      <h2 class="section-title">Co přibylo od 1.0.0-beta</h2>
+      <div class="grid grid-3">
+        <div class="card cyan">
+          <h3 class="card-heading">Gates mode (default)</h3>
+          <p class="card-text">
+            Engine credituje každý Initiative/Epic/Feature status přechod jako
+            mini-deliverable. Architekti a PM jsou kreditováni za LBC, design
+            a refinement práci napříč gates — ne jen za finální Done.
+            Validováno na 4 PI × 2 iterace simulaci.
+          </p>
+        </div>
+        <div class="card green">
+          <h3 class="card-heading">GitHub Projects sync</h3>
+          <p class="card-text">
+            <code>sync push</code> vytvoří issues s custom fields, nastaví
+            assignees podle <code>github:</code> mapping v people.yaml.
+            <code>sync pull</code> mirror UI změn zpět do YAMLu.
+            <code>--strategy last-write-wins</code> auto-resolve konfliktů.
+          </p>
+        </div>
+        <div class="card yellow">
+          <h3 class="card-heading">Production ready</h3>
+          <p class="card-text">
+            127 unit testů, 6 E2E proti reálnému GitHubu, 100 Monte Carlo runs
+            (avg MAD 7.8 % vs ground truth, spread 0.35 pp pod ±20 %
+            perturbací). Plný operační runbook v
+            <code>docs/RUNBOOK.md</code>.
+          </p>
+        </div>
       </div>
     </div>
   </section>

@@ -2,7 +2,7 @@
 
 **Derive hours from Git evidence. No timesheets.**
 
-[![EDPA](https://img.shields.io/badge/EDPA-1.0.0--beta-34d399)](docs/methodology.md)
+[![EDPA](https://img.shields.io/badge/EDPA-1.1.0--beta-34d399)](docs/methodology.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/Made_for-GitHub-181717?logo=github)](https://github.com)
 
@@ -27,19 +27,23 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 
 **After EDPA:**
 ```
-$ python3 .claude/edpa/scripts/engine.py --demo
+$ python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
 
-EDPA 1.0.0-beta — Iteration DEMO-1.1 (simple mode)
+EDPA 1.1.0-beta — Iteration PI-2026-1.3 (gates mode)
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
-Alice (Arch)              Arch          40h   40.01h      4   OK
-Alice (PM)                PM            20h    20.0h      2   OK
-Bob (Dev)                 Dev           80h    80.0h      4   OK
-Carol (Dev)               Dev           60h   59.99h      3   OK
+J. Urbanek                Arch          40h    40.0h     15   OK   ← Arch credited 15×
+                                                                     for Feature/Epic gate
+                                                                     transitions (LBC, design,
+                                                                     refinement) — invisible
+                                                                     in old simple mode.
+O. Tuma                   DevSecOps      80h    80.0h      9   OK
+Turyna                    Dev           60h    60.0h      7   OK
+Matousek                  Dev           60h    60.0h      5   OK
 ----------------------------------------------------------------------
-TEAM TOTAL                             200h   200.0h
-PLANNING CAPACITY                    160.0h  (factor: 0.8)
+TEAM TOTAL                             240h   240.0h
+PLANNING CAPACITY                    192.0h  (factor: 0.8)
 
 All invariants passed: YES
 ```
@@ -48,10 +52,12 @@ All invariants passed: YES
 
 - **Zero manual input** — hours derived from GitHub delivery evidence (commits, PRs, reviews, comments)
 - **Mathematical guarantee** — derived hours always sum to declared capacity
+- **Gates mode (default)** — credits each Initiative/Epic/Feature status transition as a mini-deliverable, so prep work (LBC, decomposition, design) gets credited as it happens, not only at final Done. Validated to ±0.35 pp stability under ±20 % CW perturbation across 100 Monte Carlo runs.
+- **Bidirectional GitHub Projects sync** — `sync push` creates issues with custom fields, `sync pull` mirrors GH UI changes back into local YAML; conflict auto-resolution with `last-write-wins` / `local-wins` / `remote-wins` strategies.
 - **Dual-view** — per-person timesheets AND per-item cost allocation from the same data
 - **Audit-grade** — frozen snapshots, immutable records, BankID signing support
 - **Self-tuning** — auto-calibrates heuristics using Karpathy's autoresearch loop
-- **GitHub-native** — works with GitHub Issues, Projects, PRs, and Actions
+- **GitHub-native** — works with GitHub Issues, Projects, PRs, and Actions (real E2E tested against `technomaton/edpa-e2e-test` sandbox)
 
 ## Quick Start
 
@@ -119,8 +125,11 @@ python3 .claude/edpa/scripts/engine.py --demo
 2. **System detects evidence** from GitHub (assignee, PR author, reviewer, committer, commenter)
 3. **Evidence maps to Contribution Weight** (owner=1.0, key=0.6, reviewer=0.25, consulted=0.15)
 4. **Score = JobSize x CW** for each (person, item) pair
-5. **Hours = (Score / TotalScores) x Capacity** — proportional allocation
-6. **Invariant: Sum always equals declared capacity**
+5. **Gates (default)**: each Initiative/Epic/Feature status transition becomes a mini-deliverable
+   with `effective_js = parent.js × gate_weight`. Stories still credited at Done. Run
+   `--mode simple` if your project does not record mid-life status transitions in git.
+6. **Hours = (Score / TotalScores) x Capacity** — proportional allocation
+7. **Invariant: Sum always equals declared capacity**
 
 Two complementary views from the same data:
 
@@ -228,13 +237,35 @@ cp -r .claude/skills/* ~/.gemini/skills/
 
 | Resource | Description |
 |----------|-------------|
-| [edpa-simulation](https://github.com/technomaton/edpa-simulation) | Full EDPA simulation — 2 PIs, 10 iterations, 510 commits, 7 team members |
+| [edpa-simulation](https://github.com/technomaton/edpa-simulation) | Original `--mode simple` simulation — 2 PIs, 10 iterations, 510 commits, 7 team members |
+| [edpa-simulation-gates](https://github.com/technomaton/edpa-simulation-gates) | `--mode gates` validation — 4 PI × 2 iter, 156 git transitions, 6-person virtual team. **Avg MAD 7.8 % vs ground truth, 0.35 pp spread under ±20 % CW perturbation across 100 Monte Carlo runs.** |
 | [calibrate_roles.py](https://github.com/technomaton/edpa-simulation/blob/main/scripts/calibrate_roles.py) | Multi-scenario CW calibration (8 scenarios, 569 pairs, MAD reduction 6.7%) |
 | [edpa.technomaton.com](https://edpa.technomaton.com) | Public website with interactive dashboard, presentation, methodology, evaluation |
 
 The default CW weights in `.edpa/config/heuristics.yaml` are calibrated from 8 team scenarios
 (Startup, Enterprise, DevOps-heavy, Research, Consultancy, AI-Native, Regulated, kashealth).
 Key correction: BO/PM/Arch are systematically undervalued by Git auto-detection; QA slightly overvalued.
+
+## GitHub Projects Sync
+
+EDPA is bidirectionally synchronized with a GitHub Project:
+
+```bash
+python3 .claude/edpa/scripts/sync.py status            # health overview
+python3 .claude/edpa/scripts/sync.py diff               # what would change
+python3 .claude/edpa/scripts/sync.py pull --commit      # GH → local YAML, auto-commit
+python3 .claude/edpa/scripts/sync.py push               # local → GH (creates issues if missing)
+python3 .claude/edpa/scripts/sync.py setup-refresh      # rebuild field IDs after manual GH edits
+python3 .claude/edpa/scripts/sync.py conflicts \
+    --strategy last-write-wins --apply                  # auto-resolve conflicts
+```
+
+`project_setup.py` creates a Project with all custom fields (Job Size, BV, TC, RR, WSJF, Team,
+per-level Status workflows, Iteration), persists field IDs to `.edpa/config/edpa.yaml`, and
+maps every backlog item to a GH issue in `.edpa/config/issue_map.yaml`. See
+[`docs/RUNBOOK.md`](docs/RUNBOOK.md) for the full operational guide and
+[`tests/test_e2e_sync.py`](tests/test_e2e_sync.py) for end-to-end tests against a real GitHub
+sandbox.
 
 ## Part of TECHNOMATON Hub
 
