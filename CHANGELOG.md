@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.2.1-beta — 2026-05-05
+
+Installer hot-fix on top of 1.1.0-beta. No engine, sync, or report
+changes — only `install.sh` is materially different.
+
 ### Fixed
 - `install.sh` now seeds `.edpa/config/edpa.yaml` from
   `project.yaml.tmpl` alongside `heuristics.yaml` and `people.yaml`.
@@ -10,6 +15,14 @@
   `✗ edpa.yaml not found` until `/edpa:setup` ran. No functional
   block — `setup` would still create the file — just a confusing
   onboarding hint.
+- `install.sh` resolves the latest release with prerelease awareness.
+  GitHub's `/releases/latest` API and `gh release download` without
+  an explicit tag both skip prereleases, so while every release is
+  `-beta` they returned 404 and the installer silently fell back to
+  a `main` branch clone. The gh path now uses `gh release list
+  --limit 1` to find the most recent tag (any release type); the
+  curl path uses `/releases` (plural) and picks the first matching
+  asset.
 
 ## 1.1.0-beta — 2026-05-05
 

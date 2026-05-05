@@ -68,19 +68,24 @@ TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 echo "Downloading EDPA plugin..."
+# Pick the most recent release tag (including prereleases — GitHub's
+# "/releases/latest" API and `gh release download` without a tag both
+# skip prereleases, which would silently fall back to a main-branch
+# clone whenever every published release is marked `-beta`).
 if command -v gh >/dev/null 2>&1; then
-  # Try latest release first, fall back to main branch
-  if gh release download --repo "$REPO" --pattern "edpa-plugin.tar.gz" --dir "$TMPDIR" 2>/dev/null; then
-    echo "Downloaded from latest release."
+  LATEST_TAG=$(gh release list --repo "$REPO" --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+  if [ -n "$LATEST_TAG" ] && gh release download "$LATEST_TAG" --repo "$REPO" --pattern "edpa-plugin.tar.gz" --dir "$TMPDIR" 2>/dev/null; then
+    echo "Downloaded from release $LATEST_TAG."
     mkdir -p "$TMPDIR/edpa"
     tar -xzf "$TMPDIR/edpa-plugin.tar.gz" -C "$TMPDIR/edpa"
   else
-    echo "No release found, cloning main branch..."
+    echo "No release asset found, cloning main branch..."
     gh repo clone "$REPO" "$TMPDIR/edpa" -- --depth 1 -q
   fi
 else
-  # Try release tarball first, fall back to main branch archive
-  RELEASE_URL=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+  # /releases (plural) returns ALL releases including prereleases,
+  # most recent first. Take the first matching asset URL.
+  RELEASE_URL=$(curl -fsSL "https://api.github.com/repos/$REPO/releases" 2>/dev/null \
     | grep '"browser_download_url".*edpa-plugin.tar.gz' \
     | head -1 | cut -d'"' -f4) || true
 
