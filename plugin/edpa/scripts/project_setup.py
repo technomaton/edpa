@@ -86,6 +86,73 @@ def fail(text):
     print(f"      {C.RED}✗{C.RESET} {text}")
 
 
+def _extend_iteration_options_via_graphql(*, project_id: str, wanted: list[str]):
+    """Append any missing iteration options to the existing Iteration
+    single-select field on the project.
+
+    GitHub's `updateProjectV2Field` replaces the full option list, so we
+    fetch the current options, union with `wanted`, and submit the
+    combined list with the existing IDs preserved (which keeps the
+    mutation a true append rather than a destructive overwrite).
+
+    Returns:
+        list[str]  — the option names that were newly added.
+        None       — the GraphQL update isn't available (mutation
+                     missing on this GitHub deployment, or the lookup
+                     failed). Caller falls back to the previous
+                     "manual add via UI" advice.
+    """
+    if not wanted:
+        return []
+    # Look up the field id + existing options for the Iteration field.
+    fields_query = (
+        f'{{ node(id: "{project_id}") {{ ... on ProjectV2 {{ '
+        f'fields(first: 100) {{ nodes {{ '
+        f'... on ProjectV2SingleSelectField {{ id name '
+        f'options {{ id name color description }} }} }} }} }} }} }}'
+    )
+    data = gh_graphql(fields_query)
+    if not data or "data" not in data:
+        return None
+    nodes = (data["data"].get("node") or {}).get("fields", {}).get("nodes", []) or []
+    iter_field = next((n for n in nodes if n.get("name") == "Iteration"), None)
+    if not iter_field:
+        return None
+    existing_options = iter_field.get("options") or []
+    existing_names = {o["name"] for o in existing_options}
+    missing = [w for w in wanted if w not in existing_names]
+    if not missing:
+        return []
+
+    def _opt_to_input(o, *, has_id):
+        # color / description are required fields on the input shape;
+        # we round-trip whatever's already there for existing options
+        # and pick a neutral default for new ones.
+        parts = [
+            f'name: "{o["name"]}"',
+            f'color: {o.get("color") or "GRAY"}',
+            f'description: "{(o.get("description") or "").replace(chr(34), chr(92) + chr(34))}"',
+        ]
+        if has_id and o.get("id"):
+            parts.insert(0, f'id: "{o["id"]}"')
+        return "{ " + ", ".join(parts) + " }"
+
+    existing_inputs = [_opt_to_input(o, has_id=True) for o in existing_options]
+    new_inputs = [_opt_to_input({"name": n}, has_id=False) for n in missing]
+    full_list = "[" + ", ".join(existing_inputs + new_inputs) + "]"
+    mutation = (
+        f'mutation {{ updateProjectV2Field(input: {{ '
+        f'fieldId: "{iter_field["id"]}" '
+        f'singleSelectOptions: {full_list} }}) {{ '
+        f'projectV2Field {{ ... on ProjectV2SingleSelectField '
+        f'{{ id options {{ id name }} }} }} }} }}'
+    )
+    result = gh_graphql(mutation)
+    if not result or "data" not in result:
+        return None
+    return missing
+
+
 def _bootstrap_pi_stub_if_empty(iter_dir: Path) -> None:
     """Drop a stub PI-{year}-1.yaml + per-iteration child files into
     iterations/ if the directory has no PI YAML yet.
@@ -353,16 +420,24 @@ def main():
         iteration_options = ["TBD"]
     opts_str = ",".join(iteration_options)
     if "Iteration" in existing_field_names:
-        # The Iteration field already exists. We can't extend single-select
-        # options non-destructively from gh CLI, so just warn the user with
-        # the exact set of tags they need to add manually in the GH UI
-        # (Project → Settings → Iteration → Add option) for this rerun's
-        # new iterations to round-trip cleanly.
-        info(f"Iteration (already exists, options not changed)")
-        if iteration_options:
-            info(f"  expected options: {', '.join(iteration_options)}")
-            info("  (add any missing ones via GH UI: Project → Settings → "
-                 "Iteration → Add option)")
+        # Iteration field already exists. gh CLI can't extend
+        # single-select options, but the GraphQL `updateProjectV2Field`
+        # mutation can — provided we send the FULL option list (existing
+        # ∪ new), since the mutation replaces rather than appends.
+        added = _extend_iteration_options_via_graphql(
+            project_id=project_id,
+            wanted=iteration_options,
+        )
+        if added is None:
+            info("Iteration (already exists, options unchanged — "
+                 "GraphQL update unavailable)")
+            if iteration_options:
+                info(f"  expected options: {', '.join(iteration_options)}")
+        elif added:
+            ok(f"Iteration (extended with {len(added)} new option(s): "
+               f"{', '.join(added)})")
+        else:
+            info(f"Iteration (already exists, all wanted options already present)")
     else:
         if run(f'gh project field-create {project_num} --owner {args.org} '
                f'--name "Iteration" --data-type SINGLE_SELECT '
