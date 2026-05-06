@@ -631,6 +631,12 @@ def load_gate_events(edpa_root, iteration_id, heuristics):
     audit = []
     for t in transitions:
         item_type = t["item_type"]
+        # Stories are surfaced by transitions.py for audit/debug visibility,
+        # but engine gates mode credits stories only at status=Done (handled
+        # in load_backlog_items). Skip story-level transitions here so we
+        # don't double-count.
+        if item_type == "Story":
+            continue
         weights = gate_weights.get(item_type, {}) or {}
         gate_key = f"{t['from_status']}→{t['to_status']}"
         weight = weights.get(gate_key)

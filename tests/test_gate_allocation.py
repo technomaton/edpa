@@ -120,10 +120,18 @@ def test_detects_initial_status_creation(tmp_path):
     repo, edpa = _make_repo(tmp_path)
     ts = transitions.detect_transitions(edpa)
     initial = [t for t in ts if t["from_status"] is None]
-    # Stories aren't tracked — only Initiative + Epic + Feature
-    assert len(initial) == 3
+    # All four levels (Initiative + Epic + Feature + Story) appear in
+    # transitions.py output for audit visibility. Engine gates mode still
+    # credits Story only at status=Done — load_gate_events filters Story
+    # transitions out so we don't double-count.
+    assert len(initial) == 4
     types = {t["item_id"]: t["item_type"] for t in initial}
-    assert types == {"I-1": "Initiative", "E-1": "Epic", "F-1": "Feature"}
+    assert types == {
+        "I-1": "Initiative",
+        "E-1": "Epic",
+        "F-1": "Feature",
+        "S-1": "Story",
+    }
 
 
 def test_detects_subsequent_transition(tmp_path):

@@ -30,6 +30,7 @@ except ImportError:
 
 
 TRACKED_DIRS = {
+    "stories": "Story",
     "features": "Feature",
     "epics": "Epic",
     "initiatives": "Initiative",
