@@ -145,7 +145,9 @@ iteration:
   id: PI-2026-1.1
   pi: PI-2026-1
   status: active
-  dates: '1.1.-7.1.2026'      # 1-week iteration
+  start_date: 2026-01-05
+  end_date: 2026-01-09
+  weeks: 1
 YAML
 
 cat > .edpa/backlog/stories/S-1.yaml <<'YAML'

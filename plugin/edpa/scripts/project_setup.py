@@ -49,9 +49,16 @@ class C:
 
 
 def run(cmd, check=True):
-    """Run a shell command and return stdout."""
+    """Run a shell command and return stdout, or None on failure.
+
+    On failure the captured stderr is echoed to ours so callers (and
+    test suites that pipe stderr) can see *why* the call failed instead
+    of just receiving a bare None.
+    """
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     if check and result.returncode != 0:
+        if result.stderr:
+            print(result.stderr.rstrip(), file=sys.stderr)
         return None
     return result.stdout.strip()
 
@@ -275,9 +282,24 @@ def main():
         f'--single-select-options "{opts_str}"')
     ok(f"Iteration (SINGLE_SELECT, {len(iteration_options)} options)")
 
-    # Refresh field IDs after creating typed status fields
-    field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json')
-    fields = json.loads(field_json).get("fields", [])
+    # Refresh field IDs after creating typed status fields. GitHub's
+    # ProjectV2 API occasionally returns 5xx right after a burst of
+    # field-create calls (eventual consistency under load); retry once
+    # so the wizard isn't fragile to that.
+    import time
+    field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json --limit 100')
+    if not field_json:
+        time.sleep(2)
+        field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json --limit 100')
+    if not field_json:
+        fail(f"gh project field-list returned no output for project #{project_num}. "
+             f"Check that gh CLI is authenticated and the project is reachable.")
+        sys.exit(1)
+    try:
+        fields = json.loads(field_json).get("fields", [])
+    except (ValueError, TypeError) as exc:
+        fail(f"Could not parse field-list JSON ({exc}); raw output: {field_json[:200]!r}")
+        sys.exit(1)
     field_ids = {f["name"]: f["id"] for f in fields}
     option_ids = {}
     for f in fields:

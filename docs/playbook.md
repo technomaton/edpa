@@ -273,36 +273,40 @@ Role-specificke korekce (strategicke role jsou Gitem podhodnoceny):
 | PM consulted | 0.20 (+0.05) | Specifikace neviditelna v Gitu |
 | Arch reviewer | 0.30 (+0.05) | Design review neviditelny |
 
-### 1.5 Nakonfigurovat .edpa/config/edpa.yaml
+### 1.5 Nakonfigurovat .edpa/config/edpa.yaml a iterations/
 
-Upravit `.edpa/config/edpa.yaml`:
+`edpa.yaml` od v1.5.0 obsahuje pouze stabilní governance / sync konfiguraci.
+PI a iterace žijí v `.edpa/iterations/` jako samostatné soubory:
 
 ```yaml
-# PI konfigurace
+# .edpa/iterations/PI-2026-1.yaml — PI-level metadata
 pi:
-  current: PI-2026-1
-  year: 2026
-  num: 1
+  id: PI-2026-1
+  status: active
   iteration_weeks: 1                      # AI-native default
-  pi_weeks: 5                             # 4 delivery + 1 IP
-  iterations:
-    - id: PI-2026-1.1
-      dates: "1.4.–7.4.2026"
-      status: planned
-    - id: PI-2026-1.2
-      dates: "8.4.–14.4.2026"
-      status: planned
-    - id: PI-2026-1.3
-      dates: "15.4.–21.4.2026"
-      status: planned
-    - id: PI-2026-1.4
-      dates: "22.4.–28.4.2026"
-      status: planned
-    - id: PI-2026-1.5
-      dates: "29.4.–5.5.2026"
-      status: planned
-      type: IP  # Innovation & Planning (debt, prioritizace, PI planning)
+  pi_iterations: 5                         # 4 delivery + 1 IP
+  start_date: 2026-04-01
+  end_date: 2026-05-05
+```
 
+```yaml
+# .edpa/iterations/PI-2026-1.1.yaml — per-iteration data
+iteration:
+  id: PI-2026-1.1
+  pi: PI-2026-1
+  start_date: 2026-04-01
+  end_date: 2026-04-07
+  weeks: 1
+  status: planned
+# planning / delivery / stories_detail follow as the iteration runs
+```
+
+Vytvoř obdobně `PI-2026-1.{2..5}.yaml`. Poslední iterace dostane
+`type: IP` (Innovation & Planning). Kontinuitu (žádné mezery /
+překryvy, `weeks` × 7 ≈ rozdíl dat) hlídá `validate_iterations.py`
+i automatický PostToolUse hook.
+
+```yaml
 # Sync nastaveni
 sync:
   github_org: "my-org"                  # <-- Vase organizace
@@ -688,7 +692,9 @@ Priklad struktury:
 iteration:
   id: PI-2026-1.1
   pi: PI-2026-1
-  dates: "1.4.–14.4.2026"
+  start_date: 2026-04-01
+  end_date: 2026-04-14
+  weeks: 2
   status: closed
 
 planning:
@@ -823,18 +829,29 @@ python .claude/edpa/scripts/backlog.py wsjf
 ```
 
 3. **Kapacitni planovani** -- aktualizovat `.edpa/config/people.yaml` (zmeny FTE, dostupnost)
-4. **Aktualizovat `.edpa/config/edpa.yaml`** -- novy PI, iterace, datumy
+4. **Vytvorit nove iteration soubory** v `.edpa/iterations/`:
 
 ```yaml
+# .edpa/iterations/PI-2026-2.yaml
 pi:
-  current: PI-2026-2
-  year: 2026
-  num: 2
-  iterations:
-    - id: PI-2026-2.1
-      dates: "10.6.–23.6.2026"
-      status: planned
-    # ...
+  id: PI-2026-2
+  status: planning
+  iteration_weeks: 2
+  pi_iterations: 5
+  start_date: 2026-06-10
+  end_date: 2026-08-18
+```
+
+```yaml
+# .edpa/iterations/PI-2026-2.1.yaml
+iteration:
+  id: PI-2026-2.1
+  pi: PI-2026-2
+  start_date: 2026-06-10
+  end_date: 2026-06-23
+  weeks: 2
+  status: planned
+# ...
 ```
 
 ---

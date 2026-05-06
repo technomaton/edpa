@@ -234,31 +234,27 @@ naming:
       </table>
     </div>
 
-    <h3>1.5 Nakonfigurovat .edpa/config/edpa.yaml</h3>
-    <pre><code>pi:
-  current: PI-2026-1
-  year: 2026
-  num: 1
+    <h3>1.5 Nakonfigurovat .edpa/iterations/ a .edpa/config/edpa.yaml</h3>
+    <p>Od v1.5 žije PI a iterace v <code>.edpa/iterations/</code> jako samostatné soubory. <code>edpa.yaml</code> obsahuje jen stabilní governance / sync konfiguraci.</p>
+    <pre><code># .edpa/iterations/PI-2026-1.yaml — PI-level metadata
+pi:
+  id: PI-2026-1
+  status: active
   iteration_weeks: 2
-  pi_weeks: 10
-  iterations:
-    - id: PI-2026-1.1
-      dates: "1.4.–14.4.2026"
-      status: planned
-    - id: PI-2026-1.2
-      dates: "15.4.–28.4.2026"
-      status: planned
-    - id: PI-2026-1.3
-      dates: "29.4.–12.5.2026"
-      status: planned
-    - id: PI-2026-1.4
-      dates: "13.5.–26.5.2026"
-      status: planned
-    - id: PI-2026-1.5
-      dates: "27.5.–9.6.2026"
-      status: planned
-      type: IP  # Innovation &amp; Planning
-
+  pi_iterations: 5
+  start_date: 2026-04-01
+  end_date: 2026-06-09</code></pre>
+    <pre><code># .edpa/iterations/PI-2026-1.1.yaml — per-iteration data
+iteration:
+  id: PI-2026-1.1
+  pi: PI-2026-1
+  start_date: 2026-04-01
+  end_date: 2026-04-14
+  weeks: 2
+  status: planned
+# (planning / delivery sekce přibydou s během iterace)</code></pre>
+    <p>Vytvoř obdobně <code>PI-2026-1.2.yaml</code> až <code>PI-2026-1.5.yaml</code>; poslední dostane <code>type: IP</code>. Kontinuitu hlídá <code>validate_iterations.py</code> a PostToolUse hook.</p>
+    <pre><code># .edpa/config/edpa.yaml — sync config
 sync:
   github_org: "my-org"
   github_project_number: 1
@@ -593,7 +589,9 @@ python3 .claude/edpa/scripts/sync.py status</code></pre>
     <pre><code>iteration:
   id: PI-2026-1.1
   pi: PI-2026-1
-  dates: "1.4.–14.4.2026"
+  start_date: 2026-04-01
+  end_date: 2026-04-14
+  weeks: 2
   status: closed
 
 planning:
