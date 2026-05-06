@@ -1,4 +1,4 @@
-"""Tests for v1.9.0-beta per-person, per-iteration capacity overrides.
+"""Tests for v1.9.0 per-person, per-iteration capacity overrides.
 
 The override is expressed as a top-level `people:` block in
 .edpa/iterations/<id>.yaml that reuses the people.yaml schema as a

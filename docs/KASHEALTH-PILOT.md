@@ -3,7 +3,7 @@
 - **Grant:** CZ.01.01.01/01/24_062/0007440 · OP TAK
 - **Org:** [`kashealth`](https://github.com/kashealth) (ČVUT FBMI + Medicalc software s.r.o.)
 - **Primary repo:** `kashealth/kas-platform-v1` (private monorepo)
-- **EDPA version:** **1.9.0-beta** (release tag, asset `edpa-plugin.tar.gz`)
+- **EDPA version:** **1.9.0** (release tag, asset `edpa-plugin.tar.gz`)
 - **Pilot lead:** Jaroslav Urbánek (Lead Architect / Vedoucí VaV)
 - **Pilot kickoff:** 2026-05-07 (proposed)
 - **Pilot duration:** 1 PI (5 weeks, target close 2026-06-11)
@@ -68,11 +68,11 @@ Vrací **exit 0** když je všechno připravené pro § 2; jinak vypíše seznam
 # v lokálním klonu kashealth/kas-platform-v1
 cd ~/projects/kas-platform-v1   # nebo kdekoli máte klon
 
-# Plugin se stáhne z release v1.9.0-beta tarballu
+# Plugin se stáhne z release v1.9.0 tarballu
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 
-**Očekávaný výstup:** `EDPA 1.9.0-beta installed successfully!` + 3 config soubory ze šablon vytvořeny v `.edpa/config/`.
+**Očekávaný výstup:** `EDPA 1.9.0 installed successfully!` + 3 config soubory ze šablon vytvořeny v `.edpa/config/`.
 
 ## 3. Naplnit configy (people.yaml, edpa.yaml)
 
@@ -229,7 +229,7 @@ people:
 **Engine output:**
 
 ```
-EDPA 1.9.0-beta — Iteration PI-2026-2.5 (gates mode)
+EDPA 1.9.0 — Iteration PI-2026-2.5 (gates mode)
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -453,9 +453,9 @@ Před prvním spuštěním je třeba se rozhodnout:
 ## Příloha B — odkazy
 
 - Governance design: [`docs/examples/governance-kashealth/governance-reseni-v3.md`](examples/governance-kashealth/governance-reseni-v3.md)
-- Methodology: [`docs/methodology.md`](methodology.md) (EDPA 1.9.0-beta spec)
+- Methodology: [`docs/methodology.md`](methodology.md) (EDPA 1.9.0 spec)
 - Per-iteration overrides RFC: [`docs/proposals/per-iteration-capacity-overrides.md`](proposals/per-iteration-capacity-overrides.md)
 - v1.9.0 E2E report: [`docs/E2E-REPORT-2026-05-06-v190.md`](E2E-REPORT-2026-05-06-v190.md) — IP iteration override scenario PASS
 - E2E test plan: [`docs/E2E-TEST-PLAN.md`](E2E-TEST-PLAN.md) — pilot je § 13 plánu
 - Last full E2E: [`docs/E2E-REPORT-2026-05-06-v181.md`](E2E-REPORT-2026-05-06-v181.md) — 20/20 PASS
-- CHANGELOG: [`CHANGELOG.md`](../CHANGELOG.md) — v1.9.0-beta release notes
+- CHANGELOG: [`CHANGELOG.md`](../CHANGELOG.md) — v1.9.0 release notes

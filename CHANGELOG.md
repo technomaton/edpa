@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 1.9.0 — 2026-05-07
+
+Stable release for the kashealth pilot kickoff (2026-05-07). Drops
+the `-beta` suffix from 1.9.0-beta after a fourth consecutive E2E
+run (`docs/E2E-REPORT-2026-05-06-v190.md`) confirmed 32/32 cumulative
+findings PASS and the 260-test unit suite stayed green across the
+B-fix breaking rename and the per-iteration override rollout.
+
+This release is what kashealth/kas-platform-v1 will install
+tomorrow per `docs/KASHEALTH-PILOT.md` § 12. No code changes vs.
+1.9.0-beta — only the version string in plugin.json, README,
+methodology, templates, skills, the E2E test plan, and the pilot
+runbook. Backlog YAMLs, iteration overrides, snapshot signature,
+and the install.sh fetch path are byte-identical to 1.9.0-beta.
+
 ## 1.9.0-beta — 2026-05-06
 
 Adds per-person, per-iteration capacity overrides — the missing piece
