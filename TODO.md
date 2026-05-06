@@ -88,6 +88,53 @@ merged option list.
 
 ---
 
+## v1.6.1 — collaborators-sync follow-ups
+
+Surfaced by the live PR run on technomaton/edpa#20 (2026-05-06).
+
+### Workflow token scope (~ 10 lines)
+
+`GITHUB_TOKEN` on the default runner returned only 2 of 5 actual repo
+collaborators (the workflow showed `Adds applied: 2` while the local
+`gh` CLI with `admin:org` scope sees 5). Outside collaborators,
+pending invitations, and team-granted access are invisible to the
+default token.
+
+**Fix:** add `permissions: { members: read }` if GitHub honors it on
+public repos, or document a `COLLAB_SYNC_TOKEN` PAT secret with the
+required scopes (`repo`, `read:org`) and reference it in the
+workflow's `env`. README quick-start should mention the secret as
+optional but recommended.
+
+### YAML round-trip preserves comments (~ 30 lines)
+
+`yaml.safe_dump()` strips comments. The first PR run wiped
+`# EXAMPLE DATA — replace with your team when deploying` from
+`.edpa/config/people.yaml`. That's a regression for any project
+where people.yaml carries inline notes (capacity rationale,
+"on parental leave", etc.).
+
+**Fix:** switch `sync_collaborators.write_people_yaml()` to
+`ruamel.yaml` round-trip mode. Already a transitive dependency
+through other ecosystem tooling but verify `requirements.txt`.
+Alternative: line-append-only path that finds the `people:` block
+and appends new entries at the end without re-serializing the rest.
+
+### Auto-merge stubs onto existing entries (~ 50 lines, optional)
+
+Both `martinturyna` and `mtury` are likely the same person
+(`turyna` in the existing roster). The current logic doesn't
+attempt a name-match merge — it appends two new stubs and leaves
+the maintainer to delete them and set `github:` on the existing
+entry instead.
+
+This is intentional for v1.6.0 (explicit, predictable, no
+false-positive merges). Revisit for v1.7 if the manual merge
+becomes painful in practice — heuristic could be: if a new
+collaborator's `name` (from `gh api users/{login}`) matches an
+existing person's `name` ≥ 70 % via fuzzy match, surface in the
+PR body with a "merge candidate" note rather than auto-applying.
+
 ## v1.5 — Operational tooling
 
 ### Skill side-effect testing via `claude -p` (P1, ~150 lines)
