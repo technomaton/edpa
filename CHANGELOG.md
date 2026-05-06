@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 1.6.2-beta — 2026-05-06
+
+### Fixed
+- **collaborators-sync workflow no longer rejected by GitHub.** The
+  v1.6.1 attempt added `permissions: { members: read }`, but that
+  scope does not exist for GitHub Actions — the parser returned
+  HTTP 422 on workflow_dispatch and the workflow file shipped
+  broken. Replaced with the PAT-secret approach the TODO already
+  flagged as the fallback: `GH_TOKEN: ${{ secrets.COLLAB_SYNC_TOKEN
+  || secrets.GITHUB_TOKEN }}`. Without the secret the workflow
+  uses the default token (direct collaborators only). Set
+  `COLLAB_SYNC_TOKEN` (PAT with `repo` + `read:org`) to cover org
+  members and pending invitations.
+
 ## 1.6.1-beta — 2026-05-06
 
 ### Fixed

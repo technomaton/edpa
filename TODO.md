@@ -92,35 +92,17 @@ merged option list.
 
 Surfaced by the live PR run on technomaton/edpa#20 (2026-05-06).
 
-### ~~Workflow token scope (members: read permission)~~ — done in v1.6.1
+### ~~Workflow token scope — PAT fallback~~ — done in v1.6.2
 
-Both `.github/workflows/collaborators-sync.yml` and the shipped
-`plugin/edpa/workflows/collaborators-sync.yml` now declare
-`permissions: { members: read }` so `GITHUB_TOKEN` can see team-
-granted access and pending invitations, not just direct
-collaborators.
-
-### Token scope — PAT fallback for org members (~ 10 lines)
-
-If `members: read` on the default `GITHUB_TOKEN` still doesn't
-surface every collaborator (private orgs, SAML-locked orgs, or
-when GitHub silently downgrades the permission), document a
-`COLLAB_SYNC_TOKEN` Personal Access Token secret with `repo` and
-`read:org` scopes.
-
-The workflow would conditionally use it:
-
-```yaml
-env:
-  GH_TOKEN: ${{ secrets.COLLAB_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
-```
-
-README quick-start gets a note: "Optional — set
-`COLLAB_SYNC_TOKEN` secret if your workflow's first run reports
-fewer collaborators than `gh api repos/{owner}/{repo}/collaborators`
-shows you locally." Open as v1.6.x patch only if the live
-deployment proves the default permission insufficient — for now
-the v1.6.1 fix is enough.
+`members: read` does NOT exist as a workflow permission (GitHub
+rejects the file with HTTP 422 — surfaced by a workflow_dispatch
+attempt right after v1.6.1 shipped, before any user could hit it).
+The actual fix landed in v1.6.2: both copies of the workflow read
+`GH_TOKEN` from `${{ secrets.COLLAB_SYNC_TOKEN || secrets.GITHUB_TOKEN }}`.
+The PAT is optional — when unset the workflow falls back to the
+default token and sees direct collaborators only. To cover org
+members + pending invitations, set `COLLAB_SYNC_TOKEN` (PAT with
+`repo` + `read:org` scopes) on the repo.
 
 ### ~~YAML round-trip preserves comments~~ — done in v1.6.1
 
