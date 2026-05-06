@@ -425,14 +425,16 @@ def _handle_people(edpa_root: Path, team_filter: str | None) -> list[TextContent
 
     result = []
     for p in people:
-        result.append({
+        entry = {
             "id": p.get("id"),
             "name": p.get("name", p.get("id")),
             "role": p.get("role"),
             "team": p.get("team"),
             "fte": p.get("fte"),
             "capacity": p.get("capacity_per_iteration") or p.get("capacity", 0),
-        })
+            "github": p.get("github") or None,
+        }
+        result.append(entry)
 
     return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
 

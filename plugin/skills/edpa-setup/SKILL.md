@@ -65,8 +65,21 @@ cp .claude/edpa/workflows/*.yml .github/workflows/ 2>/dev/null || true
 ### 3. Initialize capacity registry
 
 Create `.edpa/config/people.yaml` with project name from $ARGUMENTS.
-Ask user for: team members (name, role, FTE, team/organization).
-Calculate capacity_per_iteration based on FTE × hours_per_week × iteration_weeks.
+For each team member, ask the user explicitly for: name, role,
+team/organization, FTE, email, **and GitHub username**. Calculate
+`capacity_per_iteration = fte × hours_per_week × iteration_weeks`.
+
+**CRITICAL** — never invent the `github` field from email patterns
+(e.g. `jaroslav@company.com` → `jaroslav`) or from the user's name.
+GitHub usernames are not derivable. If the user does not know
+someone's login, leave `github: ""` and tell them they can fill it
+in later — `sync push --assignee` simply skips people without a
+login. Inventing a login risks routing issue assignments to a
+stranger with the same handle.
+
+Canonical phrasing per person:
+> "GitHub username for {name}? (leave blank if you don't know it
+> right now — you can fill it in later in `.edpa/config/people.yaml`)"
 
 Template:
 ```yaml
@@ -86,6 +99,8 @@ people:
     fte: 1.0
     capacity_per_iteration: 80
     email: ""
+    github: ""              # GitHub login (or blank — don't guess)
+    availability: confirmed  # confirmed, partial, unavailable
 ```
 
 ### 4. Initialize CW heuristics

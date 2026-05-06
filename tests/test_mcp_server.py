@@ -149,7 +149,7 @@ def test_handle_iterations_has_results():
 # ---------------------------------------------------------------------------
 
 def test_handle_people_all():
-    """Returns all 9 people."""
+    """Returns all 9 people with the documented field set."""
     data = parse_result(_handle_people(EDPA_ROOT, None))
     assert len(data) == 9
 
@@ -159,6 +159,8 @@ def test_handle_people_all():
     assert urbanek["team"] == "CVUT"
     assert urbanek["fte"] == 0.5
     assert urbanek["capacity"] == 40
+    # github is part of the surface — None when missing, login string when set.
+    assert "github" in urbanek
 
 
 def test_handle_people_filter_team():
