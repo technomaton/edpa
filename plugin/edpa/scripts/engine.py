@@ -47,6 +47,12 @@ def get_version():
 
 VERSION = get_version()
 
+# Evidence roles the engine knows how to map. Anything else in
+# contributors[].role is rejected with a clear error so users don't
+# silently get 0h derived. Person roles (Dev/Arch/QA/PM) belong in
+# people.yaml, not in story contributors.
+EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
+
 
 def load_yaml(path):
     """Load a YAML file. Returns parsed content or None on failure.
@@ -340,6 +346,9 @@ def load_backlog_items(edpa_root, iteration_id=None):
 
     items = []
     manual_cw_overrides = {}  # {(person_id, item_id): cw_value}
+    schema_warnings = []      # collected per-item schema problems
+    contributors_seen_total = 0
+    evidence_pairs_total = 0
 
     type_dirs = {
         "stories": "Story",
@@ -399,50 +408,130 @@ def load_backlog_items(edpa_root, iteration_id=None):
             body_parts = []
             contributors = data.get("contributors", []) or []
 
+            # Preserve top-level assignees (sync pull stores them as
+            # [{"login": "..."}, ...]) so /contribute body and assignee
+            # signals from GitHub aren't dropped on the floor.
+            top_assignees = data.get("assignees") or []
+            if isinstance(top_assignees, list):
+                for a in top_assignees:
+                    if isinstance(a, dict) and a.get("login"):
+                        if not any(x.get("login") == a["login"] for x in assignees):
+                            assignees.append({"login": a["login"]})
+                    elif isinstance(a, str):
+                        if not any(x.get("login") == a for x in assignees):
+                            assignees.append({"login": a})
+
             # Assignee from top-level field
             assignee = data.get("assignee") or data.get("owner")
-            if assignee:
+            if assignee and not any(a.get("login") == assignee for a in assignees):
                 assignees.append({"login": assignee})
 
-            for contrib in contributors:
+            item_pairs = 0
+            for idx, contrib in enumerate(contributors):
                 if not isinstance(contrib, dict):
+                    schema_warnings.append(
+                        f"{item_id}: contributors[{idx}] is not a mapping (got {type(contrib).__name__})"
+                    )
                     continue
+                contributors_seen_total += 1
                 person = contrib.get("person", "")
-                role = (contrib.get("role", "") or "").lower()
+                role_raw = (contrib.get("role", "") or "").lower()
+                # Accept `weight` as an alias for `cw` so users following older
+                # docs/templates still get correct allocation. Document the
+                # canonical key in the WARN.
                 cw = contrib.get("cw")
+                if cw is None and contrib.get("weight") is not None:
+                    cw = contrib.get("weight")
+                    schema_warnings.append(
+                        f"{item_id}: contributors[{idx}] uses 'weight' — "
+                        f"renamed to 'cw' in v1.7. Engine accepted it for now."
+                    )
+
+                if not person:
+                    schema_warnings.append(
+                        f"{item_id}: contributors[{idx}] missing 'person' (got {contrib!r})"
+                    )
+                    continue
+
+                if role_raw and role_raw not in EVIDENCE_ROLES:
+                    schema_warnings.append(
+                        f"{item_id}: contributors[{idx}] role={role_raw!r} is not an evidence role "
+                        f"({sorted(EVIDENCE_ROLES)}). Person roles (Dev/Arch/QA/PM) belong in people.yaml — "
+                        f"this contributor will not produce evidence."
+                    )
+                    # Still treat presence-of-cw as a manual CW override.
+                    if cw is not None:
+                        manual_cw_overrides[(person, item_id)] = float(cw)
+                    continue
 
                 # Store manual CW override if present
                 if cw is not None:
                     manual_cw_overrides[(person, item_id)] = float(cw)
 
                 # Map contributor role to engine evidence fields
-                if role == "owner":
+                if role_raw == "owner":
                     if not any(a.get("login") == person for a in assignees):
                         assignees.append({"login": person})
-                elif role == "key":
+                elif role_raw == "key":
                     if pr_author is None:
                         pr_author = person
                     commit_authors.append(person)
-                elif role == "reviewer":
+                elif role_raw == "reviewer":
                     pr_reviewers.append(person)
-                elif role == "consulted":
+                elif role_raw == "consulted":
                     commenters.append(person)
+                elif not role_raw:
+                    schema_warnings.append(
+                        f"{item_id}: contributors[{idx}] missing 'role' (one of {sorted(EVIDENCE_ROLES)}). "
+                        f"Skipped — person={person!r} produces no evidence signal."
+                    )
+                    continue
+
+                item_pairs += 1
 
                 # Generate /contribute command for manual CW
                 if cw is not None:
                     body_parts.append(f"/contribute @{person} weight:{cw}")
+
+            evidence_pairs_total += item_pairs
+
+            # Preserve top-level body (e.g., from sync pull) and append our
+            # generated /contribute lines so both signals contribute.
+            top_body = data.get("body", "") or ""
+            body_combined = top_body
+            if body_parts:
+                if body_combined:
+                    body_combined += "\n"
+                body_combined += "\n".join(body_parts)
 
             items.append({
                 "id": item_id,
                 "level": data.get("type", level),
                 "job_size": js,
                 "assignees": assignees,
-                "body": "\n".join(body_parts) if body_parts else "",
+                "body": body_combined,
                 "pr_author": pr_author,
                 "commit_authors": commit_authors,
                 "pr_reviewers": pr_reviewers,
                 "commenters": commenters,
             })
+
+    if schema_warnings:
+        print("", file=sys.stderr)
+        print("WARN: backlog schema issues detected:", file=sys.stderr)
+        for w in schema_warnings:
+            print(f"  - {w}", file=sys.stderr)
+        print("", file=sys.stderr)
+
+    if contributors_seen_total > 0 and evidence_pairs_total == 0:
+        print(
+            "WARN: 0 evidence pairs derived from "
+            f"{contributors_seen_total} contributor entries. "
+            "Engine will allocate 0h. Check contributors[].role and "
+            f"contributors[].cw — required schema is role ∈ "
+            f"{sorted(EVIDENCE_ROLES)}, cw ∈ [0,1].",
+            file=sys.stderr,
+        )
 
     return items, manual_cw_overrides
 
