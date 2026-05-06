@@ -38,6 +38,37 @@ TRACKED_DIRS = {
 
 STATUS_LINE = re.compile(r"^([+-])status:\s*(\S+)")
 
+_RELATIVE_SINCE_RE = re.compile(
+    r"^\s*(\d+)\s*(day|days|d|week|weeks|w|month|months|m)\s*$",
+    re.IGNORECASE,
+)
+
+
+def parse_since(value: str) -> datetime:
+    """Parse --since value: ISO YYYY-MM-DD or relative like 7days/2weeks/1month."""
+    from datetime import timedelta
+    s = (value or "").strip()
+    m = _RELATIVE_SINCE_RE.match(s)
+    if m:
+        n = int(m.group(1))
+        unit = m.group(2).lower()
+        if unit.startswith("d"):
+            delta = timedelta(days=n)
+        elif unit.startswith("w"):
+            delta = timedelta(weeks=n)
+        else:  # 'm' = month, approximate as 30 days
+            delta = timedelta(days=30 * n)
+        return datetime.now(timezone.utc) - delta
+    # Fall back to ISO YYYY-MM-DD
+    return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+
+
+def parse_until(value: str) -> datetime:
+    """Parse --until: ISO YYYY-MM-DD (relative not currently supported)."""
+    return datetime.fromisoformat(value).replace(
+        hour=23, minute=59, second=59, tzinfo=timezone.utc,
+    )
+
 
 def run_git(args, cwd: Path):
     result = subprocess.run(
@@ -194,8 +225,14 @@ def annotate_with_iterations(edpa_root: Path, transitions):
 def main():
     parser = argparse.ArgumentParser(description="EDPA Transition Detector")
     parser.add_argument("--edpa-root", default=".edpa", type=Path)
-    parser.add_argument("--since", help="ISO date YYYY-MM-DD (start of window)")
-    parser.add_argument("--until", help="ISO date YYYY-MM-DD (end of window)")
+    parser.add_argument(
+        "--since",
+        help="ISO YYYY-MM-DD or relative (1day/7days/2weeks/3months)",
+    )
+    parser.add_argument(
+        "--until",
+        help="ISO YYYY-MM-DD (end of window)",
+    )
     parser.add_argument("--iteration", help="Iteration ID — derive window from .edpa/iterations/<id>.yaml")
     parser.add_argument("--format", choices=["text", "json"], default="text")
     args = parser.parse_args()
@@ -213,11 +250,19 @@ def main():
         since, until = parse_iteration_dates(iter_file)
     else:
         if args.since:
-            since = datetime.fromisoformat(args.since).replace(tzinfo=timezone.utc)
+            try:
+                since = parse_since(args.since)
+            except ValueError as e:
+                print(f"ERROR: --since {args.since!r} is not ISO YYYY-MM-DD or "
+                      f"relative (1day/2weeks/3months): {e}",
+                      file=sys.stderr)
+                return 2
         if args.until:
-            until = datetime.fromisoformat(args.until).replace(
-                hour=23, minute=59, second=59, tzinfo=timezone.utc
-            )
+            try:
+                until = parse_until(args.until)
+            except ValueError as e:
+                print(f"ERROR: --until must be ISO YYYY-MM-DD: {e}", file=sys.stderr)
+                return 2
 
     transitions = detect_transitions(args.edpa_root, since=since, until=until)
     annotate_with_iterations(args.edpa_root, transitions)
