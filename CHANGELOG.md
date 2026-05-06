@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.5.0-beta — 2026-05-06
+
 ### Changed (BREAKING)
 - **PI/iteration schema migration.** `pis[]` is no longer stored in
   `.edpa/config/edpa.yaml`. The canonical source is now
@@ -39,6 +41,14 @@
   `config['pi']` (singular) fallback removed too. No migration shim:
   pre-1.5 projects that still ship `pis[]` should upgrade by moving
   iteration data into `iterations/*.yaml`.
+
+### Fixed
+- `project_setup.py` setup-refresh flow no longer crashes with
+  `TypeError: the JSON object must be str, bytes or bytearray, not
+  NoneType` when the GitHub ProjectV2 API returns 5xx mid-burst. The
+  `gh project field-list` call retries once after a 2 s sleep and
+  fails with a clear error message instead of `json.loads(None)`.
+  Pre-existing bug surfaced by the v1.5 e2e run.
 
 ## 1.4.1-beta — 2026-05-06
 
