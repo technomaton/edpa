@@ -151,28 +151,24 @@ benefit from a known-good signal independent of the developer's machine.
 **Acceptance:** workflow runs nightly, posts a status check on the latest
 release tag.
 
-### Release pipeline as CI workflow (~ 1 file)
+### Release pipeline as CI workflow — _shipped, awaiting first-tag verify_
 
-Today `edpa-plugin.tar.gz` is built locally before each `gh release create`
-— the maintainer runs `tar -czf edpa-plugin.tar.gz plugin/` and uploads
-the asset by hand. Risks: forgotten asset (installer falls back to main
-branch silently), inconsistent tar contents between releases, no
-provenance trail.
+`.github/workflows/release.yml` lives. Triggers on `v*` tag push or
+manual `workflow_dispatch` for back-fill. Builds `edpa-plugin.tar.gz`
+with `__pycache__`/`*.pyc`/`.DS_Store` excluded, extracts the matching
+CHANGELOG section into release notes, sets `--prerelease` for
+`-alpha`/`-beta`/`-rc` tags, calls `gh release create` (or `gh release
+upload --clobber` if the tag already has a release).
 
-Add `.github/workflows/release.yml`:
-  on:
-    push:
-      tags: ['v*']
-  jobs.release:
-    - checkout
-    - tar -czf edpa-plugin.tar.gz plugin/
-    - gh release create "$TAG" --prerelease --notes-from-tag edpa-plugin.tar.gz
+**Maintainer flow** is now: bump versions, update CHANGELOG, commit
+`release: vX.Y.Z`, then `git tag vX.Y.Z && git push --tags`. The
+workflow does the rest. v1.5.0-beta itself was published manually
+(workflow didn't exist yet); next tag is the real test.
 
-Once shipped, document the maintainer flow as `git tag vX.Y.Z && git push
---tags` (no manual asset build).
-
-**Acceptance:** pushing a `v*` tag produces a GitHub Release with
-`edpa-plugin.tar.gz` attached, byte-identical regardless of who pushed.
+**Remaining acceptance:** push the next `v*` tag (probably v1.5.1 or
+v1.6.0), confirm Actions run completes green and the resulting
+release asset matches the manually-built v1.5.0-beta tarball
+byte-for-byte (modulo timestamps).
 
 ### Rate limiting / DoS guard for MCP (~ 40 lines)
 

@@ -1,0 +1,110 @@
+name: Release
+
+# Triggered when a `v*` tag is pushed. Builds edpa-plugin.tar.gz from
+# the plugin/ tree and publishes a GitHub Release with that asset
+# attached. Removes the manual `tar -czf ... && gh release create ...`
+# step from the maintainer's hand and guarantees byte-identical asset
+# layout regardless of who tagged.
+#
+# Maintainer flow becomes: bump versions, update CHANGELOG, commit
+# release: vX.Y.Z, then `git tag vX.Y.Z && git push --tags`. The
+# workflow does the rest.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # Manual re-run path for repairing a release whose asset upload was
+  # interrupted, or back-filling assets onto a tag that was created
+  # before this workflow existed.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to (re)build the asset for, e.g. v1.5.0-beta'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve target tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: $TAG"
+
+      - name: Checkout at tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Build edpa-plugin.tar.gz
+        run: |
+          tar --exclude='__pycache__' \
+              --exclude='*.pyc' \
+              --exclude='.DS_Store' \
+              -czf edpa-plugin.tar.gz plugin/
+          ls -lh edpa-plugin.tar.gz
+          echo "Contents (top level):"
+          tar -tzf edpa-plugin.tar.gz | head -10
+
+      - name: Extract CHANGELOG section for ${{ steps.tag.outputs.version }}
+        run: |
+          python3 - "${{ steps.tag.outputs.version }}" > release-notes.md <<'PY'
+          import re, sys
+          version = sys.argv[1]
+          text = open('CHANGELOG.md').read()
+          # Match `## {version} — date` heading through the next `## ` heading.
+          pattern = rf'(## {re.escape(version)}\b.*?)(?=\n## )'
+          m = re.search(pattern, text, re.DOTALL)
+          if m:
+              print(m.group(1).strip())
+          else:
+              # No CHANGELOG entry yet — emit a stub so gh release create
+              # doesn't choke on an empty file. Maintainer should backfill.
+              print(f"# {version}\n\n_CHANGELOG entry pending._")
+          PY
+          echo "--- release-notes.md preview ---"
+          head -20 release-notes.md
+
+      - name: Decide prerelease flag
+        id: prerelease
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          # Match the historical convention: every -alpha/-beta/-rc tag
+          # is a prerelease. Stable tags (no suffix) are full releases.
+          if [[ "$TAG" == *"-alpha"* || "$TAG" == *"-beta"* || "$TAG" == *"-rc"* ]]; then
+            echo "flag=--prerelease" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Tag already published — just refresh the asset (handles
+            # workflow_dispatch back-fill and interrupted upload retries).
+            echo "Release $TAG exists — refreshing asset only."
+            gh release upload "$TAG" edpa-plugin.tar.gz \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$TAG" edpa-plugin.tar.gz \
+              --repo "$GITHUB_REPOSITORY" \
+              ${{ steps.prerelease.outputs.flag }} \
+              --title "$TAG" \
+              --notes-file release-notes.md
+          fi
