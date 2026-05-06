@@ -2,11 +2,13 @@
 
 ## Unreleased
 
-## 1.7.0-beta — 2026-05-06
+## 1.8.0-beta — 2026-05-06
 
 Closes all 18 findings from the 2026-05-06 E2E test
 (`docs/E2E-REPORT-2026-05-06.md`) plus a follow-up cleanup of the
-`contributors[].role` key. Six findings were critical — engine
+`contributors[].role` key. Minor-bumped from 1.7.0 because the
+contributors schema rename is breaking — see "Breaking" below for
+the one-shot migration command. Six findings were critical — engine
 silently allocating 0h on a schema mismatch, project_setup
 duplicating projects/issues on rerun, missing typed Status
 field_ids on first run — and the rest were ergonomic gaps the

@@ -198,7 +198,7 @@ initiatives:
                 iteration: PI-2026-1.1
                 contributors:
                   - person: turyna
-                    role: owner
+                    as: owner
                     cw: 1.0
 ```
 
