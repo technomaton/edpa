@@ -1918,7 +1918,11 @@ def cmd_conflicts(root, sync_config, args):
         gh_data = None
     if gh_data:
         local_items = collect_items_flat(root)
-        remote_items = parse_remote_items(gh_data)
+        fields_mapping = sync_config.get(
+            "fields_mapping",
+            DEFAULT_SYNC_CONFIG["fields_mapping"],
+        )
+        remote_items = map_gh_items_to_edpa(gh_data, fields_mapping)
         diff = compute_diff(local_items, remote_items)
         local_recent_files = _files_changed_since(root, last_pull)
         for change in diff:
