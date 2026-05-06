@@ -90,3 +90,33 @@ people:
 # total_fte: sum of people[].fte
 # total_capacity_per_iteration: sum of people[].capacity_per_iteration
 # total_capacity_per_pi: total_capacity_per_iteration × delivery_iterations_per_pi
+
+# ─────────────────────────────────────────────────────────────────────
+# Backlog item evidence schema (referenced from .edpa/backlog/**/*.yaml)
+# ─────────────────────────────────────────────────────────────────────
+# `people[].role` here = HUMAN role (Dev, Arch, QA, PM, DevSecOps).
+# `contributors[].role` in backlog YAMLs = EVIDENCE role: one of
+#     owner | key | reviewer | consulted
+# These are the only four values the engine knows how to map to
+# evidence signals. Anything else (e.g. role: Dev, role: architect)
+# is treated as unmapped and produces zero evidence — engine prints
+# a clear WARN at startup so this no longer fails silently.
+#
+# Example of a properly evidence-shaped story:
+#
+#   id: S-200
+#   type: Story
+#   parent: F-100
+#   js: 5
+#   status: Done
+#   iteration: PI-2026-1.3
+#   contributors:
+#     - person: bob-dev          # must match people[].id above
+#       role: owner              # owner | key | reviewer | consulted
+#       cw: 0.8                  # 0..1 manual contribution weight (alias: weight)
+#     - person: carol-qa
+#       role: reviewer
+#       cw: 0.2
+#
+# `validate_syntax.py --strict .edpa/backlog/` will block commits that
+# don't match this schema; the default mode warns but allows commit.

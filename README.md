@@ -284,6 +284,40 @@ Two complementary views from the same data:
 | **Per-person** | How did P's time distribute? | Timesheet | Sum = capacity |
 | **Per-item** | What did item X cost? | Cost allocation | Sum = 100% |
 
+## Backlog Item Schema
+
+Every YAML under `.edpa/backlog/<level>/` follows this shape (the
+pre-commit hook + `validate_syntax.py` enforce it):
+
+```yaml
+id: S-200                 # required, must match file name + level prefix
+type: Story               # Initiative | Epic | Feature | Story | Defect | Task
+title: "Add OMOP parser"  # required
+parent: F-100             # required for non-Initiative levels
+status: Done              # required. Portfolio enum (Initiative/Epic):
+                          #   Funnel | Reviewing | Analyzing | Ready | Implementing | Done
+                          # Delivery enum (Feature/Story/Defect):
+                          #   Funnel | Analyzing | Backlog | Implementing | Validating |
+                          #   Deploying | Releasing | Done
+js: 5                     # required for Story/Feature, > 0
+iteration: PI-2026-1.3    # required for Story; optional for Feature
+contributors:             # who actually delivered the work
+  - person: bob-dev       # MUST match a people[].id in people.yaml
+    role: owner           # owner | key | reviewer | consulted (evidence role)
+    cw: 0.8               # 0..1 manual contribution weight (alias: weight)
+  - person: carol-qa
+    role: reviewer
+    cw: 0.2
+```
+
+`contributors[].role` is **not** the human job role (Dev/Arch/QA/PM —
+that lives in `people.yaml`). It's the **evidence role** the engine
+uses to map the contributor to a signal: `owner` ≈ assignee,
+`key` ≈ PR author, `reviewer` ≈ PR reviewer, `consulted` ≈
+issue commenter. Anything outside that enum produces zero evidence
+and triggers a clear `WARN: 0 evidence pairs derived from N
+contributor entries` at engine startup.
+
 ## Directory Structure
 
 After installation, your project will have:
