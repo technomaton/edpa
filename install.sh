@@ -156,6 +156,38 @@ if [ ! -f ".edpa/config/edpa.yaml" ] && [ -f "$TARGET/edpa/templates/project.yam
   echo "Created .edpa/config/edpa.yaml from template (run /edpa:setup to configure)"
 fi
 
+# Install GitHub Actions workflows. The plugin ships ten workflows under
+# edpa/workflows/, but GitHub only runs files in .github/workflows/. Without
+# this copy step, workflows sit unused inside the plugin directory and the
+# customer never gets branch-check, contributor-detect, sync-*, etc.
+#
+# Safe defaults: only copy files that don't already exist in the target.
+# A user who has hand-edited their workflow keeps the hand-edited version;
+# new workflows are installed without surprise overwrites. Use
+# `EDPA_FORCE_WORKFLOWS=1` to force overwrites on a deliberate update.
+if [ -d "$TARGET/edpa/workflows" ]; then
+  mkdir -p ".github/workflows"
+  installed=0
+  skipped=0
+  for src in "$TARGET"/edpa/workflows/*.yml; do
+    [ -e "$src" ] || continue
+    name=$(basename "$src")
+    dest=".github/workflows/$name"
+    if [ -e "$dest" ] && [ "$EDPA_FORCE_WORKFLOWS" != "1" ]; then
+      skipped=$((skipped + 1))
+    else
+      cp "$src" "$dest"
+      installed=$((installed + 1))
+    fi
+  done
+  if [ $installed -gt 0 ] || [ $skipped -gt 0 ]; then
+    echo "GitHub Actions: $installed workflow(s) installed in .github/workflows/, $skipped already present (skipped)"
+    if [ $skipped -gt 0 ] && [ "$EDPA_FORCE_WORKFLOWS" != "1" ]; then
+      echo "  (set EDPA_FORCE_WORKFLOWS=1 and re-run to overwrite skipped files)"
+    fi
+  fi
+fi
+
 # Show installed version
 if [ -f "$TARGET/.claude-plugin/plugin.json" ]; then
   VERSION=$(python3 -c "import json; print(json.load(open('$TARGET/.claude-plugin/plugin.json'))['version'])" 2>/dev/null || echo "unknown")

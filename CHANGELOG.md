@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+## 1.4.1-beta — 2026-05-06
+
+Installer hot-fix on top of [v1.4.0-beta](https://github.com/technomaton/edpa/releases/tag/v1.4.0-beta).
+Tag-only patch — engine, sync, MCP server, reports, and templates are
+byte-identical. Only `install.sh` is materially different.
+
+### Fixed
+- `install.sh` now copies `plugin/edpa/workflows/*.yml` into the
+  target project's `.github/workflows/` directory. Without this step
+  the ten EDPA GitHub Actions (branch-check, contributor-detect,
+  iteration-close, pi-close, sync-git-to-projects,
+  sync-projects-to-git, traceability-check, validate-item,
+  velocity-track, wsjf-calculate) sat unused inside
+  `.claude/edpa/workflows/` because GitHub only runs files in
+  `.github/workflows/`. Customers ended up with a half-functional
+  EDPA install where PR branch checks, validation, and bidirectional
+  sync workflows simply never fired.
+- Safe defaults: only files that don't already exist get copied. A
+  user with hand-edited workflows keeps the hand-edited versions; new
+  workflows install without surprise overwrites. Set
+  `EDPA_FORCE_WORKFLOWS=1` and re-run the installer to overwrite
+  skipped files.
+- Caught while reviewing the kashealth project's `.github/workflows/`
+  directory on 2026-05-06 — six EDPA workflows were missing from
+  what should have been a complete install.
+
+### Verified live
+Three install scenarios tested:
+1. Fresh repo (no `.github/workflows/`) → 10 EDPA workflows installed.
+2. Repo with custom `dispatch-hub-sync.yml` + a user-customized
+   `branch-check.yml` → 9 installed, 1 skipped, the user's
+   customization stays intact, the unrelated custom workflow stays
+   too.
+3. Same as #2 but with `EDPA_FORCE_WORKFLOWS=1` → all 10 installed,
+   user customization gets replaced with the canonical version.
+
 ## 1.4.0-beta — 2026-05-05
 
 Minor release. **Default cadence changes** for freshly initialized
