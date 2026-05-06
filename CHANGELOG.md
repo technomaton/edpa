@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+### Changed (BREAKING)
+- **PI/iteration schema migration.** `pis[]` is no longer stored in
+  `.edpa/config/edpa.yaml`. The canonical source is now
+  `.edpa/iterations/`:
+  - `PI-{year}-{n}.yaml` carries PI-level metadata (status,
+    `iteration_weeks`, `pi_iterations`, `start_date`, `end_date`).
+  - `PI-{year}-{n}.{m}.yaml` carries per-iteration plan and delivery.
+  Per-iteration files use ISO `start_date`/`end_date` plus an explicit
+  `weeks` override; the legacy Czech `dates: "D.M.–D.M.YYYY"` string
+  and the `cadence: "2/10"` shorthand have been removed. `weeks` is
+  reconciled against the date range; declared/derived mismatch is an
+  error surfaced through `edpa_validate` and the PostToolUse hook.
+- `edpa_iterations` MCP response is now `{iterations: [...], warnings?: [...]}`
+  instead of a bare list. `edpa_status` replaces `active_iteration_dates`
+  with separate ISO `active_iteration_start`/`_end` fields and adds a
+  top-level `warnings` field when the loader detects schema drift.
+
+### Added
+- `derive_pis()` runtime loader (`plugin/edpa/scripts/_pi_loader.py`)
+  reconstructs the PI list at runtime, validates continuity (no date
+  gaps/overlaps; weekend bridging tolerated), and reconciles
+  declared vs. derived weeks. 30 unit tests cover every diagnostic.
+- `edpa_validate` MCP tool + `validate_iterations.py` CLI surface
+  the loader's diagnostics for hooks, CI, and assistants.
+- PostToolUse hook (`validate_on_save.sh`) now also runs the
+  iteration validator whenever `.edpa/iterations/*.yaml` changes, so
+  schema drift surfaces immediately on stderr (non-blocking).
+- `project_setup.py` bootstraps a stub `iterations/PI-{year}-1.yaml`
+  (1-week × 5 default cadence, status `planning`) when
+  `iterations/` is empty, so the assistant has something to surface
+  right after setup.
+
+### Removed
+- `config['pis'][*]` — both the field and every reader path. Legacy
+  `config['pi']` (singular) fallback removed too. No migration shim:
+  pre-1.5 projects that still ship `pis[]` should upgrade by moving
+  iteration data into `iterations/*.yaml`.
+
 ## 1.4.1-beta — 2026-05-06
 
 Installer hot-fix on top of [v1.4.0-beta](https://github.com/technomaton/edpa/releases/tag/v1.4.0-beta).

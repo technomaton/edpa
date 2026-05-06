@@ -49,4 +49,16 @@ except Exception as exc:
 # into stdout, which made Claude Code render them as if they were tool
 # output rather than diagnostics.
 
+# Iteration-schema validation: when the edited file is .edpa/iterations/*.yaml,
+# also run the structural validator so date gaps, weeks mismatches, etc.
+# surface immediately. Non-blocking — exit 0 even if errors are found.
+case "$FILE_PATH" in
+    */.edpa/iterations/*.yaml)
+        VALIDATOR="$SCRIPT_DIR/validate_iterations.py"
+        if [ -f "$VALIDATOR" ]; then
+            python3 "$VALIDATOR" 2>&1 | grep -E "^(✗|⚠)" | sed 's/^/EDPA: /' >&2 || true
+        fi
+        ;;
+esac
+
 exit 0

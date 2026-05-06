@@ -31,15 +31,18 @@ Computes derived hours for all team members for a given iteration using EDPA for
 
 If `$ARGUMENTS` is empty, blank, or "help":
 
-1. Read `.edpa/config/edpa.yaml` and extract `pi.iterations`
+1. Call MCP tool `edpa_iterations` (or read `.edpa/iterations/*.yaml`
+   directly). PI/iteration timeline data is reconstructed at runtime
+   from those per-PI and per-iteration YAML files — `edpa.yaml` no
+   longer carries `pis[]`.
 2. Present available iterations with status and dates:
    ```
    Available iterations:
-     PI-2026-1.1  [closed]   1.4–14.4
-     PI-2026-1.2  [closed]   15.4–28.4
-     PI-2026-1.3  [closed]   29.4–12.5
-     PI-2026-1.4  [active]   13.5–26.5  <-- suggested
-     PI-2026-1.5  [planned]  27.5–9.6   (IP)
+     PI-2026-1.1  [closed]   2026-04-06–2026-04-17
+     PI-2026-1.2  [closed]   2026-04-20–2026-05-01
+     PI-2026-1.3  [closed]   2026-05-04–2026-05-15
+     PI-2026-1.4  [active]   2026-05-18–2026-05-29  <-- suggested
+     PI-2026-1.5  [planned]  2026-06-01–2026-06-12  (IP)
    ```
 3. **Default suggestion:** the iteration with `status: active`. If none is active, suggest the latest `closed`.
 4. Ask user: "Which iteration to compute? [suggested-id]"
