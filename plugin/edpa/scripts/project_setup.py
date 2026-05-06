@@ -286,20 +286,32 @@ def main():
     for fname, opts in typed_status_fields.items():
         _create_field(fname, data_type="SINGLE_SELECT", options=opts)
 
-    # Iteration field — populated from .edpa/iterations/*.yaml IDs.
-    # GitHub's native ITERATION type requires a fixed cadence + duration that
-    # doesn't always match SAFe PI windows; SINGLE_SELECT is more flexible
-    # and lets sync round-trip the iteration tag verbatim.
+    # Iteration field — populated from .edpa/iterations/*.yaml IDs and
+    # from any `iteration:` value used by backlog items. GitHub's native
+    # ITERATION type requires a fixed cadence + duration that doesn't
+    # always match SAFe PI windows; SINGLE_SELECT is more flexible and
+    # lets sync round-trip the iteration tag verbatim.
     iter_dir = Path(".edpa/iterations")
-    iteration_options = []
+    iteration_options: list[str] = []
+    seen_iters: set[str] = set()
     if iter_dir.is_dir():
         for f in sorted(iter_dir.glob("*.yaml")):
             try:
                 iter_doc = yaml.safe_load(open(f)) or {}
                 iid = iter_doc.get("iteration", {}).get("id") or f.stem
-                iteration_options.append(iid)
+                if iid and iid not in seen_iters:
+                    iteration_options.append(iid)
+                    seen_iters.add(iid)
             except (yaml.YAMLError, OSError):
                 continue
+    # Pull any iteration tags referenced by backlog items so a fresh
+    # setup with stories tagged "PI-2026-1.1" doesn't silently fail
+    # every push with `[failed: no option_id for 'Iteration':'PI-2026-1.1']`.
+    for it in items:
+        iid = (it.get("iteration") or "").strip()
+        if iid and iid not in seen_iters:
+            iteration_options.append(iid)
+            seen_iters.add(iid)
     # Always create the Iteration field. Without it, every subsequent push
     # of an item with `iteration:` set fails with "no field_id for 'Iteration'"
     # and pull wipes local iteration tags. Use a TBD placeholder when no
@@ -309,7 +321,16 @@ def main():
         iteration_options = ["TBD"]
     opts_str = ",".join(iteration_options)
     if "Iteration" in existing_field_names:
+        # The Iteration field already exists. We can't extend single-select
+        # options non-destructively from gh CLI, so just warn the user with
+        # the exact set of tags they need to add manually in the GH UI
+        # (Project → Settings → Iteration → Add option) for this rerun's
+        # new iterations to round-trip cleanly.
         info(f"Iteration (already exists, options not changed)")
+        if iteration_options:
+            info(f"  expected options: {', '.join(iteration_options)}")
+            info("  (add any missing ones via GH UI: Project → Settings → "
+                 "Iteration → Add option)")
     else:
         if run(f'gh project field-create {project_num} --owner {args.org} '
                f'--name "Iteration" --data-type SINGLE_SELECT '
