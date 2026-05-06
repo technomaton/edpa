@@ -64,8 +64,19 @@ def parse_since(value: str) -> datetime:
 
 
 def parse_until(value: str) -> datetime:
-    """Parse --until: ISO YYYY-MM-DD (relative not currently supported)."""
-    return datetime.fromisoformat(value).replace(
+    """Parse --until: ISO YYYY-MM-DD or relative (1day/2weeks/3months).
+
+    Relative values count back from `now`, identical to --since, so
+    `--since 2weeks --until 1day` selects everything that landed
+    between two weeks ago and yesterday.
+    """
+    s = (value or "").strip()
+    if _RELATIVE_SINCE_RE.match(s):
+        # Reuse parse_since for the math, then snap to end-of-day so a
+        # relative --until still feels like "include the whole day".
+        dt = parse_since(s)
+        return dt.replace(hour=23, minute=59, second=59)
+    return datetime.fromisoformat(s).replace(
         hour=23, minute=59, second=59, tzinfo=timezone.utc,
     )
 
@@ -231,7 +242,7 @@ def main():
     )
     parser.add_argument(
         "--until",
-        help="ISO YYYY-MM-DD (end of window)",
+        help="ISO YYYY-MM-DD or relative (1day/2weeks/3months)",
     )
     parser.add_argument("--iteration", help="Iteration ID — derive window from .edpa/iterations/<id>.yaml")
     parser.add_argument("--format", choices=["text", "json"], default="text")
