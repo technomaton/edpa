@@ -88,6 +88,54 @@ merged option list.
 
 ---
 
+## v1.6.4 — hierarchy + views auto-creation (real-world feedback 2026-05-06)
+
+### `/edpa:sync push` must create issues as sub-issues, not flat (~ 50 lines)
+
+Live testing surfaced that `sync.py push` creates GitHub Issues
+without linking them as sub-issues of their `parent:` field. The
+infrastructure exists — `project_setup.py:469-517` STEP 8 already
+calls GraphQL `addSubIssue` correctly during initial setup. But the
+ongoing push path only writes `parent:` into the issue body and
+returns. Every Story/Feature/Epic added after initial setup ends
+up as a top-level issue.
+
+**Acceptance:**
+- After `sync.py push` completes, every newly-created issue with a
+  non-null `parent:` is linked as a sub-issue of that parent on
+  GitHub. Existing project_setup STEP 8 mutation logic should be
+  factored out into a reusable helper called by both initial setup
+  and ongoing push.
+- `/edpa:sync` skill instruction adds: "Always preserve hierarchy.
+  Never produce a flat issue list."
+
+### `/edpa:setup` must call create_project_views.py automatically (~ 10 lines)
+
+`project_setup.py:584` *suggests* `python .claude/edpa/scripts/
+create_project_views.py` as a manual next step. Customers don't
+read suggestions — the views never get created and the GitHub
+Project shows only the default Table view.
+
+**Acceptance:**
+- New STEP 9 (or appended to STEP 7) runs `create_project_views.py`
+  with the project number resolved from STEP 2.
+- Wizard summary at the end prints the view URLs so the maintainer
+  can verify them in one click.
+- Failure to create views is non-fatal — emit a warning and continue
+  (the rest of setup is still useful).
+
+### `/edpa:setup` skill template forbids flat issue lists (~ 5 lines)
+
+Update `plugin/skills/edpa-setup/SKILL.md` STEP 7 / "Output
+confirmation" section: change the next-step suggestion from
+> "Create work items using GitHub Issues with the hierarchy ..."
+
+to an explicit instruction earlier in the flow:
+> "Items in `.edpa/backlog/` MUST link to their parent via the
+> `parent:` field. Skill must refuse to create top-level issues
+> for non-Initiative items. /edpa:sync push will then enforce
+> the parent-child sub-issue relationship on GitHub."
+
 ## v1.6.1 — collaborators-sync follow-ups
 
 Surfaced by the live PR run on technomaton/edpa#20 (2026-05-06).
