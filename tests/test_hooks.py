@@ -171,7 +171,7 @@ class TestValidateSyntaxEdgeCases:
         """Binary file with .yaml extension -> error."""
         binary_file = tmp_path / "bad.yaml"
         binary_file.write_bytes(b"\x00\x01\x02\xff\xfe\x80\x81")
-        errors = validate_yaml(binary_file)
+        errors, _ = validate_yaml(binary_file)
         assert len(errors) > 0
         assert "binary" in errors[0].lower() or "error" in errors[0].lower()
 
@@ -180,7 +180,7 @@ class TestValidateSyntaxEdgeCases:
         tmpl_path = ROOT / "plugin" / "edpa" / "templates" / "cw_heuristics.yaml.tmpl"
         if not tmpl_path.exists():
             pytest.skip("cw_heuristics.yaml.tmpl not found")
-        errors = validate_yaml(tmpl_path)
+        errors, _ = validate_yaml(tmpl_path)
         assert errors == [], f"Template has YAML errors: {errors}"
 
     def test_deeply_nested_yaml(self, tmp_path):
@@ -202,7 +202,7 @@ class TestValidateSyntaxEdgeCases:
             }
         }
         complex_yaml.write_text(yaml.dump(content))
-        errors = validate_yaml(complex_yaml)
+        errors, _ = validate_yaml(complex_yaml)
         assert errors == []
 
     def test_yaml_with_anchors(self, tmp_path):
@@ -221,12 +221,12 @@ class TestValidateSyntaxEdgeCases:
             "  <<: *defaults\n"
             "  id: bob\n"
         )
-        errors = validate_yaml(anchor_yaml)
+        errors, _ = validate_yaml(anchor_yaml)
         assert errors == []
 
     def test_file_not_found(self, tmp_path):
         """Non-existent file -> error (not crash)."""
-        errors = validate_yaml(tmp_path / "nonexistent.yaml")
+        errors, _ = validate_yaml(tmp_path / "nonexistent.yaml")
         assert len(errors) > 0
         assert "not found" in errors[0].lower()
 
