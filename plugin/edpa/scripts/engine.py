@@ -863,24 +863,11 @@ def show_status(edpa_root):
     print()
 
 
-def write_snapshot(edpa_root, iteration_id, engine_output, capacity):
-    """Write frozen snapshot to .edpa/snapshots/ with revision tracking."""
-    snapshots_dir = edpa_root / "snapshots"
-    snapshots_dir.mkdir(parents=True, exist_ok=True)
-
-    # Determine revision number
-    base = snapshots_dir / f"{iteration_id}.json"
-    if base.exists():
-        # Find next revision
-        rev = 2
-        while (snapshots_dir / f"{iteration_id}_rev{rev}.json").exists():
-            rev += 1
-        snapshot_path = snapshots_dir / f"{iteration_id}_rev{rev}.json"
-        print(f"Snapshot revision: {snapshot_path.name} (original exists)")
-    else:
-        snapshot_path = base
-
-    snapshot = {
+def _snapshot_payload(iteration_id, engine_output, capacity):
+    """Build the snapshot dict (without frozen_at) so we can hash and
+    diff successive runs without spurious revisions.
+    """
+    payload = {
         "snapshot_version": VERSION,
         "iteration": iteration_id,
         "generated_at": engine_output["computed_at"],
@@ -909,11 +896,9 @@ def write_snapshot(edpa_root, iteration_id, engine_output, capacity):
         },
         "signature_status": "pending",
     }
-
-    # Collect all items with their contributors
     for person in engine_output["people"]:
         for item in person["items"]:
-            snapshot["items"].append({
+            payload["items"].append({
                 "id": item["id"],
                 "level": item["level"],
                 "job_size": item["js"],
@@ -923,10 +908,62 @@ def write_snapshot(edpa_root, iteration_id, engine_output, capacity):
                 "ratio": item["ratio"],
                 "hours": item["hours"],
             })
+    return payload
+
+
+def _payload_signature(payload: dict) -> str:
+    """Stable hash of snapshot content excluding timestamps. Two runs of
+    the engine over identical inputs should hash to the same digest."""
+    import hashlib
+    blob = json.dumps(
+        {k: v for k, v in payload.items()
+         if k not in ("generated_at",)},
+        sort_keys=True, ensure_ascii=False,
+    )
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def write_snapshot(edpa_root, iteration_id, engine_output, capacity):
+    """Write frozen snapshot to .edpa/snapshots/.
+
+    Revisioning rule: a new _revN.json file is created only when the
+    payload hash differs from the canonical PI-X.Y.json (excluding
+    timestamps). Identical reruns now refresh `frozen_at` on the
+    canonical file instead of proliferating PI-X.Y_rev2/3/4.json.
+    """
+    snapshots_dir = edpa_root / "snapshots"
+    snapshots_dir.mkdir(parents=True, exist_ok=True)
+
+    payload = _snapshot_payload(iteration_id, engine_output, capacity)
+    new_signature = _payload_signature(payload)
+
+    base = snapshots_dir / f"{iteration_id}.json"
+    snapshot_path = base
+    note = ""
+    if base.exists():
+        try:
+            existing = json.load(open(base, encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            existing = None
+        existing_sig = existing.get("payload_signature") if existing else None
+        if existing_sig and existing_sig == new_signature:
+            note = "refreshed (same content, frozen_at updated)"
+        else:
+            rev = 2
+            while (snapshots_dir / f"{iteration_id}_rev{rev}.json").exists():
+                rev += 1
+            snapshot_path = snapshots_dir / f"{iteration_id}_rev{rev}.json"
+            note = f"new revision (content changed); previous: {base.name}"
+
+    payload["payload_signature"] = new_signature
+    payload["frozen_at"] = datetime.now(timezone.utc).isoformat()
 
     with open(snapshot_path, "w") as f:
-        json.dump(snapshot, f, indent=2, ensure_ascii=False)
-    print(f"Snapshot frozen: {snapshot_path}")
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+    if note:
+        print(f"Snapshot {snapshot_path.name}: {note}")
+    else:
+        print(f"Snapshot frozen: {snapshot_path}")
 
 
 def write_excel(edpa_root, iteration_id, results, capacity):
