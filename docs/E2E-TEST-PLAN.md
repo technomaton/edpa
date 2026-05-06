@@ -3,9 +3,18 @@
 End-to-end ověření celého EDPA workflow od čisté instalace až po uzavření iterace
 a vygenerování reportů, včetně oboustranného sync s GitHub Projects.
 
-**Verze plánu:** 1.0 (2026-05-05)
-**Pokrývaná verze EDPA:** 1.1.0-beta (engine, sync push/pull, gates default, sync setup-refresh)
+**Verze plánu:** 1.1 (2026-05-06)
+**Pokrývaná verze EDPA:** 1.8.0-beta (engine, sync push/pull, gates default,
+sync setup-refresh, idempotent project_setup, contributors `as:` schema, `--check-readiness`,
+batch `reports.py`, sub-issue idempotence, schema validation v `validate_syntax.py`)
 **Cílový stav po projití:** plugin nainstalovaný, GitHub Project naplněný, jeden uzavřený PI s reporty.
+
+**Co se změnilo proti 1.0:** všechny předchozí E2E nálezy z 2026-05-06 jsou opravené
+(viz `docs/E2E-REPORT-2026-05-06.md` pro 18-bodovou matici). Schema backlogu má
+**breaking** rename `contributors[].role` → `contributors[].as` a `weight` → `cw`;
+legacy YAML migrate jednorázově `python3 .claude/edpa/scripts/migrate_contributors.py`.
+Tento test ověřuje, že čistý onboarding (install → setup → engine → reports) projde
+**bez ručních zásahů** — engine vrátí non-zero alokaci na první spuštění.
 
 ---
 
