@@ -1,4 +1,3 @@
-# EXAMPLE DATA — replace with your team when deploying
 project:
   name: Medical Platform & Datovy e-shop
   registration: CZ.01.01.01/01/24_062/0007440
@@ -59,6 +58,24 @@ people:
   team: UX Consultants
   fte: 0.25
   capacity: 20
+- id: martinturyna
+  name: MT
+  role: ''
+  team: ''
+  fte: 0.0
+  capacity_per_iteration: 0
+  email: mturyna@gmail.com
+  github: martinturyna
+  availability: confirmed
+- id: mtury
+  name: Martin Turyna
+  role: ''
+  team: ''
+  fte: 0.0
+  capacity_per_iteration: 0
+  email: ''
+  github: mtury
+  availability: confirmed
 teams:
 - id: CVUT
   planning_factor: 0.8
