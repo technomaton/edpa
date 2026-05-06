@@ -76,9 +76,18 @@ def link_sub_issue(parent_node_id: str, child_node_id: str) -> "tuple[bool, str]
     errors = result.get("errors") or []
     if not errors:
         return True, "linked"
-    # GraphQL returned errors. "already a sub-issue" is idempotent, not failure.
+    # GraphQL returned errors. Several phrasings mean "already linked"
+    # depending on which validator GitHub picked up the duplicate at.
+    # Treat them all as idempotent so a rerun reports `Links: N` instead
+    # of `Links: 0` while pretending it failed.
     err_text = "; ".join(str(e.get("message", e)) for e in errors)
-    if any("already" in str(e).lower() for e in errors):
+    err_lower = err_text.lower()
+    idempotent_phrases = (
+        "already",
+        "duplicate sub-issue",
+        "may only have one parent",
+    )
+    if any(phrase in err_lower for phrase in idempotent_phrases):
         return True, "already linked"
     return False, err_text
 

@@ -201,43 +201,74 @@ def main():
             info(f"{name} (already exists)")
 
     # ═══════════════════════════════════════════════════════════
-    # STEP 2: Create GitHub Project
+    # STEP 2: Create or reuse GitHub Project
     # ═══════════════════════════════════════════════════════════
-    step(2, "Creating GitHub Project")
-    result = run(f'gh project create --owner {args.org} --title "{args.project_title}" --format json')
-    if result:
-        project_data = json.loads(result)
-        project_id = project_data["id"]
-        project_num = project_data["number"]
-        ok(f"Project #{project_num} created (id={project_id})")
-    else:
-        # Project might already exist, find it
-        result = run(f'gh project list --owner {args.org} --format json')
-        projects = json.loads(result).get("projects", [])
-        match = [p for p in projects if args.project_title in p.get("title", "")]
+    # `gh project create` happily creates duplicates when a project with
+    # the same title exists, so we always look up existing projects first
+    # and reuse on exact title match. This makes setup idempotent so a
+    # rerun fixes a half-finished setup instead of doubling everything.
+    step(2, "Creating or reusing GitHub Project")
+    project_id = None
+    project_num = None
+    list_result = run(f'gh project list --owner {args.org} --format json --limit 100')
+    if list_result:
+        try:
+            existing = json.loads(list_result).get("projects", [])
+        except (ValueError, TypeError):
+            existing = []
+        match = [p for p in existing if p.get("title", "") == args.project_title]
         if match:
             project_num = match[0]["number"]
             project_id = match[0]["id"]
-            info(f"Project #{project_num} already exists")
+            info(f"Reusing existing project #{project_num} (exact title match)")
+    if not project_id:
+        result = run(f'gh project create --owner {args.org} --title "{args.project_title}" --format json')
+        if result:
+            project_data = json.loads(result)
+            project_id = project_data["id"]
+            project_num = project_data["number"]
+            ok(f"Project #{project_num} created (id={project_id})")
         else:
             fail("Could not create or find project")
             sys.exit(1)
 
     # ═══════════════════════════════════════════════════════════
-    # STEP 3: Create custom fields
+    # STEP 3: Create custom fields (idempotent)
     # ═══════════════════════════════════════════════════════════
+    # Snapshot existing fields up front so a rerun on a partially-set-up
+    # project skips fields that already exist instead of erroring out
+    # with "name already taken".
     step(3, "Creating custom fields")
+    pre_field_json = run(f'gh project field-list {project_num} --owner {args.org} '
+                         f'--format json --limit 100')
+    existing_field_names = set()
+    if pre_field_json:
+        try:
+            for f in json.loads(pre_field_json).get("fields", []):
+                existing_field_names.add(f.get("name", ""))
+        except (ValueError, TypeError):
+            existing_field_names = set()
+
+    def _create_field(name, *, data_type, options=None):
+        if name in existing_field_names:
+            info(f"{name} (already exists)")
+            return
+        cmd = (f'gh project field-create {project_num} --owner {args.org} '
+               f'--name "{name}" --data-type {data_type}')
+        if options:
+            cmd += f' --single-select-options "{options}"'
+        if run(cmd):
+            ok(f"{name} ({data_type})")
+        else:
+            fail(f"{name} ({data_type}) — field-create failed")
+
     number_fields = ["Job Size", "Business Value", "Time Criticality",
                      "Risk Reduction", "WSJF Score"]
     for name in number_fields:
-        run(f'gh project field-create {project_num} --owner {args.org} '
-            f'--name "{name}" --data-type NUMBER')
-        ok(f"{name} (NUMBER)")
+        _create_field(name, data_type="NUMBER")
 
-    run(f'gh project field-create {project_num} --owner {args.org} '
-        f'--name "Team" --data-type SINGLE_SELECT '
-        f'--single-select-options "Core,Platform,Management"')
-    ok("Team (SINGLE_SELECT)")
+    _create_field("Team", data_type="SINGLE_SELECT",
+                  options="Core,Platform,Management")
 
     # Create typed SAFe status fields (single-select per level)
     # Portfolio: Initiative + Epic share one workflow
@@ -253,10 +284,7 @@ def main():
     }
 
     for fname, opts in typed_status_fields.items():
-        run(f'gh project field-create {project_num} --owner {args.org} '
-            f'--name "{fname}" --data-type SINGLE_SELECT '
-            f'--single-select-options "{opts}"')
-        ok(f"{fname} (SINGLE_SELECT)")
+        _create_field(fname, data_type="SINGLE_SELECT", options=opts)
 
     # Iteration field — populated from .edpa/iterations/*.yaml IDs.
     # GitHub's native ITERATION type requires a fixed cadence + duration that
@@ -280,34 +308,64 @@ def main():
     if not iteration_options:
         iteration_options = ["TBD"]
     opts_str = ",".join(iteration_options)
-    run(f'gh project field-create {project_num} --owner {args.org} '
-        f'--name "Iteration" --data-type SINGLE_SELECT '
-        f'--single-select-options "{opts_str}"')
-    ok(f"Iteration (SINGLE_SELECT, {len(iteration_options)} options)")
+    if "Iteration" in existing_field_names:
+        info(f"Iteration (already exists, options not changed)")
+    else:
+        if run(f'gh project field-create {project_num} --owner {args.org} '
+               f'--name "Iteration" --data-type SINGLE_SELECT '
+               f'--single-select-options "{opts_str}"'):
+            ok(f"Iteration (SINGLE_SELECT, {len(iteration_options)} options)")
+        else:
+            fail("Iteration (SINGLE_SELECT) — field-create failed")
 
     # Refresh field IDs after creating typed status fields. GitHub's
-    # ProjectV2 API occasionally returns 5xx right after a burst of
-    # field-create calls (eventual consistency under load); retry once
-    # so the wizard isn't fragile to that.
+    # ProjectV2 API occasionally returns partial data right after a
+    # burst of field-create calls (eventual consistency). We need *all*
+    # 4 typed Status fields persisted — without Initiative Status or
+    # Story Status, sync push/pull silently drops those item levels —
+    # so we retry until they appear (or give up loudly after a max).
     import time
-    field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json --limit 100')
-    if not field_json:
-        time.sleep(2)
-        field_json = run(f'gh project field-list {project_num} --owner {args.org} --format json --limit 100')
-    if not field_json:
+    expected_typed_status = set(typed_status_fields.keys())
+    field_ids = {}
+    option_ids = {}
+    fields = []
+    last_seen = set()
+    for attempt in range(6):  # ~ 0+1+2+3+5+8 ≈ 19s upper bound
+        field_json = run(f'gh project field-list {project_num} --owner {args.org} '
+                         f'--format json --limit 100')
+        if not field_json:
+            time.sleep(1 + attempt)
+            continue
+        try:
+            fields = json.loads(field_json).get("fields", [])
+        except (ValueError, TypeError) as exc:
+            fail(f"Could not parse field-list JSON ({exc}); raw output: {field_json[:200]!r}")
+            sys.exit(1)
+        field_ids = {f["name"]: f["id"] for f in fields}
+        option_ids = {}
+        for f in fields:
+            for opt in f.get("options", []):
+                option_ids[f"{f['name']}:{opt['name']}"] = opt["id"]
+        last_seen = set(field_ids.keys())
+        if expected_typed_status.issubset(last_seen):
+            break
+        missing = sorted(expected_typed_status - last_seen)
+        info(f"field-list returned {len(field_ids)} fields, "
+             f"waiting on {missing} (attempt {attempt + 1}/6)")
+        time.sleep(1 + attempt)
+
+    if not field_ids:
         fail(f"gh project field-list returned no output for project #{project_num}. "
              f"Check that gh CLI is authenticated and the project is reachable.")
         sys.exit(1)
-    try:
-        fields = json.loads(field_json).get("fields", [])
-    except (ValueError, TypeError) as exc:
-        fail(f"Could not parse field-list JSON ({exc}); raw output: {field_json[:200]!r}")
-        sys.exit(1)
-    field_ids = {f["name"]: f["id"] for f in fields}
-    option_ids = {}
-    for f in fields:
-        for opt in f.get("options", []):
-            option_ids[f"{f['name']}:{opt['name']}"] = opt["id"]
+
+    missing_typed = expected_typed_status - last_seen
+    if missing_typed:
+        fail(f"typed Status fields missing after retries: {sorted(missing_typed)}. "
+             f"Push/pull for those item levels will not work. Re-run setup or "
+             f"`sync.py setup-refresh` once the GitHub API stabilizes.")
+        # don't exit — persist what we have so user isn't blocked, but
+        # the loud message points them at the recovery path.
 
     info(f"Fields: {len(field_ids)}, Options: {len(option_ids)}")
 
@@ -335,10 +393,30 @@ def main():
         issue_type_ids = {}
 
     # ═══════════════════════════════════════════════════════════
-    # STEP 6: Create issues
+    # STEP 6: Create issues (idempotent — reuse on title match)
     # ═══════════════════════════════════════════════════════════
     step(6, f"Creating {len(items)} issues")
-    issue_map = {}  # item_id → (issue_number, project_item_id)
+    issue_map = {}  # item_id → (issue_number, project_item_id, node_id)
+    issues_created = 0
+    issues_reused = 0
+
+    # Snapshot existing issues so a rerun finds and reuses them by title
+    # instead of creating duplicates (this was the F4 bug — the second
+    # setup created S-1, F-1, etc. as fresh issues, breaking issue_map
+    # and orphaning the old ones).
+    existing_issue_lookup = {}
+    list_issues_json = run(
+        f'gh issue list --repo {full_repo} --state all --limit 1000 '
+        f'--json number,title'
+    )
+    if list_issues_json:
+        try:
+            for it in json.loads(list_issues_json):
+                t = (it.get("title") or "").strip()
+                if t and t not in existing_issue_lookup:
+                    existing_issue_lookup[t] = str(it["number"])
+        except (ValueError, TypeError):
+            existing_issue_lookup = {}
 
     for item in items:
         title = f"{item['id']}: {item['title']}"
@@ -357,13 +435,22 @@ def main():
         if item.get("type") == "Enabler":
             label_flag = ' --label "Enabler"'
 
-        result = run(f'gh issue create --repo {full_repo} --title "{title}" '
-                     f'--body "{body}"{label_flag}')
+        existing_num = existing_issue_lookup.get(title.strip())
+        if existing_num:
+            issue_num = existing_num
+            issue_url = f"https://github.com/{full_repo}/issues/{issue_num}"
+            info(f"{title} → reusing #{issue_num}")
+            result = issue_url  # downstream code only checks truthiness
+            issues_reused += 1
+        else:
+            result = run(f'gh issue create --repo {full_repo} --title "{title}" '
+                         f'--body "{body}"{label_flag}')
+            if result:
+                issue_url = result.strip()
+                issue_num = issue_url.split("/")[-1]
+                ok(f"{title} → #{issue_num}")
+                issues_created += 1
         if result:
-            issue_url = result.strip()
-            issue_num = issue_url.split("/")[-1]
-            ok(f"{title} → #{issue_num}")
-
             # Assign native Issue Type via GraphQL
             issue_node_id = None
             type_id = issue_type_ids.get(item["level"])
@@ -556,7 +643,11 @@ def main():
     print(f"\n{'═' * 70}")
     print(f"  {C.GREEN}{C.BOLD}Setup complete!{C.RESET}")
     print(f"  Project: https://github.com/orgs/{args.org}/projects/{project_num}")
-    print(f"  Issues:  {len(issue_map)} created")
+    if issues_reused:
+        print(f"  Issues:  {issues_created} created, {issues_reused} reused "
+              f"({len(issue_map)} mapped)")
+    else:
+        print(f"  Issues:  {issues_created} created")
     print(f"  Fields:  {set_count} values set")
     print(f"  Links:   {link_count} sub-issue links")
     if views_created is True:
