@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+## 1.6.0-beta — 2026-05-06
+
+### Added
+- **GitHub-aware people pipeline.** The `github` field on `people.yaml`
+  entries is now uniformly handled across the toolchain:
+  - `_people_loader.py` (new): canonical loader, `display_handle()`
+    (`@login` fallback to id), `avatar_url()`, plus `validate_people()`
+    that flags assignees with no github login, unknown assignees,
+    and unused people-registry entries.
+  - `mcp_server.edpa_validate` now merges iteration + people
+    diagnostics. The PostToolUse hook surfaces both whenever the
+    user edits `.edpa/iterations/*.yaml` or `.edpa/config/people.yaml`.
+  - `mcp_server.edpa_people` returns the `github` field so the
+    assistant sees who has a login attached.
+  - `backlog.py` renders `@github_login` for assignees in tree, show,
+    and iteration views (falls back to internal id).
+  - `board.py` uses `github.com/{login}.png` avatars on cards and
+    filter chips when a login is on file; colored-initials fallback
+    otherwise.
+  - `edpa_commit_info.resolve_person()` learns two new match
+    priorities: GitHub noreply email (`login@users.noreply.github.com`
+    and the `id+login@…` privacy form) and `git user.name` literally
+    matching a github handle. Web-UI commits now route to the right
+    person.
+- **Collaborator → people.yaml sync.** `sync_collaborators.py`
+  (new) diffs the repository's GitHub collaborator list against
+  `people.yaml`. Strategy "D" (asymmetric):
+  - Removed collaborators → `availability: unavailable` (factual,
+    no human input needed; auto-committed by the workflow).
+  - New collaborators → auto-filled stub via PR for review (login,
+    public name, public email pulled from `gh api users/{login}`;
+    role/team/FTE/capacity left blank for the maintainer).
+  Wired up as `.github/workflows/collaborators-sync.yml` (member
+  added/removed/edited events + `workflow_dispatch`), the
+  `/edpa:sync-people` skill (manual trigger), and a read-only MCP
+  tool `edpa_sync_people` that reports the diff without writing.
+
+### Changed
+- `plugin/skills/edpa-setup/SKILL.md` template now includes the
+  `github` field with an explicit "ASK user, never invent"
+  instruction. Closes a real failure observed on 2026-05-06 where
+  the wizard hallucinated GitHub logins from the admin's email
+  pattern.
+
+### Fixed
+- _(none — Phase 1's defensive `gh project field-list` retry already
+  shipped in 1.5.0-beta)._
+
 ## 1.5.0-beta — 2026-05-06
 
 ### Changed (BREAKING)
