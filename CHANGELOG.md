@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+## 1.8.1-beta — 2026-05-06
+
+Patch release closing the one new finding (N1) and one UX gap (N2)
+caught by the v1.8.0-beta E2E re-validation
+(`docs/E2E-REPORT-2026-05-06-v180.md`).
+
+### Fixed
+- **`sync.cmd_conflicts`** referenced a non-existent
+  `parse_remote_items()` helper introduced in the F10 fix. Real
+  function name is `map_gh_items_to_edpa(gh_data, fields_mapping)`.
+  Same-field conflict detection raised `NameError` as soon as
+  `gh_fetch_project_items` returned data; now flags conflicts
+  cleanly with the live-diff augmentation message. (E2E v180 N1)
+
+### Added
+- **Auto-commit of EDPA-managed setup state.** New
+  `plugin/edpa/scripts/_auto_commit.py` helper used by:
+  - `project_setup.py` STEP 9b — commits `.edpa/config/edpa.yaml`,
+    `.edpa/config/issue_map.yaml`, and `.edpa/iterations/` once the
+    new project IDs / field IDs / option IDs are persisted.
+  - `sync push` — commits `issue_map.yaml` updates after creating
+    issues (and any field changes that landed on `edpa.yaml`).
+  - `sync setup-refresh` — commits the recovered state.
+
+  Each command takes `--no-commit` to opt out (useful for CI flows
+  that want to inspect the diff before committing). The helper
+  uses `git add <specific paths>` + `git commit -- <paths>` so
+  unrelated work-in-progress in the working tree stays
+  uncommitted; auto-commit silently skips when:
+  - the directory is not a git repo,
+  - the user has no `user.name` / `user.email` configured,
+  - the targeted paths match HEAD.
+
+  Closes E2E v180 N2 — sandboxes that ran setup, made an unrelated
+  PR, then merged + pulled were silently losing the project IDs
+  to a conflict-free `git pull --ff-only` against a HEAD that had
+  the pre-setup `edpa.yaml`. The state now lives in git from the
+  moment it's known to be useful.
+
 ## 1.8.0-beta — 2026-05-06
 
 Closes all 18 findings from the 2026-05-06 E2E test

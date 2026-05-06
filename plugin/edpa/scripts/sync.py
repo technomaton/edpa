@@ -1352,7 +1352,44 @@ def cmd_push(root, sync_config, args):
 
     update_sync_state(root, "push", len(local_items), compute_backlog_checksum(root))
     print(color(f"  {CHECK} Pushed {pushed} field changes, {created} issues created, {failed} failed", C.OK))
+
+    # Auto-commit issue_map.yaml (and edpa.yaml when push extended it,
+    # e.g., new project_item_ids when an issue was created). Same
+    # rationale as project_setup STEP 9b — uncommitted state can be
+    # silently reverted by a later git checkout / squash merge.
+    if not getattr(args, "no_commit", False):
+        _commit_sync_state(root,
+                           message=f"EDPA sync push: {created} created, {pushed} updated")
     print()
+
+
+def _commit_sync_state(root, *, message: str):
+    """Auto-commit EDPA-managed config / state files. Imported lazily so
+    sync.py stays runnable when _auto_commit isn't on the path (e.g.,
+    a stripped-down install)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from _auto_commit import maybe_commit
+    except ImportError:
+        return
+    finally:
+        sys.path.pop(0)
+    result = maybe_commit(
+        paths=[
+            ".edpa/config/edpa.yaml",
+            ".edpa/config/issue_map.yaml",
+            ".edpa/iterations",
+            ".edpa/sync_state.json",
+            ".edpa/changelog.jsonl",
+        ],
+        message=message,
+        root=root,
+    )
+    if result == "committed":
+        print(color(f"  {CHECK} Auto-committed sync state ({message})", C.OK))
+    elif result == "skipped":
+        print(color("  (auto-commit skipped — not a git repo or "
+                    "git user.name / user.email unset)", C.MUTED))
 
 
 def cmd_setup_refresh(root, _sync_config, _args):
@@ -1474,6 +1511,17 @@ def cmd_setup_refresh(root, _sync_config, _args):
     save_issue_map(root, state)
 
     print(color(f"  {CHECK} Setup state refreshed: {len(field_ids)} fields, {len(issue_map)} items mapped", C.OK))
+
+    # Auto-commit recovered state — the entire point of setup-refresh
+    # is to rebuild the IDs that someone or something lost. Leaving the
+    # rebuilt state uncommitted invites the same regression on the next
+    # git checkout. --no-commit on the command line opts out.
+    if not getattr(_args, "no_commit", False):
+        _commit_sync_state(
+            root,
+            message=f"EDPA sync setup-refresh: {len(field_ids)} fields, "
+                    f"{len(issue_map)} items recovered",
+        )
     print()
 
 
@@ -2184,6 +2232,9 @@ def main():
     p_push = sub.add_parser("push", help=".edpa/backlog/ item files -> GitHub Projects")
     p_push.add_argument("--mock", action="store_true",
                         help="Use mock data instead of real GitHub API")
+    p_push.add_argument("--no-commit", action="store_true",
+                        help="Skip the auto-commit of issue_map.yaml + edpa.yaml "
+                             "after push. Default: auto-commit.")
 
     # diff
     p_diff = sub.add_parser("diff", help="Show what would change (dry-run)")
@@ -2208,9 +2259,13 @@ def main():
     # status
     sub.add_parser("status", help="Show sync status")
 
-    # setup-refresh: re-discover field_ids/option_ids/issue_map from existing GH project
-    sub.add_parser("setup-refresh",
-                   help="Re-query GitHub to rebuild field_ids/option_ids/issue_map (recovery)")
+    # setup-refresh: re-discover field_ids/option_ids/issue_map from existing GH project, with optional --no-commit
+    # (parser injection happens just below)
+
+    p_refresh = sub.add_parser("setup-refresh",
+                               help="Re-query GitHub to rebuild field_ids/option_ids/issue_map (recovery)")
+    p_refresh.add_argument("--no-commit", action="store_true",
+                           help="Skip the auto-commit of recovered state. Default: auto-commit.")
 
     # add-iteration: append a new iteration option to the GH Project Iteration field
     p_add_iter = sub.add_parser("add-iteration",

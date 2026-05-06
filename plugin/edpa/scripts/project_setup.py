@@ -230,6 +230,12 @@ def main():
     parser.add_argument("--non-interactive", action="store_true",
                         help="Skip interactive prompts (e.g. project-views "
                              "configuration). Useful for CI / scripted runs.")
+    parser.add_argument("--no-commit", action="store_true",
+                        help="Do not auto-commit setup state changes "
+                             "(.edpa/config/edpa.yaml, issue_map.yaml, "
+                             "iterations/). By default setup commits these "
+                             "so a subsequent git checkout / squash-merge "
+                             "doesn't lose project IDs.")
     args = parser.parse_args()
 
     full_repo = f"{args.org}/{args.repo}"
@@ -758,6 +764,40 @@ def main():
     with open(issue_map_path, "w") as f:
         yaml.dump(serializable_map, f, default_flow_style=False, allow_unicode=True, sort_keys=True)
     ok(f"issue_map.yaml: {len(serializable_map['items'])} items mapped")
+
+    # ═══════════════════════════════════════════════════════════
+    # STEP 9b: Auto-commit setup state so a subsequent git checkout
+    # (or squash-merge of an unrelated PR) can't silently lose the
+    # GitHub Project IDs / issue_map / bootstrapped iterations.
+    # E2E v1.8.0-beta hit this directly when the maintainer ran
+    # setup, made an unrelated PR, merged it, and pulled — the
+    # uncommitted edpa.yaml mutations got reverted to the pre-setup
+    # version. Fix: commit only the EDPA-managed paths (specific git
+    # add, no `-a`) so unrelated work-in-progress stays uncommitted.
+    # ═══════════════════════════════════════════════════════════
+    if not args.no_commit:
+        step("9b", "Committing setup state to git")
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        try:
+            from _auto_commit import maybe_commit  # noqa: E402
+        finally:
+            sys.path.pop(0)
+        committed = maybe_commit(
+            paths=[
+                ".edpa/config/edpa.yaml",
+                ".edpa/config/issue_map.yaml",
+                ".edpa/iterations",
+            ],
+            message=f"EDPA: persist setup state for project #{project_num}",
+        )
+        if committed == "committed":
+            ok("Setup state committed (.edpa/config/* + .edpa/iterations/)")
+        elif committed == "no-op":
+            info("Setup state already up to date in git — nothing to commit")
+        else:
+            info("Auto-commit skipped (not a git repo or git unavailable). "
+                 "Manually: git add .edpa/config/edpa.yaml .edpa/config/issue_map.yaml "
+                 ".edpa/iterations && git commit -m 'EDPA setup state'")
 
     # ═══════════════════════════════════════════════════════════
     # STEP 10 (optional): Configure GitHub Project views by issue type
