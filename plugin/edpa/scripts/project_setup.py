@@ -79,6 +79,36 @@ def fail(text):
     print(f"      {C.RED}✗{C.RESET} {text}")
 
 
+def _bootstrap_pi_stub_if_empty(iter_dir: Path) -> None:
+    """Drop a stub PI-{year}-1.yaml into iterations/ if the directory has
+    no PI YAML yet. Defaults: 1-week iterations × 5 per PI, status planning,
+    starting next Monday. Customer edits or replaces it during PI Planning.
+    """
+    iter_dir.mkdir(parents=True, exist_ok=True)
+    if any(iter_dir.glob("PI-*.yaml")):
+        return
+    from datetime import date, timedelta
+    today = date.today()
+    monday = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
+    weeks = 5  # pi_iterations × iteration_weeks (1)
+    pi_id = f"PI-{monday.year}-1"
+    end = monday + timedelta(weeks=weeks) - timedelta(days=1)
+    stub = (
+        f"# PI-level metadata. Per-iteration files live alongside as\n"
+        f"# {pi_id}.{{1..N}}.yaml; the assistant reconstructs the\n"
+        f"# timeline at runtime via _pi_loader.py.\n\n"
+        f"pi:\n"
+        f"  id: {pi_id}\n"
+        f"  status: planning\n"
+        f"  iteration_weeks: 1\n"
+        f"  pi_iterations: {weeks}\n"
+        f"  start_date: {monday.isoformat()}\n"
+        f"  end_date: {end.isoformat()}\n"
+    )
+    (iter_dir / f"{pi_id}.yaml").write_text(stub, encoding="utf-8")
+    ok(f"Bootstrapped {iter_dir}/{pi_id}.yaml (1-week × 5)")
+
+
 def info(text):
     print(f"      {C.GRAY}{text}{C.RESET}")
 
@@ -489,43 +519,16 @@ def main():
             project["name"] = args.project_title
             config["project"] = project
 
-        # Persist pis[] from .edpa/iterations/*.yaml so MCP edpa_status
-        # and edpa_iterations have something to report immediately after
-        # setup. Without this the assistant sees iterations_total=0 even
-        # though iteration YAMLs exist on disk.
-        iter_dir = Path(".edpa/iterations")
-        iterations_list = []
-        if iter_dir.is_dir():
-            for f in sorted(iter_dir.glob("*.yaml")):
-                try:
-                    doc = yaml.safe_load(open(f)) or {}
-                    it = doc.get("iteration") or {}
-                    if it.get("id"):
-                        iterations_list.append({
-                            "id": it["id"],
-                            "status": it.get("status", "planned"),
-                            "dates": it.get("dates", ""),
-                        })
-                except (yaml.YAMLError, OSError):
-                    continue
-        if iterations_list and not config.get("pis"):
-            # Derive PI id from the first iteration id (e.g. PI-2026-1.1 → PI-2026-1)
-            first_iter_id = iterations_list[0]["id"]
-            pi_id = first_iter_id.rsplit(".", 1)[0] if "." in first_iter_id else first_iter_id
-            # AI-native default: 1-week iterations. Classic SAFe (2-week)
-            # remains supported — set people.yaml cadence.iteration_weeks
-            # explicitly and edit pis[*].iteration_weeks if you re-run setup.
-            config["pis"] = [{
-                "id": pi_id,
-                "status": "active",
-                "iteration_weeks": 1,
-                "pi_iterations": len(iterations_list),
-                "iterations": iterations_list,
-            }]
-
         with open(config_path, "w") as f:
             yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         ok(f"Project #{project_num}, {len(field_ids)} fields, {len(option_ids)} options saved")
+
+        # Bootstrap a stub PI-level YAML if iterations/ is empty so the
+        # assistant has something to report immediately after setup.
+        # AI-native defaults: 1-week iterations × 5 per PI. Customer
+        # creates the per-iteration files (PI-{id}.{n}.yaml) as the team
+        # plans them; gaps surface via edpa_validate.
+        _bootstrap_pi_stub_if_empty(Path(".edpa/iterations"))
 
     issue_map_path = Path(".edpa/config/issue_map.yaml")
     serializable_map = {
