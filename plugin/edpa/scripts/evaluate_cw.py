@@ -133,12 +133,56 @@ def evaluate(ground_truth_path, heuristics_path, verbose=False, per_role=False):
     return mad
 
 
+def _default_ground_truth_path():
+    return Path(".edpa") / "data" / "ground_truth.yaml"
+
+
+def cmd_check_readiness(ground_truth_path, min_records):
+    """Refuse to run the auto-calibration loop until enough confirmed CW
+    records exist. Used by the /edpa:autocalib skill (and anyone else
+    running `evaluate_cw.py --check-readiness`) to short-circuit before
+    a fresh project has any ground truth."""
+    path = Path(ground_truth_path) if ground_truth_path else _default_ground_truth_path()
+    data = load_yaml(path) or {}
+    records = data.get("records") or []
+    n = len(records)
+    if n < min_records:
+        print(
+            f"Insufficient ground truth ({n} < {min_records} records) at {path}. "
+            "Skip until first PI is closed and reviewed."
+        )
+        return 1
+    print(f"Ready: {n} records ≥ {min_records} at {path}")
+    return 0
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EDPA CW Heuristics Evaluator")
-    parser.add_argument("--ground-truth", required=True, help="Path to ground_truth.yaml")
-    parser.add_argument("--heuristics", required=True, help="Path to cw_heuristics.yaml")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Show per-record details")
-    parser.add_argument("--per-role", action="store_true", help="Show per-role MAD breakdown")
+    parser.add_argument("--ground-truth",
+                        help="Path to ground_truth.yaml")
+    parser.add_argument("--heuristics",
+                        help="Path to cw_heuristics.yaml")
+    parser.add_argument("--verbose", "-v", action="store_true",
+                        help="Show per-record details")
+    parser.add_argument("--per-role", action="store_true",
+                        help="Show per-role MAD breakdown")
+    parser.add_argument(
+        "--check-readiness", action="store_true",
+        help="Print whether ground_truth.yaml has enough records to run "
+             "the auto-calibration loop (default min: 20). Exits 0 when "
+             "ready, 1 when not, with no MAD computation either way.",
+    )
+    parser.add_argument("--min-records", type=int, default=20,
+                        help="Minimum records for --check-readiness (default: 20)")
     args = parser.parse_args()
 
-    evaluate(args.ground_truth, args.heuristics, verbose=args.verbose, per_role=args.per_role)
+    if args.check_readiness:
+        sys.exit(cmd_check_readiness(args.ground_truth, args.min_records))
+
+    if not args.ground_truth or not args.heuristics:
+        parser.error(
+            "--ground-truth and --heuristics are required unless --check-readiness is given"
+        )
+
+    evaluate(args.ground_truth, args.heuristics,
+             verbose=args.verbose, per_role=args.per_role)
