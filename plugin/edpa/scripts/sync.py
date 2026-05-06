@@ -1027,6 +1027,28 @@ def log_change(root, source, action, item_id, field="", old="", new="", actor="s
     append_jsonl(changelog_path, entry)
 
 
+def _files_changed_since(root, since_ts):
+    """Return relative paths under .edpa/backlog/ that have a commit
+    touching them since `since_ts` (ISO timestamp). Used by sync
+    conflicts to know which items have local edits that haven't been
+    pushed yet, so we can flag a same-field local-vs-remote drift even
+    when the remote change skipped the changelog (direct GH UI / API).
+    """
+    if not since_ts:
+        return set()
+    try:
+        result = subprocess.run(
+            ["git", "log", f"--since={since_ts}", "--name-only",
+             "--pretty=format:", "--", ".edpa/backlog/"],
+            cwd=str(root), capture_output=True, text=True, check=False,
+        )
+    except (FileNotFoundError, OSError):
+        return set()
+    if result.returncode != 0:
+        return set()
+    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+
+
 def update_sync_state(root, direction, items_count, checksum):
     """Update the sync state file."""
     state_path = root / ".edpa" / "sync_state.json"
@@ -1881,6 +1903,45 @@ def cmd_conflicts(root, sync_config, args):
             git_changes.setdefault(item_id, []).append(entry)
 
     conflict_ids = set(github_changes) & set(git_changes)
+
+    # Augment changelog-based detection with a fresh remote-vs-local diff:
+    # changes made directly in the GH UI (or via API) never hit the local
+    # changelog, so a same-field conflict like local F-1=Reviewing vs.
+    # remote F-1=Implementing would not show up. We flag any field that
+    # currently differs *and* has been touched locally since last_pull.
+    augmented_ids: set[str] = set()
+    augmented_changes: dict[str, list] = {}
+    try:
+        gh_data = gh_fetch_project_items(sync_config)
+    except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError) as e:
+        print(color(f"  (skipping live diff: {e})", C.MUTED))
+        gh_data = None
+    if gh_data:
+        local_items = collect_items_flat(root)
+        remote_items = parse_remote_items(gh_data)
+        diff = compute_diff(local_items, remote_items)
+        local_recent_files = _files_changed_since(root, last_pull)
+        for change in diff:
+            if change.get("action") != "field_changed":
+                continue
+            iid = change["id"]
+            if iid in conflict_ids:
+                continue
+            backlog_path = _item_file_path(root, iid)
+            if not backlog_path:
+                continue
+            rel = str(backlog_path.relative_to(root)) if backlog_path.is_absolute() \
+                else str(backlog_path)
+            if rel not in local_recent_files:
+                continue
+            augmented_ids.add(iid)
+            augmented_changes.setdefault(iid, []).append({
+                "field": change.get("field", "?"),
+                "local": change.get("local_val", ""),
+                "remote": change.get("remote_val", ""),
+            })
+    conflict_ids = conflict_ids | augmented_ids
+
     if not conflict_ids:
         print(color(f"  {CHECK} No conflicts detected.", C.OK))
         print(color(f"  Last pull: {last_pull or '—'}", C.MUTED))
@@ -1896,11 +1957,19 @@ def cmd_conflicts(root, sync_config, args):
         print(f"    {bold(color(item_id, C.WARN))}")
         for label, color_code, source_changes in (("GitHub changes:", C.SYNC, github_changes),
                                                     ("Git changes:",    C.OK,   git_changes)):
+            entries = source_changes.get(item_id, [])
+            if not entries:
+                continue
             print(color(f"      {label}", color_code))
-            for e in source_changes[item_id]:
+            for e in entries:
                 f = e.get("field", "?")
                 print(f"        {f}: {e.get('old', '')} {ARROW} {e.get('new', '')}"
                       f"  [{e.get('ts', '')[:19]}]")
+        if item_id in augmented_changes:
+            print(color("      Live diff (no changelog entry from GH UI):", C.SYNC))
+            for change in augmented_changes[item_id]:
+                print(f"        {change['field']}: {change['local']} (local) "
+                      f"{ARROW} {change['remote']} (remote)")
         print()
 
     if strategy == "report":
