@@ -730,25 +730,22 @@ def show_status(edpa_root):
     else:
         print("✗ heuristics not found (will use defaults)")
 
-    # Iterations from edpa.yaml
-    edpa_cfg_path = edpa_root / "config" / "edpa.yaml"
-    if edpa_cfg_path.exists():
-        edpa_cfg = load_yaml(edpa_cfg_path) or {}
-        # Support new pis[] array and legacy pi:{} format
-        pis = edpa_cfg.get("pis", [])
-        if not pis and edpa_cfg.get("pi"):
-            legacy = edpa_cfg["pi"]
-            pis = [{"id": legacy.get("current", "?"), "iterations": legacy.get("iterations", []), "status": "active"}]
-        active_pi = next((p for p in pis if p.get("status") == "active"), pis[0] if pis else {})
-        iterations = active_pi.get("iterations", [])
-        if iterations:
-            print(f"✓ {len(iterations)} iterations defined (PI: {active_pi.get('id', '?')})")
-            for it in iterations:
-                status = it.get("status", "?")
-                marker = "→" if status == "active" else " "
-                print(f"  {marker} {it.get('id', '?'):<16} {it.get('dates', ''):<20} [{status}]")
-    else:
-        print("✗ edpa.yaml not found")
+    # Iterations — derived from .edpa/iterations/*.yaml (no longer in edpa.yaml).
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _pi_loader import derive_pis, find_active_pi  # noqa: E402
+
+    pis, _ = derive_pis(edpa_root)
+    active_pi = find_active_pi(pis)
+    iterations = active_pi.get("iterations", [])
+    if iterations:
+        print(f"✓ {len(iterations)} iterations defined (PI: {active_pi.get('id', '?')})")
+        for it in iterations:
+            status = it.get("status", "?")
+            marker = "→" if status == "active" else " "
+            dates = f"{it.get('start_date', '?')}–{it.get('end_date', '?')}"
+            print(f"  {marker} {it.get('id', '?'):<16} {dates:<26} [{status}]")
+    elif not (edpa_root / "iterations").is_dir():
+        print("✗ iterations/ directory not found")
 
     # Backlog
     backlog_dir = edpa_root / "backlog"

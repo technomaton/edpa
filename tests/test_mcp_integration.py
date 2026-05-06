@@ -131,22 +131,29 @@ def edpa_workspace(tmp_path: Path) -> Path:
     ):
         (edpa / sub).mkdir(parents=True, exist_ok=True)
 
-    # Config — keep it tiny but real-shaped
+    # Config — keep it tiny but real-shaped (no pis[]; PI/iter YAMLs below).
     (edpa / "config" / "edpa.yaml").write_text(
         "project:\n"
         "  name: 'MCP Integration Test Project'\n"
         "governance:\n"
         "  methodology: 'EDPA test'\n"
         "  calculation_mode: 'gates'\n"
-        "pis:\n"
-        "  - id: PI-2026-1\n"
-        "    status: active\n"
-        "    iteration_weeks: 2\n"
-        "    pi_iterations: 1\n"
-        "    iterations:\n"
-        "      - id: PI-2026-1.1\n"
-        "        status: active\n"
-        "        dates: '1.1.-15.1.2026'\n"
+    )
+    (edpa / "iterations" / "PI-2026-1.yaml").write_text(
+        "pi:\n"
+        "  id: PI-2026-1\n"
+        "  status: active\n"
+        "  iteration_weeks: 2\n"
+        "  pi_iterations: 1\n"
+    )
+    (edpa / "iterations" / "PI-2026-1.1.yaml").write_text(
+        "iteration:\n"
+        "  id: PI-2026-1.1\n"
+        "  pi: PI-2026-1\n"
+        "  start_date: 2026-01-05\n"
+        "  end_date: 2026-01-16\n"
+        "  weeks: 2\n"
+        "  status: active\n"
     )
     (edpa / "config" / "people.yaml").write_text(
         "people:\n"

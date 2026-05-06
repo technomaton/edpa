@@ -65,7 +65,7 @@ def _make_repo(tmp_path):
     (edpa / "iterations" / "PI-2026-1.1.yaml").write_text(
         "iteration:\n"
         "  id: PI-2026-1.1\n  pi: PI-2026-1\n  status: closed\n"
-        "  dates: '6.4.-17.4.2026'\n"
+        "  start_date: 2026-04-06\n  end_date: 2026-04-17\n  weeks: 2\n"
         "planning: {capacity: 140, planned_sp: 8}\n"
         "delivery: {delivered_sp: 8, velocity: 8}\n"
     )

@@ -35,10 +35,6 @@ TRACKED_DIRS = {
     "initiatives": "Initiative",
 }
 
-CZECH_MONTHS_DAYS = re.compile(r"(\d{1,2})\.(\d{1,2})\.")
-DATES_FIELD = re.compile(
-    r"^\s*(\d{1,2})\.(\d{1,2})\.[\s\u2013\u2014\-]+(\d{1,2})\.(\d{1,2})\.(\d{4})"
-)
 STATUS_LINE = re.compile(r"^([+-])status:\s*(\S+)")
 
 
@@ -64,30 +60,19 @@ def run_git(args, cwd: Path):
 
 
 def parse_iteration_dates(iter_yaml: Path):
-    """Return (start_dt, end_dt) for an iteration YAML, both UTC.
-
-    Prefers explicit ISO `start_date`/`end_date` fields if present.
-    Falls back to parsing the Czech `dates: "D.M.-D.M.YYYY"` string.
-    """
+    """Return (start_dt, end_dt) for an iteration YAML, both UTC."""
     data = yaml.safe_load(iter_yaml.read_text(encoding="utf-8")) or {}
     it = data.get("iteration", {})
 
     iso_start = it.get("start_date")
     iso_end = it.get("end_date")
-    if iso_start and iso_end:
-        return (
-            datetime.fromisoformat(str(iso_start)).replace(tzinfo=timezone.utc),
-            datetime.fromisoformat(str(iso_end)).replace(tzinfo=timezone.utc),
-        )
-
-    raw = it.get("dates", "")
-    m = DATES_FIELD.search(raw)
-    if not m:
-        raise ValueError(f"{iter_yaml.name}: cannot parse dates '{raw}'")
-    d1, m1, d2, m2, year = (int(x) for x in m.groups())
-    start = datetime(year, m1, d1, 0, 0, 0, tzinfo=timezone.utc)
-    end = datetime(year, m2, d2, 23, 59, 59, tzinfo=timezone.utc)
-    return start, end
+    if not (iso_start and iso_end):
+        raise ValueError(f"{iter_yaml.name}: start_date/end_date missing")
+    return (
+        datetime.fromisoformat(str(iso_start)).replace(tzinfo=timezone.utc),
+        datetime.fromisoformat(str(iso_end)).replace(
+            hour=23, minute=59, second=59, tzinfo=timezone.utc),
+    )
 
 
 def find_iteration_for_timestamp(edpa_root: Path, ts: datetime):

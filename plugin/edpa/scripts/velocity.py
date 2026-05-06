@@ -56,7 +56,8 @@ def load_closed_iterations(edpa_root: Path):
         records.append({
             "id": it.get("id", f.stem),
             "pi": it.get("pi"),
-            "dates": it.get("dates"),
+            "start_date": str(it["start_date"]) if it.get("start_date") else None,
+            "end_date": str(it["end_date"]) if it.get("end_date") else None,
             "planned_sp": planned,
             "delivered_sp": delivered,
             "velocity": delivery.get("velocity", delivered),

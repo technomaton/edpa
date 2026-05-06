@@ -325,14 +325,12 @@ def _handle_status(edpa_root: Path) -> list[TextContent]:
     config = load_yaml(edpa_root / "config" / "edpa.yaml") or {}
     people_cfg = load_yaml(edpa_root / "config" / "people.yaml") or {}
 
-    # Support new pis[] array and legacy pi:{} format
-    pis = config.get("pis", [])
-    if not pis and config.get("pi"):
-        legacy = config["pi"]
-        pis = [{"id": legacy.get("current", "?"), "iterations": legacy.get("iterations", []),
-                "status": "active", "iteration_weeks": legacy.get("iteration_weeks", 2),
-                "pi_iterations": legacy.get("pi_iterations", len(legacy.get("iterations", [])))}]
-    active_pi = next((p for p in pis if p.get("status") == "active"), pis[0] if pis else {})
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _pi_loader import derive_pis, find_active_pi, split_diagnostics  # noqa: E402
+
+    pis, diags = derive_pis(edpa_root)
+    _, warnings = split_diagnostics(diags)
+    active_pi = find_active_pi(pis)
     iterations = active_pi.get("iterations", [])
     active = next((i for i in iterations if i.get("status") == "active"), None)
     closed_count = sum(1 for i in iterations if i.get("status") == "closed")
@@ -346,7 +344,7 @@ def _handle_status(edpa_root: Path) -> list[TextContent]:
     # "project: unknown" forever. Fall back to people.yaml only for
     # legacy v0.x configs that still bundled both into one file.
     project = config.get("project") or people_cfg.get("project", {})
-    iter_weeks = active_pi.get("iteration_weeks", 2)
+    iter_weeks = active_pi.get("iteration_weeks", 1)
     pi_iters = active_pi.get("pi_iterations", len(iterations))
 
     result = {
@@ -355,42 +353,48 @@ def _handle_status(edpa_root: Path) -> list[TextContent]:
         "iterations_total": len(iterations),
         "iterations_closed": closed_count,
         "active_iteration": active["id"] if active else None,
-        "active_iteration_dates": active.get("dates") if active else None,
+        "active_iteration_start": active.get("start_date") if active else None,
+        "active_iteration_end": active.get("end_date") if active else None,
         "team_size": len(people),
         "total_capacity_per_iteration": total_capacity,
         "cadence": f"{iter_weeks}-week iterations, {pi_iters * iter_weeks}-week PI ({pi_iters} iterations)",
     }
+    if warnings:
+        result["warnings"] = warnings
     return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
 
 
 def _handle_iterations(edpa_root: Path, status_filter: str | None) -> list[TextContent]:
-    config = load_yaml(edpa_root / "config" / "edpa.yaml") or {}
-    # Support new pis[] array and legacy pi:{} format
-    pis = config.get("pis", [])
-    if not pis and config.get("pi"):
-        legacy = config["pi"]
-        pis = [{"id": legacy.get("current", "?"), "iterations": legacy.get("iterations", [])}]
-    active_pi = next((p for p in pis if p.get("status") == "active"), pis[0] if pis else {})
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _pi_loader import derive_pis, find_active_pi, split_diagnostics  # noqa: E402
+
+    pis, diags = derive_pis(edpa_root)
+    _, warnings = split_diagnostics(diags)
+    active_pi = find_active_pi(pis)
     iterations = active_pi.get("iterations", [])
 
     if status_filter:
         iterations = [i for i in iterations if i.get("status") == status_filter]
 
-    result = []
+    items = []
     for it in iterations:
         entry = {
             "id": it.get("id"),
             "status": it.get("status"),
-            "dates": it.get("dates"),
+            "start_date": it.get("start_date"),
+            "end_date": it.get("end_date"),
+            "weeks": it.get("weeks"),
         }
         if it.get("type"):
             entry["type"] = it["type"]
-        # Check if results exist
         results_path = edpa_root / "reports" / f"iteration-{it.get('id')}" / "edpa_results.json"
         entry["has_results"] = results_path.exists()
-        result.append(entry)
+        items.append(entry)
 
-    return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+    payload: dict = {"iterations": items}
+    if warnings:
+        payload["warnings"] = warnings
+    return [TextContent(type="text", text=json.dumps(payload, indent=2, ensure_ascii=False))]
 
 
 def _handle_validate(edpa_root: Path) -> list[TextContent]:

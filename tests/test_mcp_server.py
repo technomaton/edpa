@@ -81,6 +81,8 @@ def test_handle_status():
     assert data["team_size"] == 9
     assert data["total_capacity_per_iteration"] == 400
     assert data["active_iteration"] == "PI-2026-1.4"
+    assert data["active_iteration_start"] == "2026-05-18"
+    assert data["active_iteration_end"] == "2026-05-29"
     assert data["iterations_total"] == 5
     assert data["iterations_closed"] == 3
     assert "cadence" in data
@@ -107,34 +109,38 @@ def test_handle_status_missing_config(tmp_path):
 def test_handle_iterations_all():
     """Returns all 5 iterations."""
     data = parse_result(_handle_iterations(EDPA_ROOT, None))
-    assert len(data) == 5
-    ids = [i["id"] for i in data]
+    iters = data["iterations"]
+    assert len(iters) == 5
+    ids = [i["id"] for i in iters]
     assert "PI-2026-1.1" in ids
     assert "PI-2026-1.5" in ids
+    # ISO date fields replace the legacy "dates" string.
+    assert iters[0]["start_date"] == "2026-04-06"
+    assert iters[0]["end_date"] == "2026-04-17"
 
 
 def test_handle_iterations_filter_active():
     """Returns only active iteration(s)."""
     data = parse_result(_handle_iterations(EDPA_ROOT, "active"))
-    assert len(data) >= 1
-    assert all(i["status"] == "active" for i in data)
-    assert data[0]["id"] == "PI-2026-1.4"
+    iters = data["iterations"]
+    assert len(iters) >= 1
+    assert all(i["status"] == "active" for i in iters)
+    assert iters[0]["id"] == "PI-2026-1.4"
 
 
 def test_handle_iterations_filter_closed():
     """Returns only closed iterations."""
     data = parse_result(_handle_iterations(EDPA_ROOT, "closed"))
-    assert len(data) == 3
-    assert all(i["status"] == "closed" for i in data)
+    iters = data["iterations"]
+    assert len(iters) == 3
+    assert all(i["status"] == "closed" for i in iters)
 
 
 def test_handle_iterations_has_results():
     """Checks has_results flag accuracy — reports dir is empty so all should be False."""
     data = parse_result(_handle_iterations(EDPA_ROOT, None))
-    # The .edpa/reports/ directory is empty, so no iteration should have results
-    for it in data:
+    for it in data["iterations"]:
         assert "has_results" in it
-        # Verify the flag is a boolean
         assert isinstance(it["has_results"], bool)
 
 
@@ -300,8 +306,9 @@ def test_call_tool_iterations_with_filter(monkeypatch):
     monkeypatch.chdir(ROOT)
     result = asyncio.run(mcp_server.call_tool("edpa_iterations", {"status": "active"}))
     data = parse_result(result)
-    assert len(data) >= 1
-    assert data[0]["id"] == "PI-2026-1.4"
+    iters = data["iterations"]
+    assert len(iters) >= 1
+    assert iters[0]["id"] == "PI-2026-1.4"
 
 
 def test_call_tool_people_with_filter(monkeypatch):
@@ -359,8 +366,10 @@ def test_read_resource_config(monkeypatch):
     """read_resource returns edpa.yaml content."""
     monkeypatch.chdir(ROOT)
     content = asyncio.run(mcp_server.read_resource("edpa://config"))
-    assert "PI-2026-1" in content
-    assert "iterations" in content
+    # PI/iteration data has moved to .edpa/iterations/*.yaml, so check for
+    # surviving edpa.yaml landmarks instead.
+    assert "iterations_dir" in content
+    assert "evidence" in content
 
 
 def test_read_resource_people(monkeypatch):
@@ -622,12 +631,21 @@ class TestLoadYAMLCache:
     def test_handlers_benefit_from_cache(self, tmp_path):
         """End-to-end: calling _handle_status twice in a row, with no
         filesystem change, must do the second pass without parsing."""
-        # Build a minimal .edpa/ tree.
+        # Build a minimal .edpa/ tree on the new schema (pis[] gone, PI/iter
+        # YAMLs in iterations/).
         (tmp_path / "config").mkdir()
+        (tmp_path / "iterations").mkdir()
         (tmp_path / "config" / "edpa.yaml").write_text(
             "project:\n  name: 'CacheTest'\n"
-            "pis:\n  - id: PI-2026-1\n    status: active\n"
-            "    iterations:\n      - id: PI-2026-1.1\n        status: active\n"
+        )
+        (tmp_path / "iterations" / "PI-2026-1.yaml").write_text(
+            "pi:\n  id: PI-2026-1\n  status: active\n"
+            "  iteration_weeks: 1\n  pi_iterations: 1\n"
+        )
+        (tmp_path / "iterations" / "PI-2026-1.1.yaml").write_text(
+            "iteration:\n  id: PI-2026-1.1\n  pi: PI-2026-1\n"
+            "  start_date: 2026-01-05\n  end_date: 2026-01-09\n"
+            "  status: active\n"
         )
         (tmp_path / "config" / "people.yaml").write_text(
             "people:\n  - id: a\n    name: A\n    role: Dev\n"

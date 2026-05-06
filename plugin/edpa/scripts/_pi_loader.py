@@ -224,3 +224,12 @@ def split_diagnostics(diags: list[dict]) -> tuple[list[dict], list[dict]]:
     errors = [d for d in diags if d.get("severity") == "error"]
     warnings = [d for d in diags if d.get("severity") == "warning"]
     return errors, warnings
+
+
+def format_iteration_dates(it: dict) -> str:
+    """Format iteration dates for human-readable display."""
+    sd = it.get("start_date")
+    ed = it.get("end_date")
+    if sd and ed:
+        return f"{sd}–{ed}"
+    return ""

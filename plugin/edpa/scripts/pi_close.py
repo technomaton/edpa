@@ -93,7 +93,10 @@ def aggregate_iterations(iteration_files):
         iterations.append({
             "id": it.get("id"),
             "status": it.get("status"),
-            "dates": it.get("dates"),
+            # PyYAML parses ISO dates into date objects; coerce to string
+            # so the report serializes cleanly to JSON.
+            "start_date": str(it["start_date"]) if it.get("start_date") else None,
+            "end_date": str(it["end_date"]) if it.get("end_date") else None,
             "planned_sp": planned,
             "delivered_sp": delivered,
             "velocity": delivery.get("velocity", delivered),
@@ -221,9 +224,12 @@ def render_summary_md(result: dict) -> str:
         "| ID | Dates | Planned | Delivered | Predictability | Velocity |",
         "|---|---|---:|---:|---:|---:|",
     ]
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _pi_loader import format_iteration_dates  # noqa: E402
+
     for it in result["iterations"]:
         lines.append(
-            f"| {it['id']} | {it.get('dates','')} | {it['planned_sp']} | "
+            f"| {it['id']} | {format_iteration_dates(it)} | {it['planned_sp']} | "
             f"{it['delivered_sp']} | {it['predictability_pct']}% | {it['velocity']} |"
         )
 

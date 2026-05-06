@@ -1,12 +1,12 @@
 # Iteration PI-2026-1.2 -- Plan & Results
-# Closed iteration: 20.4.–1.5.2026
 
 iteration:
   id: PI-2026-1.2
   pi: PI-2026-1
-  dates: "20.4.–1.5.2026"
+  start_date: 2026-04-20
+  end_date: 2026-05-01
+  weeks: 2
   status: closed
-  cadence: "2/10"  # 2-week iteration, 10-week PI
 
 planning:
   capacity: 380  # team total hours

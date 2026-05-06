@@ -615,7 +615,10 @@ def _show_iteration_status(backlog, iteration_id, args):
 
     if iter_data:
         it = iter_data.get("iteration", {})
-        print(color(f"  {it.get('dates', '')}  |  Status: {it.get('status', '?')}  |  Cadence: {it.get('cadence', '?')}", C.MUTED))
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from _pi_loader import format_iteration_dates  # noqa: E402
+        weeks = it.get("weeks", "?")
+        print(color(f"  {format_iteration_dates(it)}  |  Status: {it.get('status', '?')}  |  Weeks: {weeks}", C.MUTED))
 
     print()
 

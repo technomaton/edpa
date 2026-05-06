@@ -1,0 +1,30 @@
+# Iteration PI-2026-1.5 -- Innovation & Planning iteration (last in PI)
+
+iteration:
+  id: PI-2026-1.5
+  pi: PI-2026-1
+  start_date: 2026-06-01
+  end_date: 2026-06-12
+  weeks: 2
+  status: planned
+  type: IP
+
+planning:
+  capacity: 380
+  planning_factor: 0.50
+  planned_sp: 0
+  stories: []
+
+delivery:
+  delivered_sp: 0
+  predictability: ""
+  velocity: 0
+  spillover: []
+  unplanned: []
+  notes: "IP iteration — innovation, planning, deferred work."
+
+stories_detail: []
+
+edpa:
+  mode: simple
+  invariants_passed: false
