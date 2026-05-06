@@ -87,9 +87,15 @@ def fail(text):
 
 
 def _bootstrap_pi_stub_if_empty(iter_dir: Path) -> None:
-    """Drop a stub PI-{year}-1.yaml into iterations/ if the directory has
-    no PI YAML yet. Defaults: 1-week iterations × 5 per PI, status planning,
-    starting next Monday. Customer edits or replaces it during PI Planning.
+    """Drop a stub PI-{year}-1.yaml + per-iteration child files into
+    iterations/ if the directory has no PI YAML yet.
+
+    Defaults: 1-week iterations × 5 per PI (4 delivery + 1 IP), status
+    planning, starting next Monday. Each child PI-{year}-1.{1..N}.yaml
+    holds the start/end window that transitions.py needs to scope
+    `--iteration` queries — without these the engine couldn't compute
+    gates because parse_iteration_dates only knows the per-iteration
+    file format. Customer edits or replaces these during PI Planning.
     """
     iter_dir.mkdir(parents=True, exist_ok=True)
     if any(iter_dir.glob("PI-*.yaml")):
@@ -113,7 +119,33 @@ def _bootstrap_pi_stub_if_empty(iter_dir: Path) -> None:
         f"  end_date: {end.isoformat()}\n"
     )
     (iter_dir / f"{pi_id}.yaml").write_text(stub, encoding="utf-8")
-    ok(f"Bootstrapped {iter_dir}/{pi_id}.yaml (1-week × 5)")
+    ok(f"Bootstrapped {iter_dir}/{pi_id}.yaml (1-week × {weeks})")
+
+    # Per-iteration child files. The last one is marked as the IP
+    # (Innovation & Planning) iteration so reports / engine can tell
+    # delivery iterations from IP without extra config.
+    delivery = weeks - 1
+    for idx in range(1, weeks + 1):
+        sub_id = f"{pi_id}.{idx}"
+        sub_path = iter_dir / f"{sub_id}.yaml"
+        if sub_path.exists():
+            continue
+        sub_start = monday + timedelta(weeks=idx - 1)
+        sub_end = sub_start + timedelta(days=6)
+        sub_type = "ip" if idx > delivery else "delivery"
+        sub_status = "planning" if idx == 1 else "future"
+        body = (
+            f"iteration:\n"
+            f"  id: {sub_id}\n"
+            f"  pi: {pi_id}\n"
+            f"  type: {sub_type}\n"
+            f"  sequence: {idx}\n"
+            f"  start_date: {sub_start.isoformat()}\n"
+            f"  end_date: {sub_end.isoformat()}\n"
+            f"  status: {sub_status}\n"
+        )
+        sub_path.write_text(body, encoding="utf-8")
+    ok(f"Bootstrapped {weeks} child iterations ({pi_id}.1..{pi_id}.{weeks})")
 
 
 def info(text):
