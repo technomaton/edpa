@@ -34,6 +34,16 @@ else
   pip3 install pyyaml --quiet --break-system-packages 2>/dev/null || pip3 install pyyaml --quiet
 fi
 
+# ruamel.yaml — comment-preserving YAML round-trip for the
+# collaborator-sync workflow. Without it sync_collaborators.py rejects
+# at startup and any people.yaml edit by the bot would lose comments.
+if python3 -c 'from ruamel.yaml import YAML' 2>/dev/null; then
+  echo "  ruamel.yaml ✓"
+else
+  echo "  ruamel.yaml not found — installing..."
+  pip3 install ruamel.yaml --quiet --break-system-packages 2>/dev/null || pip3 install ruamel.yaml --quiet
+fi
+
 # mcp — required for MCP server (.claude/edpa/scripts/mcp_server.py)
 # Without this the MCP tools (edpa_status, edpa_backlog, ...) silently fail
 # to start and Claude Code falls back to Bash + grep for everything.

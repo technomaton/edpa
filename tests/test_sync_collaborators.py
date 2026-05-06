@@ -165,6 +165,74 @@ def test_write_people_yaml_preserves_keys(tmp_path):
     assert reloaded == doc
 
 
+def test_round_trip_preserves_top_level_comment(tmp_path):
+    """Comments must survive load → modify → write — that's the whole
+    reason ruamel.yaml replaced PyYAML on the write path."""
+    p = tmp_path / "people.yaml"
+    p.write_text(
+        "# EXAMPLE DATA — replace with your team when deploying\n"
+        "people:\n"
+        "  - id: alice\n"
+        "    name: Alice\n"
+        "    github: alice-gh\n"
+    )
+    doc = sc.load_people_yaml_round_trip(p)
+    # Touch the doc so we exercise the full read-write cycle, not just dump.
+    doc["people"][0]["fte"] = 1.0
+    sc.write_people_yaml(p, doc)
+    text = p.read_text()
+    assert "# EXAMPLE DATA — replace with your team when deploying" in text
+
+
+def test_round_trip_preserves_inline_comment(tmp_path):
+    """Inline `# capacity rationale` comments next to fields must also
+    survive — that's the workflow's typical use case (capacity notes,
+    'on parental leave', etc.)."""
+    p = tmp_path / "people.yaml"
+    p.write_text(
+        "people:\n"
+        "  - id: alice\n"
+        "    name: Alice\n"
+        "    fte: 0.5  # parental leave until Q3\n"
+        "    github: alice-gh\n"
+    )
+    doc = sc.load_people_yaml_round_trip(p)
+    sc.write_people_yaml(p, doc)
+    text = p.read_text()
+    assert "parental leave until Q3" in text
+
+
+def test_round_trip_with_apply_adds_preserves_comments(tmp_path, monkeypatch):
+    """Full e2e: original file has a comment, apply_adds appends a stub,
+    the comment still appears."""
+    monkeypatch.setattr(sc, "fetch_user_profile",
+                        lambda login: {"name": "Eve Example", "email": ""})
+    p = tmp_path / "people.yaml"
+    p.write_text(
+        "# EXAMPLE DATA banner\n"
+        "people:\n"
+        "  - id: alice\n"
+        "    name: Alice\n"
+        "    github: alice-gh\n"
+    )
+    doc = sc.load_people_yaml_round_trip(p)
+    sc.apply_adds(doc["people"],
+                  [{"login": "eve-gh", "collaborator": {"login": "eve-gh"}}])
+    sc.write_people_yaml(p, doc)
+    text = p.read_text()
+    assert "# EXAMPLE DATA banner" in text
+    assert "id: eve-gh" in text
+    assert "name: Eve Example" in text
+
+
+def test_load_people_yaml_round_trip_handles_missing(tmp_path):
+    """An empty file should produce an empty dict, not raise."""
+    p = tmp_path / "empty.yaml"
+    p.write_text("")
+    doc = sc.load_people_yaml_round_trip(p)
+    assert doc == {}
+
+
 # --- find_edpa_root --------------------------------------------------------
 
 def test_find_edpa_root_handles_dot_edpa_directly(tmp_path):

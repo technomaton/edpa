@@ -49,6 +49,27 @@ except ImportError:
           file=sys.stderr)
     sys.exit(1)
 
+# ruamel.yaml is used ONLY for the read-modify-write cycle on
+# .edpa/config/people.yaml so the file's comments, blank lines, key
+# order, and quoting style survive the sync. Everywhere else the
+# toolchain reads YAML for analysis only and PyYAML stays in charge.
+try:
+    from ruamel.yaml import YAML  # noqa: E402
+    _RUAMEL = YAML()
+    _RUAMEL.preserve_quotes = True
+    # Match the indent style other tools in the toolchain emit:
+    # - block sequences sit one indent in from the parent mapping key
+    # - mapping keys at 2 spaces per level
+    # offset=2 + sequence=4 keeps `- id: alice` aligned 2 spaces under
+    # the `people:` key, which is what hand-edited people.yaml files use.
+    _RUAMEL.indent(mapping=2, sequence=4, offset=2)
+    _RUAMEL.allow_unicode = True
+    _RUAMEL.width = 4096   # avoid silent line-wrap rewrites
+except ImportError:
+    print("ERROR: ruamel.yaml required for round-trip writes. "
+          "Install with: pip install ruamel.yaml", file=sys.stderr)
+    sys.exit(1)
+
 
 def _gh(args: list[str]) -> "str | None":
     """Run `gh ...` and return stdout. None on non-zero exit."""
@@ -193,12 +214,22 @@ def apply_adds(people: list[dict], adds: list[dict]) -> int:
     return n
 
 
+def load_people_yaml_round_trip(path: Path) -> dict:
+    """Load people.yaml in a comment-preserving mode. The returned object
+    is a ruamel CommentedMap that behaves like a dict for read/write but
+    carries comment, key-order, and quoting metadata so a later
+    ``write_people_yaml`` round-trips them faithfully."""
+    with open(path, encoding="utf-8") as f:
+        doc = _RUAMEL.load(f)
+    return doc or {}
+
+
 def write_people_yaml(path: Path, doc: dict) -> None:
-    """Persist people.yaml with the same formatting conventions as the
-    rest of the toolchain (block style, allow_unicode, no key reorder)."""
+    """Persist people.yaml using ruamel round-trip — comments, blank
+    lines, key order, and quoting style on entries we did not touch
+    survive the sync."""
     with open(path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(doc, f, sort_keys=False, allow_unicode=True,
-                       default_flow_style=False)
+        _RUAMEL.dump(doc, f)
 
 
 def find_edpa_root(start: Path) -> "Path | None":
@@ -268,7 +299,7 @@ def main(argv: list[str] | None = None) -> int:
 
     people_path = edpa_root / "config" / "people.yaml"
     try:
-        doc = yaml.safe_load(people_path.read_text(encoding="utf-8")) or {}
+        doc = load_people_yaml_round_trip(people_path)
     except (OSError, yaml.YAMLError) as exc:
         print(f"ERROR: cannot read {people_path}: {exc}", file=sys.stderr)
         return 1

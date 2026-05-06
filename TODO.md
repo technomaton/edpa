@@ -92,33 +92,40 @@ merged option list.
 
 Surfaced by the live PR run on technomaton/edpa#20 (2026-05-06).
 
-### Workflow token scope (~ 10 lines)
+### ~~Workflow token scope (members: read permission)~~ — done in v1.6.1
 
-`GITHUB_TOKEN` on the default runner returned only 2 of 5 actual repo
-collaborators (the workflow showed `Adds applied: 2` while the local
-`gh` CLI with `admin:org` scope sees 5). Outside collaborators,
-pending invitations, and team-granted access are invisible to the
-default token.
+Both `.github/workflows/collaborators-sync.yml` and the shipped
+`plugin/edpa/workflows/collaborators-sync.yml` now declare
+`permissions: { members: read }` so `GITHUB_TOKEN` can see team-
+granted access and pending invitations, not just direct
+collaborators.
 
-**Fix:** add `permissions: { members: read }` if GitHub honors it on
-public repos, or document a `COLLAB_SYNC_TOKEN` PAT secret with the
-required scopes (`repo`, `read:org`) and reference it in the
-workflow's `env`. README quick-start should mention the secret as
-optional but recommended.
+### Token scope — PAT fallback for org members (~ 10 lines)
 
-### YAML round-trip preserves comments (~ 30 lines)
+If `members: read` on the default `GITHUB_TOKEN` still doesn't
+surface every collaborator (private orgs, SAML-locked orgs, or
+when GitHub silently downgrades the permission), document a
+`COLLAB_SYNC_TOKEN` Personal Access Token secret with `repo` and
+`read:org` scopes.
 
-`yaml.safe_dump()` strips comments. The first PR run wiped
-`# EXAMPLE DATA — replace with your team when deploying` from
-`.edpa/config/people.yaml`. That's a regression for any project
-where people.yaml carries inline notes (capacity rationale,
-"on parental leave", etc.).
+The workflow would conditionally use it:
 
-**Fix:** switch `sync_collaborators.write_people_yaml()` to
-`ruamel.yaml` round-trip mode. Already a transitive dependency
-through other ecosystem tooling but verify `requirements.txt`.
-Alternative: line-append-only path that finds the `people:` block
-and appends new entries at the end without re-serializing the rest.
+```yaml
+env:
+  GH_TOKEN: ${{ secrets.COLLAB_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+```
+
+README quick-start gets a note: "Optional — set
+`COLLAB_SYNC_TOKEN` secret if your workflow's first run reports
+fewer collaborators than `gh api repos/{owner}/{repo}/collaborators`
+shows you locally." Open as v1.6.x patch only if the live
+deployment proves the default permission insufficient — for now
+the v1.6.1 fix is enough.
+
+### ~~YAML round-trip preserves comments~~ — done in v1.6.1
+
+Switched `sync_collaborators` to `ruamel.yaml` so people.yaml
+comments survive the read-modify-write cycle.
 
 ### Auto-merge stubs onto existing entries (~ 50 lines, optional)
 

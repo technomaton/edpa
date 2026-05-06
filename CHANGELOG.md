@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 1.6.1-beta — 2026-05-06
+
+### Fixed
+- **collaborators-sync workflow now sees team-granted access.** Both
+  `.github/workflows/collaborators-sync.yml` and the shipped copy in
+  `plugin/edpa/workflows/` add `permissions: { members: read }` so the
+  default `GITHUB_TOKEN` covers org members and pending invitations,
+  not just direct collaborators. Live PR #20 on technomaton/edpa
+  surfaced this — it picked up 2 of 5 collaborators because the
+  default token's scope was narrower than the maintainer's local
+  `gh auth`. (PAT-secret fallback for SAML-locked orgs is filed in
+  TODO.md as v1.6.x patch material — open it only if `members: read`
+  proves insufficient in production.)
+- **people.yaml comments survive the sync.** `sync_collaborators.py`
+  now uses `ruamel.yaml` round-trip for the read-modify-write cycle
+  instead of `yaml.safe_dump()`. The first PR run wiped the
+  `# EXAMPLE DATA — replace with your team when deploying` banner;
+  this patch keeps comments, blank lines, key order, and quoting
+  style on entries the sync did not touch.
+
+### Added
+- `ruamel.yaml` as a runtime dependency (`requirements.txt`,
+  `install.sh` checks). Adds ~120 KB; pure-Python.
+
 ## 1.6.0-beta — 2026-05-06
 
 ### Added

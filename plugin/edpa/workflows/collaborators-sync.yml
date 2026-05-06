@@ -23,6 +23,12 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Read team membership so the workflow sees everyone the human
+  # maintainer would see via `gh api repos/{owner}/{repo}/collaborators`
+  # — not just direct collaborators that the default GITHUB_TOKEN
+  # exposes. If GitHub still hides org members behind SAML/SSO, set
+  # the COLLAB_SYNC_TOKEN secret (PAT with read:org) — see TODO.md.
+  members: read
 
 jobs:
   sync:
