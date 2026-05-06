@@ -16,7 +16,8 @@
     "./skills/edpa-engine/SKILL.md",
     "./skills/edpa-reports/SKILL.md",
     "./skills/edpa-autocalib/SKILL.md",
-    "./skills/edpa-sync/SKILL.md"
+    "./skills/edpa-sync/SKILL.md",
+    "./skills/edpa-sync-people/SKILL.md"
   ],
   "commands": [
     "./commands/edpa/setup.md",
