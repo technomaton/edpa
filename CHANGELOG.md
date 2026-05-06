@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 1.6.3-beta — 2026-05-06
+
+### Fixed
+- **collaborators-sync workflow installs ruamel.yaml.** v1.6.2 fixed
+  the workflow syntax but the `Install Python deps` step still only
+  pip-installed `pyyaml`. The first run after the fix exited with
+  `ERROR: ruamel.yaml required for round-trip writes` because
+  `sync_collaborators.py` now imports it at startup. Workflow now
+  installs both: `pip install pyyaml ruamel.yaml`. Both copies
+  (live + shipped) updated in lockstep.
+
 ## 1.6.2-beta — 2026-05-06
 
 ### Fixed

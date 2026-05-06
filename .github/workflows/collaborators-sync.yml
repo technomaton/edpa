@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Python deps
-        run: pip install pyyaml
+        run: pip install pyyaml ruamel.yaml
 
       - name: Decide action
         id: decide
