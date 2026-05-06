@@ -1,0 +1,59 @@
+# Kashealth pilot — edpa.yaml seed
+#
+# Po `cp` do .edpa/config/edpa.yaml stačí 1 edit (project.name).
+# Sekce `sync` je pre-filled na kashealth/kas-platform-v1; sekce
+# `field_ids` / `option_ids` / `github_project_id` se naplní automaticky
+# až `project_setup.py` proběhne (a auto-commit STEP 9b je perzistuje).
+
+project:
+  name: "Medical Platform + Datový e-shop"
+  registration: "CZ.01.01.01/01/24_062/0007440"
+  program: "OP TAK"
+  organizations:
+    - name: "ČVUT FBMI"
+    - name: "Medicalc software s.r.o."
+  domain: "kashealth.cz"
+
+governance:
+  methodology: "EDPA 1.8.1-beta"
+  # Calculation mode:
+  #   gates  (default) — credits per status transition on Initiative/Epic/Feature
+  #                      + Story=Done. Doporučeno po validaci A/B vs simple.
+  #   simple — only items with status=Done count. Audit-conservative;
+  #            v 1. PI pilotu je rozumné spustit oba módy paralelně
+  #            (viz KASHEALTH-PILOT.md § 9).
+  #   full   — JS × CW × RS (přidává Relevance Signal, většinou jen pro audit).
+  calculation_mode: "gates"
+  audit_mode: "full"   # always store RS in snapshots
+
+naming:
+  pi_pattern: "PI-{year}-{pi_num}"
+  iteration_pattern: "PI-{year}-{pi_num}.{iter_num}"
+  branch_pattern: "{type}/{item_id}-{description}"
+  item_prefixes:
+    initiative: "I"
+    epic: "E"
+    feature: "F"
+    story: "S"
+    task: "T"
+    defect: "D"
+
+# Native GitHub Issue Types (org-level).
+# Pokud chybí v org → `python3 plugin/edpa/scripts/issue_types.py setup --org kashealth`.
+issue_types:
+  Initiative: "Strategic business initiative with investment funding"
+  Epic: "Large body of work decomposed into features"
+  Feature: "A service provided by the system that fulfills a stakeholder need"
+  Story: "A small, deliverable unit of value completed within an iteration"
+  Defect: "A defect in existing functionality"
+  Task: "Technical work without user-facing value"
+
+labels:
+  Enabler: "Infrastructure, research, technical debt"
+
+sync:
+  github_org: "kashealth"
+  github_repo: "kas-platform-v1"
+  # Vše níže (`github_project_id`, `field_ids`, `option_ids`,
+  # `github_project_number`) se naplní automaticky při project_setup.py.
+  # NEEDITUJTE ručně.
