@@ -23,6 +23,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from _pi_loader import derive_pis, split_diagnostics  # noqa: E402
+from _people_loader import validate_people  # noqa: E402
 
 SEV_GLYPH = {"error": "✗", "warning": "⚠"}
 
@@ -71,7 +72,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ERROR: no .edpa/ found from {args.path}", file=sys.stderr)
         return 1
 
-    pis, diags = derive_pis(edpa_root)
+    pis, iter_diags = derive_pis(edpa_root)
+    people_diags = validate_people(edpa_root)
+    diags = list(iter_diags) + list(people_diags)
     errors, warnings = split_diagnostics(diags)
 
     if args.json:

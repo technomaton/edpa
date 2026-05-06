@@ -123,6 +123,41 @@ class TestPersonResolution:
         person = resolve_person(self.PEOPLE, email="@domain.com")
         assert person is None
 
+    PEOPLE_WITH_GITHUB = [
+        {"id": "urbanek", "name": "J. Urbanek", "role": "Arch",
+         "email": "jaroslav@example.com", "github": "jurby"},
+        {"id": "tuma", "name": "O. Tuma", "role": "DevSecOps",
+         "email": "tuma@example.com", "github": "tuma-on-gh"},
+    ]
+
+    def test_match_by_github_noreply_email(self):
+        """GitHub web edits send `<login>@users.noreply.github.com`."""
+        person = resolve_person(self.PEOPLE_WITH_GITHUB,
+                                email="jurby@users.noreply.github.com")
+        assert person is not None
+        assert person["id"] == "urbanek"
+
+    def test_match_by_github_privacy_protected_noreply(self):
+        """The `<id>+<login>@users.noreply.github.com` form must also match."""
+        person = resolve_person(self.PEOPLE_WITH_GITHUB,
+                                email="12345+jurby@users.noreply.github.com")
+        assert person is not None
+        assert person["id"] == "urbanek"
+
+    def test_match_by_github_handle_in_name(self):
+        """git user.name set to a github handle resolves through github field."""
+        person = resolve_person(self.PEOPLE_WITH_GITHUB, name="tuma-on-gh")
+        assert person is not None
+        assert person["id"] == "tuma"
+
+    def test_github_match_outranks_email_prefix(self):
+        """GitHub login match wins over the id-equals-email-prefix fallback."""
+        # email prefix "jaroslav" doesn't match anyone's id; github "jurby" does.
+        person = resolve_person(self.PEOPLE_WITH_GITHUB,
+                                email="jurby@users.noreply.github.com",
+                                name="someone-else")
+        assert person["id"] == "urbanek"
+
 
 # ---------------------------------------------------------------------------
 # TestValidateSyntaxEdgeCases

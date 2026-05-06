@@ -101,6 +101,22 @@ def person_initials(name):
     return name[:2].upper() if name else "?"
 
 
+def avatar_html(person, fallback_id, *, size=40, klass="card__avatar"):
+    """Render a GitHub avatar <img> when the person has a github login on
+    file; fall back to colored-initials <div> otherwise. Title text uses
+    the display name (or the bare id when name is missing)."""
+    name = person.get("name") or fallback_id or "?"
+    title = esc(name)
+    gh = person.get("github") if person else None
+    if gh:
+        src = f"https://github.com/{esc(gh)}.png?size={size}"
+        return (f'<img class="{klass} {klass}--gh" src="{src}" '
+                f'alt="@{esc(gh)}" title="{title} (@{esc(gh)})" '
+                f'width="{size}" height="{size}">')
+    init = person_initials(name)
+    return f'<div class="{klass}" title="{title}">{init}</div>'
+
+
 def render_card(item, people, items_by_id):
     item_type = item.get("type", "Story")
     tc = TYPE_COLORS.get(item_type, TYPE_COLORS["Story"])
@@ -109,8 +125,7 @@ def render_card(item, people, items_by_id):
     status = item.get("status", "Planned")
     assignee_id = item.get("assignee") or item.get("owner", "")
     assignee = people.get(assignee_id, {})
-    assignee_name = esc(assignee.get("name", assignee_id))
-    initials = person_initials(assignee.get("name", assignee_id))
+    avatar = avatar_html(assignee, assignee_id, size=40, klass="card__avatar")
     iteration = esc(item.get("iteration", ""))
 
     # Parent breadcrumb
@@ -156,7 +171,7 @@ def render_card(item, people, items_by_id):
   {breadcrumb}
   {wsjf_html}
   <div class="card__foot">
-    <div class="card__avatar" title="{assignee_name}">{initials}</div>
+    {avatar}
     {iter_html}
   </div>
 </article>"""
@@ -208,9 +223,11 @@ def render_html(items, people, project_name, level_filter=None, iteration_filter
     assignee_chips = ""
     for a_id in assignees:
         p = people.get(a_id, {})
-        name = esc(p.get("name", a_id))
-        init = person_initials(p.get("name", a_id))
-        assignee_chips += f'<button class="chip chip--assignee" data-filter-assignee="{esc(a_id)}" title="{name}">{init}</button>\n'
+        chip_inner = avatar_html(p, a_id, size=24, klass="chip__avatar")
+        assignee_chips += (
+            f'<button class="chip chip--assignee" '
+            f'data-filter-assignee="{esc(a_id)}">{chip_inner}</button>\n'
+        )
 
     # Iteration options
     iter_options = '<option value="">All iterations</option>\n'

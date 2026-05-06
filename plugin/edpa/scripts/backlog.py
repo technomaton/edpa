@@ -27,6 +27,30 @@ except ImportError:
     sys.exit(1)
 
 
+def _people_index(root: Path) -> dict:
+    """Cache: people-by-id index loaded from .edpa/config/people.yaml.
+    Returns {} if the file is absent so callers can fall back to bare ids."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _people_loader import load_people  # noqa: E402
+    edpa_root = root if root else Path(".edpa")
+    if not edpa_root.is_dir() and (Path.cwd() / ".edpa").is_dir():
+        edpa_root = Path.cwd() / ".edpa"
+    _, by_id = load_people(edpa_root)
+    return by_id
+
+
+def _assignee_display(person_id, by_id: dict) -> str:
+    """Render @github_login for an assignee id when the github field is set;
+    fall back to the bare internal id otherwise. Empty/None → '?'."""
+    if not person_id:
+        return "?"
+    person = by_id.get(person_id)
+    if not person:
+        return person_id   # unknown — show what we have
+    gh = person.get("github")
+    return f"@{gh}" if gh else person_id
+
+
 # -- ANSI Colors (EDPA palette) -----------------------------------------------
 
 class C:
@@ -363,15 +387,15 @@ def cmd_tree(backlog, args):
                 if iter_filter:
                     stories = [s for s in stories if s.get("iteration") == iter_filter]
 
+                by_id = _people_index(getattr(args, "_root", None))
                 for si, story in enumerate(stories):
                     is_last_story = si == len(stories) - 1
                     scon = ELBOW if is_last_story else TEE
 
                     story_iter = story.get('iteration', '?')
-                    story_assignee = story.get('assignee', '?')
                     story_js = story.get('js', 0)
                     iter_tag = color(f"@{story_iter}", C.MUTED) if story.get("iteration") else ""
-                    assignee_tag = color(f"-> {story_assignee}", C.DIM) if story.get("assignee") else ""
+                    assignee_tag = color(f"-> {_assignee_display(story.get('assignee'), by_id)}", C.DIM) if story.get("assignee") else ""
 
                     inner_pad = " " if is_last_feat else PIPE
                     print(f" {epad}  {inner_pad}  {scon}{DASH}{DASH} {color(story['id'], C.STORY)} "
@@ -403,10 +427,11 @@ def cmd_show(backlog, args, root=None):
     print(f"  {bold('Level:')}    {level}")
     print(f"  {bold('Status:')}   {status_badge(item.get('status'))}")
 
+    by_id = _people_index(root)
     if item.get("owner"):
-        print(f"  {bold('Owner:')}    {item['owner']}")
+        print(f"  {bold('Owner:')}    {_assignee_display(item['owner'], by_id)}")
     if item.get("assignee"):
-        print(f"  {bold('Assignee:')} {item['assignee']}")
+        print(f"  {bold('Assignee:')} {_assignee_display(item['assignee'], by_id)}")
     if item.get("iteration"):
         print(f"  {bold('Iteration:')} {item['iteration']}")
     if item.get("parent"):
@@ -629,8 +654,9 @@ def _show_iteration_status(backlog, iteration_id, args):
     print()
 
     print(f"  {bold('Stories:')}")
+    by_id = _people_index(getattr(args, "_root", None))
     for s in stories:
-        assignee = s.get("assignee", "?")
+        assignee = _assignee_display(s.get("assignee"), by_id)
         print(f"    {color(s['id'], C.STORY):20s} {s['title']:30s}  {status_badge(s.get('status'))}  "
               f"JS={s.get('js',0)}  {color(f'-> {assignee}', C.DIM)}")
     print()
@@ -1020,6 +1046,9 @@ def main():
         sys.exit(1)
 
     backlog = load_backlog(root)
+    # Stash .edpa/ path on args so cmd_* helpers (people index, etc.)
+    # don't need an extra parameter through the call chain.
+    args._root = root / ".edpa"
 
     if args.command == "tree":
         cmd_tree(backlog, args)

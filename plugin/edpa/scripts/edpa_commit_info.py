@@ -68,34 +68,67 @@ def git_diff_staged():
     return ""
 
 
-def resolve_person(people, email=None, name=None):
-    """Resolve a person from people list by email or name.
+_GH_NOREPLY_RE = re.compile(r"^(?:\d+\+)?(?P<login>[A-Za-z0-9-]+)@users\.noreply\.github\.com$")
 
-    Match priority:
-      1. email field matches git email exactly
-      2. id matches email prefix (before @)
-      3. id matches git user.name (case-insensitive)
+
+def _github_login_from_email(email):
+    """Extract the GitHub login from a `noreply` commit email.
+
+    GitHub-routed commits use `<login>@users.noreply.github.com` (or the
+    privacy-protected form `<id>+<login>@users.noreply.github.com`). Pull
+    the login out so callers can match against people.yaml's github field.
+    Returns None when the email is not a GitHub noreply address.
+    """
+    if not email:
+        return None
+    m = _GH_NOREPLY_RE.match(email.strip())
+    return m.group("login") if m else None
+
+
+def resolve_person(people, email=None, name=None):
+    """Resolve a person from people list by GitHub login, email, or name.
+
+    Match priority (highest first):
+      1. github field matches the login extracted from a GitHub noreply
+         email — most reliable when commits go through GitHub UI / web edits
+      2. github field matches the git user.name as a literal handle
+      3. email field matches git email exactly
+      4. id matches email prefix (before @)
+      5. id matches git user.name (case-insensitive)
 
     Returns the person dict or None.
     """
     if not people:
         return None
 
-    # 1. Match by email field
+    # 1. GitHub noreply email → login → people.yaml.github
+    gh_from_email = _github_login_from_email(email)
+    if gh_from_email:
+        for person in people:
+            if person.get("github") and person["github"].lower() == gh_from_email.lower():
+                return person
+
+    # 2. git user.name literally matches a github handle
+    if name:
+        for person in people:
+            if person.get("github") and person["github"].lower() == name.lower():
+                return person
+
+    # 3. email field matches git email exactly
     if email:
         for person in people:
             if person.get("email") == email:
                 return person
 
-    # 2. Match by id == email prefix
+    # 4. id matches email prefix
     if email and "@" in email:
         prefix = email.split("@")[0]
-        if prefix:  # guard against empty prefix (e.g., "@domain.com")
+        if prefix:
             for person in people:
                 if person.get("id") == prefix:
                     return person
 
-    # 3. Match by id == name (case-insensitive)
+    # 5. id matches git user.name (case-insensitive)
     if name:
         for person in people:
             if person.get("id", "").lower() == name.lower():

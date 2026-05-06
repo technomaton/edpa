@@ -398,14 +398,17 @@ def _handle_iterations(edpa_root: Path, status_filter: str | None) -> list[TextC
 
 
 def _handle_validate(edpa_root: Path) -> list[TextContent]:
-    """Run iteration schema + continuity validation, return structured report."""
-    # Local import: keeps the optional helper out of module-load path so the
+    """Run iteration + people validation, return structured report."""
+    # Local import: keeps the optional helpers out of module-load path so the
     # MCP server can still start even if a plugin upgrade is mid-flight.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from _pi_loader import derive_pis, split_diagnostics  # noqa: E402
+    from _people_loader import validate_people  # noqa: E402
 
-    pis, diags = derive_pis(edpa_root)
-    errors, warnings = split_diagnostics(diags)
+    pis, iter_diags = derive_pis(edpa_root)
+    people_diags = validate_people(edpa_root)
+    all_diags = list(iter_diags) + list(people_diags)
+    errors, warnings = split_diagnostics(all_diags)
     payload = {
         "ok": not errors,
         "pi_count": len(pis),
