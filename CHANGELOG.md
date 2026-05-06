@@ -4,12 +4,17 @@
 
 ## 1.7.0-beta — 2026-05-06
 
-Closes 12 of the 18 findings from the 2026-05-06 E2E test
+Closes all 18 findings from the 2026-05-06 E2E test
 (`docs/E2E-REPORT-2026-05-06.md`). Six were critical — engine
 silently allocating 0h on a schema mismatch, project_setup
 duplicating projects/issues on rerun, missing typed Status
 field_ids on first run — and the rest were ergonomic gaps the
-test plan documented but the scripts didn't deliver.
+test plan documented but the scripts didn't deliver. The six
+low-priority cleanups bundled at the end of the release fix
+snapshot revisioning, --until parser parity, per-iteration YAML
+bootstrap, GraphQL extension of the Iteration field on rerun,
+the snapshot.frozen_at field, and an explicit README example of
+the contributors[].role/cw schema.
 
 ### Fixed
 - **`engine.py`** validates contributor schema and surfaces it
@@ -79,9 +84,33 @@ test plan documented but the scripts didn't deliver.
   tags from backlog items, not just `.edpa/iterations/*.yaml`.
   Stories tagged `PI-2026-1.1` no longer fail every push with
   `[failed: no option_id for Iteration:PI-2026-1.1]`. When the
-  Iteration field already exists on rerun, the expected option
-  set is printed with a UI breadcrumb (gh CLI can't add options
-  to an existing single-select field non-destructively). (E2E F8)
+  Iteration field already exists on rerun, missing options are
+  appended via `updateProjectV2Field` GraphQL mutation (replacing,
+  with the existing option IDs round-tripped, so the call is
+  effectively additive); we fall back to the previous
+  "edit via UI" advice when the GraphQL endpoint is unavailable. (E2E F8, L2)
+- **Engine snapshots** carry `frozen_at` (UTC ISO timestamp at
+  write time) alongside the existing `generated_at` (engine
+  compute time). Snapshot revisioning now compares a
+  `payload_signature` (sha256 over content excluding timestamps)
+  against the canonical `PI-X.Y.json`; identical reruns refresh
+  `frozen_at` in place rather than producing `_rev2/_rev3/_rev4.json`
+  proliferation. (E2E L1, L6)
+- **`transitions.py --until`** accepts the same relative formats as
+  `--since` (`1day`, `2weeks`, `3months`), so back-fill audits like
+  `--since 2weeks --until 1day` work without computing dates by
+  hand. (E2E L4)
+- **`project_setup.py` bootstrap** — when `iterations/` is empty,
+  setup now writes both the PI-level stub *and* the per-iteration
+  `PI-X.Y.{1..N}.yaml` files (delivery + IP) in the format
+  `transitions.py` expects (`iteration:` mapping with start/end).
+  Previously a fresh project couldn't compute gates because
+  `parse_iteration_dates` had no per-iteration windows to read. (E2E L5)
+- **README** + `people.yaml.tmpl` ship an explicit "Backlog Item
+  Schema" example that calls out `contributors[].role` ∈
+  {owner, key, reviewer, consulted} and `cw` (with `weight` as a
+  legacy alias) so the F14/F16 silent-0h failure mode is now
+  documented up front. (E2E L3)
 
 ## 1.6.4-beta — 2026-05-06
 
