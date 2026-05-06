@@ -10,14 +10,14 @@ status: Implementing
 parent: E-12
 owner: tuma
 contributors:
-  - person: tuma
-    role: key
-    cw: 0.4
-  - person: do
-    role: owner
-    cw: 0.45
-  - person: urbanek
-    role: consulted
-    cw: 0.15
+- person: tuma
+  cw: 0.4
+  as: key
+- person: do
+  cw: 0.45
+  as: owner
+- person: urbanek
+  cw: 0.15
+  as: consulted
 iteration: PI-2026-1.1
 iteration_half: 2

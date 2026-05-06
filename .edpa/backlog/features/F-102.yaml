@@ -10,14 +10,14 @@ status: Implementing
 parent: E-10
 owner: urbanek
 contributors:
-  - person: urbanek
-    role: architect
-    cw: 0.35
-  - person: turyna
-    role: owner
-    cw: 0.35
-  - person: d1
-    role: key
-    cw: 0.3
+- person: urbanek
+  cw: 0.35
+  as: key
+- person: turyna
+  cw: 0.35
+  as: owner
+- person: d1
+  cw: 0.3
+  as: key
 iteration: PI-2026-1.1
 iteration_half: 1

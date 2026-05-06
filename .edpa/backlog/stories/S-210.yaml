@@ -10,10 +10,10 @@ parent: F-110
 assignee: d2
 iteration: PI-2026-1.2
 contributors:
-  - person: d2
-    role: owner
-    cw: 1
-  - person: matousek
-    role: consulted
-    cw: 0.25
+- person: d2
+  cw: 1
+  as: owner
+- person: matousek
+  cw: 0.25
+  as: consulted
 iteration_half: 1

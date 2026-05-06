@@ -5,26 +5,43 @@
 ## 1.7.0-beta — 2026-05-06
 
 Closes all 18 findings from the 2026-05-06 E2E test
-(`docs/E2E-REPORT-2026-05-06.md`). Six were critical — engine
+(`docs/E2E-REPORT-2026-05-06.md`) plus a follow-up cleanup of the
+`contributors[].role` key. Six findings were critical — engine
 silently allocating 0h on a schema mismatch, project_setup
 duplicating projects/issues on rerun, missing typed Status
 field_ids on first run — and the rest were ergonomic gaps the
-test plan documented but the scripts didn't deliver. The six
-low-priority cleanups bundled at the end of the release fix
-snapshot revisioning, --until parser parity, per-iteration YAML
-bootstrap, GraphQL extension of the Iteration field on rerun,
-the snapshot.frozen_at field, and an explicit README example of
-the contributors[].role/cw schema.
+test plan documented but the scripts didn't deliver. Six
+low-priority cleanups fix snapshot revisioning, --until parser
+parity, per-iteration YAML bootstrap, GraphQL extension of the
+Iteration field on rerun, the snapshot.frozen_at field, and an
+explicit README example of the contributors schema.
+
+### Breaking
+- **`contributors[].role` → `contributors[].as`** in every YAML
+  under `.edpa/backlog/`. The old key collided with
+  `people[].role` (job role like Dev/Arch/QA/PM) and made every
+  read of the two files require domain-switching in the reader's
+  head. The new key has no alias on the engine or validator — a
+  legacy YAML hard-fails with `validate_syntax.py` and is skipped
+  by `engine.py load_backlog_items` with a migration breadcrumb.
+  `contributors[].weight` is renamed to `contributors[].cw` for
+  the same reason (one canonical key, no alias). One-shot fix:
+  `python3 .claude/edpa/scripts/migrate_contributors.py`. The
+  script also translates common job-role labels (architect /
+  developer / QA / PM / product_owner) to their nearest evidence
+  role (key / owner / reviewer / consulted) so the migration is a
+  single command on existing backlogs.
 
 ### Fixed
 - **`engine.py`** validates contributor schema and surfaces it
   loudly. `load_backlog_items` now warns per-item when
-  `contributors[].role` is not in the evidence enum
+  `contributors[].as` is not in the evidence enum
   (owner|key|reviewer|consulted) or `cw` is missing, and prints a
   summary `WARN: 0 evidence pairs derived from N contributor
-  entries` when nothing produced evidence. `weight` accepted as a
-  transitional alias for `cw`. Top-level `body` and `assignees`
-  preserved on the way to evidence detection. (E2E F14, F16)
+  entries` when nothing produced evidence. Top-level `body` and
+  `assignees` preserved on the way to evidence detection. Legacy
+  `role:` / `weight:` keys are rejected — see Breaking section.
+  (E2E F14, F16)
 - **`project_setup.py`** is idempotent. Reuses an existing project
   on exact title match (gh project create silently lets duplicate
   titles through), reuses existing issues by title on rerun, skips
@@ -107,10 +124,9 @@ the contributors[].role/cw schema.
   Previously a fresh project couldn't compute gates because
   `parse_iteration_dates` had no per-iteration windows to read. (E2E L5)
 - **README** + `people.yaml.tmpl` ship an explicit "Backlog Item
-  Schema" example that calls out `contributors[].role` ∈
-  {owner, key, reviewer, consulted} and `cw` (with `weight` as a
-  legacy alias) so the F14/F16 silent-0h failure mode is now
-  documented up front. (E2E L3)
+  Schema" example that calls out `contributors[].as` ∈
+  {owner, key, reviewer, consulted} and `cw`, so the F14/F16
+  silent-0h failure mode is now documented up front. (E2E L3)
 
 ## 1.6.4-beta — 2026-05-06
 

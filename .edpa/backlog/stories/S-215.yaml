@@ -10,12 +10,12 @@ parent: F-120
 assignee: turyna
 iteration: PI-2026-1.3
 contributors:
-  - person: do
-    role: owner
-    cw: 1
-  - person: tuma
-    role: key
-    cw: 0.6
-  - person: urbanek
-    role: consulted
-    cw: 0.15
+- person: do
+  cw: 1
+  as: owner
+- person: tuma
+  cw: 0.6
+  as: key
+- person: urbanek
+  cw: 0.15
+  as: consulted

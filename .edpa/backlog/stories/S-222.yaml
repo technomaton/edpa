@@ -11,8 +11,8 @@ assignee: d2
 iteration: PI-2026-1.4
 contributors:
 - person: d2
-  role: owner
   cw: 1.0
+  as: owner
 - person: matousek
-  role: consulted
   cw: 0.25
+  as: consulted

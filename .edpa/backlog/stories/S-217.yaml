@@ -10,7 +10,7 @@ parent: F-120
 assignee: tuma
 iteration: PI-2026-1.2
 contributors:
-  - person: tuma
-    role: owner
-    cw: 1
+- person: tuma
+  cw: 1
+  as: owner
 iteration_half: 2

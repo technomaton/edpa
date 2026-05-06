@@ -74,18 +74,18 @@ def _make_repo(tmp_path):
     )
     (edpa / "backlog" / "epics" / "E-1.yaml").write_text(
         "id: E-1\ntype: Epic\ntitle: T\nparent: I-1\njs: 13\nstatus: Funnel\n"
-        "contributors:\n  - person: alice\n    role: owner\n    cw: 1\n"
+        "contributors:\n  - person: alice\n    as: owner\n    cw: 1\n"
     )
     (edpa / "backlog" / "features" / "F-1.yaml").write_text(
         "id: F-1\ntype: Feature\ntitle: T\nparent: E-1\njs: 8\nstatus: Funnel\n"
         "iteration: PI-2026-1\n"
-        "contributors:\n  - person: alice\n    role: reviewer\n    cw: 0.3\n"
-        "  - person: bob\n    role: owner\n    cw: 1\n"
+        "contributors:\n  - person: alice\n    as: reviewer\n    cw: 0.3\n"
+        "  - person: bob\n    as: owner\n    cw: 1\n"
     )
     (edpa / "backlog" / "stories" / "S-1.yaml").write_text(
         "id: S-1\ntype: Story\ntitle: T\nparent: F-1\njs: 5\nstatus: Done\n"
         "iteration: PI-2026-1.1\n"
-        "contributors:\n  - person: bob\n    role: owner\n    cw: 1\n"
+        "contributors:\n  - person: bob\n    as: owner\n    cw: 1\n"
     )
 
     _git(repo, "init", "-q")

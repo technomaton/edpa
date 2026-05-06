@@ -11,8 +11,8 @@ assignee: tuma
 iteration: PI-2026-1.1
 contributors:
 - person: tuma
-  role: owner
   cw: 1.0
+  as: owner
 - person: matousek
-  role: key
   cw: 0.6
+  as: key

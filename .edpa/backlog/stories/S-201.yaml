@@ -11,8 +11,8 @@ assignee: turyna
 iteration: PI-2026-1.1
 contributors:
 - person: turyna
-  role: owner
   cw: 1.0
+  as: owner
 - person: urbanek
-  role: reviewer
   cw: 0.3
+  as: reviewer

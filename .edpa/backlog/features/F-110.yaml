@@ -10,14 +10,14 @@ status: Implementing
 parent: E-11
 owner: matousek
 contributors:
-  - person: matousek
-    role: owner
-    cw: 0.45
-  - person: d2
-    role: key
-    cw: 0.4
-  - person: pm
-    role: consulted
-    cw: 0.2
+- person: matousek
+  cw: 0.45
+  as: owner
+- person: d2
+  cw: 0.4
+  as: key
+- person: pm
+  cw: 0.2
+  as: consulted
 iteration: PI-2026-2.2
 iteration_half: 1

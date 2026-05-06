@@ -10,9 +10,9 @@ parent: F-101
 assignee: urbanek
 iteration: PI-2026-1.3
 contributors:
-  - person: tuma
-    role: owner
-    cw: 1
-  - person: do
-    role: consulted
-    cw: 0.25
+- person: tuma
+  cw: 1
+  as: owner
+- person: do
+  cw: 0.25
+  as: consulted

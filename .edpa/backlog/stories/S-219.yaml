@@ -10,12 +10,12 @@ parent: F-102
 assignee: tuma
 iteration: PI-2026-1.4
 contributors:
-  - person: urbanek
-    role: owner
-    cw: 1
-  - person: turyna
-    role: consulted
-    cw: 0.25
-  - person: pm
-    role: consulted
-    cw: 0.2
+- person: urbanek
+  cw: 1
+  as: owner
+- person: turyna
+  cw: 0.25
+  as: consulted
+- person: pm
+  cw: 0.2
+  as: consulted

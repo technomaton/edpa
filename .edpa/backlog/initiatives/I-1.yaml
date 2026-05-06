@@ -7,8 +7,8 @@ parent: null
 owner: pm
 contributors:
 - person: pm
-  role: owner
   cw: 0.6
+  as: owner
 - person: urbanek
-  role: architect
   cw: 0.3
+  as: key

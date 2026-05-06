@@ -110,7 +110,8 @@ def update_contributors(yaml_path: Path, new_contributors: list, *, dry_run=Fals
 
     Only adds new contributors — never removes existing ones.
     If a contributor already exists with a higher CW, keeps the higher
-    value. Returns True when something changed.
+    value. Returns True when something changed. New entries use the v1.7
+    schema (`as:` for evidence role, `cw:` for weight).
     """
     data = yaml.safe_load(yaml_path.read_text()) or {}
     existing = data.get("contributors", []) or []
@@ -125,7 +126,7 @@ def update_contributors(yaml_path: Path, new_contributors: list, *, dry_run=Fals
         if person in existing_map:
             if existing_map[person].get("cw", 0) < nc.get("cw", 0):
                 existing_map[person]["cw"] = nc["cw"]
-                existing_map[person]["role"] = nc["role"]
+                existing_map[person]["as"] = nc["as"]
                 changed = True
         else:
             existing.append(nc)
@@ -254,21 +255,21 @@ def process_pr_evidence(edpa_root: Path, repo: str, pr_number: str,
         if info["author"]:
             new_contribs.append({
                 "person": resolve(info["author"]),
-                "role": "key",
+                "as": "key",
                 "cw": weights.get("key", 0.6),
                 "source": f"pr_author:#{pr_number}",
             })
         for login in sorted(info["reviewers"]):
             new_contribs.append({
                 "person": resolve(login),
-                "role": "reviewer",
+                "as": "reviewer",
                 "cw": weights.get("reviewer", 0.25),
                 "source": f"pr_reviewer:#{pr_number}",
             })
         for login in sorted(info["commit_authors"]):
             new_contribs.append({
                 "person": resolve(login),
-                "role": "reviewer",
+                "as": "reviewer",
                 "cw": weights.get("reviewer", 0.25),
                 "source": f"commit_author:#{pr_number}",
             })

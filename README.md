@@ -303,20 +303,26 @@ js: 5                     # required for Story/Feature, > 0
 iteration: PI-2026-1.3    # required for Story; optional for Feature
 contributors:             # who actually delivered the work
   - person: bob-dev       # MUST match a people[].id in people.yaml
-    role: owner           # owner | key | reviewer | consulted (evidence role)
-    cw: 0.8               # 0..1 manual contribution weight (alias: weight)
+    as: owner             # owner | key | reviewer | consulted (evidence role)
+    cw: 0.8               # 0..1 manual contribution weight
   - person: carol-qa
-    role: reviewer
+    as: reviewer
     cw: 0.2
 ```
 
-`contributors[].role` is **not** the human job role (Dev/Arch/QA/PM —
-that lives in `people.yaml`). It's the **evidence role** the engine
-uses to map the contributor to a signal: `owner` ≈ assignee,
+`contributors[].as` is **not** the human job role (Dev/Arch/QA/PM —
+that lives in `people[].role`). It's the **evidence role** the engine
+uses to map the contributor to a GitHub signal: `owner` ≈ assignee,
 `key` ≈ PR author, `reviewer` ≈ PR reviewer, `consulted` ≈
 issue commenter. Anything outside that enum produces zero evidence
 and triggers a clear `WARN: 0 evidence pairs derived from N
 contributor entries` at engine startup.
+
+> Migrating from <1.7? Run
+> `python3 .claude/edpa/scripts/migrate_contributors.py` once.
+> The old keys (`role:` and `weight:`) are hard-rejected — there is
+> no aliasing, by design — so the validator will tell you exactly
+> which file still needs the rewrite.
 
 ## Directory Structure
 

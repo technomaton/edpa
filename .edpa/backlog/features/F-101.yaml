@@ -11,16 +11,16 @@ iteration: PI-2026-2.2
 parent: E-10
 owner: tuma
 contributors:
-  - person: tuma
-    role: key
-    cw: 0.35
-  - person: matousek
-    role: owner
-    cw: 0.4
-  - person: d1
-    role: contributor
-    cw: 0.25
-  - person: pm
-    role: consulted
-    cw: 0.2
+- person: tuma
+  cw: 0.35
+  as: key
+- person: matousek
+  cw: 0.4
+  as: owner
+- person: d1
+  cw: 0.25
+  as: key
+- person: pm
+  cw: 0.2
+  as: consulted
 iteration_half: 1

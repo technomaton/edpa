@@ -14,7 +14,7 @@ Checks:
   - Python: syntax (ast.parse)
   - Binary detection (UnicodeDecodeError)
   - Backlog item schema: required fields, status enum per type,
-    contributors role/cw shape (.edpa/backlog/{initiatives,epics,features,stories,defects}/*.yaml)
+    contributors[].as / cw shape (.edpa/backlog/{initiatives,epics,features,stories,defects}/*.yaml)
 """
 
 import ast
@@ -208,10 +208,12 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
         if iteration and not isinstance(iteration, str):
             errors.append(f"{path}: iteration must be a string (got {type(iteration).__name__})")
 
-    # Contributors schema (role mismatch is WARNING by default — strict
-    # upgrades to ERROR. Existing rich-documentation backlogs use
-    # human-readable labels like 'architect' for documentation purposes
-    # and shouldn't fail the pre-commit hook.)
+    # Contributors schema. The evidence-role enum lives under `as:` since
+    # v1.7. Legacy keys `role:` and `weight:` are HARD errors with a
+    # migration pointer — there are no backwards-compatibility aliases,
+    # users have to run migrate_contributors.py once. Values outside the
+    # evidence enum are warnings by default (rich-doc backlogs use
+    # human-readable labels for documentation); --strict upgrades them.
     contribs = data.get("contributors")
     if contribs is not None:
         bucket = errors if strict else warnings
@@ -227,35 +229,47 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
                     continue
                 if not entry.get("person"):
                     bucket.append(f"{path}: contributors[{idx}] missing 'person'")
-                role = (entry.get("role") or "").lower()
-                if not role:
+                # Reject legacy keys outright with a migration breadcrumb.
+                if "role" in entry:
+                    errors.append(
+                        f"{path}: contributors[{idx}] uses legacy 'role' — "
+                        f"renamed to 'as' in v1.7 to disambiguate from "
+                        f"people[].role. Run "
+                        f"`python3 .claude/edpa/scripts/migrate_contributors.py` "
+                        f"to rewrite the whole backlog at once."
+                    )
+                if "weight" in entry:
+                    errors.append(
+                        f"{path}: contributors[{idx}] uses legacy 'weight' — "
+                        f"renamed to 'cw' in v1.7. Run "
+                        f"`python3 .claude/edpa/scripts/migrate_contributors.py`."
+                    )
+                evidence_as = (entry.get("as") or "").lower()
+                if not evidence_as and "role" not in entry:
                     bucket.append(
-                        f"{path}: contributors[{idx}] missing 'role' "
+                        f"{path}: contributors[{idx}] missing 'as' "
                         f"(one of {sorted(EVIDENCE_ROLES)})"
                     )
-                elif role not in EVIDENCE_ROLES:
+                elif evidence_as and evidence_as not in EVIDENCE_ROLES:
                     bucket.append(
-                        f"{path}: contributors[{idx}] role={role!r} is not an evidence role "
-                        f"({sorted(EVIDENCE_ROLES)}). Person roles (Dev/Arch/QA/PM) "
+                        f"{path}: contributors[{idx}] as={evidence_as!r} is not an evidence role "
+                        f"({sorted(EVIDENCE_ROLES)}). Job roles (Dev/Arch/QA/PM) "
                         f"belong in people.yaml — engine will not credit this contributor."
                     )
-                # cw or weight (alias) — out-of-range is always an error
-                # (real correctness, not a stylistic concern)
+                # cw — out-of-range is always an error (real correctness)
                 cw_value = entry.get("cw")
-                if cw_value is None:
-                    cw_value = entry.get("weight")
                 if cw_value is not None:
                     try:
                         cw_num = float(cw_value)
                     except (TypeError, ValueError):
                         errors.append(
-                            f"{path}: contributors[{idx}] cw/weight must be numeric "
+                            f"{path}: contributors[{idx}] cw must be numeric "
                             f"(got {cw_value!r})"
                         )
                         continue
                     if not 0 <= cw_num <= 1:
                         errors.append(
-                            f"{path}: contributors[{idx}] cw/weight must be in [0,1] "
+                            f"{path}: contributors[{idx}] cw must be in [0,1] "
                             f"(got {cw_num})"
                         )
 

@@ -10,10 +10,10 @@ parent: F-120
 assignee: do
 iteration: PI-2026-1.4
 contributors:
-  - person: do
-    role: owner
-    cw: 1
-  - person: tuma
-    role: consulted
-    cw: 0.25
+- person: do
+  cw: 1
+  as: owner
+- person: tuma
+  cw: 0.25
+  as: consulted
 iteration_half: 2

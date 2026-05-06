@@ -10,9 +10,9 @@ parent: F-102
 assignee: turyna
 iteration: PI-2026-1.4
 contributors:
-  - person: turyna
-    role: owner
-    cw: 1
-  - person: d1
-    role: key
-    cw: 0.6
+- person: turyna
+  cw: 1
+  as: owner
+- person: d1
+  cw: 0.6
+  as: key

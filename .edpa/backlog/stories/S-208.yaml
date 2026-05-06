@@ -11,8 +11,8 @@ assignee: d1
 iteration: PI-2026-1.2
 contributors:
 - person: d1
-  role: owner
   cw: 1.0
+  as: owner
 - person: turyna
-  role: consulted
   cw: 0.25
+  as: consulted

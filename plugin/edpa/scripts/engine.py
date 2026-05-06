@@ -47,9 +47,9 @@ def get_version():
 
 VERSION = get_version()
 
-# Evidence roles the engine knows how to map. Anything else in
-# contributors[].role is rejected with a clear error so users don't
-# silently get 0h derived. Person roles (Dev/Arch/QA/PM) belong in
+# Evidence roles the engine knows how to map. Anything else under
+# contributors[].as is rejected with a clear error so users don't
+# silently get 0h derived. Job roles (Dev/Arch/QA/PM) belong in
 # people.yaml, not in story contributors.
 EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
 
@@ -435,17 +435,29 @@ def load_backlog_items(edpa_root, iteration_id=None):
                     continue
                 contributors_seen_total += 1
                 person = contrib.get("person", "")
-                role_raw = (contrib.get("role", "") or "").lower()
-                # Accept `weight` as an alias for `cw` so users following older
-                # docs/templates still get correct allocation. Document the
-                # canonical key in the WARN.
+                # `as:` is the evidence role (owner|key|reviewer|consulted).
+                # `role:` is rejected — too easily confused with people.yaml's
+                # job role. `weight:` is rejected — canonical key is `cw`.
+                # Both have a clear migration message via validate_syntax.py
+                # so downstream tools can point users at the rename.
+                evidence_as = (contrib.get("as", "") or "").lower()
                 cw = contrib.get("cw")
-                if cw is None and contrib.get("weight") is not None:
-                    cw = contrib.get("weight")
+                if "role" in contrib and not evidence_as:
                     schema_warnings.append(
-                        f"{item_id}: contributors[{idx}] uses 'weight' — "
-                        f"renamed to 'cw' in v1.7. Engine accepted it for now."
+                        f"{item_id}: contributors[{idx}] uses legacy 'role' — "
+                        f"renamed to 'as' in v1.7. "
+                        f"Run plugin/edpa/scripts/migrate_contributors.py "
+                        f"or rewrite by hand. Skipping this contributor."
                     )
+                    continue
+                if "weight" in contrib and cw is None:
+                    schema_warnings.append(
+                        f"{item_id}: contributors[{idx}] uses legacy 'weight' — "
+                        f"renamed to 'cw' in v1.7. "
+                        f"Run plugin/edpa/scripts/migrate_contributors.py. "
+                        f"Skipping this contributor."
+                    )
+                    continue
 
                 if not person:
                     schema_warnings.append(
@@ -453,10 +465,10 @@ def load_backlog_items(edpa_root, iteration_id=None):
                     )
                     continue
 
-                if role_raw and role_raw not in EVIDENCE_ROLES:
+                if evidence_as and evidence_as not in EVIDENCE_ROLES:
                     schema_warnings.append(
-                        f"{item_id}: contributors[{idx}] role={role_raw!r} is not an evidence role "
-                        f"({sorted(EVIDENCE_ROLES)}). Person roles (Dev/Arch/QA/PM) belong in people.yaml — "
+                        f"{item_id}: contributors[{idx}] as={evidence_as!r} is not an evidence role "
+                        f"({sorted(EVIDENCE_ROLES)}). Job roles (Dev/Arch/QA/PM) belong in people.yaml — "
                         f"this contributor will not produce evidence."
                     )
                     # Still treat presence-of-cw as a manual CW override.
@@ -468,21 +480,21 @@ def load_backlog_items(edpa_root, iteration_id=None):
                 if cw is not None:
                     manual_cw_overrides[(person, item_id)] = float(cw)
 
-                # Map contributor role to engine evidence fields
-                if role_raw == "owner":
+                # Map evidence role to engine evidence fields
+                if evidence_as == "owner":
                     if not any(a.get("login") == person for a in assignees):
                         assignees.append({"login": person})
-                elif role_raw == "key":
+                elif evidence_as == "key":
                     if pr_author is None:
                         pr_author = person
                     commit_authors.append(person)
-                elif role_raw == "reviewer":
+                elif evidence_as == "reviewer":
                     pr_reviewers.append(person)
-                elif role_raw == "consulted":
+                elif evidence_as == "consulted":
                     commenters.append(person)
-                elif not role_raw:
+                elif not evidence_as:
                     schema_warnings.append(
-                        f"{item_id}: contributors[{idx}] missing 'role' (one of {sorted(EVIDENCE_ROLES)}). "
+                        f"{item_id}: contributors[{idx}] missing 'as' (one of {sorted(EVIDENCE_ROLES)}). "
                         f"Skipped — person={person!r} produces no evidence signal."
                     )
                     continue
@@ -527,8 +539,8 @@ def load_backlog_items(edpa_root, iteration_id=None):
         print(
             "WARN: 0 evidence pairs derived from "
             f"{contributors_seen_total} contributor entries. "
-            "Engine will allocate 0h. Check contributors[].role and "
-            f"contributors[].cw — required schema is role ∈ "
+            "Engine will allocate 0h. Check contributors[].as and "
+            f"contributors[].cw — required schema is as ∈ "
             f"{sorted(EVIDENCE_ROLES)}, cw ∈ [0,1].",
             file=sys.stderr,
         )
@@ -564,19 +576,22 @@ def _contributors_to_evidence_fields(item_data):
         if not isinstance(contrib, dict):
             continue
         person = contrib.get("person", "")
-        role = (contrib.get("role", "") or "").lower()
+        # Evidence role lives under `as:` (canonical, since v1.7).
+        # Legacy `role:` is silently ignored here — `load_backlog_items`
+        # is the gatekeeper that surfaces the rename WARN to users.
+        evidence_as = (contrib.get("as", "") or "").lower()
         cw = contrib.get("cw")
 
-        if role == "owner":
+        if evidence_as == "owner":
             if not any(a.get("login") == person for a in assignees):
                 assignees.append({"login": person})
-        elif role == "key":
+        elif evidence_as == "key":
             if pr_author is None:
                 pr_author = person
             commit_authors.append(person)
-        elif role == "reviewer":
+        elif evidence_as == "reviewer":
             pr_reviewers.append(person)
-        elif role == "consulted":
+        elif evidence_as == "consulted":
             commenters.append(person)
 
         if cw is not None:

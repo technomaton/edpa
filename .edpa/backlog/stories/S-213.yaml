@@ -10,9 +10,9 @@ parent: F-111
 assignee: matousek
 iteration: PI-2026-1.3
 contributors:
-  - person: d2
-    role: owner
-    cw: 1
-  - person: d1
-    role: consulted
-    cw: 0.25
+- person: d2
+  cw: 1
+  as: owner
+- person: d1
+  cw: 0.25
+  as: consulted

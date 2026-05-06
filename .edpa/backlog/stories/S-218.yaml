@@ -11,8 +11,8 @@ assignee: urbanek
 iteration: PI-2026-1.4
 contributors:
 - person: urbanek
-  role: owner
   cw: 1.0
+  as: owner
 - person: tuma
-  role: consulted
   cw: 0.15
+  as: consulted

@@ -11,8 +11,8 @@ assignee: matousek
 iteration: PI-2026-1.2
 contributors:
 - person: matousek
-  role: owner
   cw: 1.0
+  as: owner
 - person: d2
-  role: key
   cw: 0.6
+  as: key

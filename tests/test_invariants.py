@@ -380,10 +380,10 @@ class TestLoadBacklogItems:
         backlog = edpa_root / "backlog"
 
         contributors = [
-            {"person": "alice", "role": "owner"},
-            {"person": "bob", "role": "key"},
-            {"person": "carol", "role": "reviewer"},
-            {"person": "dave", "role": "consulted"},
+            {"person": "alice", "as": "owner"},
+            {"person": "bob", "as": "key"},
+            {"person": "carol", "as": "reviewer"},
+            {"person": "dave", "as": "consulted"},
         ]
         self._create_item(backlog, "stories", "S-300", "Story", 5, "Done", "PI-2026-1.1",
                           assignee="alice", contributors=contributors)
@@ -404,7 +404,7 @@ class TestLoadBacklogItems:
         backlog = edpa_root / "backlog"
 
         contributors = [
-            {"person": "alice", "role": "key", "cw": 0.3},
+            {"person": "alice", "as": "key", "cw": 0.3},
         ]
         self._create_item(backlog, "stories", "S-400", "Story", 5, "Done", "PI-2026-1.1",
                           contributors=contributors)

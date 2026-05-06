@@ -69,7 +69,7 @@ def _plant_minimal_backlog(target: Path):
     (backlog / "stories" / "S-1.yaml").write_text(
         "id: S-1\ntype: Story\ntitle: T\nparent: F-1\njs: 5\n"
         "status: Done\niteration: PI-2026-1.1\n"
-        "contributors:\n  - person: example-arch\n    role: owner\n    cw: 1\n"
+        "contributors:\n  - person: example-arch\n    as: owner\n    cw: 1\n"
     )
     (target / ".edpa" / "iterations" / "PI-2026-1.1.yaml").write_text(
         "iteration:\n"

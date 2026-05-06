@@ -11,11 +11,11 @@ assignee: d1
 iteration: PI-2026-1.4
 contributors:
 - person: d1
-  role: owner
   cw: 1.0
+  as: owner
 - person: tuma
-  role: key
   cw: 0.6
+  as: key
 - person: urbanek
-  role: consulted
   cw: 0.15
+  as: consulted
