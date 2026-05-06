@@ -3,7 +3,7 @@
 - **Grant:** CZ.01.01.01/01/24_062/0007440 · OP TAK
 - **Org:** [`kashealth`](https://github.com/kashealth) (ČVUT FBMI + Medicalc software s.r.o.)
 - **Primary repo:** `kashealth/kas-platform-v1` (private monorepo)
-- **EDPA version:** **1.8.1-beta** (release tag, asset `edpa-plugin.tar.gz`)
+- **EDPA version:** **1.9.0-beta** (release tag, asset `edpa-plugin.tar.gz`)
 - **Pilot lead:** Jaroslav Urbánek (Lead Architect / Vedoucí VaV)
 - **Pilot kickoff:** 2026-05-07 (proposed)
 - **Pilot duration:** 1 PI (5 weeks, target close 2026-06-11)
@@ -11,8 +11,10 @@
 > Tento dokument je _runbook_ — sekvenční seznam reálných příkazů od
 > prázdného repa po uzavřenou iteraci s reporty. Sekce 1–3 jsou
 > pre-flight (org-level Issue Types + people.yaml + backlog seed).
-> Sekce 4 je `project_setup.py`. Sekce 5–9 vedou prvním PI cyklem.
-> Sekce 10–11 řeší předvídatelnost (A/B simple vs gates) a rollback.
+> Sekce 4 je `project_setup.py`. Sekce 5–9 vedou prvním PI cyklem,
+> sekce 6.5 řeší per-iteration capacity overrides (PTO / sick / IP
+> crunch). Sekce 10–11 řeší předvídatelnost (A/B simple vs gates) a
+> rollback.
 
 ## 0. Quick orientation
 
@@ -23,6 +25,7 @@ Pilot ověří, že EDPA produkuje audit-grade per-person hodiny **z reálné de
 - ✅ `item-costs.xlsx` per-item alokace (sloupce: item, person, role, cw, derived_hours, hourly_rate, cost)
 - ✅ Frozen snapshot `PI-2026-2.json` se signature + frozen_at
 - ✅ A/B porovnání: `--mode simple` (audit conservative) vs `--mode gates` (default), MAD ≤ 15 % vůči manuálnímu odhadu PM-a
+- ✅ Per-iteration capacity overrides ošetřeny pro IP iteraci (PI-2026-2.5) i ad-hoc PTO/sick napříč PI — viz § 6.5
 
 ## 1. Pre-flight checklist (před prvním commitem)
 
@@ -65,11 +68,11 @@ Vrací **exit 0** když je všechno připravené pro § 2; jinak vypíše seznam
 # v lokálním klonu kashealth/kas-platform-v1
 cd ~/projects/kas-platform-v1   # nebo kdekoli máte klon
 
-# Plugin se stáhne z release v1.8.1-beta tarballu
+# Plugin se stáhne z release v1.9.0-beta tarballu
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 
-**Očekávaný výstup:** `EDPA 1.8.1-beta installed successfully!` + 3 config soubory ze šablon vytvořeny v `.edpa/config/`.
+**Očekávaný výstup:** `EDPA 1.9.0-beta installed successfully!` + 3 config soubory ze šablon vytvořeny v `.edpa/config/`.
 
 ## 3. Naplnit configy (people.yaml, edpa.yaml)
 
@@ -188,11 +191,99 @@ python3 .claude/edpa/scripts/sync.py pull --commit
 
 **Auto-detection contributorů z PR mergů** je řízeno `.github/workflows/contributor-detect.yml` — po každém merge se přidají `as: key` (PR author) a `as: reviewer` (commit authors / reviewers) do backlog YAMLů.
 
+## 6.5 Per-iteration capacity overrides (v1.9.0+)
+
+`people.yaml` deklaruje **stálou** capacity per člena. Reálné iterace
+mají odchylky: dovolená, nemoc, IP crunch, onboarding ramp. Místo
+editace `people.yaml` před close + revert (špinavá historie) nebo
+multi-contract entries (rozbije reporting) deklaruj override **přímo
+v iteration YAML**:
+
+```yaml
+# .edpa/iterations/PI-2026-2.5.yaml — IP iterace
+iteration:
+  id: PI-2026-2.5
+  pi: PI-2026-2
+  type: ip
+  sequence: 5
+  start_date: 2026-06-08
+  end_date: 2026-06-14
+  status: closed
+
+# Iteration-level people overrides — reuse people.yaml schema, partial.
+# Engine matchne podle `id` a aplikuje recognised pole
+# (capacity_per_iteration). `note:` je volitelný audit annotation.
+people:
+  - id: turyna
+    capacity_per_iteration: 44
+    note: "IP weekend deploy push (Jun 13-14, +4h overtime)"
+  - id: jurby
+    capacity_per_iteration: 10
+    note: "vacation Jun 9-11 (3 days PTO certified)"
+  - id: matousek
+    capacity_per_iteration: 24
+    note: "flu Jun 10-12 (sick leave certified)"
+  # tuma neposiluje — používá baseline z people.yaml
+```
+
+**Engine output:**
+
+```
+EDPA 1.9.0-beta — Iteration PI-2026-2.5 (gates mode)
+======================================================================
+Person                    Role     Capacity  Derived  Items   OK
+----------------------------------------------------------------------
+J. Urbanek (PTO)          Arch         10.0h    10.0h      2   OK
+Turyna (overtime)         Dev          44.0h    44.0h      6   OK
+Matousek (sick)           Dev          24.0h    24.0h      3   OK
+Tuma                      DevSecOps      40h    40.0h      5   OK
+----------------------------------------------------------------------
+TEAM TOTAL                            118.0h   118.0h
+PLANNING CAPACITY                      94.4h  (factor: 0.8)
+```
+
+**Per-person timesheet** ukazuje baseline + override + reason:
+
+```markdown
+- Capacity: **44.0h** (baseline 40h, override abs 44h
+  (+4h vs baseline 40h) ("IP weekend deploy push (Jun 13-14, +4h overtime)"))
+```
+
+**Audit trail v gitu + snapshot:**
+
+- Override commit hint: `git commit -m "PI-2026-2.5: capacity overrides for IP push + 2 PTO/sick"`
+- Snapshot drží `capacity_baseline` + `capacity_override.{capacity, note}` per osobu — auditor vidí původní deklaraci i adjustment.
+- `validate_syntax.py` blokuje typo (neznámý `id`, duplicitní entry, žádné override fields ani note, negativní capacity).
+
+**Kdy override použít:**
+
+| Scénář | Použití | `capacity_per_iteration` | `note:` |
+|--------|---------|--------------------------|---------|
+| Vacation (3 dny) | běžné | 10 (z 20) nebo 28 (z 40) | `"vacation Jun 9-11"` |
+| Sick leave (2 dny) | občasné | 24 (z 40) | `"flu Jun 10-12 (cert)"` |
+| IP crunch | jednou za PI | 44 (z 40) | `"IP weekend deploy push"` |
+| Onboarding ramp | jednorázové | 8 → 16 → 24 → 32 → 40 přes 5 iterací | `"onboarding week N"` |
+| Plné PTO (celý týden) | občasné | 0 | `"vacation full week"` |
+| Audit-only (žádná změna capacity) | dle potřeby | (vypustit pole) | `"pulled in C-suite reviews"` |
+
+> Override `capacity_per_iteration: 0` je validní — osoba má 0 h
+> derived hours v této iteraci, invariant zůstane OK pokud nejsou
+> kreditové stories. Pokud má kredity ale 0 h capacity, invariant_ok
+> bude `false` (audit anomaly — řeší retro).
+
 ## 7. Iterační close (po 1 týdnu)
 
 Pro každou delivery iteraci PI-2026-2.{1..4}:
 
+> **Před spuštěním engine:** zkontroluj `.edpa/iterations/PI-2026-2.X.yaml`
+> a doplň `people:` overrides pokud někdo z týmu měl odlišnou capacity
+> v této iteraci (PTO, sick, overtime). Detail viz § 6.5.
+
 ```bash
+# 7.0 Volitelně: zaktualizuj iteration YAML o overrides (PTO/sick/overtime)
+$EDITOR .edpa/iterations/PI-2026-2.X.yaml
+git -c user.email=... add . && git commit -m "PI-2026-2.X: capacity overrides"
+
 # 7.1 Spustit engine v gates mode (default)
 python3 .claude/edpa/scripts/engine.py \
   --edpa-root .edpa --iteration PI-2026-2.1 \
@@ -262,6 +353,7 @@ Po review: rozhodnutí, jestli přepnout default na `gates` pro PI-2026-3, nebo 
 | Risk | Pravděpodobnost | Impact | Mitigace |
 |------|-----------------|--------|----------|
 | Tým nemá `git config user.email` set | M | sync push auto-commit failne, state v worktree | preflight.sh kontroluje; instrukce `git config --global user.email …` |
+| Někdo měl PTO/sick a engine to nezohlednil | M | per-osobu capacity neodpovídá realitě | doplnit `people:` override do iteration YAML před close (§ 6.5); validator hlídá typo, snapshot drží reason v `note:` |
 | Iteration field nemá option `PI-2026-2.x` po setup | L | sync push selže `no option_id for Iteration:…` | v1.8.1+ collects ze všech iteration files; pokud chybí, `sync.py add-iteration PI-2026-2.x` |
 | Story má `as: developer` (legacy schema) | L | `validate_syntax --strict` ERROR | `migrate_contributors.py` rewrite |
 | Member nemá GH login v `people.yaml` | M | evidence detection mine ho | preflight.sh kontroluje email a github fields |
@@ -345,6 +437,8 @@ Před prvním spuštěním je třeba se rozhodnout:
 3. **hourly_rate** per role — finální čísla pro item-costs.xlsx
 4. **Branding timesheets** — `kashealth.cz` letterhead na MD timesheetech? *Volitelné, post-pilot.*
 5. **Calibration timing** — kdy spustit `evaluate_cw.py --check-readiness` (potřeba ≥ 20 ground truth records). *Návrh: po PI-2026-2 close + manual review.*
+6. **PTO / sick policy** — kdo zapisuje override do iteration YAML (§ 6.5)? Návrh: každý člen sám commituje vlastní `people:` entry pro iteraci, kde měl PTO/sick (před close); PM/Lead audit-checkne při weekly cadence (§ 13). M365 integrace pro auto-fill z OOO calendaru je v2.x roadmap.
+7. **IP iterace overtime** — má team policy "+4h IP push" jako standard, nebo ad-hoc? Pokud standard → override přidat preventivně do bootstrapped `PI-2026-2.5.yaml` při setup (§ 4 step 6); pokud ad-hoc → doplnit dle § 6.5 v týdnu close.
 
 ## Příloha A — soubory dodané v tomto pilotním balíčku
 
@@ -354,11 +448,14 @@ Před prvním spuštěním je třeba se rozhodnout:
 | `docs/kashealth-pilot/preflight.sh` | automatizovaný readiness check |
 | `docs/kashealth-pilot/people.yaml.example` | šablona s 4 členy + role placeholder |
 | `docs/kashealth-pilot/edpa.yaml.example` | šablona s `sync.github_org=kashealth, sync.github_repo=kas-platform-v1` |
+| `docs/proposals/per-iteration-capacity-overrides.md` | RFC + design pivot za § 6.5 (override schema, validace, snapshot) |
 
 ## Příloha B — odkazy
 
 - Governance design: [`docs/examples/governance-kashealth/governance-reseni-v3.md`](examples/governance-kashealth/governance-reseni-v3.md)
-- Methodology: [`docs/methodology.md`](methodology.md) (EDPA 1.8.1-beta spec)
+- Methodology: [`docs/methodology.md`](methodology.md) (EDPA 1.9.0-beta spec)
+- Per-iteration overrides RFC: [`docs/proposals/per-iteration-capacity-overrides.md`](proposals/per-iteration-capacity-overrides.md)
+- v1.9.0 E2E report: [`docs/E2E-REPORT-2026-05-06-v190.md`](E2E-REPORT-2026-05-06-v190.md) — IP iteration override scenario PASS
 - E2E test plan: [`docs/E2E-TEST-PLAN.md`](E2E-TEST-PLAN.md) — pilot je § 13 plánu
 - Last full E2E: [`docs/E2E-REPORT-2026-05-06-v181.md`](E2E-REPORT-2026-05-06-v181.md) — 20/20 PASS
-- CHANGELOG: [`CHANGELOG.md`](../CHANGELOG.md) — v1.8.1-beta release notes
+- CHANGELOG: [`CHANGELOG.md`](../CHANGELOG.md) — v1.9.0-beta release notes
