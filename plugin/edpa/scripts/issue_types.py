@@ -243,9 +243,13 @@ def update_issue_type(type_id, name=None, gql_color=None, description=None):
     if not fields:
         return None
     field_str = ", ".join(fields)
+    # GitHub renamed the field on UpdateIssueTypeInput from `id`
+    # (deprecated) to `issueTypeId`. The deprecated name now errors out
+    # with `Argument 'issueTypeId' on InputObject 'UpdateIssueTypeInput'
+    # is required` so we send the canonical name.
     data = gh_graphql(f'''mutation {{
       updateIssueType(input: {{
-        id: "{type_id}"
+        issueTypeId: "{type_id}"
         {field_str}
       }}) {{
         issueType {{
