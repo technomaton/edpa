@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+## 1.6.4-beta — 2026-05-06
+
+### Added
+- **`_sub_issue_linker.py`** — shared helper for the GraphQL
+  `addSubIssue` mutation. `project_setup.py` STEP 8 (initial bulk
+  link) and `sync.py push` (incremental link) now share one
+  implementation. The mutation is idempotent — "already a sub-issue"
+  is treated as success so re-runs on a partially-synced project
+  are safe.
+- **Optional auto-create of GitHub Project views.** New STEP 10 in
+  `project_setup.py` prompts the maintainer ("Configure standard
+  views now? [Y/n]"). On yes, runs `create_project_views.py`. On
+  failure prints a warning and continues — non-fatal. New
+  `--non-interactive` flag skips the prompt for CI / scripted runs.
+
+### Changed
+- **`/edpa:setup` skill explicitly forbids flat issue lists.** Real
+  testing on 2026-05-06 surfaced that the wizard could be tricked
+  into producing a flat backlog when items were created via
+  `gh issue create` directly or by writing `.edpa/backlog/**/*.yaml`
+  by hand. Skill now requires `backlog.py add` per item (which
+  enforces `--parent`), then a single `sync push` at the end.
+  `gh issue create` bypass is called out as forbidden in the skill
+  body.
+
+### Fixed
+- N/A — Phase 1 fix is purely instructional.
+
 ## 1.6.3-beta — 2026-05-06
 
 ### Fixed

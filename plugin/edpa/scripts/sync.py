@@ -676,22 +676,21 @@ def gh_create_issue(state, item, item_level, people_handles=None):
 
 
 def gh_link_subissue(state, parent_node_id, child_node_id):
-    """Link a child issue to its parent via GraphQL addSubIssue."""
+    """Link a child issue to its parent via GraphQL addSubIssue.
+
+    Thin shim over the shared `_sub_issue_linker` helper so that
+    project_setup.py STEP 8 (initial bulk link) and sync.py push
+    (incremental link) share one implementation. ``state`` is
+    accepted but unused for backward compatibility with existing
+    callers.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _sub_issue_linker import link_sub_issue  # noqa: E402
+
     if not (parent_node_id and child_node_id):
         return False
-    mutation = (
-        f'mutation {{ addSubIssue(input: {{ '
-        f'issueId: "{parent_node_id}", subIssueId: "{child_node_id}" }}) '
-        f'{{ issue {{ id }} subIssue {{ id }} }} }}'
-    )
-    result = subprocess.run(
-        ["gh", "api", "graphql", "-f", f"query={mutation}"],
-        capture_output=True, text=True, timeout=20,
-    )
-    if result.returncode == 0:
-        return True
-    # "already a sub-issue" is fine
-    return "already" in result.stdout.lower() or "already" in result.stderr.lower()
+    ok, _msg = link_sub_issue(parent_node_id, child_node_id)
+    return ok
 
 
 def parse_gh_item_type(item):

@@ -128,6 +128,9 @@ def main():
                         help="Project title")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print plan without executing")
+    parser.add_argument("--non-interactive", action="store_true",
+                        help="Skip interactive prompts (e.g. project-views "
+                             "configuration). Useful for CI / scripted runs.")
     args = parser.parse_args()
 
     full_repo = f"{args.org}/{args.repo}"
@@ -470,51 +473,21 @@ def main():
     # ═══════════════════════════════════════════════════════════
     step(8, "Linking sub-issues (parent-child hierarchy)")
 
-    link_count = 0
-    link_errors = 0
-    for item in items:
-        parent_id = item.get("parent")
-        if not parent_id:
-            continue
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _sub_issue_linker import link_items  # noqa: E402
 
-        child_mapping = issue_map.get(item["id"])
-        parent_mapping = issue_map.get(parent_id)
-        if not child_mapping or not parent_mapping:
-            if parent_id:
-                info(f"  {item['id']} → {parent_id} (skipped, parent not in issue_map)")
-            continue
-
-        _, _, child_node_id = child_mapping
-        _, _, parent_node_id = parent_mapping
-
-        if not child_node_id or not parent_node_id:
-            info(f"  {item['id']} → {parent_id} (skipped, missing node ID)")
-            continue
-
-        mutation = (
-            f'mutation {{ addSubIssue(input: {{ '
-            f'issueId: "{parent_node_id}", subIssueId: "{child_node_id}" }}) '
-            f'{{ issue {{ id }} subIssue {{ id }} }} }}'
-        )
-        result = gh_graphql(mutation)
-        if result and "errors" not in result:
-            link_count += 1
-        else:
-            link_errors += 1
-            errors = result.get("errors", []) if result else []
-            # "already a sub-issue" is not a real error
-            if any("already" in str(e).lower() for e in errors):
-                link_count += 1
-                link_errors -= 1
-            else:
-                info(f"  {item['id']} → {parent_id} (failed: {errors})")
-
-    if link_count:
-        ok(f"{link_count} sub-issue links created")
-    if link_errors:
-        info(f"{link_errors} links failed (see above)")
-    if not link_count and not link_errors:
+    counts = link_items(
+        items, issue_map,
+        on_skip=lambda cid, pid, msg: info(f"  {cid} → {pid} (skipped, {msg})"),
+        on_error=lambda cid, pid, msg: info(f"  {cid} → {pid} (failed: {msg})"),
+    )
+    if counts["linked"]:
+        ok(f"{counts['linked']} sub-issue links created")
+    if counts["errors"]:
+        info(f"{counts['errors']} links failed (see above)")
+    if counts == {"linked": 0, "errors": 0, "skipped": 0}:
         info("No parent references found in backlog items")
+    link_count = counts["linked"]   # downstream summary uses this
 
     # ═══════════════════════════════════════════════════════════
     # STEP 9: Persist GitHub state for sync
@@ -572,6 +545,12 @@ def main():
     ok(f"issue_map.yaml: {len(serializable_map['items'])} items mapped")
 
     # ═══════════════════════════════════════════════════════════
+    # STEP 10 (optional): Configure GitHub Project views by issue type
+    # ═══════════════════════════════════════════════════════════
+    views_created = _maybe_create_project_views(args, project_num,
+                                                non_interactive=args.non_interactive)
+
+    # ═══════════════════════════════════════════════════════════
     # DONE
     # ═══════════════════════════════════════════════════════════
     print(f"\n{'═' * 70}")
@@ -580,12 +559,66 @@ def main():
     print(f"  Issues:  {len(issue_map)} created")
     print(f"  Fields:  {set_count} values set")
     print(f"  Links:   {link_count} sub-issue links")
+    if views_created is True:
+        print(f"  Views:   created automatically (Initiative / Epic / Feature / Story / Status)")
+    elif views_created is False:
+        print(f"  Views:   creation failed — see warnings above; run "
+              f"`python .claude/edpa/scripts/create_project_views.py` to retry")
+    else:
+        print(f"  Views:   skipped — run `python .claude/edpa/scripts/create_project_views.py` "
+              f"when you want them")
     print(f"\n  {C.YELLOW}{C.BOLD}Next steps:{C.RESET}")
-    print(f"  1. Configure views: python .claude/edpa/scripts/create_project_views.py")
-    print(f"  2. Enable automations in GitHub UI (Settings → Workflows):")
+    print(f"  1. Enable automations in GitHub UI (Settings → Workflows):")
     print(f"     - Item added to project → Set status to Todo")
     print(f"     - Auto-add issues from linked repository")
     print(f"{'═' * 70}\n")
+
+
+def _maybe_create_project_views(args, project_num, non_interactive=False):
+    """Optional STEP 10: ask the maintainer whether to auto-create the
+    standard GitHub Project views (per-level filters + status board).
+    Try once; on subprocess failure, log + continue (non-fatal).
+
+    Returns:
+      True   — views created successfully
+      False  — invocation tried but failed (warning printed)
+      None   — user declined or non-interactive mode skipped them
+    """
+    step(10, "Configure GitHub Project views (optional)")
+    if non_interactive:
+        info("non-interactive mode — skipping (run create_project_views.py manually)")
+        return None
+    try:
+        answer = input(f"      Configure standard views now? [Y/n] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        info("no input available — skipping")
+        return None
+    if answer in ("n", "no"):
+        info("skipped — you can run create_project_views.py later")
+        return None
+
+    views_script = Path(__file__).resolve().parent / "create_project_views.py"
+    if not views_script.exists():
+        fail(f"create_project_views.py not found at {views_script}")
+        return False
+
+    project_url = f"https://github.com/orgs/{args.org}/projects/{project_num}"
+    try:
+        result = subprocess.run(
+            ["python3", str(views_script), "--url", project_url],
+            capture_output=True, text=True, timeout=120,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        fail(f"create_project_views invocation failed: {exc}")
+        return False
+
+    if result.returncode != 0:
+        fail(f"create_project_views returned exit {result.returncode}")
+        if result.stderr:
+            print(f"      {result.stderr.strip()}")
+        return False
+    ok("Views configured (Initiative / Epic / Feature / Story / Status)")
+    return True
 
 
 if __name__ == "__main__":
