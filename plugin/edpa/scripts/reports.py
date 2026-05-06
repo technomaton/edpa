@@ -40,6 +40,39 @@ def _load_results(results_path: Path) -> dict:
         return json.load(f)
 
 
+def _format_override_summary(override: dict | None, baseline) -> str:
+    """Return a one-line human description of an iteration capacity
+    override, or empty string when no override was applied. Used in
+    both per-person timesheets and the team rollup column.
+
+    `override` shape (from engine._resolve_capacity):
+        {"capacity": <number>, "note": "<audit annotation>"}
+    """
+    if not override:
+        return ""
+    cap = override.get("capacity")
+    note = (override.get("note") or "").strip()
+    if cap is None:
+        body = "no-op"
+    else:
+        try:
+            base_n = float(baseline) if baseline is not None else None
+            cap_n = float(cap)
+        except (TypeError, ValueError):
+            base_n = None
+            cap_n = cap
+        if base_n is not None:
+            diff = cap_n - base_n
+            if diff == 0:
+                body = f"abs {cap_n:g}h ≡ baseline"
+            else:
+                sign = "+" if diff > 0 else ""
+                body = f"abs {cap_n:g}h ({sign}{diff:g}h vs baseline {base_n:g}h)"
+        else:
+            body = f"abs {cap_n:g}h"
+    return body + (f' ("{note}")' if note else "")
+
+
 def _format_person_md(person: dict, results: dict) -> str:
     iteration = results.get("iteration", "?")
     mode = results.get("mode", "?")
@@ -48,6 +81,17 @@ def _format_person_md(person: dict, results: dict) -> str:
     derived = person.get("total_derived", 0)
     items = person.get("items", []) or []
     invariant_ok = person.get("invariant_ok", True)
+    baseline = person.get("capacity_baseline")
+    override = person.get("capacity_override")
+
+    if override:
+        capacity_line = (
+            f"- Capacity: **{capacity}h** "
+            f"(baseline {baseline}h, override "
+            f"{_format_override_summary(override, baseline)})"
+        )
+    else:
+        capacity_line = f"- Capacity: **{capacity}h**"
 
     lines = [
         f"# Timesheet — {person.get('name', person.get('id', '?'))} "
@@ -56,7 +100,7 @@ def _format_person_md(person: dict, results: dict) -> str:
         f"- Iteration: **{iteration}**",
         f"- Mode: **{mode}**",
         f"- Methodology: **{methodology}**",
-        f"- Capacity: **{capacity}h**",
+        capacity_line,
         f"- Derived: **{derived}h**",
         f"- Invariant: **{'OK' if invariant_ok else 'FAIL'}**",
         "",
@@ -89,6 +133,11 @@ def _format_team_md(results: dict) -> str:
     people = results.get("people", []) or []
     team_total = results.get("team_total", 0)
     capacity_total = sum(p.get("capacity", 0) for p in people)
+    # Show the Override column only when at least one person had an
+    # override applied — keeps reports clean for the common case where
+    # everyone runs at baseline.
+    has_overrides = any(p.get("capacity_override") for p in people)
+
     lines = [
         f"# Team Rollup — {iteration}",
         "",
@@ -98,16 +147,35 @@ def _format_team_md(results: dict) -> str:
         f"- Team capacity: **{capacity_total}h**",
         f"- Team derived: **{team_total}h**",
         "",
-        "| Person | Role | Capacity | Derived | Items | Invariant |",
-        "|--------|------|----------|---------|-------|-----------|",
     ]
+    if has_overrides:
+        lines += [
+            "| Person | Role | Capacity | Override | Derived | Items | Invariant |",
+            "|--------|------|----------|----------|---------|-------|-----------|",
+        ]
+    else:
+        lines += [
+            "| Person | Role | Capacity | Derived | Items | Invariant |",
+            "|--------|------|----------|---------|-------|-----------|",
+        ]
     for p in people:
-        lines.append(
-            f"| {p.get('name', p.get('id', '?'))} | {p.get('role', '?')} | "
-            f"{p.get('capacity', 0)}h | {p.get('total_derived', 0)}h | "
-            f"{len(p.get('items', []) or [])} | "
-            f"{'OK' if p.get('invariant_ok', True) else 'FAIL'} |"
-        )
+        invariant = "OK" if p.get("invariant_ok", True) else "FAIL"
+        if has_overrides:
+            override_cell = _format_override_summary(
+                p.get("capacity_override"),
+                p.get("capacity_baseline", p.get("capacity", 0))) or "—"
+            lines.append(
+                f"| {p.get('name', p.get('id', '?'))} | {p.get('role', '?')} | "
+                f"{p.get('capacity', 0)}h | {override_cell} | "
+                f"{p.get('total_derived', 0)}h | "
+                f"{len(p.get('items', []) or [])} | {invariant} |"
+            )
+        else:
+            lines.append(
+                f"| {p.get('name', p.get('id', '?'))} | {p.get('role', '?')} | "
+                f"{p.get('capacity', 0)}h | {p.get('total_derived', 0)}h | "
+                f"{len(p.get('items', []) or [])} | {invariant} |"
+            )
     lines.append("")
     return "\n".join(lines) + "\n"
 

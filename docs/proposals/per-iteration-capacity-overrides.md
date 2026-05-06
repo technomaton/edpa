@@ -1,6 +1,6 @@
 # RFC — Per-person, per-iteration capacity overrides
 
-- **Status:** draft
+- **Status:** **implemented in v1.9.0-beta** (with schema pivot — see § 13)
 - **Author:** Jaroslav Urbánek (proposal request 2026-05-06)
 - **Target release:** v1.9.0-beta
 - **Required for:** kashealth pilot (IP iteration with crunch hours expected)
@@ -393,3 +393,81 @@ pro pilot a tag tuto RFC jako `status: deferred`.
 | Path D: separate `capacity_overrides.yaml` | symetrické s `heuristics.yaml` | další konfig, méně lokality | overengineering |
 | Path E: capacity_factor multiplier | jednoduchost | ztrácí absolutní hodiny | nedostatečné pro PTO |
 | Path F: structured calendar events log | flexibilní | komplexní agregace, vyšší LoC | out of scope v1.9 |
+| **Path G: iteration-level `people:` override (reuse people.yaml schema)** | **reuse existing schema, žádné nové vocabulary** | **degraduje povinný `reason:` na volitelný `note:`** | **vybráno — implementováno v v1.9.0** |
+
+## 13. Implementation pivot — schema review (post-RFC)
+
+Při review prvního drafu zazněl argument: "místo zavádět nový blok
+`capacity_overrides:` s `delta`/`absolute`/`reason` recyklujme
+existující `people:` schema z `people.yaml` jako partial override".
+
+### Pivot rationale
+
+| Aspekt | RFC v1 (`capacity_overrides:`) | v1.9.0 final (`iteration.people[]`) |
+|--------|-------------------------------|-------------------------------------|
+| Vocabulary | nový (`delta`, `absolute`, `reason`) | žádný (reuse `people:`) |
+| Semantika | additive (delta) nebo absolute | absolute only (`capacity_per_iteration: 44`) |
+| Audit reason | `reason:` povinný (≥10 znaků) | `note:` volitelný |
+| Sanity check | reason ≥10 znaků; one-of(delta, absolute) | non-empty entry: capacity nebo note |
+| LoC | ~80 v engine + ~75 v validator | ~60 v engine + ~75 v validator |
+| Forward compat | jen capacity | celé people schema (availability, fte, …) později |
+
+Trade-off: ztrácíme "audit-grade" sílu povinného `reason:`. Validator
+odmítne entry bez capacity i bez note jako "no override fields"
+(typo guard). Operator může psát jen `capacity_per_iteration: 44`
+bez note — engine to vezme, ale audit log v gitu pak nese kontext
+v commit message.
+
+### Final schema
+
+```yaml
+# .edpa/iterations/PI-2026-1.3.yaml
+iteration:
+  id: PI-2026-1.3
+  pi: PI-2026-1
+  type: ip
+  sequence: 5
+  start_date: 2026-06-08
+  end_date: 2026-06-14
+  status: closed
+
+# Iteration-level people overrides (v1.9.0+).
+# Reuses .edpa/config/people.yaml schema; engine matches by `id` and
+# overrides recognised fields. `note:` is optional audit annotation.
+people:
+  - id: bob-dev
+    capacity_per_iteration: 44
+    note: "IP weekend deploy push (Jun 13-14)"
+  - id: alice-arch
+    capacity_per_iteration: 10
+    note: "vacation Jun 9-11 (3 days PTO)"
+  - id: carol-qa
+    capacity_per_iteration: 14
+    note: "flu Jun 10-12 (sick leave certified)"
+```
+
+### Engine internals (final)
+
+`_load_iteration_people_overrides()` čte `iteration.people[]` a
+vrací `{person_id: full_entry_dict}`. `_resolve_capacity()` matchne
+`capacity_per_iteration` (nebo legacy alias `capacity`); ostatní
+fields nech prozatím beze změny chování — známka pro budoucí
+expansion (override `availability` aj.).
+
+Snapshot zachovává původní strukturu: `capacity_baseline`,
+`capacity_override = {capacity, note}` jen když override přitomen,
+jinak fields vůbec ne (zachovává L6 dedup byte-identicky).
+
+### Validator (final)
+
+`validate_iteration_people_overrides()` (alias
+`validate_capacity_overrides` zachovaný pro backward-compat). Hard
+errors na: neznámý id, duplicitní id, missing id, žádné override
+fields ani note, negativní capacity. Žádné varování pro >2× baseline
+v této verzi (může se přidat ve v1.10.0 pokud je potřeba).
+
+### Test coverage
+
+15 unit testů v `tests/test_capacity_overrides.py` — engine integration
+(7), validator (7), snapshot persistence (1).
+

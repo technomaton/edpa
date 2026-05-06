@@ -112,6 +112,134 @@ TYPE_PREFIXES = {
 }
 
 
+def _is_iteration_path(path: Path) -> bool:
+    """True if path lives under .edpa/iterations/<file>.yaml."""
+    parts = path.parts
+    if ".edpa" not in parts:
+        return False
+    try:
+        idx = parts.index(".edpa")
+    except ValueError:
+        return False
+    return (idx + 1 < len(parts)
+            and parts[idx + 1] == "iterations"
+            and path.suffix in YAML_EXTENSIONS)
+
+
+def _people_ids_for_iteration(path: Path) -> set[str] | None:
+    """Find the .edpa/config/people.yaml that sits next to this iteration
+    file and return the set of person ids declared there. Returns None
+    when people.yaml is missing or unreadable — caller treats that as
+    "skip person id cross-check" rather than fail validation."""
+    parts = path.parts
+    try:
+        idx = parts.index(".edpa")
+    except ValueError:
+        return None
+    edpa_dir = Path(*parts[: idx + 1]) if path.is_absolute() else Path(*parts[: idx + 1])
+    if path.is_absolute():
+        edpa_dir = Path("/" + str(edpa_dir)) if not str(edpa_dir).startswith("/") else edpa_dir
+    people_path = edpa_dir / "config" / "people.yaml"
+    if not people_path.is_file():
+        return None
+    try:
+        data = yaml.safe_load(people_path.read_text(encoding="utf-8")) or {}
+    except (yaml.YAMLError, OSError):
+        return None
+    return {p.get("id") for p in (data.get("people") or []) if isinstance(p, dict) and p.get("id")}
+
+
+def validate_iteration_people_overrides(path: Path, data, *, strict=False):
+    """Validate top-level `people:` block in an iteration YAML.
+
+    The iteration-level `people:` reuses the people.yaml schema as a
+    partial override — only fields explicitly set affect the engine.
+    Hard errors surface typos that change behaviour (unknown id, no
+    matching field touched, negative capacity); soft warnings flag
+    entries that compute but smell wrong.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    if not isinstance(data, dict):
+        return errors, warnings
+    entries = data.get("people")
+    if entries is None:
+        return errors, warnings
+    if not isinstance(entries, list):
+        errors.append(
+            f"{path}: iteration.people must be a list "
+            f"(got {type(entries).__name__})"
+        )
+        return errors, warnings
+
+    valid_person_ids = _people_ids_for_iteration(path)
+    seen_ids: set[str] = set()
+    for idx, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            errors.append(
+                f"{path}: iteration.people[{idx}] must be a mapping "
+                f"(got {type(entry).__name__})"
+            )
+            continue
+        pid = entry.get("id")
+        if not pid:
+            errors.append(f"{path}: iteration.people[{idx}] missing 'id'")
+            continue
+        if pid in seen_ids:
+            errors.append(
+                f"{path}: iteration.people[{idx}] duplicates earlier entry "
+                f"for id={pid!r} (one override per person per iteration)"
+            )
+        seen_ids.add(pid)
+        if valid_person_ids is not None and pid not in valid_person_ids:
+            errors.append(
+                f"{path}: iteration.people[{idx}] id={pid!r} "
+                f"not found in .edpa/config/people.yaml"
+            )
+
+        # Engine knows how to override capacity_per_iteration / capacity.
+        # An override entry without any recognised override field is
+        # almost certainly a typo — except when only `note:` is set
+        # (audit-only annotation, e.g., "Bob worked his usual hours but
+        # we want to record context").
+        recognised = {"capacity_per_iteration", "capacity"}
+        has_capacity_override = any(
+            k in entry and entry[k] is not None for k in recognised
+        )
+        has_note = bool((entry.get("note") or "").strip())
+        if not has_capacity_override and not has_note:
+            errors.append(
+                f"{path}: iteration.people[{idx}] has no override fields. "
+                f"Set capacity_per_iteration and/or note."
+            )
+
+        for key in recognised:
+            val = entry.get(key)
+            if val is None:
+                continue
+            try:
+                num = float(val)
+            except (TypeError, ValueError):
+                errors.append(
+                    f"{path}: iteration.people[{idx}].{key} must be numeric "
+                    f"(got {val!r})"
+                )
+                continue
+            if num < 0:
+                errors.append(
+                    f"{path}: iteration.people[{idx}].{key} must be >= 0 "
+                    f"(got {num})"
+                )
+
+    return errors, warnings
+
+
+# Backward-compat alias — older callers / tests still importing the
+# v1.9.0-RFC name continue to work after the rename to the simpler
+# iteration.people[] schema.
+validate_capacity_overrides = validate_iteration_people_overrides
+
+
 def _is_backlog_path(path: Path) -> bool:
     """True if `path` lives under a backlog item dir we know how to validate."""
     parts = path.parts
@@ -309,6 +437,13 @@ def validate_yaml(path, *, content=None, strict=False):
             path, data, strict=strict)
         errors.extend(item_errors)
         warnings.extend(item_warnings)
+
+    # Iteration YAMLs may carry top-level `people:` overrides (v1.9+).
+    if data is not None and _is_iteration_path(path):
+        iter_errors, iter_warnings = validate_iteration_people_overrides(
+            path, data, strict=strict)
+        errors.extend(iter_errors)
+        warnings.extend(iter_warnings)
 
     return errors, warnings
 

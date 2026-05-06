@@ -2,6 +2,73 @@
 
 ## Unreleased
 
+## 1.9.0-beta — 2026-05-06
+
+Adds per-person, per-iteration capacity overrides — the missing piece
+for IP iterations with crunch hours, vacations, sick leave, and any
+other one-off schedule deviation that doesn't belong in
+people.yaml's permanent baseline.
+
+### Added
+- **Iteration-level `people:` overrides.** An iteration YAML
+  (`.edpa/iterations/<id>.yaml`) may now carry a top-level `people:`
+  block reusing the same schema as `people.yaml`. Engine matches
+  entries by `id` and overrides `capacity_per_iteration` (or the
+  legacy alias `capacity`) on top of the baseline declared in
+  people.yaml. An optional `note:` is preserved through the snapshot
+  and reports for audit. Example:
+
+  ```yaml
+  iteration:
+    id: PI-2026-1.3
+    ...
+  people:
+    - id: bob-dev
+      capacity_per_iteration: 44
+      note: "IP weekend deploy push (Jun 13-14)"
+    - id: alice-arch
+      capacity_per_iteration: 10
+      note: "vacation Jun 9-11 (3 days PTO)"
+  ```
+
+  - `engine.run_edpa()` gained `edpa_root=` and `iteration_id=` kwargs;
+    when both are passed it loads `iteration.people[]` overrides and
+    surfaces `capacity_baseline` + `capacity_override` on each person
+    result. Pre-1.9 callers (no iteration_id) still work — every
+    person uses people.yaml baseline only.
+  - `validate_syntax.py` recognises the iteration `people:` schema and
+    hard-fails on unknown person id, duplicate entries, missing id,
+    no override fields, or negative capacity. Backward-compat alias
+    `validate_capacity_overrides` re-exports
+    `validate_iteration_people_overrides` so older callers keep working.
+  - Snapshots persist `capacity_baseline` + `capacity_override`
+    (with `note`) when an override applied; absent fields keep
+    pre-1.9 snapshots byte-identical (preserves the L6 dedup behaviour).
+  - `reports.py` per-person timesheet shows `(baseline 40h, override
+    abs 44h (+4h vs baseline 40h) ("IP weekend deploy push"))` when
+    an override is active; team rollup gains an `Override` column the
+    moment any iteration entry has overrides applied.
+
+  Why iteration `people:` rather than a separate `capacity_overrides:`
+  block (the original RFC shape): reuses an existing schema users
+  already know, no new vocabulary. Trade-off accepted: the audit
+  reason is downgraded from required `reason:` to optional `note:`,
+  with `validate_syntax` enforcing that an override entry must touch
+  at least one of capacity/note (otherwise it's a no-op typo).
+
+- 15 new unit tests in `tests/test_capacity_overrides.py` covering:
+  override applied, PTO override, person-without-override unchanged,
+  no-override no-op, note-only audit annotation, negative capacity
+  rejected, invariant holds with overrides, validator: unknown
+  person / duplicate id / missing id / empty override entry /
+  negative capacity / clean override / note-only override, snapshot
+  persistence shape.
+
+- `docs/proposals/per-iteration-capacity-overrides.md` — the original
+  RFC; v1.9.0 implementation pivoted from `capacity_overrides:` to
+  iteration `people:` based on review feedback (simpler, reuses
+  existing schema). RFC retained for design history.
+
 ## 1.8.1-beta — 2026-05-06
 
 Patch release closing the one new finding (N1) and one UX gap (N2)

@@ -202,25 +202,131 @@ def compute_cw(evidence_entry, heuristics, person_role=None):
     return 0.15
 
 
-def run_edpa(capacity_config, heuristics, items, mode="gates"):
+def _load_iteration_people_overrides(edpa_root, iteration_id):
+    """Read iteration-level `people:` overrides from
+    .edpa/iterations/<id>.yaml. Reuses the same schema as
+    .edpa/config/people.yaml; only fields explicitly set on the
+    iteration entry override the baseline (matching by `id`).
+
+    Returns a dict keyed by person id of the override fields, or an
+    empty dict when the iteration file has no `people:` section (or
+    the file doesn't exist). Optional `note` is preserved for the
+    audit trail (snapshot + reports) but doesn't affect the math.
+
+    Schema (v1.9.0+):
+        iteration:
+          id: PI-2026-1.3
+          ...
+        people:
+          - id: bob-dev
+            capacity_per_iteration: 44
+            note: "IP weekend deploy push (Jun 13-14)"
+          - id: alice-arch
+            capacity_per_iteration: 10
+            note: "vacation Jun 9-11"
+    """
+    if not edpa_root or not iteration_id:
+        return {}
+    iter_file = Path(edpa_root) / "iterations" / f"{iteration_id}.yaml"
+    if not iter_file.is_file():
+        return {}
+    try:
+        data = yaml.safe_load(iter_file.read_text(encoding="utf-8")) or {}
+    except (yaml.YAMLError, OSError):
+        return {}
+    entries = data.get("people") or []
+    out = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        pid = entry.get("id")
+        if not pid:
+            continue
+        # Store the full entry so future fields (availability, etc.)
+        # can be overridden without changing this loader. Engine reads
+        # the keys it knows about; everything else is just metadata.
+        out[pid] = dict(entry)
+    return out
+
+
+# Set of people.yaml fields that the engine knows how to override per
+# iteration. Anything else in iteration.people[<entry>] is preserved as
+# metadata in the snapshot but doesn't affect the calculation.
+ITERATION_OVERRIDABLE_FIELDS = {"capacity_per_iteration", "capacity"}
+
+
+def _resolve_capacity(person, override):
+    """Apply iteration-level override on top of the baseline capacity
+    declared in people.yaml.
+
+    Returns (effective, baseline, override_meta) where:
+      - effective is the capacity to feed into the proportional allocation
+      - baseline is people[].capacity_per_iteration from people.yaml
+      - override_meta is None when no override was applied, otherwise a
+        dict {capacity, note?} suitable for snapshot persistence
+
+    Raises ValueError when the resolved capacity would be negative —
+    the engine treats this as a configuration error rather than
+    silently clamping to 0.
+    """
+    cpi = person.get("capacity_per_iteration")
+    baseline = cpi if cpi is not None else person.get("capacity", 0)
+    if not override:
+        return baseline, baseline, None
+    eff_source = None
+    eff = baseline
+    if override.get("capacity_per_iteration") is not None:
+        eff = float(override["capacity_per_iteration"])
+        eff_source = "capacity_per_iteration"
+    elif override.get("capacity") is not None:
+        eff = float(override["capacity"])
+        eff_source = "capacity"
+    if eff_source is None:
+        # Override entry exists but doesn't touch capacity (e.g., only
+        # `note:`). Effective stays at baseline; we still record the
+        # note so reports can surface it.
+        if override.get("note"):
+            return baseline, baseline, {
+                "capacity": baseline,
+                "note": override.get("note", ""),
+            }
+        return baseline, baseline, None
+    if eff < 0:
+        raise ValueError(
+            f"iteration people override for {person.get('id', '?')!r} "
+            f"produces negative capacity ({eff}h); check the value"
+        )
+    return eff, baseline, {
+        "capacity": eff,
+        "note": override.get("note", ""),
+    }
+
+
+def run_edpa(capacity_config, heuristics, items, mode="gates", *,
+             edpa_root=None, iteration_id=None):
     """
     Run the core EDPA calculation.
 
     Returns: list of person results with derived hours.
+
+    edpa_root + iteration_id are optional but required together when
+    capacity_overrides should be applied — engine reads them from
+    .edpa/iterations/<id>.yaml. When either is None, behavior matches
+    pre-v1.9 (every person uses people.yaml baseline only).
     """
     people = capacity_config.get("people", [])
     threshold = heuristics.get("evidence_threshold", 1.0)
-    iteration_id = "computed"
+    overrides_map = _load_iteration_people_overrides(edpa_root, iteration_id)
 
     # Detect evidence
-    evidence = detect_evidence(people, items, iteration_id)
+    evidence = detect_evidence(people, items, iteration_id or "computed")
 
     results = []
 
     for person in people:
         pid = person["id"]
-        cpi = person.get("capacity_per_iteration")
-        capacity = cpi if cpi is not None else person.get("capacity", 0)
+        capacity, baseline, override_meta = _resolve_capacity(
+            person, overrides_map.get(pid))
         person_items = []
 
         for item in items:
@@ -296,7 +402,7 @@ def run_edpa(capacity_config, heuristics, items, mode="gates"):
             if any(pi["hours"] < 0 for pi in person_items):
                 invariant_ok = False
 
-        results.append({
+        result_entry = {
             "id": pid,
             "name": person.get("name", pid),
             "role": person.get("role", ""),
@@ -304,7 +410,14 @@ def run_edpa(capacity_config, heuristics, items, mode="gates"):
             "total_derived": round(total_derived, 2),
             "items": person_items,
             "invariant_ok": invariant_ok,
-        })
+        }
+        # Surface override metadata only when an override was actually
+        # applied — keeps pre-1.9 snapshots byte-identical for runs that
+        # don't touch capacity_overrides.
+        if override_meta is not None:
+            result_entry["capacity_baseline"] = baseline
+            result_entry["capacity_override"] = override_meta
+        results.append(result_entry)
 
     return results
 
@@ -902,6 +1015,13 @@ def _snapshot_payload(iteration_id, engine_output, capacity):
                 "total_derived": r["total_derived"],
                 "items_count": len(r["items"]),
                 "invariant_ok": r["invariant_ok"],
+                # capacity_baseline + capacity_override are present only
+                # when run_edpa applied an override — keeps the snapshot
+                # byte-identical for plain runs (preserves L6 dedup).
+                **({"capacity_baseline": r["capacity_baseline"]}
+                   if "capacity_baseline" in r else {}),
+                **({"capacity_override": r["capacity_override"]}
+                   if "capacity_override" in r else {}),
             }
             for r in engine_output["people"]
         ],
@@ -1185,7 +1305,10 @@ def main():
     else:
         planning_factor = 0.8
 
-    results = run_edpa(capacity, heuristics, items, mode=args.mode)
+    results = run_edpa(
+        capacity, heuristics, items, mode=args.mode,
+        edpa_root=args.edpa_root, iteration_id=iteration_id,
+    )
 
     all_passed = all(r["invariant_ok"] for r in results if r["items"])
     team_total = sum(r["total_derived"] for r in results)
