@@ -270,6 +270,11 @@ async def list_tools() -> list[Tool]:
                 "additionalProperties": False,
             },
         ),
+        Tool(
+            name="edpa_validate",
+            description="Validate iterations/*.yaml continuity and schema. Returns errors and warnings.",
+            inputSchema={"type": "object", "properties": {}, "additionalProperties": False},
+        ),
     ]
 
 
@@ -301,6 +306,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                                          "Expected pattern: <type-prefix>-<digits>, "
                                          "e.g. S-200, F-12, I-1.")]
             return _handle_item(edpa_root, safe_id)
+        elif name == "edpa_validate":
+            return _handle_validate(edpa_root)
         logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception:
@@ -384,6 +391,25 @@ def _handle_iterations(edpa_root: Path, status_filter: str | None) -> list[TextC
         result.append(entry)
 
     return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+
+
+def _handle_validate(edpa_root: Path) -> list[TextContent]:
+    """Run iteration schema + continuity validation, return structured report."""
+    # Local import: keeps the optional helper out of module-load path so the
+    # MCP server can still start even if a plugin upgrade is mid-flight.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _pi_loader import derive_pis, split_diagnostics  # noqa: E402
+
+    pis, diags = derive_pis(edpa_root)
+    errors, warnings = split_diagnostics(diags)
+    payload = {
+        "ok": not errors,
+        "pi_count": len(pis),
+        "iteration_count": sum(len(p.get("iterations", [])) for p in pis),
+        "errors": errors,
+        "warnings": warnings,
+    }
+    return [TextContent(type="text", text=json.dumps(payload, indent=2, ensure_ascii=False))]
 
 
 def _handle_people(edpa_root: Path, team_filter: str | None) -> list[TextContent]:

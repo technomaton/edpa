@@ -204,7 +204,7 @@ class TestProtocolHandshake:
 class TestToolsAdvertised:
     """tools/list must return the documented EDPA tool surface."""
 
-    def test_five_tools_returned(self, edpa_workspace):
+    def test_documented_tools_returned(self, edpa_workspace):
         with MCPClient(edpa_workspace) as client:
             client.initialize()
             client.send("tools/list")
@@ -214,7 +214,7 @@ class TestToolsAdvertised:
             names = {t["name"] for t in tools}
             assert names == {
                 "edpa_status", "edpa_iterations", "edpa_people",
-                "edpa_backlog", "edpa_item",
+                "edpa_backlog", "edpa_item", "edpa_validate",
             }, f"Tool set drift: {names}"
 
     def test_edpa_item_requires_item_id(self, edpa_workspace):
