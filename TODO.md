@@ -151,24 +151,24 @@ benefit from a known-good signal independent of the developer's machine.
 **Acceptance:** workflow runs nightly, posts a status check on the latest
 release tag.
 
-### Release pipeline as CI workflow — _shipped, awaiting first-tag verify_
+### ~~Release pipeline as CI workflow~~ — done in `6f1c6e1`
 
-`.github/workflows/release.yml` lives. Triggers on `v*` tag push or
+`.github/workflows/release.yml` triggers on `v*` tag push and on
 manual `workflow_dispatch` for back-fill. Builds `edpa-plugin.tar.gz`
 with `__pycache__`/`*.pyc`/`.DS_Store` excluded, extracts the matching
-CHANGELOG section into release notes, sets `--prerelease` for
-`-alpha`/`-beta`/`-rc` tags, calls `gh release create` (or `gh release
-upload --clobber` if the tag already has a release).
+CHANGELOG section into release notes, auto-detects prerelease via
+`-alpha`/`-beta`/`-rc` suffix, then `gh release create` (or `gh
+release upload --clobber` on existing tags).
 
-**Maintainer flow** is now: bump versions, update CHANGELOG, commit
-`release: vX.Y.Z`, then `git tag vX.Y.Z && git push --tags`. The
-workflow does the rest. v1.5.0-beta itself was published manually
-(workflow didn't exist yet); next tag is the real test.
+Maintainer flow is now: bump versions, update CHANGELOG, commit
+`release: vX.Y.Z`, then `git tag vX.Y.Z && git push --tags`.
 
-**Remaining acceptance:** push the next `v*` tag (probably v1.5.1 or
-v1.6.0), confirm Actions run completes green and the resulting
-release asset matches the manually-built v1.5.0-beta tarball
-byte-for-byte (modulo timestamps).
+Verified via `workflow_dispatch` against v1.5.0-beta on 2026-05-06
+(run #25443979871, success): re-built asset has different gzip
+metadata (BSD tar vs GNU tar, different file ordering) but the 53
+files inside are byte-identical to the manual build — sorted-content
+sha256 `73b336ff723a48433148841d4f348e486e7624fb4619c1e9e0ce49d3b3e5cf5d`
+on both. install.sh extraction is indistinguishable.
 
 ### Rate limiting / DoS guard for MCP (~ 40 lines)
 
