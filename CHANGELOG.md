@@ -2,6 +2,87 @@
 
 ## Unreleased
 
+## 1.7.0-beta — 2026-05-06
+
+Closes 12 of the 18 findings from the 2026-05-06 E2E test
+(`docs/E2E-REPORT-2026-05-06.md`). Six were critical — engine
+silently allocating 0h on a schema mismatch, project_setup
+duplicating projects/issues on rerun, missing typed Status
+field_ids on first run — and the rest were ergonomic gaps the
+test plan documented but the scripts didn't deliver.
+
+### Fixed
+- **`engine.py`** validates contributor schema and surfaces it
+  loudly. `load_backlog_items` now warns per-item when
+  `contributors[].role` is not in the evidence enum
+  (owner|key|reviewer|consulted) or `cw` is missing, and prints a
+  summary `WARN: 0 evidence pairs derived from N contributor
+  entries` when nothing produced evidence. `weight` accepted as a
+  transitional alias for `cw`. Top-level `body` and `assignees`
+  preserved on the way to evidence detection. (E2E F14, F16)
+- **`project_setup.py`** is idempotent. Reuses an existing project
+  on exact title match (gh project create silently lets duplicate
+  titles through), reuses existing issues by title on rerun, skips
+  fields that already exist instead of erroring on "name already
+  taken", and now retries the post-create field-list refresh up to
+  six times so all four typed Status fields persist on first run
+  (the eventual-consistency window that previously cost
+  Initiative Status / Story Status). Final summary distinguishes
+  created vs reused. (E2E F2, F3, F4)
+- **`_sub_issue_linker.py`** treats "duplicate sub-issues" /
+  "may only have one parent" as idempotent success so a rerun
+  reports the existing links instead of `Links: 0`.
+- **`issue_types.py`** uses `issueTypeId` on
+  `UpdateIssueTypeInput` (the deprecated `id` argument now hard-
+  fails). Description-update path works again. (E2E F1)
+- **`sync.py conflicts`** augments the changelog-based detection
+  with a live diff against GitHub. Same-field conflicts that
+  skipped the changelog (direct GH UI / API edits) are now flagged
+  as long as the local YAML was touched since `last_pull`. Falls
+  back gracefully when gh fetch fails. (E2E F10)
+- **`transitions.py`** tracks `.edpa/backlog/stories/` so story
+  status changes show up in CLI output and engine gate audit;
+  engine `load_gate_events` skips Story-level transitions to keep
+  the existing "Story credited at Done only" semantics. (E2E F13)
+
+### Added
+- **`reports.py`** — batch generator for per-person timesheets and
+  PI summaries. `python3 .claude/edpa/scripts/reports.py
+  PI-2026-1.1` reads `edpa_results.json` and emits
+  `timesheet-<id>.md` per person plus `timesheet-team.md`. `--pi`
+  aggregates iteration results under a PI prefix. The
+  /edpa:reports skill no longer needs a Claude session in the
+  loop. (E2E F17)
+- **`validate_syntax.py`** schema check for backlog YAMLs under
+  `.edpa/backlog/`. Verifies required fields per type, status
+  enum (portfolio vs delivery + legacy), id-prefix matching,
+  js > 0, contributors structure. Contributors role mismatch is
+  a warning by default (existing rich-doc backlogs use
+  human-readable role labels for documentation); `--strict`
+  upgrades it to an error. Stdin mode (`- --kind yaml`) and
+  `--strict` flag added. (E2E F5, F6, F12)
+- **`detect_contributors.py`** CLI / audit modes. `--pr <N>` and
+  `--item <ID> --since 7days` work without `PR_NUMBER` so users
+  can re-credit contributors offline. `--dry-run` shows changes
+  without writing YAML. (E2E F7)
+- **`transitions.py --since`** accepts relative durations
+  (`1day`, `2weeks`, `3months`) in addition to ISO YYYY-MM-DD.
+  Bad values produce a clear error message pointing at both
+  formats. (E2E F9)
+- **`evaluate_cw.py --check-readiness`** — exits 1 with a clear
+  "Insufficient ground truth (X < 20 records)" message when the
+  ground_truth.yaml is too sparse to start auto-calibration;
+  exits 0 with "Ready: ..." otherwise. The locked evaluation
+  logic is unchanged — readiness is a gate, not a new objective
+  function. (E2E F18)
+- **`project_setup.py`** Iteration field now collects iteration
+  tags from backlog items, not just `.edpa/iterations/*.yaml`.
+  Stories tagged `PI-2026-1.1` no longer fail every push with
+  `[failed: no option_id for Iteration:PI-2026-1.1]`. When the
+  Iteration field already exists on rerun, the expected option
+  set is printed with a UI breadcrumb (gh CLI can't add options
+  to an existing single-select field non-destructively). (E2E F8)
+
 ## 1.6.4-beta — 2026-05-06
 
 ### Added

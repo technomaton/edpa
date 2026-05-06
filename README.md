@@ -29,7 +29,7 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 ```
 $ python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
 
-EDPA 1.6.4-beta — Iteration PI-2026-1.3 (gates mode)
+EDPA 1.7.0-beta — Iteration PI-2026-1.3 (gates mode)
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -84,7 +84,7 @@ EDPA Installer
   mcp (MCP SDK) ✓
   openpyxl ✓
   ...
-EDPA 1.6.4-beta installed successfully!
+EDPA 1.7.0-beta installed successfully!
 ```
 
 Three config files were seeded from templates:
@@ -125,7 +125,7 @@ python3 .claude/edpa/scripts/engine.py --status
 ```
 
 ```
-EDPA 1.6.4-beta — Status
+EDPA 1.7.0-beta — Status
 ========================================
 ✓ .edpa/ found at .edpa
 ✓ people.yaml — 2 members, 1.5 FTE, 60h/iteration
@@ -193,7 +193,7 @@ python3 .claude/edpa/scripts/engine.py \
 
 ```
 ======================================================================
-EDPA 1.6.4-beta — Iteration PI-2026-1.1 (gates mode)
+EDPA 1.7.0-beta — Iteration PI-2026-1.1 (gates mode)
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -369,7 +369,7 @@ cp -r .claude/skills/* ~/.gemini/skills/
 
 | Document | Description |
 |----------|-------------|
-| [Methodology](docs/methodology.md) | Full EDPA v1.6.4-beta specification |
+| [Methodology](docs/methodology.md) | Full EDPA v1.7.0-beta specification |
 | [Quick Start](docs/quick-start.md) | 10-minute setup guide |
 | [Evidence Detection](docs/evidence-detection.md) | How GitHub signals map to CW |
 | [Dual-View](docs/dual-view.md) | Per-person vs per-item perspectives |
