@@ -2,39 +2,81 @@
 
 ## Unreleased
 
-### Planned for 1.10.0
+## 1.10.0-beta — 2026-05-07
 
 Skill-first gap closure + Excel workbook consolidation. Pays down
-two structural debts surfaced during kashealth pilot prep without
-blocking the 2026-05-07 kickoff. **Zero new top-level skills** —
-v1.10 extends two existing skills instead of multiplying ceremony.
-RFC:
+two structural debts surfaced during kashealth pilot prep. **Zero
+new top-level skills** — extends `/edpa:setup` and
+`/edpa:close-iteration` instead of multiplying ceremonies. RFC:
 [`docs/proposals/v1.10-skill-first-gaps-and-excel-consolidation.md`](docs/proposals/v1.10-skill-first-gaps-and-excel-consolidation.md).
 
-- **Excel consolidation.** Merge `summary.xlsx` and
-  `item-costs.xlsx` into a single `edpa-results.xlsx` with two
-  tabs (`Team Summary`, `Item Costs`). ~15-line refactor of
-  `engine.py:1105–1224` write_excel. No domain change — same
-  rows, one workbook.
-- **`/edpa:setup` Stage 0 — preflight + Issue Types.** Adds an
-  org-level prerequisites stage before today's people.yaml seed:
-  gh scopes, org access, member presence, Issue Types,
-  `git config user.email`, Python imports. Auto-fix offers per
-  FAIL; Issue Types missing → calls `issue_types.py setup --org`
-  after confirmation. Idempotent and re-runnable as
-  `/edpa:setup --check-only` for the "just verify readiness" use
-  case. Eliminates today's cryptic GraphQL-error path.
-- **`/edpa:close-iteration` prep step — capacity overrides.**
-  Adds an interactive prep block before the engine call: prompts
-  for any non-baseline capacity (PTO, sick, overtime, ramp),
-  validates person-id against people.yaml, edits the iteration
-  YAML, runs schema validator, commits with audit message.
-  `--prep-only` flag records overrides mid-iteration without
-  closing.
-- **Runbook trim.** Once the three items above ship,
-  `docs/kashealth-pilot/KASHEALTH-PILOT.md` collapses from 14
-  sections to ~3 pages: skill quick-reference + edge cases.
-  Detailed v1.9.0 form archived alongside.
+### Added
+
+- **`plugin/edpa/scripts/preflight.py`** — Python port of the
+  kashealth-pilot preflight shell with auto-fix offers and a public
+  `run_preflight()` function. Checks toolchain, gh scopes,
+  org access, member presence, Issue Types, `git config user.email`,
+  Python modules, and (when `people.yaml` exists) cross-references
+  declared github logins against org members.
+- **`plugin/edpa/scripts/capacity_override.py`** — interactive
+  helper for the v1.9.0 per-iteration `people:` override schema.
+  Validates person-id against `people.yaml`, computes diff vs
+  baseline, accepts absolute or `+N`/`-N` delta, prompts for audit
+  note, runs `validate_syntax.py`, auto-commits with message
+  `<iter>: capacity override <person> -> <hours>h (<note>)`.
+- **`/edpa:setup` Stage 0** — preflight runs before any
+  provisioning, blocks on ERROR. New flags: `--check-only` (Stage 0
+  only, no provisioning), `--skip-preflight` (escape hatch for
+  repeat runs), `--auto-fix` (apply offered fixes without
+  prompting). Issue Types FAIL specifically offers
+  `issue_types.py setup --org`. Eliminates the "setup fails with
+  cryptic GraphQL error" path.
+- **`/edpa:close-iteration` prep step** — interactive capacity
+  override prompt before the engine call. Three argument forms:
+  `<iter>` (full close: prep + engine + reports), `<iter> --prep-only`
+  (record overrides without closing — for mid-iteration use, e.g.
+  PTO declared Tuesday, close is Friday), `<iter> --skip-prep`
+  (engine + reports only, for re-runs).
+
+### Changed
+
+- **Excel output consolidated** to a single `edpa-results.xlsx`
+  per iteration with two tabs: `Team Summary` (per-person:
+  Person, Role, FTE, Capacity, Derived, Items, OK + TOTAL row)
+  and `Item Costs` (per-item-person: Item, Level, JS, Person,
+  CW, Score, Ratio, Hours). Replaces the prior split of
+  `summary.xlsx` + `item-costs.xlsx`. Pure code-shape refactor of
+  `engine.py:write_excel` — same rows, one workbook.
+- **`docs/kashealth-pilot/KASHEALTH-PILOT.md`** trimmed from 14
+  sections (460 lines) to 8 sections (188 lines) as skill
+  quick-reference. Full v1.9.0 form archived as
+  `KASHEALTH-PILOT-detailed.md`.
+- **`plugin/skills/edpa-reports/SKILL.md`** PI-rollup output
+  description aligned with reality: `pi-summary-<id>.md` (the
+  actual reports.py output) instead of the never-implemented
+  `pi-summary.xlsx`.
+- **Version bumped to 1.10.0-beta** in `plugin.json`, README badge,
+  methodology doc, skill metadata.
+
+### Why this release
+
+Pilot kickoff prep revealed:
+
+1. The kickoff runbook had 9 of 14 sections still calling
+   `python3 .claude/edpa/scripts/...` directly — a gap inside
+   existing skills, not a documentation problem. `/edpa:setup`
+   failed with cryptic GraphQL error when org Issue Types were
+   missing. There was no skill at all for capacity overrides
+   (v1.9.0's flagship feature).
+2. `summary.xlsx` and `item-costs.xlsx` were split across two
+   `Workbook()` instances for no domain reason — auditor opens
+   to aggregate, drills down to per-item, which is a single-file
+   two-tab pattern.
+
+Fixed by extending two existing skills with the necessary prep
+and check stages, and refactoring engine's xlsx writer.
+
+## 1.9.0 — 2026-05-07
 
 ## 1.9.0 — 2026-05-07
 
