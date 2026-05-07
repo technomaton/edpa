@@ -333,11 +333,10 @@ No item enters delivery without: Issue Type, Parent, Job Size, BV+TC+RR, Owner. 
 Iteration Close → per person:
   .edpa/reports/iteration-{I}/vykaz-{person}.md
   .edpa/reports/iteration-{I}/vykaz-{person}.json
-  .edpa/reports/iteration-{I}/summary.xlsx
-  .edpa/reports/iteration-{I}/item-costs.xlsx    ← per-item view
+  .edpa/reports/iteration-{I}/edpa-results.xlsx    ← Team Summary + Item Costs tabs
 
 PI Close → aggregation:
-  .edpa/reports/planning-interval-{PI}/summary.xlsx
+  .edpa/reports/planning-interval-{PI}/pi-summary-{PI}.md
 
 Annual:
   .edpa/reports/2026/annual.xlsx

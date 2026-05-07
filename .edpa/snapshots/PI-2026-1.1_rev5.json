@@ -1,0 +1,270 @@
+{
+  "snapshot_version": "1.9.0",
+  "iteration": "PI-2026-1.1",
+  "generated_at": "2026-05-07T07:38:46.891208+00:00",
+  "frozen": true,
+  "methodology": "EDPA 1.9.0",
+  "mode": "gates",
+  "capacity_registry": {
+    "people": [
+      {
+        "id": "urbanek",
+        "name": "J. Urbanek",
+        "role": "Arch",
+        "team": "CVUT",
+        "fte": 0.5,
+        "capacity": 40
+      },
+      {
+        "id": "tuma",
+        "name": "O. Tuma",
+        "role": "DevSecOps",
+        "team": "CVUT",
+        "fte": 1.0,
+        "capacity": 80
+      },
+      {
+        "id": "turyna",
+        "name": "Turyna",
+        "role": "Dev",
+        "team": "CVUT",
+        "fte": 0.75,
+        "capacity": 60
+      },
+      {
+        "id": "matousek",
+        "name": "Matousek",
+        "role": "Dev",
+        "team": "CVUT",
+        "fte": 0.75,
+        "capacity": 60
+      },
+      {
+        "id": "pm",
+        "name": "PM Partner",
+        "role": "PM",
+        "team": "Partner",
+        "fte": 0.5,
+        "capacity": 40
+      },
+      {
+        "id": "d1",
+        "name": "Sr Dev MC",
+        "role": "Dev",
+        "team": "Partner",
+        "fte": 0.5,
+        "capacity": 40
+      },
+      {
+        "id": "d2",
+        "name": "DB Spec MC",
+        "role": "Dev",
+        "team": "Partner",
+        "fte": 0.5,
+        "capacity": 40
+      },
+      {
+        "id": "do",
+        "name": "DevOps MC",
+        "role": "Dev",
+        "team": "Partner",
+        "fte": 0.25,
+        "capacity": 20
+      },
+      {
+        "id": "ux1",
+        "name": "UX Designer",
+        "role": "UX",
+        "team": "UX Consultants",
+        "fte": 0.25,
+        "capacity": 20
+      }
+    ],
+    "teams": [
+      {
+        "id": "CVUT",
+        "planning_factor": 0.8
+      },
+      {
+        "id": "Partner",
+        "planning_factor": 0.75
+      },
+      {
+        "id": "UX Consultants",
+        "planning_factor": 0.5,
+        "type": "external"
+      }
+    ]
+  },
+  "derived_reports": [
+    {
+      "person": "urbanek",
+      "name": "J. Urbanek",
+      "role": "Arch",
+      "capacity": 40,
+      "total_derived": 40.0,
+      "items_count": 1,
+      "invariant_ok": true
+    },
+    {
+      "person": "tuma",
+      "name": "O. Tuma",
+      "role": "DevSecOps",
+      "capacity": 80,
+      "total_derived": 80.0,
+      "items_count": 2,
+      "invariant_ok": true
+    },
+    {
+      "person": "turyna",
+      "name": "Turyna",
+      "role": "Dev",
+      "capacity": 60,
+      "total_derived": 60.0,
+      "items_count": 2,
+      "invariant_ok": true
+    },
+    {
+      "person": "matousek",
+      "name": "Matousek",
+      "role": "Dev",
+      "capacity": 60,
+      "total_derived": 60.0,
+      "items_count": 2,
+      "invariant_ok": true
+    },
+    {
+      "person": "pm",
+      "name": "PM Partner",
+      "role": "PM",
+      "capacity": 40,
+      "total_derived": 0,
+      "items_count": 0,
+      "invariant_ok": true
+    },
+    {
+      "person": "d1",
+      "name": "Sr Dev MC",
+      "role": "Dev",
+      "capacity": 40,
+      "total_derived": 40.0,
+      "items_count": 1,
+      "invariant_ok": true
+    },
+    {
+      "person": "d2",
+      "name": "DB Spec MC",
+      "role": "Dev",
+      "capacity": 40,
+      "total_derived": 0,
+      "items_count": 0,
+      "invariant_ok": true
+    },
+    {
+      "person": "do",
+      "name": "DevOps MC",
+      "role": "Dev",
+      "capacity": 20,
+      "total_derived": 0,
+      "items_count": 0,
+      "invariant_ok": true
+    },
+    {
+      "person": "ux1",
+      "name": "UX Designer",
+      "role": "UX",
+      "capacity": 20,
+      "total_derived": 0,
+      "items_count": 0,
+      "invariant_ok": true
+    }
+  ],
+  "items": [
+    {
+      "id": "S-201",
+      "level": "Story",
+      "job_size": 5,
+      "contributor": "urbanek",
+      "cw": 0.3,
+      "score": 1.5,
+      "ratio": 1.0,
+      "hours": 40.0
+    },
+    {
+      "id": "S-202",
+      "level": "Story",
+      "job_size": 3,
+      "contributor": "tuma",
+      "cw": 1.0,
+      "score": 3.0,
+      "ratio": 0.375,
+      "hours": 30.0
+    },
+    {
+      "id": "S-203",
+      "level": "Story",
+      "job_size": 5,
+      "contributor": "tuma",
+      "cw": 1.0,
+      "score": 5.0,
+      "ratio": 0.625,
+      "hours": 50.0
+    },
+    {
+      "id": "S-201",
+      "level": "Story",
+      "job_size": 5,
+      "contributor": "turyna",
+      "cw": 1.0,
+      "score": 5.0,
+      "ratio": 0.869565,
+      "hours": 52.17
+    },
+    {
+      "id": "S-202",
+      "level": "Story",
+      "job_size": 3,
+      "contributor": "turyna",
+      "cw": 0.25,
+      "score": 0.75,
+      "ratio": 0.130435,
+      "hours": 7.83
+    },
+    {
+      "id": "S-203",
+      "level": "Story",
+      "job_size": 5,
+      "contributor": "matousek",
+      "cw": 0.6,
+      "score": 3.0,
+      "ratio": 0.5,
+      "hours": 30.0
+    },
+    {
+      "id": "S-204",
+      "level": "Story",
+      "job_size": 3,
+      "contributor": "matousek",
+      "cw": 1.0,
+      "score": 3.0,
+      "ratio": 0.5,
+      "hours": 30.0
+    },
+    {
+      "id": "S-204",
+      "level": "Story",
+      "job_size": 3,
+      "contributor": "d1",
+      "cw": 0.25,
+      "score": 0.75,
+      "ratio": 1.0,
+      "hours": 40.0
+    }
+  ],
+  "invariants": {
+    "all_passed": true
+  },
+  "signature_status": "pending",
+  "payload_signature": "5d5a7038fddc4d26a072ffe6b64d78ec655cc44ef489782cc4b221ce592e714e",
+  "frozen_at": "2026-05-07T07:38:46.894680+00:00"
+}

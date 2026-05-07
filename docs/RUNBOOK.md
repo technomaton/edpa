@@ -201,9 +201,9 @@ allocation, frozen JSON snapshot, optional Excel exports.
 
 - `.edpa/reports/iteration-<ID>/timesheet-<person>.md` (one per person).
 - `.edpa/reports/iteration-<ID>/edpa_results.json` (engine echo, in-place).
-- `.edpa/reports/iteration-<ID>/item-costs.xlsx` (per-item cost split).
+- `.edpa/reports/iteration-<ID>/edpa-results.xlsx` (Team Summary + Item Costs tabs).
 - `.edpa/snapshots/<ID>.json` (frozen, methodology-tagged).
-- `.edpa/reports/pi-<PI>/pi-summary.xlsx` (when invoked with `pi`).
+- `.edpa/reports/pi-<PI>/pi-summary-<PI>.md` (when invoked with `pi`).
 
 **No standalone script** — the `edpa-reports` skill drives Claude to read
 results, format reports, and write artifacts. See `.claude/skills/edpa-reports/SKILL.md`

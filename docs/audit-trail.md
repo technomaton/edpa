@@ -78,11 +78,10 @@ Signed documents stored in `.edpa/reports/signed/`.
 Iteration Close → per person:
   .edpa/reports/iteration-{ID}/vykaz-{person}.md
   .edpa/reports/iteration-{ID}/vykaz-{person}.json
-  .edpa/reports/iteration-{ID}/summary.xlsx
-  .edpa/reports/iteration-{ID}/item-costs.xlsx
+  .edpa/reports/iteration-{ID}/edpa-results.xlsx    ← Team Summary + Item Costs tabs
 
 PI Close → aggregation:
-  .edpa/reports/pi-{PI}/pi-summary.xlsx
+  .edpa/reports/pi-{PI}/pi-summary-{PI}.md
 
 Annual:
   .edpa/reports/{year}/annual.xlsx

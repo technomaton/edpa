@@ -659,7 +659,7 @@ Nebo pres GitHub Actions (workflow_dispatch):
 .edpa/reports/iteration-PI-2026-1.1/
   edpa_results.json      # Kompletni vypocet (JSON)
   vykaz-alice.md         # Vykaz pro kazdou osobu
-  item-costs.xlsx        # Naklady per polozka (Excel)
+  edpa-results.xlsx      # Team Summary + Item Costs tabs (Excel)
 .edpa/snapshots/
   PI-2026-1.1.json       # Zmrazeny snapshot
 ```

@@ -56,7 +56,7 @@ fi
 
 # openpyxl — required for Excel exports in /edpa:reports
 # Without this the engine prints "Excel export skipped" and the reports
-# skill produces only Markdown timesheets, no item-costs.xlsx.
+# skill produces only Markdown timesheets, no edpa-results.xlsx.
 if python3 -c 'import openpyxl' 2>/dev/null; then
   echo "  openpyxl ✓"
 else

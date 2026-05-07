@@ -1102,7 +1102,7 @@ def write_snapshot(edpa_root, iteration_id, engine_output, capacity):
 
 
 def write_excel(edpa_root, iteration_id, results, capacity):
-    """Write summary.xlsx and item-costs.xlsx using openpyxl."""
+    """Write edpa-results.xlsx (Team Summary + Item Costs tabs) using openpyxl."""
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1122,10 +1122,20 @@ def write_excel(edpa_root, iteration_id, results, capacity):
         top=Side(style="thin"), bottom=Side(style="thin"),
     )
 
-    # --- summary.xlsx (per-person) ---
+    def autosize(ws):
+        for col_idx in range(1, ws.max_column + 1):
+            max_len = 0
+            for row_idx in range(1, ws.max_row + 1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                if cell.value is not None:
+                    max_len = max(max_len, len(str(cell.value)))
+            ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 4, 30)
+
     wb = Workbook()
+
+    # --- Tab 1: Team Summary (per-person) ---
     ws = wb.active
-    ws.title = "Summary"
+    ws.title = "Team Summary"
 
     project_name = capacity.get("project", {}).get("name", "")
     ws.append([f"EDPA {VERSION} — {iteration_id}"])
@@ -1158,7 +1168,6 @@ def write_excel(edpa_root, iteration_id, results, capacity):
         for col in range(1, len(row) + 1):
             ws.cell(row=ws.max_row, column=col).border = thin_border
 
-    # Totals row
     total_cap = sum(r["capacity"] for r in results)
     total_derived = sum(r["total_derived"] for r in results)
     total_items = sum(len(r["items"]) for r in results)
@@ -1168,23 +1177,10 @@ def write_excel(edpa_root, iteration_id, results, capacity):
         cell.font = header_font
         cell.border = thin_border
 
-    # Auto-width (skip merged cells)
-    for col_idx in range(1, ws.max_column + 1):
-        max_len = 0
-        for row_idx in range(1, ws.max_row + 1):
-            cell = ws.cell(row=row_idx, column=col_idx)
-            if cell.value is not None:
-                max_len = max(max_len, len(str(cell.value)))
-        ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 4, 30)
+    autosize(ws)
 
-    summary_path = report_dir / "summary.xlsx"
-    wb.save(summary_path)
-    print(f"Excel: {summary_path}")
-
-    # --- item-costs.xlsx (per-item) ---
-    wb2 = Workbook()
-    ws2 = wb2.active
-    ws2.title = "Item Costs"
+    # --- Tab 2: Item Costs (per-item-person) ---
+    ws2 = wb.create_sheet("Item Costs")
 
     ws2.append([f"EDPA {VERSION} — {iteration_id} — Per-Item Allocation"])
     ws2.merge_cells("A1:H1")
@@ -1209,17 +1205,11 @@ def write_excel(edpa_root, iteration_id, results, capacity):
             for col in range(1, len(row) + 1):
                 ws2.cell(row=ws2.max_row, column=col).border = thin_border
 
-    for col_idx in range(1, ws2.max_column + 1):
-        max_len = 0
-        for row_idx in range(1, ws2.max_row + 1):
-            cell = ws2.cell(row=row_idx, column=col_idx)
-            if cell.value is not None:
-                max_len = max(max_len, len(str(cell.value)))
-        ws2.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 4, 30)
+    autosize(ws2)
 
-    items_path = report_dir / "item-costs.xlsx"
-    wb2.save(items_path)
-    print(f"Excel: {items_path}")
+    out_path = report_dir / "edpa-results.xlsx"
+    wb.save(out_path)
+    print(f"Excel: {out_path}")
 
 
 def main():

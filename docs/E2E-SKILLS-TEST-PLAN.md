@@ -554,8 +554,9 @@ GitHub.
 
 Output narrative:
 - Engine summary: `TEAM TOTAL = capacity`, `All invariants passed: YES`
-- Reports skill takes over: 2× timesheet (per person), `item-costs.xlsx`,
-  `summary.xlsx`, frozen snapshot, `edpa_results.json`.
+- Reports skill takes over: 2× timesheet (per person), single
+  `edpa-results.xlsx` (Team Summary + Item Costs tabs), frozen snapshot,
+  `edpa_results.json`.
 
 ### 9.3 Read results via MCP
 
@@ -607,7 +608,7 @@ contribution allocation.
 ```
 
 **[expect skill: edpa-reports]** Aggregates all closed iterations in
-the PI into `pi-summary.xlsx`.
+the PI into `pi-summary-{PI}.md`.
 
 **[pass]** Each invocation produces the right artifact; skill recognizes
 all three argument forms.

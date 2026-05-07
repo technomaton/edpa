@@ -222,7 +222,7 @@ What just happened:
 - **All invariants passed**: each person's derived hours sum to their
   declared capacity, ratios sum to 1.0, no negative scores. The math
   holds — the snapshot is auditable.
-- An `item-costs.xlsx` was emitted alongside the JSON results.
+- An `edpa-results.xlsx` (Team Summary + Item Costs tabs) was emitted alongside the JSON results.
 
 ### 5. Generate timesheets — `/edpa:reports PI-2026-1.1` (Claude Code)
 
@@ -233,8 +233,7 @@ plus the cost-allocation Excel. After it runs:
 ```
 .edpa/reports/iteration-PI-2026-1.1/
 ├── edpa_results.json      ← engine output
-├── item-costs.xlsx        ← per-item / per-person cost split
-├── summary.xlsx           ← team summary
+├── edpa-results.xlsx      ← Team Summary + Item Costs tabs
 ├── timesheet-alice.md     ← human-readable, ready to attach to invoice
 └── timesheet-bob.md
 ```

@@ -689,7 +689,7 @@ ls -la .edpa/reports/iteration-PI-2026-1.1/
 #   timesheet-<person1>.md  (jeden na osobu z people.yaml s derived_hours > 0)
 #   timesheet-<person2>.md
 #   ...
-#   item-costs.xlsx
+#   edpa-results.xlsx       (Team Summary + Item Costs tabs)
 #   edpa_results.json (z fáze 9)
 
 ls -la .edpa/snapshots/
@@ -704,13 +704,14 @@ ls -la .edpa/snapshots/
   (capacity invariant)
 - ✅ Snapshot má `methodology_version`, `engine_mode`, `frozen_at`
 
-### 10.3 Item-costs XLSX
+### 10.3 edpa-results XLSX (two tabs)
 
 ```bash
 python3 -c "
 import openpyxl
-wb = openpyxl.load_workbook('.edpa/reports/iteration-PI-2026-1.1/item-costs.xlsx')
-ws = wb.active
+wb = openpyxl.load_workbook('.edpa/reports/iteration-PI-2026-1.1/edpa-results.xlsx')
+assert wb.sheetnames == ['Team Summary', 'Item Costs'], wb.sheetnames
+ws = wb['Item Costs']
 for row in ws.iter_rows(values_only=True, max_row=10):
     print(row)
 "
@@ -885,7 +886,7 @@ Plán je úspěšně provedený, pokud:
 | 8 | `sync conflicts` detekuje souběžnou změnu lokál+GH                    | ☐      |
 | 9 | `sync setup-refresh` rekonstruuje `field_ids` a `issue_map.yaml`     | ☐      |
 | 10| `engine.py --mode gates` projde bez warning a vyrobí audit trail     | ☐      |
-| 11| Reports skill vyrobí timesheety + item-costs.xlsx + snapshot          | ☐      |
+| 11| Reports skill vyrobí timesheety + edpa-results.xlsx + snapshot       | ☐      |
 | 12| `pytest tests/` (118 testů) je 100% zelený                           | ☐      |
 | 13| `pytest -m e2e` proti sandboxu projde (5 testů v `test_e2e_sync.py`) | ☐      |
 | 14| Kashealth dry-run (§ 13) ukáže rozumný plán bez API zápisu           | ☐      |
