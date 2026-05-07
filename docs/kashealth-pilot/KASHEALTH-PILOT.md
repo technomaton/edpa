@@ -24,7 +24,7 @@ Pilot ověří, že EDPA produkuje audit-grade per-person hodiny **z reálné de
 - ✅ Per-person `timesheet-<id>.md` pro 4 členy (jurby, turyna, matousek, tuma)
 - ✅ `item-costs.xlsx` per-item alokace (sloupce: Item, Level, JS, Person, CW, Score, Ratio, Hours — žádný cost; sazby drží separátní privátní registr)
 - ✅ Frozen snapshot `PI-2026-2.json` se signature + frozen_at
-- ✅ A/B porovnání: `--mode simple` (audit conservative) vs `--mode gates` (default), MAD ≤ 15 % vůči manuálnímu odhadu PM-a
+- ✅ Defaultne: `--mode gates` (default), MAD ≤ 15 %
 - ✅ Per-iteration capacity overrides ošetřeny pro IP iteraci (PI-2026-2.5) i ad-hoc PTO/sick napříč PI — viz § 6.5
 
 ## 1. Pre-flight checklist (před prvním commitem)
@@ -127,7 +127,7 @@ yq '.sync.field_ids | keys' .edpa/config/edpa.yaml
 
 # Iteration files vytvořené
 ls .edpa/iterations/
-# PI-2026-2.yaml + PI-2026-2.{1..5}.yaml
+# PI-2026-1.yaml + PI-2026-1.{1..5}.yaml
 
 # Setup state je v gitu (NE jen v working tree)
 git log --oneline -5
@@ -199,10 +199,10 @@ multi-contract entries (rozbije reporting) deklaruj override **přímo
 v iteration YAML**:
 
 ```yaml
-# .edpa/iterations/PI-2026-2.5.yaml — IP iterace
+# .edpa/iterations/PI-2026-1.5.yaml — IP iterace
 iteration:
-  id: PI-2026-2.5
-  pi: PI-2026-2
+  id: PI-2026-1.5
+  pi: PI-2026-1
   type: ip
   sequence: 5
   start_date: 2026-06-08
@@ -216,7 +216,7 @@ people:
   - id: turyna
     capacity_per_iteration: 44
     note: "IP weekend deploy push (Jun 13-14, +4h overtime)"
-  - id: jurby
+  - id: urbanek
     capacity_per_iteration: 10
     note: "vacation Jun 9-11 (3 days PTO certified)"
   - id: matousek
@@ -274,29 +274,29 @@ PLANNING CAPACITY                      94.4h  (factor: 0.8)
 
 Pro každou delivery iteraci PI-2026-2.{1..4}:
 
-> **Před spuštěním engine:** zkontroluj `.edpa/iterations/PI-2026-2.X.yaml`
+> **Před spuštěním engine:** zkontroluj `.edpa/iterations/PI-2026-1.X.yaml`
 > a doplň `people:` overrides pokud někdo z týmu měl odlišnou capacity
 > v této iteraci (PTO, sick, overtime). Detail viz § 6.5.
 
 ```bash
 # 7.0 Volitelně: zaktualizuj iteration YAML o overrides (PTO/sick/overtime)
-$EDITOR .edpa/iterations/PI-2026-2.X.yaml
-git -c user.email=... add . && git commit -m "PI-2026-2.X: capacity overrides"
+$EDITOR .edpa/iterations/PI-2026-1.X.yaml
+git -c user.email=... add . && git commit -m "PI-2026-1.X: capacity overrides"
 
 # 7.1 Spustit engine v gates mode (default)
 python3 .claude/edpa/scripts/engine.py \
-  --edpa-root .edpa --iteration PI-2026-2.1 \
+  --edpa-root .edpa --iteration PI-2026-1.1 \
   --mode gates \
-  --output .edpa/reports/iteration-PI-2026-2.1/edpa_results.json
+  --output .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
 
 # 7.2 Vyrobit timesheets + team rollup (deterministicky, žádný Claude)
-python3 .claude/edpa/scripts/reports.py PI-2026-2.1
+python3 .claude/edpa/scripts/reports.py PI-2026-1.1
 ```
 
 **Pass kritéria:**
 
 - `All invariants passed: YES` (per-osobu Σ derived_hours = capacity)
-- Snapshot `.edpa/snapshots/PI-2026-2.1.json` má `frozen_at` populated
+- Snapshot `.edpa/snapshots/PI-2026-1.1.json` má `frozen_at` populated
 - 4 timesheet-`<id>`.md soubory + `timesheet-team.md` + `item-costs.xlsx`
 
 ## 8. PI close (po 5 týdnech)
@@ -304,11 +304,11 @@ python3 .claude/edpa/scripts/reports.py PI-2026-2.1
 ```bash
 # 8.1 Engine na celý PI
 python3 .claude/edpa/scripts/engine.py \
-  --edpa-root .edpa --iteration PI-2026-2 \
-  --mode gates --output .edpa/reports/iteration-PI-2026-2/edpa_results.json
+  --edpa-root .edpa --iteration PI-2026-1 \
+  --mode gates --output .edpa/reports/iteration-PI-2026-1/edpa_results.json
 
 # 8.2 PI summary aggreguje 4 delivery iterace
-python3 .claude/edpa/scripts/reports.py --pi PI-2026-2
+python3 .claude/edpa/scripts/reports.py --pi PI-2026-1
 
 # 8.3 BankID podpis snapshotu (audit-grade — volitelné v pilotu)
 # Detail v docs/audit-trail.md
@@ -320,16 +320,16 @@ První PI **paralelně** počítej oba módy. Cíl: validovat, že gates output 
 
 ```bash
 # Parallel A/B
-python3 .claude/edpa/scripts/engine.py --iteration PI-2026-2.1 --mode simple \
+python3 .claude/edpa/scripts/engine.py --iteration PI-2026-1.1 --mode simple \
   --output .edpa/reports/iteration-PI-2026-2.1/edpa_results_simple.json
-python3 .claude/edpa/scripts/engine.py --iteration PI-2026-2.1 --mode gates \
+python3 .claude/edpa/scripts/engine.py --iteration PI-2026-1.1 --mode gates \
   --output .edpa/reports/iteration-PI-2026-2.1/edpa_results_gates.json
 
 # Diff per-osobu
 python3 -c "
 import json
-s=json.load(open('.edpa/reports/iteration-PI-2026-2.1/edpa_results_simple.json'))
-g=json.load(open('.edpa/reports/iteration-PI-2026-2.1/edpa_results_gates.json'))
+s=json.load(open('.edpa/reports/iteration-PI-2026-1.1/edpa_results_simple.json'))
+g=json.load(open('.edpa/reports/iteration-PI-2026-1.1/edpa_results_gates.json'))
 print(f'{\"Person\":20} {\"Role\":10} {\"simple\":>8} {\"gates\":>8} {\"Δ\":>8}')
 for sp, gp in zip(s['people'], g['people']):
     delta = gp['total_derived'] - sp['total_derived']
@@ -353,11 +353,11 @@ Po review: rozhodnutí, jestli přepnout default na `gates` pro PI-2026-3, nebo 
 |------|-----------------|--------|----------|
 | Tým nemá `git config user.email` set | M | sync push auto-commit failne, state v worktree | preflight.sh kontroluje; instrukce `git config --global user.email …` |
 | Někdo měl PTO/sick a engine to nezohlednil | M | per-osobu capacity neodpovídá realitě | doplnit `people:` override do iteration YAML před close (§ 6.5); validator hlídá typo, snapshot drží reason v `note:` |
-| Iteration field nemá option `PI-2026-2.x` po setup | L | sync push selže `no option_id for Iteration:…` | v1.8.1+ collects ze všech iteration files; pokud chybí, `sync.py add-iteration PI-2026-2.x` |
+| Iteration field nemá option `PI-2026-1.x` po setup | L | sync push selže `no option_id for Iteration:…` | v1.9.0+ collects ze všech iteration files; pokud chybí, `sync.py add-iteration PI-2026-1.x` |
 | Story má `as: developer` (legacy schema) | L | `validate_syntax --strict` ERROR | `migrate_contributors.py` rewrite |
 | Member nemá GH login v `people.yaml` | M | evidence detection mine ho | preflight.sh kontroluje email a github fields |
 | Engine vrací 0h | L | gates evidence prázdná | engine WARN výpis ukáže `0 evidence pairs derived` + breadcrumb |
-| GH Project ručně přejmenován | L | idempotent setup vytvoří duplikát | exact title match — proto přesně `Kashealth-PI-2026-2` |
+| GH Project ručně přejmenován | L | idempotent setup vytvoří duplikát | exact title match — proto přesně `Kashealth-PI-2026-1` |
 | Org member ruším z org | M | sync_collaborators.py jej přepne na `availability: unavailable` | týdenní `python3 .claude/edpa/scripts/sync_collaborators.py` |
 
 **Rollback plan:**
@@ -370,14 +370,14 @@ Po review: rozhodnutí, jestli přepnout default na `gates` pro PI-2026-3, nebo 
 
 | # | Kritérium | Měření |
 |---|-----------|--------|
-| 1 | EDPA produkuje per-person timesheety pro všechny 4 členy s Σ = capacity | `python3 reports.py PI-2026-2` + manual review |
-| 2 | item-costs.xlsx je akceptovatelný pro audit (CZK/h × DerivedHours = item cost, sum přes team = capacity_cost) | manual cross-check vs governance-reseni-v3.md rates |
+| 1 | EDPA produkuje per-person timesheety pro všechny 4 členy s Σ = capacity | `python3 reports.py PI-2026-1` + manual review |
+| 2 | item-costs.xlsx `item-costs.xlsx` per-item alokace (sloupce: Item, Level, JS, Person, CW, Score, Ratio, Hours — žádný cost; sazby drží separátní privátní registr) |
 | 3 | Gates mode produkuje "rozumné" hodiny vs PM odhad (MAD ≤ 15 %) | A/B diff (§ 9) + PM review |
 | 4 | Žádná Layer-1 governance ceremonie nebyla zbytečně přidaná (žádný timesheet, žádný TS-tracking tool) | retro feedback od týmu |
 | 5 | Setup → first iteration close trvá ≤ 30 min člověka času (nejen wall-clock) | log time-to-close |
 | 6 | Auto-commit feature drží state přes 5+ PR mergů | `git log` ukáže `EDPA:` commits jsou in-place po každém pull |
 
-Pokud 5+ z 6 PASS → pilot úspěšný, pokračuj na PI-2026-3 (full prod) a zveřejni jako case study.
+Pokud 5+ z 6 PASS → pilot úspěšný, pokračuj na PI-2026-2 (full prod) a zveřejni jako case study.
 
 ## 12. Day-1 — kompletní sekvence (copy-paste ready)
 
@@ -399,7 +399,7 @@ git add .edpa/config/ && git commit -m "EDPA pilot: seed configs"
 # === Setup GitHub Project ===
 python3 .claude/edpa/scripts/project_setup.py \
   --org kashealth --repo kas-platform-v1 \
-  --project-title "Kashealth-PI-2026-2"
+  --project-title "KAS — Medical Platform"
 # auto-commit "EDPA: persist setup state" by měl proběhnout
 
 # === Sanity check ===
