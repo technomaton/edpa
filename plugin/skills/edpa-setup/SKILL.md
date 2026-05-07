@@ -40,7 +40,46 @@ If `$ARGUMENTS` is empty, blank, or "help":
 
 ## Steps
 
-### 1. Verify prerequisites
+### 0. Stage 0 — Preflight readiness check (v1.10.0+)
+
+Before any provisioning, run the preflight script. It verifies:
+
+- `python3`, `git`, `gh` on PATH; Python ≥ 3.10
+- Required modules: `yaml`, `openpyxl`
+- `gh auth status` + scopes: `admin:org`, `project`, `repo`, `workflow`
+- Org access (members visible to your token)
+- Target repo accessible
+- Org-level Issue Types: Initiative, Epic, Feature, Story, Defect, Task
+- `git config user.name` + `user.email` set (auto-commit needs them)
+- (If `.edpa/config/people.yaml` exists) declared github logins are
+  org members
+
+Stage 0 runs as part of `project_setup.py` automatically — there is no
+separate command to remember. When a check fails, the script prints
+the exact remediation command. Issue Types missing → offers to run
+`issue_types.py setup --org <org>` interactively.
+
+```bash
+# Standalone preflight (no provisioning) — for "is this repo ready?":
+python3 .claude/edpa/scripts/project_setup.py --org <org> --repo <repo> --check-only
+
+# Full setup (runs Stage 0 first, blocks on ERROR, then provisions):
+python3 .claude/edpa/scripts/project_setup.py --org <org> --repo <repo> \
+  --project-title "<title>"
+
+# CI / scripted: never prompt, never auto-fix:
+python3 .claude/edpa/scripts/project_setup.py ... --non-interactive
+
+# Auto-apply offered fixes (e.g. create missing Issue Types):
+python3 .claude/edpa/scripts/project_setup.py ... --auto-fix
+```
+
+Stage 0 is idempotent and re-runnable. Skip via `--skip-preflight` only
+for repeat runs in the same session where preflight already passed.
+
+### 1. Verify Python toolchain (covered by Stage 0)
+
+Stage 0 already checked this. Listed here for reference:
 
 ```bash
 gh auth status

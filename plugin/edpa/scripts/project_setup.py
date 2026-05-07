@@ -236,9 +236,53 @@ def main():
                              "iterations/). By default setup commits these "
                              "so a subsequent git checkout / squash-merge "
                              "doesn't lose project IDs.")
+    parser.add_argument("--check-only", action="store_true",
+                        help="Run Stage 0 preflight only (gh scopes, org "
+                             "access, Issue Types, git config) and exit. "
+                             "Performs no provisioning.")
+    parser.add_argument("--skip-preflight", action="store_true",
+                        help="Skip Stage 0 preflight. Use only for repeat "
+                             "runs where preflight already passed in this "
+                             "session. CI / first-time setup should NOT skip.")
+    parser.add_argument("--auto-fix", action="store_true",
+                        help="In Stage 0, auto-apply offered fixes (e.g. "
+                             "create missing org Issue Types) without "
+                             "prompting.")
     args = parser.parse_args()
 
     full_repo = f"{args.org}/{args.repo}"
+
+    # ═══════════════════════════════════════════════════════════
+    # STAGE 0: Preflight readiness check (v1.10.0+)
+    # ═══════════════════════════════════════════════════════════
+    # Block before provisioning when toolchain, gh scopes, org
+    # access, Issue Types, or git config are not in place. Replaces
+    # the manual `docs/kashealth-pilot/preflight.sh` step + the
+    # cryptic GraphQL-error path when org Issue Types are missing.
+    if not args.skip_preflight:
+        try:
+            from preflight import run_preflight
+        except ImportError:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from preflight import run_preflight  # noqa: E402
+        rc = run_preflight(
+            org=args.org,
+            repo=args.repo,
+            non_interactive=args.non_interactive,
+            auto_fix=args.auto_fix,
+        )
+        if rc != 0:
+            print(f"\n{C.RED}Preflight failed — resolve the ✗ items above "
+                  f"before re-running setup.{C.RESET}")
+            sys.exit(rc)
+        if args.check_only:
+            print(f"\n{C.GREEN}✓ Preflight only (--check-only) — exiting "
+                  f"before provisioning.{C.RESET}")
+            sys.exit(0)
+    elif args.check_only:
+        print(f"{C.RED}--check-only and --skip-preflight are "
+              f"mutually exclusive.{C.RESET}")
+        sys.exit(2)
 
     print(f"\n{C.BOLD}{C.PURPLE}  EDPA GitHub Project Setup{C.RESET}")
     print(f"  {C.GRAY}Organization: {args.org}")
