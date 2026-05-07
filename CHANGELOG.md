@@ -6,7 +6,9 @@
 
 Skill-first gap closure + Excel workbook consolidation. Pays down
 two structural debts surfaced during kashealth pilot prep without
-blocking the 2026-05-07 kickoff. RFC:
+blocking the 2026-05-07 kickoff. **Zero new top-level skills** —
+v1.10 extends two existing skills instead of multiplying ceremony.
+RFC:
 [`docs/proposals/v1.10-skill-first-gaps-and-excel-consolidation.md`](docs/proposals/v1.10-skill-first-gaps-and-excel-consolidation.md).
 
 - **Excel consolidation.** Merge `summary.xlsx` and
@@ -14,21 +16,22 @@ blocking the 2026-05-07 kickoff. RFC:
   tabs (`Team Summary`, `Item Costs`). ~15-line refactor of
   `engine.py:1105–1224` write_excel. No domain change — same
   rows, one workbook.
-- **New skill `/edpa:preflight`.** Wraps
-  `docs/kashealth-pilot/preflight.sh` (gh scopes, org access,
-  member presence, Issue Types, git config) as a first-class
-  skill with auto-fix offers. Eliminates today's "setup fails
-  with cryptic GraphQL error" path when Issue Types are missing.
-- **`/edpa:setup` extension.** Adds Stage 0 — Issue Types
-  check + auto-create via `issue_types.py setup --org` before
-  Project creation. Today's separate manual step folds into the
-  setup skill.
-- **New skill `/edpa:capacity-override`.** Interactive wrapper
-  for v1.9.0's per-iteration `people:` overrides. Validates
-  person-id, computes diff vs baseline, prompts for `--note`,
-  commits with audit message. Today users must edit YAML by
-  schema memory.
-- **Runbook trim.** Once the four items above ship,
+- **`/edpa:setup` Stage 0 — preflight + Issue Types.** Adds an
+  org-level prerequisites stage before today's people.yaml seed:
+  gh scopes, org access, member presence, Issue Types,
+  `git config user.email`, Python imports. Auto-fix offers per
+  FAIL; Issue Types missing → calls `issue_types.py setup --org`
+  after confirmation. Idempotent and re-runnable as
+  `/edpa:setup --check-only` for the "just verify readiness" use
+  case. Eliminates today's cryptic GraphQL-error path.
+- **`/edpa:close-iteration` prep step — capacity overrides.**
+  Adds an interactive prep block before the engine call: prompts
+  for any non-baseline capacity (PTO, sick, overtime, ramp),
+  validates person-id against people.yaml, edits the iteration
+  YAML, runs schema validator, commits with audit message.
+  `--prep-only` flag records overrides mid-iteration without
+  closing.
+- **Runbook trim.** Once the three items above ship,
   `docs/kashealth-pilot/KASHEALTH-PILOT.md` collapses from 14
   sections to ~3 pages: skill quick-reference + edge cases.
   Detailed v1.9.0 form archived alongside.
