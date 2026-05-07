@@ -320,13 +320,22 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
             f"Allowed: {sorted(schema['statuses'])}"
         )
 
-    # JS sanity
+    # JS sanity. Only Stories and Defects must have a positive estimate;
+    # Initiatives / Epics / Features carry `js` as optional and frequently
+    # land with `js: 0` meaning "no estimate yet at this hierarchy level".
+    # Treat 0 as equivalent to missing for the optional-js levels.
+    js_required = "js" in schema.get("required", set())
     js = data.get("js")
     if js is not None:
         try:
             js_val = float(js)
-            if js_val <= 0:
-                errors.append(f"{path}: js must be > 0 (got {js!r})")
+            if js_val < 0:
+                errors.append(f"{path}: js must be >= 0 (got {js!r})")
+            elif js_val == 0 and js_required:
+                errors.append(
+                    f"{path}: js must be > 0 for {expected_type} "
+                    f"(got 0 — Stories/Defects need an estimate)"
+                )
         except (TypeError, ValueError):
             errors.append(f"{path}: js must be numeric (got {js!r})")
 

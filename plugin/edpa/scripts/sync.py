@@ -1056,10 +1056,9 @@ def update_sync_state(root, direction, items_count, checksum):
 
     state = {}
     if state_path.exists():
-        try:
-            state = load_json(state_path)
-        except (json.JSONDecodeError, FileNotFoundError):
-            state = {}
+        # load_json returns None for empty/unparseable files; coalesce to {}
+        # so the subsequent `state[...]` assignments don't blow up.
+        state = load_json(state_path) or {}
 
     if direction == "pull":
         state["last_pull"] = now
@@ -2117,7 +2116,7 @@ def cmd_status(root, sync_config, args):
     # Sync state
     state_path = root / ".edpa" / "sync_state.json"
     if state_path.exists():
-        state = load_json(state_path)
+        state = load_json(state_path) or {}
         last_pull = state.get("last_pull", "never")
         last_push = state.get("last_push", "never")
         items_synced = state.get("items_synced", 0)
@@ -2304,7 +2303,10 @@ def main():
         changelog_path.touch()
 
     sync_state_path = root / ".edpa" / "sync_state.json"
-    if not sync_state_path.exists():
+    # Treat both missing AND empty-file states as "needs initialisation".
+    # An install.sh that ran `touch sync_state.json` (pre-1.10 path) leaves
+    # a 0-byte file; loading it returns None and crashes downstream `state[..]`.
+    if not sync_state_path.exists() or sync_state_path.stat().st_size == 0:
         save_json(sync_state_path, {
             "last_pull": None,
             "last_push": None,

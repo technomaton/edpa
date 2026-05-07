@@ -219,6 +219,10 @@ def info(text):
     print(f"      {C.GRAY}{text}{C.RESET}")
 
 
+def warn(text):
+    print(f"      {C.YELLOW}⚠{C.RESET} {text}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="EDPA GitHub Project Setup")
     parser.add_argument("--org", required=True, help="GitHub organization")
@@ -248,6 +252,12 @@ def main():
                         help="In Stage 0, auto-apply offered fixes (e.g. "
                              "create missing org Issue Types) without "
                              "prompting.")
+    parser.add_argument("--no-views", action="store_true",
+                        help="Skip the optional GH Project views step "
+                             "(STEP 10). Equivalent to declining the prompt "
+                             "in interactive mode, but explicit so CI / "
+                             "scripted runs don't have to know that "
+                             "--non-interactive auto-skips views.")
     args = parser.parse_args()
 
     full_repo = f"{args.org}/{args.repo}"
@@ -402,14 +412,31 @@ def main():
         if name in existing_field_names:
             info(f"{name} (already exists)")
             return
-        cmd = (f'gh project field-create {project_num} --owner {args.org} '
-               f'--name "{name}" --data-type {data_type}')
+        cmd_args = ["gh", "project", "field-create", str(project_num),
+                    "--owner", args.org, "--name", name,
+                    "--data-type", data_type]
         if options:
-            cmd += f' --single-select-options "{options}"'
-        if run(cmd):
+            cmd_args += ["--single-select-options", options]
+        result = subprocess.run(cmd_args, capture_output=True, text=True)
+        if result.returncode == 0:
             ok(f"{name} ({data_type})")
-        else:
-            fail(f"{name} ({data_type}) — field-create failed")
+            existing_field_names.add(name)
+            return
+        # Distinguish "already exists" (idempotent re-run noise) from real
+        # failure. GitHub's GraphQL surface returns "Name has already been
+        # taken" when the field exists; we treat that as success-equivalent
+        # so the operator doesn't see a misleading red ✗ on a benign re-run.
+        stderr = (result.stderr or "").lower()
+        if ("already been taken" in stderr
+                or "already exists" in stderr
+                or "name has already" in stderr):
+            info(f"{name} (already exists)")
+            existing_field_names.add(name)
+            return
+        # Real failure — surface stderr so the operator can debug.
+        fail(f"{name} ({data_type}) — field-create failed")
+        if result.stderr:
+            print(f"      {C.GRAY}{result.stderr.strip()}{C.RESET}")
 
     number_fields = ["Job Size", "Business Value", "Time Criticality",
                      "Risk Reduction", "WSJF Score"]
@@ -489,12 +516,25 @@ def main():
         else:
             info(f"Iteration (already exists, all wanted options already present)")
     else:
-        if run(f'gh project field-create {project_num} --owner {args.org} '
-               f'--name "Iteration" --data-type SINGLE_SELECT '
-               f'--single-select-options "{opts_str}"'):
+        result = subprocess.run(
+            ["gh", "project", "field-create", str(project_num),
+             "--owner", args.org, "--name", "Iteration",
+             "--data-type", "SINGLE_SELECT",
+             "--single-select-options", opts_str],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
             ok(f"Iteration (SINGLE_SELECT, {len(iteration_options)} options)")
         else:
-            fail("Iteration (SINGLE_SELECT) — field-create failed")
+            stderr = (result.stderr or "").lower()
+            if ("already been taken" in stderr
+                    or "already exists" in stderr
+                    or "name has already" in stderr):
+                info("Iteration (already exists)")
+            else:
+                fail("Iteration (SINGLE_SELECT) — field-create failed")
+                if result.stderr:
+                    print(f"      {C.GRAY}{result.stderr.strip()}{C.RESET}")
 
     # Refresh field IDs after creating typed status fields. GitHub's
     # ProjectV2 API occasionally returns partial data right after a
@@ -885,11 +925,23 @@ def _maybe_create_project_views(args, project_num, non_interactive=False):
     Returns:
       True   — views created successfully
       False  — invocation tried but failed (warning printed)
-      None   — user declined or non-interactive mode skipped them
+      None   — user declined, --no-views set, or non-interactive auto-skip
     """
     step(10, "Configure GitHub Project views (optional)")
+    if getattr(args, "no_views", False):
+        info("--no-views — skipped (no warning; explicit operator choice)")
+        return None
     if non_interactive:
-        info("non-interactive mode — skipping (run create_project_views.py manually)")
+        # Views require Playwright + an interactive GH login on first run,
+        # so a non-interactive setup can't drive them. Print a louder
+        # message than a quiet `info(...)` so the operator knows this is
+        # an automatic skip, not a silent feature dropout.
+        warn("non-interactive mode — skipping views (Playwright requires "
+             "an interactive GH login on first run)")
+        hint = (f"      Run later with an interactive shell: "
+                f"python3 .claude/edpa/scripts/create_project_views.py "
+                f"--url https://github.com/orgs/{args.org}/projects/{project_num}")
+        print(hint)
         return None
     try:
         answer = input(f"      Configure standard views now? [Y/n] ").strip().lower()

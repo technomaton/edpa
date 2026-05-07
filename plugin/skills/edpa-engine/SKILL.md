@@ -123,12 +123,19 @@ Score[P, story_done] = JobSize[story] × CW[P, story]
 Falls back to Done-only filter for every level. Use when the project
 doesn't record mid-life status transitions in git.
 
+> **Quirk:** simple/full modes credit **only items with `status: Done`**.
+> A fresh backlog with everything in `Backlog` / `Implementing`
+> produces 0 derived hours and emits `WARN: 0 evidence pairs derived
+> from N contributor entries`. This is by design (audit-conservative).
+> Use `gates` for partial credit before iteration close.
+
 ```
 Score[P, item] = JobSize[item] × CW[P, item]   # only items with status: Done
 ```
 
 **Full mode (`--mode full`):**
-Same as simple but adds RS audit detail in the snapshot.
+Same as simple but adds RS audit detail in the snapshot. Same Done-only
+filter applies.
 
 ```
 Score[P, item] = JobSize[item] × CW[P, item] × RS[P, item]

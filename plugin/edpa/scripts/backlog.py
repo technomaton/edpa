@@ -924,6 +924,40 @@ def cmd_add(root, backlog, args):
     bv = getattr(args, "bv", None)
     tc = getattr(args, "tc", None)
     rr = getattr(args, "rr", None)
+    raw_contributors = getattr(args, "contributor", None) or []
+
+    # Parse --contributor PERSON:ROLE:CW triplets up front so a typo on
+    # one entry rejects the whole add (item not yet created).
+    EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
+    contributors = []
+    for raw in raw_contributors:
+        parts = raw.split(":")
+        if len(parts) != 3:
+            print(color(f"  Error: --contributor must be PERSON:ROLE:CW "
+                        f"(got {raw!r}; expected 3 colon-separated fields)",
+                        C.ERR))
+            sys.exit(1)
+        person, role, cw_str = (p.strip() for p in parts)
+        if not person:
+            print(color(f"  Error: --contributor missing person id "
+                        f"(got {raw!r})", C.ERR))
+            sys.exit(1)
+        if role not in EVIDENCE_ROLES:
+            print(color(f"  Error: --contributor role={role!r} not in "
+                        f"{sorted(EVIDENCE_ROLES)} (got {raw!r}). Job titles "
+                        f"like Dev/Arch/QA belong in people.yaml.", C.ERR))
+            sys.exit(1)
+        try:
+            cw = float(cw_str)
+        except ValueError:
+            print(color(f"  Error: --contributor cw must be numeric "
+                        f"(got {cw_str!r} in {raw!r})", C.ERR))
+            sys.exit(1)
+        if not (0.0 <= cw <= 1.0):
+            print(color(f"  Error: --contributor cw must be in [0,1] "
+                        f"(got {cw} in {raw!r})", C.ERR))
+            sys.exit(1)
+        contributors.append({"person": person, "as": role, "cw": cw})
 
     # Validate type
     if item_type not in TYPE_DIRS:
@@ -964,6 +998,8 @@ def cmd_add(root, backlog, args):
         item_data["assignee"] = assignee
     if iteration:
         item_data["iteration"] = iteration
+    if contributors:
+        item_data["contributors"] = contributors
 
     # Compute WSJF if we have enough data
     if js and js > 0:
@@ -1033,6 +1069,12 @@ def main():
     p_add.add_argument("--assignee", help="Assignee (person ID)")
     p_add.add_argument("--status", default="Funnel", help="Status (default: Funnel)")
     p_add.add_argument("--iteration", help="Iteration ID (e.g. PI-2026-1.3)")
+    p_add.add_argument("--contributor", action="append", default=[],
+                       metavar="PERSON:ROLE:CW",
+                       help="Add a contributor (repeatable). Format "
+                            "PERSON:ROLE:CW where ROLE ∈ "
+                            "{owner,key,reviewer,consulted} and CW ∈ "
+                            "[0,1]. Example: --contributor turyna:owner:0.7")
 
     args = parser.parse_args()
 

@@ -125,21 +125,46 @@ Rules:
 - Manual override: `/contribute @person weight:0.6`
 - Commit count does NOT convert to time — only signals relevance
 
-### 5.4 Calculation — Two Variants
+### 5.4 Calculation — Three Modes
 
-**Methodologically pure variant (audit):**
+The engine supports three modes, selected via `engine.py --mode {simple,full,gates}`:
+
+| Mode | Crediting rule | Use case |
+|------|----------------|----------|
+| `simple` | Credits items at **`status: Done`** only. Conservative; ignores partial work. | Audit-defensive baseline; works when only completed items should count. |
+| `full` | Same as `simple` (credits **`status: Done`** only) but applies the methodologically pure variant including Relevance Signal. | Audit-grade close. |
+| `gates` *(default in v1.10+)* | Credits each gate transition along the workflow (Backlog → Implementing → Implemented → Done) for Stories, plus typed Status transitions on Feature/Epic/Initiative. | Mid-iteration visibility; partial credit before close. |
+
+> **Important — `status: Done` requirement for simple/full.** Items
+> still in `status: Backlog` / `Implementing` / `Validating` produce **0
+> derived hours** in `simple` and `full` modes. If a backlog has been
+> set up but no work has transitioned to Done yet, the engine emits
+> `WARN: 0 evidence pairs derived from N contributor entries`. This is
+> by design — the audit-conservative variants refuse to credit
+> in-flight work. Use `gates` mode to see partial credit during the
+> iteration.
+
+**Methodologically pure variant (audit; `--mode full`):**
 ```text
 Score[P, item] = JobSize[item] x ContributionWeight[P, item] x RelevanceSignal[P, item]
 DerivedHours[P, item] = (Score[P, item] / SumScores[P, I]) x Capacity[P, I]
 ```
 
-**Simplified operational variant:**
+**Simplified operational variant (`--mode simple`):**
 ```text
 Score[P, item] = JobSize[item] x ContributionWeight[P, item]
 DerivedHours[P, item] = (Score[P, item] / SumScores[P, I]) x Capacity[P, I]
 ```
 
-Recommendation: start with operational variant. Preserve Evidence Score and Relevance Signal in snapshots for audit defense.
+**Gates variant (`--mode gates`, default):** same Score formula as
+operational, but credit accrues at each typed status transition rather
+than only at terminal `Done`. See `docs/audit-trail.md` § Gate-mode
+calculation for the per-transition split.
+
+Recommendation: start with `gates` for visibility, switch to `simple`
+or `full` for the iteration-close audit snapshot. Preserve Evidence
+Score and Relevance Signal in snapshots for audit defense regardless
+of mode.
 
 ### 5.5 Mathematical Guarantee
 

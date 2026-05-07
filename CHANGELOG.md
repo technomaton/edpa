@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### Fixed (post-1.10.0-beta E2E)
+
+Six paper-cut issues surfaced by the full-pilot E2E
+(`docs/E2E-REPORT-2026-05-07-v1100-beta-full-pilot.md`). None block
+v1.10.0-beta but all fixed before promoting to RC.
+
+- **`sync.py` no longer crashes on empty `sync_state.json`**
+  (`'NoneType' has no attribute 'get'`). Loads coalesce to `{}`; init
+  path also catches 0-byte files left by older `install.sh` (`touch
+  sync_state.json`).
+- **`project_setup.py` field-create log distinguishes "already exists"
+  from real failure.** Pre-fix every idempotent re-run printed
+  misleading `✗ field-create failed` for fields that *did* land. Now
+  matches stderr against "already been taken" / "already exists" and
+  prints `(already exists)` instead.
+- **`validate_syntax.py` allows `js: 0` for Initiative/Epic/Feature.**
+  Strict validator was rejecting Initiatives that legitimately have no
+  estimate at portfolio level. Story/Defect still require `js > 0`.
+- **`backlog.py add` gains `--contributor PERSON:ROLE:CW` flag**
+  (repeatable). Validates ROLE ∈ {owner,key,reviewer,consulted} and
+  CW ∈ [0,1] before writing. Fixes the runbook examples that referenced
+  a flag that didn't exist.
+- **`project_setup.py` adds `--no-views` flag** for explicit views skip.
+  Non-interactive auto-skip path now prints a louder `⚠` warning
+  explaining Playwright requires interactive login on first run.
+- **methodology.md + edpa-engine SKILL.md document `status: Done`
+  requirement** for `simple` and `full` modes. Was a quirk noted only
+  in source comments; now front-and-center in user docs as a
+  three-mode comparison table.
+
 ## 1.10.0-beta — 2026-05-07
 
 Skill-first gap closure + Excel workbook consolidation. Pays down
