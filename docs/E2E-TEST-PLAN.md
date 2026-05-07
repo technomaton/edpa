@@ -716,8 +716,10 @@ for row in ws.iter_rows(values_only=True, max_row=10):
 "
 ```
 
-**Pass:** sloupce `item_id, person, role, cw, derived_hours, hourly_rate, cost`,
-součet sloupce `cost` souhlasí s manuálním výpočtem.
+**Pass:** sloupce `Item, Level, JS, Person, CW, Score, Ratio, Hours`,
+součet sloupce `Hours` per osobu odpovídá `capacity` z people.yaml +
+případnému iteration override. Sazby/cost EDPA dnes neprodukuje —
+náklady aplikuje separátní (privátní) cost registry mimo repo.
 
 ### 10.4 PI summary (volitelné)
 
@@ -808,7 +810,8 @@ proteče první commit.
 python3 plugin/edpa/scripts/issue_types.py setup --org kashealth
 
 # 2. Naplň .edpa/config/people.yaml reálným týmem (4–6 lidí, role, FTE,
-#    capacity_per_iteration, hourly_rate)
+#    capacity_per_iteration). Sazby (hourly_rate) NEDÁVAT do EDPA configu —
+#    drží privátní cost registry mimo repo.
 $EDITOR .edpa/config/people.yaml
 
 # 3. Naplň .edpa/config/edpa.yaml: sync.github_org=kashealth, sync.github_repo=…

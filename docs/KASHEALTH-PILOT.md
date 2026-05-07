@@ -22,7 +22,7 @@ Pilot ověří, že EDPA produkuje audit-grade per-person hodiny **z reálné de
 
 - ✅ GitHub Project `Kashealth-PI-2026-2` s naplněnou hierarchií Initiative → Epic → Feature → Story
 - ✅ Per-person `timesheet-<id>.md` pro 4 členy (jurby, turyna, matousek, tuma)
-- ✅ `item-costs.xlsx` per-item alokace (sloupce: item, person, role, cw, derived_hours, hourly_rate, cost)
+- ✅ `item-costs.xlsx` per-item alokace (sloupce: Item, Level, JS, Person, CW, Score, Ratio, Hours — žádný cost; sazby drží separátní privátní registr)
 - ✅ Frozen snapshot `PI-2026-2.json` se signature + frozen_at
 - ✅ A/B porovnání: `--mode simple` (audit conservative) vs `--mode gates` (default), MAD ≤ 15 % vůči manuálnímu odhadu PM-a
 - ✅ Per-iteration capacity overrides ošetřeny pro IP iteraci (PI-2026-2.5) i ad-hoc PTO/sick napříč PI — viz § 6.5
@@ -84,15 +84,14 @@ cp /Users/jurby/projects/edpa/docs/kashealth-pilot/edpa.yaml.example  .edpa/conf
 
 # Edituj people.yaml — vyplň FTE, capacity_per_iteration, email per člena
 $EDITOR .edpa/config/people.yaml
-
-# Vyplň hourly_rate per role (CZK/h) v people.yaml — pro item-costs.xlsx
-# Doporučené (subdoporučení dle governance-reseni-v3.md):
-#   Arch:        2400 Kč/h
-#   Dev:         1800 Kč/h
-#   DevSecOps:   2000 Kč/h
-#   QA:          1400 Kč/h
-#   PM:          2200 Kč/h
 ```
+
+> **Poznámka — sazby (hourly_rate / MD rates).** EDPA dnes nikde
+> nečte `hourly_rate` field a item-costs.xlsx nemá sloupce `hourly_rate`
+> ani `cost` (jen Item, Level, JS, Person, CW, Score, Ratio, Hours).
+> Sazby pro vyúčtování grantu držte v **separátním privátním registru**
+> (např. M365 SharePoint, ne v public EDPA repu) a aplikujte je až
+> mimo EDPA na výstup `item-costs.xlsx`.
 
 **Commit configů hned po editaci** (chrání před § 4 mutace ztracením):
 
@@ -434,7 +433,7 @@ Před prvním spuštěním je třeba se rozhodnout:
 
 1. **PI cadence** — AI-native (1-week × 5) vs SAFe (2-week × 10)? *Default: AI-native, lze přepnout v `people.yaml`.*
 2. **FTE distribuce** — 1.0 / 0.5 / 0.25 per člen pro PI-2026-2? *Doporučení v `people.yaml.example`.*
-3. **hourly_rate** per role — finální čísla pro item-costs.xlsx
+3. **Cost reporting** — sazby pro grant vyúčtování drží privátní registr (ne EDPA people.yaml). Kdo cost-aggregaci dělá a jaký formát expects auditor?
 4. **Branding timesheets** — `kashealth.cz` letterhead na MD timesheetech? *Volitelné, post-pilot.*
 5. **Calibration timing** — kdy spustit `evaluate_cw.py --check-readiness` (potřeba ≥ 20 ground truth records). *Návrh: po PI-2026-2 close + manual review.*
 6. **PTO / sick policy** — kdo zapisuje override do iteration YAML (§ 6.5)? Návrh: každý člen sám commituje vlastní `people:` entry pro iteraci, kde měl PTO/sick (před close); PM/Lead audit-checkne při weekly cadence (§ 13). M365 integrace pro auto-fill z OOO calendaru je v2.x roadmap.

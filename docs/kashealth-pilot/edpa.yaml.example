@@ -15,7 +15,7 @@ project:
   domain: "kashealth.cz"
 
 governance:
-  methodology: "EDPA 1.8.1-beta"
+  methodology: "EDPA 1.9.0"
   # Calculation mode:
   #   gates  (default) — credits per status transition on Initiative/Epic/Feature
   #                      + Story=Done. Doporučeno po validaci A/B vs simple.

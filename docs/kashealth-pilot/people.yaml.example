@@ -3,17 +3,22 @@
 # 4 členové z kashealth org membership (k 2026-05-06):
 #   - jurby          → Jaroslav Urbánek (Lead Architect, ČVUT FBMI)
 #   - martinturyna   → Martin Turyna (Dev, ČVUT FBMI)
-#   - dmatousek22    → ? Matoušek (Dev, FBMI/Medicalc)
-#   - sirTurbisCZ    → ? Tuma (DevSecOps, Medicalc)
+#   - dmatousek22    → Daniel Matoušek (Dev, FČVUT FBMI)
+#   - sirTurbisCZ    → Ondřej Tůma (DevSecOps, ČVUT FBMI)
 #
 # DOPLNIT před prvním PI:
 #   - name (full)
 #   - email (preferovaně @kashealth.cz pro M365 license parity)
-#   - role z {Arch, Dev, DevSecOps, QA, PM}
-#   - fte (0.0..1.0)
+#   - role z {Arch, Dev, DevSecOps, QA, PO, PM, BO, SME, SRE, Ops}
+#   - fte (0.0..1.0) (máme HPP na 1.0 FTE, ale k tomu máme ještě DPP na 5 hodin v měsíci (Urbánek) a 7 hod v měsíci (ostatní), takže bych to připočítal vždy jednu iteraci v měsíci, aby se tam vešlo s využitím možnosti přetížit alokaci)
 #   - capacity_per_iteration (hours per 1-week iteration; FTE * 40)
-#   - hourly_rate (CZK/h, viz docs/examples/governance-kashealth/governance-reseni-v3.md)
 #   - availability {confirmed, partial, unavailable}
+#
+# POZN. — sazby (hourly_rate / MD rates) zde nejsou. EDPA dnes nikde
+# nečte hourly_rate field a item-costs.xlsx nemá sloupce hourly_rate
+# ani cost (jen Item, Level, JS, Person, CW, Score, Ratio, Hours).
+# Sazby držte v separátním (privátním) registru — dle smluv —
+# ne v EDPA configu, který může skončit v public repu.
 
 cadence:
   # AI-native default per EDPA: 1-week delivery iteration × 5 (4 delivery + 1 IP).
@@ -32,48 +37,44 @@ teams:
     # jen heuristika pro PI Planning, ne pro DerivedHours.
 
 people:
-  - id: jurby
+  - id: urbanek-jaroslav
     name: "Jaroslav Urbánek"
     role: Arch
     team: "kashealth"
-    fte: 0.5             # ← UPRAVTE
-    capacity_per_iteration: 20  # FTE × 40 (1-week iter)
-    email: "urbanek.jaroslav@gmail.com"   # ← preferovaně @kashealth.cz
+    fte: 1.0
+    capacity_per_iteration: 40       # FTE × 40 (1-week iter)
+    email: "jaroslav.urbanek@kashealth.cz"
     github: "jurby"
-    hourly_rate: 2400    # CZK/h, dle governance-reseni-v3.md
     availability: confirmed
 
-  - id: turyna
+  - id: turyna-martin
     name: "Martin Turyna"
     role: Dev
     team: "kashealth"
-    fte: 1.0             # ← UPRAVTE
+    fte: 1.0
     capacity_per_iteration: 40
-    email: ""             # ← DOPLNIT
+    email: "martin.turyna@kashealth.cz"
     github: "martinturyna"
-    hourly_rate: 1800
     availability: confirmed
 
-  - id: matousek
-    name: "? Matoušek"   # ← DOPLNIT plné jméno
+  - id: matousek-daniel
+    name: "Daniel Matoušek"
     role: Dev
     team: "kashealth"
-    fte: 1.0             # ← UPRAVTE
+    fte: 1.0
     capacity_per_iteration: 40
-    email: ""             # ← DOPLNIT
+    email: "daniel.matousek@kashealth.cz"
     github: "dmatousek22"
-    hourly_rate: 1800
     availability: confirmed
 
-  - id: tuma
-    name: "? Tuma"       # ← DOPLNIT plné jméno
+  - id: tuma-ondrej
+    name: "Ondřej Tůma"
     role: DevSecOps
     team: "kashealth"
-    fte: 1.0             # ← UPRAVTE
+    fte: 1.0
     capacity_per_iteration: 40
-    email: ""             # ← DOPLNIT
+    email: "ondrej.tuma@kashealth.cz"
     github: "sirTurbisCZ"
-    hourly_rate: 2000
     availability: confirmed
 
 # ─────────────────────────────────────────────────────────────────────
