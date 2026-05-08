@@ -2,6 +2,75 @@
 
 ## Unreleased
 
+### v1.11 — Single-source CW pipeline (BREAKING)
+
+CW computation moved entirely from engine to detect_contributors.
+The engine becomes a thin consumer of pre-computed `cw` values.
+This fundamentally changes the meaning of `contributors[].cw` and
+the calibration target — re-baseline required after upgrade.
+
+**Architecture change.**
+- `detect_contributors.py` collects all evidence signals (5
+  auto-detected + 5 manual variants) and writes
+  `contributors[].cw + signals[]` to backlog YAML.
+- Engine reads `cw` directly. No `detect_evidence()`. No
+  `compute_cw()`. No role-priority lookup. No RelevanceSignal.
+
+**Schema migration (BREAKING).**
+- `contributors[].as` field DROPPED (legacy `owner/key/reviewer/
+  consulted` classifier). Role labels are derived at display time
+  from signal types in reports.py / timesheets, not stored.
+- `contributors[].cw` semantic CHANGED: was absolute [0,1] role
+  weight, now per-item-normalized share (Σ across persons = 1.0
+  per item).
+- `contributors[].contribution_score` field ADDED — raw signal
+  weight sum (input to per-item normalization).
+- `contributors[].signals[]` field ADDED — full audit trail with
+  `type`, `ref` (auditor-resolvable identifier), `weight`,
+  optional `excerpt` (for `manual:*` types), `detected_at`.
+
+**`/contribute` directive — additive signals.**
+- Now parsed in 5 surfaces: PR body, PR comment, commit message,
+  issue body, issue comment. Each emits `manual:<surface>` signal.
+- Multiple directives stack additively (no override semantic).
+- `as:role` clause silently dropped — role classification is gone.
+- See `docs/contribute-directive.md` for usage patterns.
+
+**Calibration target shrinks.**
+- 11+ parameters → 5 parameters (5 signal weights only).
+- `role_weights` and `role_overrides` matrices dropped from
+  `cw_heuristics.yaml`. Strategic-role bias correction handled
+  through signal weight tuning instead. v1.10 calibration data is
+  NOT comparable; re-run `/edpa:calibrate` on v1.11.
+- `gate_role_affinity` matrix also dropped (was an audit hint
+  tied to the role taxonomy that no longer exists).
+
+**Evidence threshold + RelevanceSignal removed.**
+- The `evidence_threshold: 1.0` parameter is gone — per-item
+  normalization makes thresholding meaningless (any positive
+  signal contribution earns proportional cw).
+- `--mode full` no longer differs from `--mode simple` in the
+  formula; both credit `status: Done` items, full just adds
+  richer audit metadata to the snapshot.
+
+**Documentation.**
+- Rewritten: docs/methodology.md § 5.3–6.5, docs/audit-trail.md,
+  docs/evidence-detection.md, docs/auto-calibration.md.
+- Added: docs/audit-references.md (canonical ref taxonomy +
+  verification commands per signal type), docs/contribute-directive.md
+  (manual override syntax + use cases).
+
+**Snapshot incompatibility.**
+- v1.10 and earlier snapshots are NOT directly comparable to
+  v1.11. Re-run engine on archived backlogs to produce
+  v1.11-compatible snapshots. No automated migration — clean cut
+  per Q3 RFC decision.
+
+**Released milestones consumed in v1.11.**
+- Findings #1 (manual /contribute in PR body) and Finding #2 (dead
+  evidence signals in engine) from v1.10.0-rc1 real-evidence E2E
+  are both addressed by the architectural rewrite above.
+
 ### Fixed (post-1.10.0-rc1, real-evidence E2E)
 
 - **`detect_contributors.py` now parses `/contribute @person weight:X

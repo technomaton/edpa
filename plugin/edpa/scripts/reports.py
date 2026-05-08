@@ -28,6 +28,52 @@ import sys
 from pathlib import Path
 
 
+# v1.11: role labels are derived at display time from signal types.
+# The data store no longer carries `as: owner/key/...` per contributor;
+# this mapping is the single canonical projection from signal type to
+# role label, used only for human-readable rendering (timesheets, team
+# rollup). Engine math doesn't see roles — only cw values.
+SIGNAL_TO_ROLE = {
+    "assignee": "owner",
+    "pr_author": "key",
+    "commit_author": "reviewer",
+    "pr_reviewer": "reviewer",
+    "issue_comment": "consulted",
+}
+
+# Manual /contribute directives default to "key" — they're explicit
+# attributions written by the operator, typically to credit a person
+# who isn't otherwise visible in commits/reviews.
+_MANUAL_DEFAULT_ROLE = "key"
+
+# Priority order for breaking ties when multiple signal types fire.
+# Highest priority on the left: assignee dominates pr_author dominates
+# commit_author etc. This matches the v1.10 role hierarchy that audit
+# auditors are familiar with.
+_ROLE_PRIORITY = ["owner", "key", "reviewer", "consulted"]
+
+
+def _derive_role_from_signals(signal_types: list[str]) -> str:
+    """Pick the highest-priority role implied by a list of signal types.
+
+    Returns "—" when signal_types is empty (no contribution detected).
+    Used in timesheet rendering to give each person a single role
+    label per item, even when they fired multiple signals.
+    """
+    if not signal_types:
+        return "—"
+    roles_present = set()
+    for s in signal_types:
+        if s.startswith("manual:"):
+            roles_present.add(_MANUAL_DEFAULT_ROLE)
+        elif s in SIGNAL_TO_ROLE:
+            roles_present.add(SIGNAL_TO_ROLE[s])
+    for role in _ROLE_PRIORITY:
+        if role in roles_present:
+            return role
+    return "—"
+
+
 def _load_results(results_path: Path) -> dict:
     if not results_path.is_file():
         print(
@@ -106,13 +152,21 @@ def _format_person_md(person: dict, results: dict) -> str:
         "",
     ]
     if items:
+        # v1.11: include a derived "Role" column so timesheets remain
+        # readable to auditors used to the Owner/Key/Reviewer/Consulted
+        # hierarchy. The role is computed from signal types in the
+        # `evidence` field — pure display-layer projection, no impact
+        # on engine math.
         lines += [
-            "| Item | Level | JS | CW | Score | Ratio | Hours |",
-            "|------|-------|----|----|-------|-------|-------|",
+            "| Item | Level | Role | JS | CW | Score | Ratio | Hours |",
+            "|------|-------|------|----|----|-------|-------|-------|",
         ]
         for it in items:
+            evidence = it.get("evidence") or []
+            role = _derive_role_from_signals(evidence)
             lines.append(
                 f"| {it.get('id','?')} | {it.get('level','?')} | "
+                f"{role} | "
                 f"{it.get('js',0)} | {float(it.get('cw',0)):.2f} | "
                 f"{float(it.get('score',0)):.2f} | "
                 f"{float(it.get('ratio',0))*100:.1f}% | "

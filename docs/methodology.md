@@ -105,25 +105,45 @@ For person **P** and Iteration **I**:
 | `Capacity[P, I]` | Confirmed at Iteration Planning | 40h |
 | `RelevantItems[P, I]` | Automatically from GitHub evidence | 6 items across 3 levels |
 | `JobSize[item]` | Custom field on issue | Fibonacci 1–20 |
-| `ContributionWeight[P, item]` | From evidence / manual override | 0.15–1.0 |
-| `RelevanceSignal[P, item]` | Normalized from Evidence Score | 0.25–1.0 |
+| `cw[P, item]` | Per-item share, computed by detect_contributors | 0.0–1.0 (Σ across persons = 1.0) |
+| `contribution_score[P, item]` | Σ signal weights for P on item (audit input) | 0.5–10+ |
 
-### 5.3 Evidence Detection
+### 5.3 Evidence Detection (v1.11)
 
-| GitHub signal | Evidence score | Typical CW |
-|---|---:|---:|
-| Assignee on issue | +4 | 1.0 |
-| Explicit `/contribute` command | +3 | 0.6 |
-| PR author referencing item | +2 | 0.6 |
-| Commit author with S-XXX / F-XXX / E-XXX in message | +1 | 0.25 |
-| PR reviewer on PR referencing item | +1 | 0.25 |
-| Issue / PR comment in design discussion | +0.5 | 0.15 |
+CW computation lives in `detect_contributors.py` (v1.11). It collects
+**all** evidence signals per (person, item) pair from real GitHub
+state, sums them additively into a `contribution_score`, then
+normalizes to per-item shares so the engine sees a clean
+`contributors[].cw` table.
+
+| Signal type | Default weight | Source | Auditor `ref` |
+|-------------|---------------:|--------|---------------|
+| `assignee` | 4.0 | Issue assignees | `issue#<num>` |
+| `pr_author` | 2.0 | PR author | `pr#<num>` |
+| `commit_author` | 1.0 | PR commit author (excl. PR author) | `pr#<num>/commit/<sha>` |
+| `pr_reviewer` | 1.0 | PR reviews submitted | `pr#<num>/review/<id>` |
+| `issue_comment` | 0.5 | Issue/PR comments (excl. bots) | `issue#<num>/comment/<id>` |
+| `manual:pr_body` | explicit | `/contribute` in PR description | `pr#<num>/body` |
+| `manual:commit_message` | explicit | `/contribute` in commit message | `commit/<sha>/message` |
+| `manual:issue_body` | explicit | `/contribute` in issue description | `issue#<num>/body` |
+| `manual:issue_comment` | explicit | `/contribute` in issue comment | `issue#<num>/comment/<id>` |
+| `manual:pr_comment` | explicit | `/contribute` in PR-level comment | `pr#<num>/comment/<id>` |
+
+Auto-detected signal weights (the first 5) live in
+`.edpa/config/cw_heuristics.yaml` and are calibrated by
+`/edpa:calibrate`. Manual `/contribute @person weight:X` directives
+carry the operator-supplied `weight:` value verbatim — they are
+**additive signals**, not overrides.
 
 Rules:
-- Relevance threshold: Evidence Score >= 1.0
-- CW heuristic: strongest signal determines default CW
-- Manual override: `/contribute @person weight:0.6`
-- Commit count does NOT convert to time — only signals relevance
+- All signals contribute additively to `contribution_score`; no priority dominance
+- `cw[P, item] = contribution_score[P, item] / Σ_persons contribution_score[*, item]`
+- Multiple `/contribute` lines for the same person stack additively
+- Role labels are derived from signal types at display time only — never stored
+
+See [`docs/evidence-detection.md`](evidence-detection.md) for the full
+detection algorithm and [`docs/contribute-directive.md`](contribute-directive.md)
+for `/contribute` usage patterns.
 
 ### 5.4 Calculation — Three Modes
 
@@ -131,113 +151,139 @@ The engine supports three modes, selected via `engine.py --mode {simple,full,gat
 
 | Mode | Crediting rule | Use case |
 |------|----------------|----------|
-| `simple` | Credits items at **`status: Done`** only. Conservative; ignores partial work. | Audit-defensive baseline; works when only completed items should count. |
-| `full` | Same as `simple` (credits **`status: Done`** only) but applies the methodologically pure variant including Relevance Signal. | Audit-grade close. |
-| `gates` *(default in v1.10+)* | Credits each gate transition along the workflow (Backlog → Implementing → Implemented → Done) for Stories, plus typed Status transitions on Feature/Epic/Initiative. | Mid-iteration visibility; partial credit before close. |
+| `simple` | Credits items at **`status: Done`** only. | Audit-defensive baseline. |
+| `full` | Same as `simple` plus full audit metadata in snapshot. | Audit-grade close. |
+| `gates` *(default)* | Credits each gate transition on Feature/Epic/Initiative parents per `gate_weights`, plus Story Done events. | Mid-iteration visibility; partial credit. |
 
-> **Important — `status: Done` requirement for simple/full.** Items
-> still in `status: Backlog` / `Implementing` / `Validating` produce **0
-> derived hours** in `simple` and `full` modes. If a backlog has been
-> set up but no work has transitioned to Done yet, the engine emits
-> `WARN: 0 evidence pairs derived from N contributor entries`. This is
-> by design — the audit-conservative variants refuse to credit
-> in-flight work. Use `gates` mode to see partial credit during the
-> iteration.
+> **`status: Done` requirement for simple/full.** Items still in
+> `status: Backlog` / `Implementing` / `Validating` produce **0
+> derived hours** in `simple` and `full` modes. Use `gates` for
+> partial credit during the iteration.
 
-**Methodologically pure variant (audit; `--mode full`):**
-```text
-Score[P, item] = JobSize[item] x ContributionWeight[P, item] x RelevanceSignal[P, item]
-DerivedHours[P, item] = (Score[P, item] / SumScores[P, I]) x Capacity[P, I]
-```
-
-**Simplified operational variant (`--mode simple`):**
-```text
-Score[P, item] = JobSize[item] x ContributionWeight[P, item]
-DerivedHours[P, item] = (Score[P, item] / SumScores[P, I]) x Capacity[P, I]
-```
-
-**Gates variant (`--mode gates`, default):** same Score formula as
-operational, but credit accrues at each typed status transition rather
-than only at terminal `Done`. See `docs/audit-trail.md` § Gate-mode
-calculation for the per-transition split.
-
-Recommendation: start with `gates` for visibility, switch to `simple`
-or `full` for the iteration-close audit snapshot. Preserve Evidence
-Score and Relevance Signal in snapshots for audit defense regardless
-of mode.
-
-### 5.5 Mathematical Guarantee
+**v1.11 unified formula** (no role dominance, no Relevance Signal):
 
 ```text
-Σ DerivedHours[P, item] = Capacity[P, I]
+contribution_score[P, item] = Σ signal_weight × signal_fired(P, item)
+cw[P, item]                 = contribution_score[P, item]
+                              / Σ_persons contribution_score[*, item]
+score[P, item]              = JobSize[item] × cw[P, item]
+ratio[P, item]              = score[P, item] / Σ_items_of_P score
+DerivedHours[P, item]       = ratio[P, item] × Capacity[P, I]
 ```
 
-Sum of derived hours equals exactly the person's capacity for the Iteration, provided at least one relevant item exists. Holds for both calculation variants.
+The pre-v1.11 `RelevanceSignal` term is gone — multi-signal evidence
+is now baked into `cw` directly via the additive aggregation in
+detect_contributors. Pre-v1.11 `--mode full` differs from `--mode simple`
+only in metadata richness (full audit trail), not in the math.
+
+### 5.5 Mathematical Guarantees
+
+Two invariants hold by construction:
+
+```text
+1. Per-item:    Σ_persons cw[*, item] = 1.0
+2. Per-person:  Σ_items   DerivedHours[P, *] = Capacity[P, I]
+```
+
+Invariant 1 follows from the sum-and-normalize aggregation: each
+item's contributions sum to 1.0 by definition. Invariant 2 follows
+from per-person ratio normalization across their items in the
+iteration. Engine validates both at run time and refuses to write
+the snapshot if either fails.
 
 ---
 
-## 6. Dual-View CW: Two Questions, One Dataset
+## 6. Two Views from One Dataset (v1.11)
 
-### 6.1 The Problem
+### 6.1 What `cw` means in v1.11
 
-CW = 0.25 for a reviewer on a Story can mean two things:
-
-- **Per-person view:** "this item took 25% of attention vs their other items" → capacity distribution
-- **Per-item view:** "they did 25% of the work on this item" → cost allocation per deliverable
-
-These are two different questions. One set of CWs cannot cover both. The model solves both — from the same data, with two normalizations.
-
-### 6.2 Per-Person Normalization (Timesheets)
-
-Answers: **How does person P's capacity distribute across their items?**
+Single semantic: **cw is the per-item share of contribution**.
 
 ```text
-DerivedHours[P, item] = (Score[P, item] / Σ Score[P, *]) x Capacity[P, I]
-
-Guarantee: Σ DerivedHours[P, *] = Capacity[P, I]
+cw[P, item] = contribution_score[P, item] / Σ_persons contribution_score[*, item]
+Σ_persons cw[*, item] = 1.0
 ```
 
-Output: **timesheet per person** — how many hours P spent on which item.
+`cw = 0.25` for person P on Story S-1 reads as **"P contributed 25%
+of S-1's evidence-weighted work"**. Pre-v1.11 cw was an absolute
+[0, 1] value with role-coupled semantics ("P was a reviewer, weight
+0.25"), which was ambiguous between two normalizations. v1.11 fixes
+the meaning to per-item share.
 
-### 6.3 Per-Item Normalization (Cost Allocation)
+### 6.2 Per-Person View (Timesheets)
+
+Answers: **How does person P's capacity distribute across their items
+this iteration?**
+
+```text
+score[P, item] = JobSize[item] × cw[P, item]
+ratio[P, item] = score[P, item] / Σ_items_of_P score
+DerivedHours[P, item] = ratio[P, item] × Capacity[P, I]
+
+Guarantee: Σ_items DerivedHours[P, *] = Capacity[P, I]
+```
+
+Output: **timesheet per person** — how many hours P spent on which
+item.
+
+### 6.3 Per-Item View (Cost Allocation)
 
 Answers: **How does work on item X distribute across people?**
 
-```text
-ItemShare[P, item] = DerivedHours[P, item] / Σ DerivedHours[*, item]
+This view is **directly readable from `cw`** without further
+computation — `cw[P, X]` IS X's share of P. To translate to hours:
 
-Where Σ runs over all contributors of the item.
+```text
+ItemHours[P, item] = JobSize[item] × cw[P, item] × hour_factor
+
+Where hour_factor is set so that Σ_items_of_P JS × cw × hour_factor = Capacity[P]
 ```
 
-Output: **cost card per item** — how many hours each person invested in this deliverable.
+Or equivalently, the per-item hours **sum to the same number** as
+the per-person view's `DerivedHours[P, item]` — they're two ways to
+read the same per-(person, item) hour value.
 
-### 6.4 Example: Story S-200 (OMOP parser impl., JS: 8)
+### 6.4 Example: Story S-200 (JobSize = 8)
 
-**Per-person view** (each from THEIR capacity):
+Detected signals:
+- turyna: assignee (4) + commit_author (1) + manual:pr_body weight=2 → score 7
+- tuma: pr_author (2) + commit_author (1) + pr_reviewer (1) → score 4
+- urbanek: issue_comment (0.5) → score 0.5
 
-| Contributor | CW | Score | Their ΣScores | Their capacity | Hours on S-200 |
-|---|---:|---:|---:|---:|---:|
-| Turyna (Dev, owner) | 1.0 | 8.0 | 42.3 | 60h | 11.3h |
-| Tuma (DevSecOps, CI/CD) | 0.6 | 4.8 | 58.1 | 80h | 6.6h |
-| Urbanek (Arch, review) | 0.25 | 2.0 | 28.6 | 40h | 2.8h |
+Σ score on S-200 = 11.5
 
-**Per-item view** (how 20.7h on S-200 distributes):
+| Contributor | Signals | contribution_score | cw (share) |
+|---|---|---:|---:|
+| Turyna | assignee + commit + manual | 7.0 | **0.609** |
+| Tuma | pr_author + commit + pr_reviewer | 4.0 | **0.348** |
+| Urbanek | issue_comment | 0.5 | **0.043** |
+| **Σ** | | **11.5** | **1.000** |
 
-| Contributor | Hours on S-200 | Share of item |
-|---|---:|---:|
-| Turyna | 11.3h | 54.6% |
-| Tuma | 6.6h | 31.9% |
-| Urbanek | 2.8h | 13.5% |
-| **Total** | **20.7h** | **100%** |
+**Per-person view** (each from their own capacity, assuming S-200 is
+their only item this iteration):
 
-### 6.5 When to Use Which
+| Contributor | JS × cw | Capacity | Hours on S-200 |
+|---|---:|---:|---:|
+| Turyna | 8 × 0.609 = 4.87 | 60h | 60.0h (sole item) |
+| Tuma | 8 × 0.348 = 2.78 | 80h | 80.0h (sole item) |
+| Urbanek | 8 × 0.043 = 0.35 | 40h | 40.0h (sole item) |
 
-| View | Question | Output | Guarantee |
-|---|---|---|---|
-| Per-person | How many hours did P spend on what? | Timesheet, OP TAK | Σ = capacity |
-| Per-item | How many people and hours did item X cost? | Cost allocation, audit per deliverable | Σ shares = 100% |
+(In real iterations each person has multiple items; ratio
+normalization across items spreads their capacity proportionally to
+score per item.)
 
-Both views are generated from the same data (CW, JS, Capacity) — no duplication, no conflict.
+### 6.5 When to read cw vs hours
+
+| Question | Read | From |
+|----------|------|------|
+| "What share of S-200's work was Turyna's?" | `cw[turyna, S-200]` | `contributors[].cw` directly |
+| "How many hours did Turyna spend on S-200?" | `DerivedHours[turyna, S-200]` | engine output `items[].hours` |
+| "How many hours did the whole team spend on S-200?" | Σ over `DerivedHours[*, S-200]` | engine output, summed across persons |
+| "What's the team total this iteration?" | Σ over `DerivedHours[*, *]` | should equal Σ Capacity by invariant |
+
+cw is normalized (sums to 1.0 per item, dimensionless). DerivedHours
+is in hours (sums to capacity per person). Both come from the same
+underlying data — no duplication.
 
 ---
 

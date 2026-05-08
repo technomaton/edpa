@@ -198,8 +198,12 @@ initiatives:
                 iteration: PI-2026-1.1
                 contributors:
                   - person: turyna
-                    as: owner
                     cw: 1.0
+                    contribution_score: 4.0
+                    signals:
+                      - type: assignee
+                        ref: issue#137
+                        weight: 4.0
 ```
 
 ## 6. Backlog CLI

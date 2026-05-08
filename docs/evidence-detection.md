@@ -1,83 +1,133 @@
-# Evidence Detection Rules
+# Evidence Detection (v1.11)
 
-## GitHub Signals → Evidence Score → CW
+EDPA derives per-person hours from delivery evidence captured in
+GitHub. v1.11 consolidates evidence detection and CW computation into a
+single pipeline in `detect_contributors.py`; the engine consumes the
+resulting per-item-normalized `cw` values directly.
 
-| Signal | Evidence Score | Typical CW | Detection method |
-|--------|---------------|------------|-----------------|
-| Assignee on issue | +4 | 1.0 (owner) | GitHub API: issue.assignees |
-| `/contribute @person weight:X` | +3 | explicit | Issue body/comment regex |
-| PR author referencing item | +2 | 0.6 (key) | PR title/body contains S-XXX |
-| Commit author with item ref | +1 | 0.25 (reviewer) | Commit message contains S-XXX |
-| PR reviewer | +1 | 0.25 (reviewer) | PR reviews API |
-| Issue/PR comment | +0.5 | 0.15 (consulted) | Comments API (exclude bots) |
+## GitHub Signals → contribution_score → cw
 
-## Detection algorithm
+| Signal type | Default weight | Source on GitHub | Reference format |
+|-------------|---------------|------------------|------------------|
+| `assignee` | **4.0** | Issue assignees | `issue#<num>` |
+| `pr_author` | **2.0** | PR author | `pr#<num>` |
+| `commit_author` | **1.0** | Commit authors in PR (excluding PR author) | `pr#<num>/commit/<sha>` |
+| `pr_reviewer` | **1.0** | PR reviews submitted | `pr#<num>/review/<id>` |
+| `issue_comment` | **0.5** | Issue / PR comments (excluding bots) | `issue#<num>/comment/<id>` |
+| `manual:pr_body` | **explicit** | `/contribute @X weight:Y` in PR description | `pr#<num>/body` |
+| `manual:commit_message` | **explicit** | `/contribute` in commit message | `commit/<sha>/message` |
+| `manual:issue_body` | **explicit** | `/contribute` in issue description | `issue#<num>/body` |
+| `manual:issue_comment` | **explicit** | `/contribute` in issue comment | `issue#<num>/comment/<id>` |
+| `manual:pr_comment` | **explicit** | `/contribute` in PR-level comment | `pr#<num>/comment/<id>` |
+
+The 5 auto-detected signal weights live in
+`.edpa/config/cw_heuristics.yaml` under the `signals:` block. They are
+calibrated by `/edpa:calibrate` against ground-truth CW records;
+manual `/contribute` weights are user-supplied per directive.
+
+## Aggregation algorithm
 
 ```
-for each person P:
-  for each item in iteration:
-    evidence_score = 0
-    signals = []
+for each item:
+  for each person:
+    contribution_score[P, item] = Σ signal_weight × signal_fired(P, item)
+    # Multiple firings of the same signal type stack additively
+    # (e.g., 3 separate /contribute lines in the same PR body).
 
-    if P in item.assignees:
-      evidence_score += 4; signals.append("assignee")
-    if P has /contribute on item:
-      evidence_score += 3; signals.append("contribute_command")
-    if P authored PR referencing item:
-      evidence_score += 2; signals.append("pr_author")
-    if P committed with item ref in message:
-      evidence_score += 1; signals.append("commit_author")
-    if P reviewed PR referencing item:
-      evidence_score += 1; signals.append("pr_reviewer")
-    if P commented on item (non-trivial):
-      evidence_score += 0.5; signals.append("issue_comment")
-
-    if evidence_score >= threshold (default 1.0):
-      CW = role_weights[highest_signal(signals)]
-      add (P, item, CW, evidence_score) to relevant_items
+  if Σ contribution_score[*, item] > 0:
+    for each person:
+      cw[P, item] = contribution_score[P, item]
+                  / Σ contribution_score[*, item]
+    # Σ_persons cw[*, item] = 1.0  per-item invariant
+  else:
+    # Edge case: 0 signals detected — leave existing contributors[]
+    # untouched and emit a warning. Engine skips the item.
 ```
 
 ## All commits are delivery evidence
 
-EDPA measures **contribution to project delivery**, not "lines of code".
+EDPA measures **contribution to project delivery**, not "lines of
+code".
 
-| Activity | Evidence? | Why |
-|----------|-----------|-----|
-| Dev commits code (`src/`) | **YES** | Implementation work |
-| PM updates backlog (`.edpa/`) | **YES** | Planning, prioritization, specification |
-| Arch edits config (`.edpa/config/`) | **YES** | Architecture decisions, configuration |
-| BO comments on Epic | **YES** | Strategic direction, business decisions |
-| QA writes tests (`tests/`) | **YES** | Quality assurance |
+| Activity | Evidence? | How it shows up |
+|----------|-----------|-----------------|
+| Dev commits code (`src/`) | **YES** | `commit_author`, `pr_author` |
+| PM updates backlog (`.edpa/`) | **YES** | `commit_author` + likely `assignee` on planning issues |
+| Arch edits config (`.edpa/config/`) | **YES** | `commit_author` + `pr_reviewer` on related items |
+| BO comments on Epic | **YES** | `issue_comment` + maybe `manual:issue_comment` |
+| QA writes tests (`tests/`) | **YES** | `commit_author`, `pr_author` |
 
-Analytical and preparatory work (planning, specification, prioritization) is the
-**majority of project work** — not development itself. A PM who spends 4 hours
-defining acceptance criteria and updating the backlog contributes as much as a
-Dev who spends 4 hours coding.
-
-The CW matrix per role ensures correct proportions — not by filtering commits,
-but by **weighting each role's contribution appropriately** (Monte Carlo calibrated).
+Analytical and preparatory work (planning, specification,
+prioritization) is the **majority of project work**. A PM who spends 4
+hours defining acceptance criteria and updating the backlog
+contributes as much as a Dev who spends 4 hours coding — both flow
+through the same signal aggregation; signal weights determine each
+activity's translation to cw share.
 
 ## Branch naming → item detection
 
-PR branch `feature/S-200-omop-parser` → extract `S-200` → match to issue.
+PR branch `feature/S-200-omop-parser` → extract `S-200` → match to
+issue. Regex: `[SFEITD]-\d+`. Also extracted from PR title, PR body,
+and commit messages.
 
-Regex: `[SFEIATB]-\d+`
+## Role labels are derived, not stored
 
-## Manual override
+EDPA's data store carries `cw` and `signals[]` only — there is no
+per-person `as: owner/key/reviewer/consulted` field. Role labels are
+**derived at display time** from the highest-priority signal type:
 
-In issue body or comment:
+| Signal type | Derived role |
+|-------------|--------------|
+| `assignee` | owner |
+| `manual:*` | key (default for /contribute attributions) |
+| `pr_author` | key |
+| `commit_author`, `pr_reviewer` | reviewer |
+| `issue_comment` | consulted |
+
+A person who fires multiple signal types gets the **highest-priority
+role** for display (timesheets, reports). The math doesn't see roles —
+only `cw` × `JS` proportional allocation.
+
+## Manual `/contribute` directive
+
+Add `/contribute @<person> weight:<float>` anywhere in:
+
+- PR description (body)
+- PR-level comment
+- Commit message body
+- Issue description (body)
+- Issue comment
+
+Each directive contributes **additively** to the person's
+`contribution_score`. Multiple directives for the same person on the
+same surface stack (e.g., three lines in one commit message → three
+signals).
+
 ```
-/contribute @urbanek weight:0.6
-/contribute @tuma weight:0.3
+/contribute @alice weight:1.5
+/contribute @bob weight:0.5
 ```
 
-Overrides auto-detected CW for that person on that item.
+The `weight:` value is the signal's contribution to
+`contribution_score`, not the final cw. After per-item normalization,
+the resulting cw share depends on what other signals fired for other
+people on the same item. See [`docs/contribute-directive.md`](contribute-directive.md)
+for usage patterns and best practices.
 
-## Relevance Signal (RS)
+## Auditor verification
 
-For full (audit) mode:
+Every signal in a contributor's `signals[]` array carries a `ref`
+that resolves to an exact location on GitHub:
+
+```yaml
+signals:
+  - type: commit_author
+    ref: pr#146/commit/fa9f4401a2b
+    weight: 1.0
+    detected_at: 2026-05-08T15:23:11Z
 ```
-RS[P, item] = min(evidence_score[P, item] / max_evidence_score_on_item, 1.0)
-```
 
-For simple (operational) mode: RS = 1.0 (effectively ignored).
+To verify: `gh api repos/<org>/<repo>/commits/fa9f4401a2b` returns the
+commit with author info. See
+[`docs/audit-references.md`](audit-references.md) for the canonical
+reference format per signal type and verification commands.

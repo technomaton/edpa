@@ -570,56 +570,30 @@ GATE_TYPE_DIRS = {
 }
 
 
-def _contributors_to_evidence_fields(item_data):
-    """Extract evidence-shaped fields from a backlog YAML's contributors list.
+def _passthrough_contributors(item_data):
+    """v1.11: pass parent's contributors[] through to gate event verbatim.
 
-    Mirrors the per-contributor mapping in load_backlog_items() so gate events
-    score with the same evidence semantics as Done items.
+    The pre-v1.11 mapping (as: → top-level evidence fields) is gone —
+    engine reads cw directly from contributors[]. Gate events synthesised
+    from parent transitions inherit the parent's contributors with their
+    pre-computed shares, which is the correct semantic: whoever drove
+    the parent across its lifecycle gets credited at each gate.
     """
-    assignees = []
-    pr_author = None
-    commit_authors = []
-    pr_reviewers = []
-    commenters = []
-    body_parts = []
-
-    assignee = item_data.get("assignee") or item_data.get("owner")
-    if assignee:
-        assignees.append({"login": assignee})
-
-    for contrib in (item_data.get("contributors") or []):
-        if not isinstance(contrib, dict):
+    contribs = []
+    for c in (item_data.get("contributors") or []):
+        if not isinstance(c, dict):
             continue
-        person = contrib.get("person", "")
-        # Evidence role lives under `as:` (canonical, since v1.7).
-        # Legacy `role:` is silently ignored here — `load_backlog_items`
-        # is the gatekeeper that surfaces the rename WARN to users.
-        evidence_as = (contrib.get("as", "") or "").lower()
-        cw = contrib.get("cw")
-
-        if evidence_as == "owner":
-            if not any(a.get("login") == person for a in assignees):
-                assignees.append({"login": person})
-        elif evidence_as == "key":
-            if pr_author is None:
-                pr_author = person
-            commit_authors.append(person)
-        elif evidence_as == "reviewer":
-            pr_reviewers.append(person)
-        elif evidence_as == "consulted":
-            commenters.append(person)
-
-        if cw is not None:
-            body_parts.append(f"/contribute @{person} weight:{cw}")
-
-    return {
-        "assignees": assignees,
-        "body": "\n".join(body_parts),
-        "pr_author": pr_author,
-        "commit_authors": commit_authors,
-        "pr_reviewers": pr_reviewers,
-        "commenters": commenters,
-    }
+        person = c.get("person")
+        cw = c.get("cw")
+        if not person or cw is None:
+            continue
+        contribs.append({
+            "person": person,
+            "cw": cw,
+            "contribution_score": c.get("contribution_score", 0),
+            "signals": c.get("signals", []),
+        })
+    return contribs
 
 
 def load_gate_events(edpa_root, iteration_id, heuristics):
@@ -694,12 +668,11 @@ def load_gate_events(edpa_root, iteration_id, heuristics):
         effective_js = round(parent_js * weight, 6)
         synth_id = f"{t['item_id']}@{t['from_status'] or 'init'}->{t['to_status']}"
 
-        ev_fields = _contributors_to_evidence_fields(parent)
         events.append({
             "id": synth_id,
             "level": item_type,
             "job_size": effective_js,
-            **ev_fields,
+            "contributors": _passthrough_contributors(parent),
         })
         audit.append({
             "synth_id": synth_id,

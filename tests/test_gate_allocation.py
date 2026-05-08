@@ -188,12 +188,10 @@ def test_template_gate_weights_sum_to_one():
         assert s == 1.0, f"{item_type} gate_weights sum to {s}, expected 1.0"
 
 
-def test_template_gate_role_affinity_present():
-    h = yaml.safe_load((TEMPLATES / "cw_heuristics.yaml.tmpl").read_text())
-    affinity = h.get("gate_role_affinity")
-    assert affinity, "gate_role_affinity missing"
-    expected_gates = {"Funnel→Analyzing", "Implementing→Validating", "Implementing→Done"}
-    assert expected_gates <= set(affinity.keys())
+# gate_role_affinity dropped in v1.11 — was an audit hint mapping gates
+# to roles (BO/PM/Arch/Dev/QA/DevSecOps), but role classification is
+# no longer stored in EDPA data (signals carry the audit trail). If a
+# gate→role hint surface returns in v1.12 it will be tested here.
 
 
 # ---------------------------------------------------------------------------
