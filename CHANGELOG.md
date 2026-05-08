@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+### Fixed (post-1.10.0-rc1, real-evidence E2E)
+
+- **`detect_contributors.py` now parses `/contribute @person weight:X
+  [as:role]` directives from PR bodies.** Surfaced as Finding #1 in
+  `docs/E2E-REPORT-2026-05-08-v1100-rc1-real-evidence.md`: previously
+  manual attribution worked only from issue bodies (via `sync pull`),
+  not from PR bodies, even though both surfaces invite users to write
+  `/contribute`. Now the detect script fetches PR `body` via
+  `gh pr view --json body`, parses `/contribute` lines, and applies
+  them as authoritative overrides on top of auto-detected
+  (`pr_author`, `commit_author`) attributions. The `as:role` clause is
+  optional; when omitted, the role inherits from the auto-detected
+  source. New entries created purely from a PR-body directive (no
+  matching commit/author signal) get `source: pr_body:#N`; updates to
+  existing detections record both signals as
+  `source: <auto>+pr_body:#N` for full audit traceability.
+- **`update_contributors()` honours manual `/contribute` overrides as
+  authoritative.** Auto-detected updates still follow the
+  v1.7+ "highest CW wins" merge rule, but a `pr_body:` source overwrites
+  `cw`, `as`, and `source` regardless of relative magnitude — operator's
+  explicit instruction beats any heuristic.
+- **13 new unit tests** in `tests/test_detect_contributors.py` lock in
+  the directive parser: edge cases (out-of-range weights, unknown
+  roles, non-numeric weights, last-directive-wins, case-insensitive
+  keyword and role, login formats with dashes/underscores, inline with
+  surrounding text).
+
+Verified end-to-end against the v1.10.0-rc1 sandbox PRs (#139..#148):
+all 10 PR bodies' `/contribute` lines now flow into `contributors[]`
+with the directive's `cw` value. Finding #2 (top-level
+`pr_author`/`commit_authors`/`pr_reviewers`/`commenters` fields are
+dead code in `detect_evidence`) is intentionally **not** addressed in
+this fix — it's tracked separately as a v1.10.x cleanup decision
+(remove dead branches vs. wire-through).
+
 ## 1.10.0-rc1 — 2026-05-08
 
 Release candidate from `v1.10.0-beta` after a full pilot E2E

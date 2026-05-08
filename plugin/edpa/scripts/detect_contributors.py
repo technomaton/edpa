@@ -59,6 +59,48 @@ def extract_item_ids(text):
     return re.findall(r'\b([SFEITD]-\d+)\b', text or "")
 
 
+# /contribute manual override directive. Matches both forms:
+#   /contribute @person weight:0.5
+#   /contribute @person weight:0.5 as:owner
+# The `as:` clause is optional; when absent we default to `key` because
+# that is the most common manual-override case ("credit person X with
+# weight Y for this work"). When the directive specifies a role we honour
+# it as long as it is one of the four evidence roles the engine accepts.
+EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
+_CONTRIBUTE_PATTERN = re.compile(
+    r'/contribute\s+@([A-Za-z0-9_-]+)\s+weight:([0-9.]+)'
+    r'(?:\s+as:([A-Za-z]+))?',
+    re.IGNORECASE,
+)
+
+
+def parse_contribute_directives(body: str) -> dict:
+    """Extract `/contribute @person weight:X [as:role]` lines from a body.
+
+    Returns a dict {login: {"cw": float, "role": str|None}}. Login is
+    preserved verbatim (case-folded by callers via load_people_map);
+    role is None when the directive omits `as:`. A bad weight (out of
+    [0,1]) or unknown role causes that line to be silently dropped —
+    this keeps detect runs robust against typos in PR bodies.
+    """
+    out: dict[str, dict] = {}
+    for match in _CONTRIBUTE_PATTERN.finditer(body or ""):
+        login, weight_str, role = match.group(1), match.group(2), match.group(3)
+        try:
+            cw = float(weight_str)
+        except ValueError:
+            continue
+        if not (0.0 <= cw <= 1.0):
+            continue
+        norm_role = role.lower() if role else None
+        if norm_role and norm_role not in EVIDENCE_ROLES:
+            continue
+        # Last directive wins (by file order) so users can override
+        # an earlier line further down in the same body.
+        out[login] = {"cw": cw, "role": norm_role}
+    return out
+
+
 # Map type prefix → backlog directory
 PREFIX_TO_DIR = {
     "S": "stories",
@@ -109,8 +151,17 @@ def update_contributors(yaml_path: Path, new_contributors: list, *, dry_run=Fals
     """Update contributors list in a backlog YAML file.
 
     Only adds new contributors — never removes existing ones.
-    If a contributor already exists with a higher CW, keeps the higher
-    value. Returns True when something changed. New entries use the v1.7
+
+    Update precedence:
+    1. Manual `/contribute` overrides (source contains `pr_body:`) are
+       authoritative — they always overwrite an existing entry's `cw`,
+       `as`, and `source`. Operator wrote them on purpose.
+    2. Auto-detected updates (source = `pr_author:` / `commit_author:` /
+       `pr_reviewer:`) only raise `cw` when the new value is higher.
+       This preserves the audit-conservative "highest signal wins"
+       behavior used since v1.7.
+
+    Returns True when something changed. New entries use the v1.7
     schema (`as:` for evidence role, `cw:` for weight).
     """
     data = yaml.safe_load(yaml_path.read_text()) or {}
@@ -123,8 +174,21 @@ def update_contributors(yaml_path: Path, new_contributors: list, *, dry_run=Fals
     changed = False
     for nc in new_contributors:
         person = nc["person"]
+        is_manual = "pr_body:" in (nc.get("source") or "")
         if person in existing_map:
-            if existing_map[person].get("cw", 0) < nc.get("cw", 0):
+            if is_manual:
+                # Manual /contribute directive overrides auto-detected
+                # values regardless of relative cw. Operator's explicit
+                # instruction beats any auto-derived heuristic.
+                e = existing_map[person]
+                if (e.get("cw") != nc["cw"]
+                        or e.get("as") != nc["as"]
+                        or e.get("source") != nc["source"]):
+                    e["cw"] = nc["cw"]
+                    e["as"] = nc["as"]
+                    e["source"] = nc["source"]
+                    changed = True
+            elif existing_map[person].get("cw", 0) < nc.get("cw", 0):
                 existing_map[person]["cw"] = nc["cw"]
                 existing_map[person]["as"] = nc["as"]
                 changed = True
@@ -164,19 +228,30 @@ def _parse_relative_since(since: str) -> datetime | None:
 
 
 def gather_pr_evidence(repo: str, pr_number: str | int):
-    """Pull author / reviewers / commit authors / item IDs for a single PR."""
-    info = {"author": "", "title": "", "branch": "", "reviewers": set(),
-            "commit_authors": set(), "item_ids": set()}
+    """Pull author / reviewers / commit authors / item IDs for a single PR.
+
+    Also fetches the PR body and parses any `/contribute` directives
+    found there. Those directives are returned in `info["overrides"]`
+    and applied at update time — they let a PR author manually credit
+    a contributor (e.g., a pair-programmer or silent reviewer) who
+    otherwise wouldn't show up in the auto-detected commit/review
+    metadata.
+    """
+    info = {"author": "", "title": "", "branch": "", "body": "",
+            "reviewers": set(), "commit_authors": set(),
+            "item_ids": set(), "overrides": {}}
     pr = run_gh(["pr", "view", str(pr_number),
-                 "--json", "author,title,headRefName,commits,reviews"],
+                 "--json", "author,title,body,headRefName,commits,reviews"],
                 repo=repo)
     if not pr:
         return info
     info["author"] = pr.get("author", {}).get("login", "") or ""
     info["title"] = pr.get("title", "") or ""
     info["branch"] = pr.get("headRefName", "") or ""
+    info["body"] = pr.get("body", "") or ""
     info["item_ids"].update(extract_item_ids(info["title"]))
     info["item_ids"].update(extract_item_ids(info["branch"]))
+    info["item_ids"].update(extract_item_ids(info["body"]))
     for c in pr.get("commits", []) or []:
         msg = (c.get("messageHeadline", "") + " "
                + (c.get("messageBody") or ""))
@@ -190,6 +265,7 @@ def gather_pr_evidence(repo: str, pr_number: str | int):
         login = r.get("author", {}).get("login", "")
         if login and login != info["author"]:
             info["reviewers"].add(login)
+    info["overrides"] = parse_contribute_directives(info["body"])
     return info
 
 
@@ -227,6 +303,13 @@ def process_pr_evidence(edpa_root: Path, repo: str, pr_number: str,
         print(f"  reviewers: {sorted(info['reviewers'])}")
     if info["commit_authors"]:
         print(f"  commit authors: {sorted(info['commit_authors'])}")
+    if info["overrides"]:
+        ov_summary = ", ".join(
+            f"@{login}={meta['cw']}"
+            + (f"/{meta['role']}" if meta["role"] else "")
+            for login, meta in sorted(info["overrides"].items())
+        )
+        print(f"  /contribute overrides: {ov_summary}")
     target_ids = sorted(info["item_ids"])
     if scope_item_id:
         target_ids = [scope_item_id] if scope_item_id in info["item_ids"] else []
@@ -245,6 +328,53 @@ def process_pr_evidence(edpa_root: Path, repo: str, pr_number: str,
     def resolve(login):
         return people_map.get(login.lower(), login)
 
+    overrides = info.get("overrides", {})
+
+    def _override_for(login: str):
+        """Return the /contribute directive matching this GH login (case
+        insensitive on login lookup; resolved person id is also tried so
+        directives may use either the login or the canonical id)."""
+        if not login:
+            return None
+        if login in overrides:
+            return overrides[login]
+        # Try case-insensitive login match
+        for k, v in overrides.items():
+            if k.lower() == login.lower():
+                return v
+        # Try people.yaml id (so `/contribute @bob` works when bob is the
+        # canonical id and the GH login is `bob-dev` or similar)
+        resolved = resolve(login)
+        if resolved in overrides:
+            return overrides[resolved]
+        for k, v in overrides.items():
+            if k.lower() == resolved.lower():
+                return v
+        return None
+
+    used_overrides: set[str] = set()
+
+    def _emit(login: str, default_role: str, default_source: str):
+        ov = _override_for(login)
+        if ov:
+            # Mark this override consumed so we don't double-emit it as
+            # a free-standing /contribute entry below.
+            for k in (login, login.lower(), resolve(login).lower()):
+                used_overrides.add(k)
+            cw = ov["cw"]
+            role = ov["role"] or default_role
+            source = f"{default_source}+pr_body:#{pr_number}"
+        else:
+            cw = weights.get(default_role, 0.25)
+            role = default_role
+            source = default_source
+        return {
+            "person": resolve(login),
+            "as": role,
+            "cw": cw,
+            "source": source,
+        }
+
     updated = 0
     for item_id in target_ids:
         yaml_path = find_backlog_file(edpa_root, item_id)
@@ -253,25 +383,29 @@ def process_pr_evidence(edpa_root: Path, repo: str, pr_number: str,
             continue
         new_contribs = []
         if info["author"]:
-            new_contribs.append({
-                "person": resolve(info["author"]),
-                "as": "key",
-                "cw": weights.get("key", 0.6),
-                "source": f"pr_author:#{pr_number}",
-            })
+            new_contribs.append(_emit(
+                info["author"], "key", f"pr_author:#{pr_number}"))
         for login in sorted(info["reviewers"]):
-            new_contribs.append({
-                "person": resolve(login),
-                "as": "reviewer",
-                "cw": weights.get("reviewer", 0.25),
-                "source": f"pr_reviewer:#{pr_number}",
-            })
+            new_contribs.append(_emit(
+                login, "reviewer", f"pr_reviewer:#{pr_number}"))
         for login in sorted(info["commit_authors"]):
+            new_contribs.append(_emit(
+                login, "reviewer", f"commit_author:#{pr_number}"))
+        # Free-standing /contribute directives that didn't match any
+        # auto-detected contributor (e.g., silent pair-programmer or
+        # consultant). These are pure manual attributions.
+        for login, meta in sorted(overrides.items()):
+            if login in used_overrides or login.lower() in used_overrides:
+                continue
+            resolved_lower = resolve(login).lower()
+            if resolved_lower in used_overrides:
+                continue
+            role = meta["role"] or "key"
             new_contribs.append({
                 "person": resolve(login),
-                "as": "reviewer",
-                "cw": weights.get("reviewer", 0.25),
-                "source": f"commit_author:#{pr_number}",
+                "as": role,
+                "cw": meta["cw"],
+                "source": f"pr_body:#{pr_number}",
             })
         changed = update_contributors(yaml_path, new_contribs, dry_run=dry_run)
         verb = "would update" if dry_run else ("updated" if changed else "unchanged")
