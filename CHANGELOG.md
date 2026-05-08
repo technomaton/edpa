@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-### v1.11 — Single-source CW pipeline (BREAKING)
+## 1.11.0-beta — 2026-05-08
+
+### Single-source CW pipeline (BREAKING)
 
 CW computation moved entirely from engine to detect_contributors.
 The engine becomes a thin consumer of pre-computed `cw` values.
