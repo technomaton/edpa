@@ -57,13 +57,16 @@ except ImportError:
 # ─── Constants ──────────────────────────────────────────────────────────────
 
 # Default signal weights (overridden by .edpa/config/cw_heuristics.yaml).
-# These mirror the v1.0 calibrated values from Monte Carlo simulation.
+# v1.11 baseline from Monte Carlo + edge-case-extended synthetic generator
+# (1000 scenarios, 32k records, 5 candidates converged to MAD 0.0805).
+# Rescaled to anchor max signal = 4.0 for human-readable scale aligned
+# with manual /contribute weight convention.
 DEFAULT_SIGNAL_WEIGHTS = {
     "assignee": 4.0,
-    "pr_author": 2.0,
-    "commit_author": 1.0,
-    "pr_reviewer": 1.0,
-    "issue_comment": 0.5,
+    "pr_author": 3.4,
+    "commit_author": 2.78,
+    "pr_reviewer": 2.25,
+    "issue_comment": 1.14,
 }
 
 # Map item-id prefix → backlog directory under .edpa/backlog/

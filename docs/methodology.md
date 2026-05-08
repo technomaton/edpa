@@ -118,11 +118,11 @@ normalizes to per-item shares so the engine sees a clean
 
 | Signal type | Default weight | Source | Auditor `ref` |
 |-------------|---------------:|--------|---------------|
-| `assignee` | 4.0 | Issue assignees | `issue#<num>` |
-| `pr_author` | 2.0 | PR author | `pr#<num>` |
-| `commit_author` | 1.0 | PR commit author (excl. PR author) | `pr#<num>/commit/<sha>` |
-| `pr_reviewer` | 1.0 | PR reviews submitted | `pr#<num>/review/<id>` |
-| `issue_comment` | 0.5 | Issue/PR comments (excl. bots) | `issue#<num>/comment/<id>` |
+| `assignee` | 4.00 | Issue assignees | `issue#<num>` |
+| `pr_author` | 3.40 | PR author | `pr#<num>` |
+| `commit_author` | 2.78 | PR commit author (excl. PR author) | `pr#<num>/commit/<sha>` |
+| `pr_reviewer` | 2.25 | PR reviews submitted | `pr#<num>/review/<id>` |
+| `issue_comment` | 1.14 | Issue/PR comments (excl. bots) | `issue#<num>/comment/<id>` |
 | `manual:pr_body` | explicit | `/contribute` in PR description | `pr#<num>/body` |
 | `manual:commit_message` | explicit | `/contribute` in commit message | `commit/<sha>/message` |
 | `manual:issue_body` | explicit | `/contribute` in issue description | `issue#<num>/body` |

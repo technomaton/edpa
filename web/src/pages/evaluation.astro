@@ -184,28 +184,33 @@ const categories = [
       },
       {
         name: 'test_signal_weights_assignee',
-        description: 'Signál assignee musí mít Evidence Score +4.0.',
+        description: 'Signál assignee musí mít Evidence Score +4.0 (v1.11 baseline).',
         expected: 'signals.assignee = 4.0',
       },
       {
-        name: 'test_signal_weights_contribute',
-        description: 'Signál contribute_command musí mít Evidence Score +3.0.',
-        expected: 'signals.contribute_command = 3.0',
-      },
-      {
         name: 'test_signal_weights_pr_author',
-        description: 'Signál pr_author musí mít Evidence Score +2.0.',
-        expected: 'signals.pr_author = 2.0',
+        description: 'Signál pr_author musí mít Evidence Score +3.4 (v1.11 baseline).',
+        expected: 'signals.pr_author = 3.4',
       },
       {
         name: 'test_signal_weights_commit',
-        description: 'Signál commit_author musí mít Evidence Score +1.0.',
-        expected: 'signals.commit_author = 1.0',
+        description: 'Signál commit_author musí mít Evidence Score +2.78 (v1.11 baseline).',
+        expected: 'signals.commit_author = 2.78',
       },
       {
-        name: 'test_highest_signal_determines_cw',
-        description: 'CW je určeno nejsilnějším signálem, ne součtem — žádné sčítání signálů pro CW.',
-        expected: 'CW = role_weights[highest_signal], no summing',
+        name: 'test_signal_weights_pr_reviewer',
+        description: 'Signál pr_reviewer musí mít Evidence Score +2.25 (v1.11 baseline).',
+        expected: 'signals.pr_reviewer = 2.25',
+      },
+      {
+        name: 'test_signal_weights_issue_comment',
+        description: 'Signál issue_comment musí mít Evidence Score +1.14 (v1.11 baseline).',
+        expected: 'signals.issue_comment = 1.14',
+      },
+      {
+        name: 'test_signals_aggregate_additively',
+        description: 'CW se počítá additivní agregací všech signálů + per-item normalizací (v1.11). Žádné highest-signal-wins.',
+        expected: 'cw[P, item] = Σ signal_weights / Σ_persons Σ signal_weights',
       },
       {
         name: 'test_manual_override_precedence',
@@ -881,18 +886,18 @@ import { VERSION } from '../lib/version';
       </div>
 
       <div class="card yellow">
-        <div class="tag" style="color:var(--yl)">Signal weights</div>
+        <div class="tag" style="color:var(--yl)">Signal weights (v1.11 baseline)</div>
         <table>
           <thead>
             <tr><th>Signal</th><th style="text-align:right">Score</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>assignee</code></td><td style="text-align:right;color:var(--gn)">4.0</td></tr>
-            <tr><td><code>contribute_command</code></td><td style="text-align:right;color:var(--cy)">3.0</td></tr>
-            <tr><td><code>pr_author</code></td><td style="text-align:right;color:var(--cy)">2.0</td></tr>
-            <tr><td><code>commit_author</code></td><td style="text-align:right;color:var(--yl)">1.0</td></tr>
-            <tr><td><code>pr_reviewer</code></td><td style="text-align:right;color:var(--yl)">1.0</td></tr>
-            <tr><td><code>issue_comment</code></td><td style="text-align:right;color:var(--or)">0.5</td></tr>
+            <tr><td><code>assignee</code></td><td style="text-align:right;color:var(--gn)">4.00</td></tr>
+            <tr><td><code>pr_author</code></td><td style="text-align:right;color:var(--cy)">3.40</td></tr>
+            <tr><td><code>commit_author</code></td><td style="text-align:right;color:var(--yl)">2.78</td></tr>
+            <tr><td><code>pr_reviewer</code></td><td style="text-align:right;color:var(--yl)">2.25</td></tr>
+            <tr><td><code>issue_comment</code></td><td style="text-align:right;color:var(--or)">1.14</td></tr>
+            <tr><td><code>manual:*</code> (/contribute)</td><td style="text-align:right;color:var(--ac2)">explicit</td></tr>
           </tbody>
         </table>
       </div>

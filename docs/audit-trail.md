@@ -48,49 +48,49 @@ Each revision includes: reason for correction, diff from previous, timestamp, au
       "contributors": [
         {
           "person": "turyna",
-          "cw": 0.591,
-          "contribution_score": 6.5,
+          "cw": 0.589,
+          "contribution_score": 8.28,
           "signals": [
             {
               "type": "assignee",
               "ref": "issue#137",
-              "weight": 4.0,
+              "weight": 4.00,
               "detected_at": "2026-05-08T15:23:11Z"
             },
             {
               "type": "commit_author",
               "ref": "pr#146/commit/fa9f440",
-              "weight": 1.0,
+              "weight": 2.78,
               "detected_at": "2026-05-08T15:23:11Z"
             },
             {
               "type": "manual:pr_body",
               "ref": "pr#146/body",
               "excerpt": "/contribute @turyna weight:1.5",
-              "weight": 1.5,
+              "weight": 1.50,
               "detected_at": "2026-05-08T15:23:11Z"
             }
           ]
         },
         {
           "person": "mtury",
-          "cw": 0.364,
-          "contribution_score": 4.0,
+          "cw": 0.330,
+          "contribution_score": 4.65,
           "signals": [
-            {"type": "pr_author", "ref": "pr#146", "weight": 2.0,
+            {"type": "pr_author", "ref": "pr#146", "weight": 3.40,
              "detected_at": "2026-05-08T15:23:11Z"},
-            {"type": "commit_author", "ref": "pr#146/commit/6b5b69c", "weight": 1.0,
+            {"type": "commit_author", "ref": "pr#146/commit/6b5b69c", "weight": 2.78,
              "detected_at": "2026-05-08T15:23:11Z"},
-            {"type": "pr_reviewer", "ref": "pr#146/review/2845102347", "weight": 1.0,
+            {"type": "pr_reviewer", "ref": "pr#146/review/2845102347", "weight": 2.25,
              "detected_at": "2026-05-08T15:23:11Z"}
           ]
         },
         {
           "person": "jurby",
-          "cw": 0.045,
-          "contribution_score": 0.5,
+          "cw": 0.081,
+          "contribution_score": 1.14,
           "signals": [
-            {"type": "issue_comment", "ref": "issue#137/comment/c984712", "weight": 0.5,
+            {"type": "issue_comment", "ref": "issue#137/comment/c984712", "weight": 1.14,
              "detected_at": "2026-05-08T15:23:11Z"}
           ]
         }

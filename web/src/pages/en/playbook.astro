@@ -937,23 +937,23 @@ TOTAL_DEVIATION=0.824000</code></pre>
               | Výkazy   |       |  Validate|
               +----------+       +----------+</code></pre>
 
-    <h3>Evidence detection</h3>
+    <h3>Evidence detection (v1.11 baseline)</h3>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Signál</th><th style="text-align:right">Váha</th><th>Evidence role</th></tr>
+          <tr><th>Signal</th><th style="text-align:right">Weight</th><th>Derived role (display)</th></tr>
         </thead>
         <tbody>
-          <tr><td>GitHub issue assignee</td><td style="text-align:right">4.0</td><td>owner</td></tr>
-          <tr><td><code>/contribute @person weight:X</code></td><td style="text-align:right">3.0</td><td>key</td></tr>
-          <tr><td>PR author referencing item</td><td style="text-align:right">2.0</td><td>key</td></tr>
-          <tr><td>Commit author s S-XXX/F-XXX</td><td style="text-align:right">1.0</td><td>reviewer</td></tr>
-          <tr><td>PR reviewer</td><td style="text-align:right">1.0</td><td>reviewer</td></tr>
-          <tr><td>Issue/PR komentář</td><td style="text-align:right">0.5</td><td>consulted</td></tr>
+          <tr><td>GitHub issue assignee</td><td style="text-align:right">4.00</td><td>owner</td></tr>
+          <tr><td>PR author referencing item</td><td style="text-align:right">3.40</td><td>key</td></tr>
+          <tr><td>Commit author with S-XXX/F-XXX</td><td style="text-align:right">2.78</td><td>reviewer</td></tr>
+          <tr><td>PR reviewer</td><td style="text-align:right">2.25</td><td>reviewer</td></tr>
+          <tr><td>Issue/PR comment</td><td style="text-align:right">1.14</td><td>consulted</td></tr>
+          <tr><td><code>/contribute @person weight:X</code></td><td style="text-align:right">explicit</td><td>key (default)</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Nejvyšší signál určuje evidence role (signály se nesčítají).</p>
+    <p>v1.11 signals <strong>aggregate additively</strong> into contribution_score per (person, item), then normalize per-item: <code>cw = score / Σ_persons score</code> (Σ across persons = 1.0). Role label is derived from dominant signal type for display only, not stored.</p>
 
     <h3>Výpočet EDPA (simple mode)</h3>
     <p>Pro každou osobu v iteraci:</p>

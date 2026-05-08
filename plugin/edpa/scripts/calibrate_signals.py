@@ -419,16 +419,17 @@ def run_calibration(n_scenarios: int, seed: int, quick: bool = False) -> dict:
     n_records = sum(len(s.contributions) for s in corpus)
     print(f"  → {n_records} (person, item) records across {n_scenarios} scenarios")
 
-    # Baseline (current defaults from cw_heuristics)
+    # Baseline = current cw_heuristics defaults (v1.11 edge-case-trained).
+    # Calibration runs measure improvement over the current shipped values.
     defaults = {
         "assignee": 4.0,
-        "pr_author": 2.0,
-        "commit_author": 1.0,
-        "pr_reviewer": 1.0,
-        "issue_comment": 0.5,
+        "pr_author": 3.4,
+        "commit_author": 2.78,
+        "pr_reviewer": 2.25,
+        "issue_comment": 1.14,
     }
     baseline_mad, _ = evaluate_mad(corpus, defaults)
-    print(f"\nBaseline (v1.0 inherited weights): MAD = {baseline_mad:.4f}")
+    print(f"\nBaseline (v1.11 shipped defaults): MAD = {baseline_mad:.4f}")
 
     # Phase 1 — Monte Carlo random sampling
     n_samples = 200 if quick else 2000

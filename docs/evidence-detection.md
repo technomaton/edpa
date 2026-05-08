@@ -9,11 +9,11 @@ resulting per-item-normalized `cw` values directly.
 
 | Signal type | Default weight | Source on GitHub | Reference format |
 |-------------|---------------|------------------|------------------|
-| `assignee` | **4.0** | Issue assignees | `issue#<num>` |
-| `pr_author` | **2.0** | PR author | `pr#<num>` |
-| `commit_author` | **1.0** | Commit authors in PR (excluding PR author) | `pr#<num>/commit/<sha>` |
-| `pr_reviewer` | **1.0** | PR reviews submitted | `pr#<num>/review/<id>` |
-| `issue_comment` | **0.5** | Issue / PR comments (excluding bots) | `issue#<num>/comment/<id>` |
+| `assignee` | **4.00** | Issue assignees | `issue#<num>` |
+| `pr_author` | **3.40** | PR author | `pr#<num>` |
+| `commit_author` | **2.78** | Commit authors in PR (excluding PR author) | `pr#<num>/commit/<sha>` |
+| `pr_reviewer` | **2.25** | PR reviews submitted | `pr#<num>/review/<id>` |
+| `issue_comment` | **1.14** | Issue / PR comments (excluding bots) | `issue#<num>/comment/<id>` |
 | `manual:pr_body` | **explicit** | `/contribute @X weight:Y` in PR description | `pr#<num>/body` |
 | `manual:commit_message` | **explicit** | `/contribute` in commit message | `commit/<sha>/message` |
 | `manual:issue_body` | **explicit** | `/contribute` in issue description | `issue#<num>/body` |

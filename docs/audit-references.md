@@ -121,9 +121,13 @@ detection time:
 - type: manual:pr_body
   ref: pr#146/body
   excerpt: "/contribute @turyna weight:1.5"
-  weight: 1.5
+  weight: 1.50
   detected_at: 2026-05-08T15:23:11Z
 ```
+
+(Default auto-detected weights for non-manual signals are: assignee=4.0,
+pr_author=3.4, commit_author=2.78, pr_reviewer=2.25, issue_comment=1.14.
+Manual `/contribute` weights are operator-supplied verbatim.)
 
 This is load-bearing for audit because GitHub does **not** preserve
 edit history of PR descriptions or commit messages by default.
