@@ -159,28 +159,28 @@ const categories = [
     icon: '\u2696',
     color: 'yl',
     cardClass: 'yellow',
-    description: 'Verification of heuristic weight correctness and rules for determining Contribution Weight. The heuristic must be consistent and reproducible.',
+    description: 'Verification of heuristic signal weight correctness and rules for determining Contribution Weight (v1.11). The heuristic must be consistent and reproducible.',
     expandedCount: 4,
     tests: [
       {
-        name: 'test_default_role_weight_owner',
-        description: 'Default weight for owner role must be 1.0.',
-        expected: 'role_weights.owner = 1.0',
+        name: 'test_signal_weight_ordering',
+        description: 'v1.11 hierarchy: assignee > pr_author > commit_author ≈ pr_reviewer > issue_comment.',
+        expected: 'sw.assignee >= sw.pr_author >= sw.commit_author ≥ sw.pr_reviewer ≥ sw.issue_comment',
       },
       {
-        name: 'test_default_role_weight_key',
-        description: 'Default weight for key role must be 0.6.',
-        expected: 'role_weights.key = 0.6',
+        name: 'test_per_item_cw_normalization',
+        description: 'Per-item cw share: Σ cw across persons = 1.0 per item.',
+        expected: 'Σ_persons cw[*, item] = 1.0 (engine invariant)',
       },
       {
-        name: 'test_default_role_weight_reviewer',
-        description: 'Default weight for reviewer role must be 0.25.',
-        expected: 'role_weights.reviewer = 0.25',
+        name: 'test_per_person_capacity_invariant',
+        description: 'Per-person hours invariant: Σ hours = capacity_per_iteration.',
+        expected: 'Σ_items DerivedHours[P, *] = Capacity[P, I]',
       },
       {
-        name: 'test_default_role_weight_consulted',
-        description: 'Default weight for consulted role must be 0.15.',
-        expected: 'role_weights.consulted = 0.15',
+        name: 'test_no_role_overrides_in_v1_11',
+        description: 'v1.11 dropped role_overrides — calibration runs on 5 signal weights.',
+        expected: 'cw_heuristics.yaml.role_overrides not present',
       },
       {
         name: 'test_signal_weights_assignee',
@@ -843,9 +843,8 @@ import { VERSION } from '../../lib/version';
           <tr><th>Experiments</th><th>Focus</th><th>Parameters</th></tr>
         </thead>
         <tbody>
-          <tr><td>1&ndash;10</td><td>role_weights</td><td>4 parameters (highest impact)</td></tr>
-          <tr><td>11&ndash;25</td><td>signal weights</td><td>6 parameters</td></tr>
-          <tr><td>26&ndash;50</td><td>threshold + fine-tuning</td><td>combined tuning</td></tr>
+          <tr><td>1&ndash;30</td><td>signal weights (Monte Carlo)</td><td>5 parameters, random sampling</td></tr>
+          <tr><td>31&ndash;50</td><td>signal weights (Nelder-Mead refinement)</td><td>local descent around MC top-K</td></tr>
         </tbody>
       </table>
     </div>
@@ -860,16 +859,17 @@ import { VERSION } from '../../lib/version';
 
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card cyan">
-        <div class="tag" style="color:var(--cy)">Role weights</div>
+        <div class="tag" style="color:var(--cy)">Derived role labels <span class="badge" style="margin-left:8px;font-size:10px;background:var(--yl);color:var(--bg);padding:2px 6px;border-radius:4px">Display layer only</span></div>
+        <p style="color:var(--t2);font-size:13px;padding:8px 0">v1.11 doesn't store roles per person — derives them from dominant signal type for UX (timesheets, reports). Engine math sees only <code>cw</code> values.</p>
         <table>
           <thead>
-            <tr><th>Role</th><th style="text-align:right">CW</th><th>Visualization</th></tr>
+            <tr><th>Dominant signal</th><th>Display role</th></tr>
           </thead>
           <tbody>
-            <tr><td><strong>owner</strong></td><td style="text-align:right">1.0</td><td><div class="cw-bar" style="width:100%;background:var(--gn)"></div></td></tr>
-            <tr><td><strong>key</strong></td><td style="text-align:right">0.6</td><td><div class="cw-bar" style="width:60%;background:var(--cy)"></div></td></tr>
-            <tr><td><strong>reviewer</strong></td><td style="text-align:right">0.25</td><td><div class="cw-bar" style="width:25%;background:var(--yl)"></div></td></tr>
-            <tr><td><strong>consulted</strong></td><td style="text-align:right">0.15</td><td><div class="cw-bar" style="width:15%;background:var(--or)"></div></td></tr>
+            <tr><td><code>assignee</code></td><td><strong>owner</strong></td></tr>
+            <tr><td><code>pr_author</code> / <code>manual:*</code></td><td><strong>key</strong></td></tr>
+            <tr><td><code>commit_author</code> / <code>pr_reviewer</code></td><td><strong>reviewer</strong></td></tr>
+            <tr><td><code>issue_comment</code></td><td><strong>consulted</strong></td></tr>
           </tbody>
         </table>
       </div>
@@ -892,24 +892,20 @@ import { VERSION } from '../../lib/version';
       </div>
     </div>
 
-    <div class="note" style="margin-top:16px"><strong>Rule:</strong> The strongest signal determines CW. Evidence Score = sum of all signals. If Evidence Score &ge; threshold (default 1.0), the person is assigned to the item.</div>
+    <div class="note" style="margin-top:16px"><strong>Rule (v1.11):</strong> Signals add additively into <code>contribution_score</code> per (person, item). Per-item normalization gives <code>cw = score / Σ_persons score</code>. No "highest signal wins", no threshold — even one comment yields a proportional share.</div>
 
-    <!-- Monte Carlo CW calibration -->
+    <!-- v1.11 Monte Carlo synthetic baseline -->
     <div class="card green" style="margin-top:24px">
-      <div class="tag" style="color:var(--gn)">Monte Carlo calibration</div>
-      <p>Validated by Monte Carlo simulation (1,000 scenarios, 68,156 records, p&lt;0.001).</p>
-      <p style="margin-top:8px">Git measures activity, not value. Strategic roles (BO, PM, Arch) are systematically undervalued.</p>
-      <table style="margin-top:12px">
-        <thead>
-          <tr><th>Role</th><th style="text-align:right">Bias</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Business Owner</td><td style="text-align:right;color:var(--or)">+0.15</td></tr>
-          <tr><td>Product Manager</td><td style="text-align:right;color:var(--yl)">+0.05</td></tr>
-          <tr><td>Architect</td><td style="text-align:right;color:var(--yl)">+0.05</td></tr>
-          <tr><td>Developer</td><td style="text-align:right;color:var(--gn)">0.00</td></tr>
-        </tbody>
-      </table>
+      <div class="tag" style="color:var(--gn)">Monte Carlo calibration (v1.11)</div>
+      <p>1,000 synthetic scenarios (32,210 records); 5 candidates converged to MAD 0.0805 after Nelder-Mead refinement.</p>
+      <p style="margin-top:8px"><strong>Strategic-role bias correction:</strong> v1.10 used per-role multipliers (<code>role_overrides</code>). v1.11 dropped that and addresses bias purely via signal weight calibration:</p>
+      <ul style="font-size:13px;line-height:1.6">
+        <li>BO/PM contributions show via <code>issue_comment</code> + manual <code>/contribute</code> directives. Calibrator boosts <code>issue_comment</code> weight if BO/PM are under-credited.</li>
+        <li>Arch contributions show via <code>pr_reviewer</code>. Calibrator boosts <code>pr_reviewer</code> weight similarly.</li>
+        <li>Dev/QA reference baseline — Git accurately captures their work.</li>
+        <li>Edge-case generator simulates <code>pm_driven</code>, <code>pair_programmed</code>, <code>design_heavy</code>, <code>silent_reviewer</code> patterns so calibration generalizes.</li>
+      </ul>
+      <p style="margin-top:8px;font-size:13px"><strong>Note:</strong> Pre-pilot baseline is from synthetic scenarios. After kashealth pilot's first PI close, calibration runs against real ground truth (≥20 confirmed cw records).</p>
     </div>
   </section>
 

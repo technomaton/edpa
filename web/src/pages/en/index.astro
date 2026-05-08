@@ -87,10 +87,10 @@ import { VERSION } from '../../lib/version';
     <div class="container">
       <p class="tag">Solution</p>
       <h2 class="section-title">How EDPA works</h2>
-      <div class="formula">Score = JobSize × ContributionWeight × RelevanceSignal
-DerivedHours = (Score / ΣScores) × Capacity
+      <div class="formula">cw[P, item] = Σ signal_weights / Σ_persons Σ signal_weights   (v1.11: per-item share, Σ = 1.0)
+Score[P, item] = JobSize × cw   →   DerivedHours = (Score / ΣScores) × Capacity
 
-Guarantee: Σ DerivedHours = Capacity — always, no exceptions.</div>
+Guarantee: Σ DerivedHours = Capacity per person AND Σ cw = 1.0 per item — always.</div>
       <p class="desc">
         The system consists of three separate layers that collaborate
         to automatically derive working hours.

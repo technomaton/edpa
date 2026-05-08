@@ -126,10 +126,10 @@ import { VERSION } from '../lib/version';
     <div class="container">
       <p class="tag">Řešení</p>
       <h2 class="section-title">Jak EDPA funguje</h2>
-      <div class="formula">Score = JobSize × ContributionWeight × RelevanceSignal
-DerivedHours = (Score / ΣScores) × Capacity
+      <div class="formula">cw[P, item] = Σ signal_weights / Σ_persons Σ signal_weights   (v1.11: per-item share, Σ = 1.0)
+Score[P, item] = JobSize × cw   →   DerivedHours = (Score / ΣScores) × Capacity
 
-Garance: Σ DerivedHours = Capacity — vždy, bez výjimky.</div>
+Garance: Σ DerivedHours = Capacity per osobě a Σ cw = 1.0 per položce — vždy.</div>
       <p class="desc">
         Systém se skládá ze tří oddělených vrstev, které spolupracují
         na automatickém odvození pracovních hodin.

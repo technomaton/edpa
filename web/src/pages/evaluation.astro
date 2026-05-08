@@ -159,28 +159,28 @@ const categories = [
     icon: '\u2696',
     color: 'yl',
     cardClass: 'yellow',
-    description: 'Ověření správnosti heuristických vah a pravidel pro určování Contribution Weight. Heuristika musí být konzistentní a reprodukovatelná.',
+    description: 'Ověření správnosti heuristických signal weights a pravidel pro určování Contribution Weight (v1.11). Heuristika musí být konzistentní a reprodukovatelná.',
     expandedCount: 4,
     tests: [
       {
-        name: 'test_default_role_weight_owner',
-        description: 'Defaultní váha role owner musí být 1.0.',
-        expected: 'role_weights.owner = 1.0',
+        name: 'test_signal_weight_ordering',
+        description: 'v1.11 hierarchie: assignee > pr_author > commit_author ≈ pr_reviewer > issue_comment.',
+        expected: 'sw.assignee >= sw.pr_author >= sw.commit_author ≥ sw.pr_reviewer ≥ sw.issue_comment',
       },
       {
-        name: 'test_default_role_weight_key',
-        description: 'Defaultní váha role key musí být 0.6.',
-        expected: 'role_weights.key = 0.6',
+        name: 'test_per_item_cw_normalization',
+        description: 'Per-item cw share: Σ cw napříč osobami = 1.0 na každém itemu.',
+        expected: 'Σ_persons cw[*, item] = 1.0 (engine invariant)',
       },
       {
-        name: 'test_default_role_weight_reviewer',
-        description: 'Defaultní váha role reviewer musí být 0.25.',
-        expected: 'role_weights.reviewer = 0.25',
+        name: 'test_per_person_capacity_invariant',
+        description: 'Per-person hours invariant: Σ hours = capacity_per_iteration.',
+        expected: 'Σ_items DerivedHours[P, *] = Capacity[P, I]',
       },
       {
-        name: 'test_default_role_weight_consulted',
-        description: 'Defaultní váha role consulted musí být 0.15.',
-        expected: 'role_weights.consulted = 0.15',
+        name: 'test_no_role_overrides_in_v1_11',
+        description: 'v1.11 dropla role_overrides — kalibrace běží na 5 signálových vahách.',
+        expected: 'cw_heuristics.yaml.role_overrides not present',
       },
       {
         name: 'test_signal_weights_assignee',
@@ -854,9 +854,8 @@ import { VERSION } from '../lib/version';
           <tr><th>Experimenty</th><th>Focus</th><th>Parametry</th></tr>
         </thead>
         <tbody>
-          <tr><td>1&ndash;10</td><td>role_weights</td><td>4 parametry (největší impact)</td></tr>
-          <tr><td>11&ndash;25</td><td>signal weights</td><td>6 parametrů</td></tr>
-          <tr><td>26&ndash;50</td><td>threshold + fine-tuning</td><td>kombinované ladění</td></tr>
+          <tr><td>1&ndash;30</td><td>signal weights (Monte Carlo)</td><td>5 parametrů, random sampling</td></tr>
+          <tr><td>31&ndash;50</td><td>signal weights (Nelder-Mead refinement)</td><td>local descent kolem MC top-K</td></tr>
         </tbody>
       </table>
     </div>
@@ -871,16 +870,17 @@ import { VERSION } from '../lib/version';
 
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card cyan">
-        <div class="tag" style="color:var(--cy)">Role weights <span class="badge" style="margin-left:8px;font-size:10px;background:var(--gn);color:var(--bg);padding:2px 6px;border-radius:4px">Monte Carlo calibrated</span></div>
+        <div class="tag" style="color:var(--cy)">Derived role labels <span class="badge" style="margin-left:8px;font-size:10px;background:var(--yl);color:var(--bg);padding:2px 6px;border-radius:4px">Display layer only</span></div>
+        <p style="color:var(--t2);font-size:13px;padding:8px 0">v1.11 už neukládá role per osobu — odvozuje se z dominantního signál typu pro UX (timesheets, reports). Engine math vidí jen <code>cw</code> hodnoty.</p>
         <table>
           <thead>
-            <tr><th>Role</th><th style="text-align:right">CW</th><th>Vizualizace</th></tr>
+            <tr><th>Dominant signal</th><th>Display role</th></tr>
           </thead>
           <tbody>
-            <tr><td><strong>owner</strong></td><td style="text-align:right">1.0</td><td><div class="cw-bar" style="width:100%;background:var(--gn)"></div></td></tr>
-            <tr><td><strong>key</strong></td><td style="text-align:right">0.6</td><td><div class="cw-bar" style="width:60%;background:var(--cy)"></div></td></tr>
-            <tr><td><strong>reviewer</strong></td><td style="text-align:right">0.25</td><td><div class="cw-bar" style="width:25%;background:var(--yl)"></div></td></tr>
-            <tr><td><strong>consulted</strong></td><td style="text-align:right">0.15</td><td><div class="cw-bar" style="width:15%;background:var(--or)"></div></td></tr>
+            <tr><td><code>assignee</code></td><td><strong>owner</strong></td></tr>
+            <tr><td><code>pr_author</code> / <code>manual:*</code></td><td><strong>key</strong></td></tr>
+            <tr><td><code>commit_author</code> / <code>pr_reviewer</code></td><td><strong>reviewer</strong></td></tr>
+            <tr><td><code>issue_comment</code></td><td><strong>consulted</strong></td></tr>
           </tbody>
         </table>
       </div>
@@ -903,28 +903,23 @@ import { VERSION } from '../lib/version';
       </div>
     </div>
 
-    <div class="note" style="margin-top:16px"><strong>Pravidlo:</strong> Nejsilnější signál určuje CW. Evidence Score = součet všech signálů. Pokud Evidence Score &ge; threshold (default 1.0), osoba je přiřazena k itemu.</div>
+    <div class="note" style="margin-top:16px"><strong>Pravidlo (v1.11):</strong> Signály se sčítají additivně do <code>contribution_score</code> per (osoba, item). Per-item normalizace dává <code>cw = score / Σ_persons score</code>. Žádný "highest signal wins", žádný threshold — i jeden komentář generuje proporční podíl.</div>
 
-    <h3 style="margin-top:28px">Validace <span class="badge" style="font-size:11px;background:var(--gn);color:var(--bg);padding:2px 8px;border-radius:4px;margin-left:8px">Monte Carlo</span></h3>
-    <p style="color:var(--t2);font-size:13px;margin-bottom:12px">1000 sc&eacute;n&aacute;řů, 68 156 z&aacute;znamů, p&lt;0.001</p>
+    <h3 style="margin-top:28px">Validace <span class="badge" style="font-size:11px;background:var(--gn);color:var(--bg);padding:2px 8px;border-radius:4px;margin-left:8px">Monte Carlo (v1.11)</span></h3>
+    <p style="color:var(--t2);font-size:13px;margin-bottom:12px">1000 syntetických sc&eacute;n&aacute;řů (32 210 z&aacute;znamů), 5 candidates konvergovaly na MAD 0.0805 (improvement 6.5% nad inherited baseline)</p>
 
     <div class="card green" style="margin-top:12px">
-      <div class="tag" style="color:var(--gn)">Role bias (Git activity vs. actual contribution)</div>
-      <table>
-        <thead>
-          <tr><th>Role</th><th style="text-align:right">Bias</th><th>Korekce</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>BO</strong></td><td style="text-align:right;color:var(--or)">+0.15</td><td>Systematicky podhodnocen &mdash; m&aacute;lo commitů, velk&yacute; dopad</td></tr>
-          <tr><td><strong>PM</strong></td><td style="text-align:right;color:var(--yl)">+0.05</td><td>Koordinace se projevuje v koment&aacute;řích, ne v k&oacute;du</td></tr>
-          <tr><td><strong>Arch</strong></td><td style="text-align:right;color:var(--yl)">+0.05</td><td>Review a design rozhodnut&iacute; maj&iacute; n&iacute;zkou git stopu</td></tr>
-          <tr><td><strong>Dev</strong></td><td style="text-align:right;color:var(--gn)">0.00</td><td>Referen&ccedil;n&iacute; baseline &mdash; git přesně zachycuje</td></tr>
-          <tr><td><strong>QA</strong></td><td style="text-align:right;color:var(--gn)">0.00</td><td>Testov&aacute;n&iacute; generuje dostatečn&eacute; sign&aacute;ly</td></tr>
-        </tbody>
-      </table>
+      <div class="tag" style="color:var(--gn)">Strategická-role bias correction (v1.11)</div>
+      <p style="font-size:14px">v1.10 used per-role multipliers (<code>role_overrides</code>) to correct that Git under-counts BO/PM/Arch contribution. v1.11 dropped the matrix and addresses bias purely via signal weight calibration:</p>
+      <ul style="font-size:13px;line-height:1.6">
+        <li>BO/PM contributions show up via <code>issue_comment</code> + manual <code>/contribute</code> directives. Calibrator boosts <code>issue_comment</code> weight if BO/PM are under-credited in ground truth.</li>
+        <li>Arch contributions show via <code>pr_reviewer</code>. Calibrator boosts <code>pr_reviewer</code> weight similarly.</li>
+        <li>Dev/QA reference baseline — Git accurately captures their commits/reviews.</li>
+        <li>Edge-case generator simuluje <code>pm_driven</code>, <code>pair_programmed</code>, <code>design_heavy</code>, <code>silent_reviewer</code> patterns aby kalibrace generalizovala.</li>
+      </ul>
     </div>
 
-    <div class="note" style="margin-top:12px"><strong>Poznámka:</strong> Git měří aktivitu, ne hodnotu. Strategické role (BO, PM, Arch) jsou systematicky podhodnoceny. Monte Carlo simulace kvantifikuje bias a umožňuje per-role korekce (<code>role_overrides</code>).</div>
+    <div class="note" style="margin-top:12px"><strong>Pozn:</strong> Pre-pilot baseline je z syntetických scénářů. Po prvním PI close kashealth pilotu se kalibruje proti reálné ground truth (≥20 confirmed cw records).</div>
   </section>
 
   <!-- ============================================================

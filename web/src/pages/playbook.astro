@@ -673,7 +673,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
         <tbody>
           <tr><td>&lt; 0.03</td><td style="color:var(--gn)">Výborné</td><td>Bez změny</td></tr>
           <tr><td>0.03 - 0.06</td><td style="color:var(--cy)">Dobré</td><td>Drobné korekce (volitelné)</td></tr>
-          <tr><td>0.06 - 0.10</td><td style="color:var(--yl)">Přijatelné</td><td>Zvážit úpravu role_overrides</td></tr>
+          <tr><td>0.06 - 0.10</td><td style="color:var(--yl)">Přijatelné</td><td>Zvážit re-kalibraci signal weights</td></tr>
           <tr><td>&gt; 0.10</td><td style="color:var(--rd)">Špatné</td><td>Nutná kalibrace</td></tr>
         </tbody>
       </table>
@@ -1028,13 +1028,13 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
     <p><strong>Řešení:</strong> formát <code>feature/S-200-omop-parser</code>. Typy: <code>feature</code>, <code>defect</code>, <code>hotfix</code>, <code>chore</code>. <code>main</code>, <code>develop</code>, <code>release/*</code> jsou výjimky.</p>
 
     <h3>MAD příliš vysoké (&gt; 0.10)</h3>
-    <p><strong>Řešení:</strong></p>
+    <p><strong>Řešení (v1.11):</strong></p>
     <ol>
-      <li>Analyzovat záznamy s největším <code>abs(auto_cw - confirmed_cw)</code></li>
-      <li>Seskupit dle role</li>
-      <li>Pokud BO má konzistentně vyšší confirmed_cw &rarr; zvýšit <code>role_overrides.BO.consulted</code></li>
-      <li>Pokud Arch reviewer je podhodnocen &rarr; zvýšit <code>role_overrides.Arch.reviewer</code></li>
-      <li>Znovu evaluovat</li>
+      <li>Analyzovat záznamy s největším <code>abs(predicted_cw - confirmed_cw)</code> per (osoba, item)</li>
+      <li>Seskupit dle dominant signal type (assignee / pr_author / commit_author / pr_reviewer / issue_comment)</li>
+      <li>Pokud strategická role (PM / BO / Arch) je systematicky podhodnocena, kalibrátor zvedne <code>signals.issue_comment</code> nebo <code>signals.pr_reviewer</code></li>
+      <li>Spustit <code>python3 .claude/edpa/scripts/calibrate_signals.py --apply</code> pro re-baseline proti aktuální ground truth</li>
+      <li>Re-run engine, ověřit invariants + nový MAD</li>
     </ol>
 
     <h3>Iteration close — "config not found"</h3>

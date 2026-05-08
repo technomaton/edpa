@@ -676,7 +676,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
         <tbody>
           <tr><td>&lt; 0.03</td><td style="color:var(--gn)">Výborné</td><td>Bez změny</td></tr>
           <tr><td>0.03 - 0.06</td><td style="color:var(--cy)">Dobré</td><td>Drobné korekce (volitelné)</td></tr>
-          <tr><td>0.06 - 0.10</td><td style="color:var(--yl)">Přijatelné</td><td>Zvážit úpravu role_overrides</td></tr>
+          <tr><td>0.06 - 0.10</td><td style="color:var(--yl)">Přijatelné</td><td>Zvážit re-kalibraci signal weights</td></tr>
           <tr><td>&gt; 0.10</td><td style="color:var(--rd)">Špatné</td><td>Nutná kalibrace</td></tr>
         </tbody>
       </table>
@@ -1036,9 +1036,9 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
     <ol>
       <li>Analyzovat záznamy s největším <code>abs(auto_cw - confirmed_cw)</code></li>
       <li>Seskupit dle role</li>
-      <li>Pokud BO má konzistentně vyšší confirmed_cw &rarr; zvýšit <code>role_overrides.BO.consulted</code></li>
-      <li>Pokud Arch reviewer je podhodnocen &rarr; zvýšit <code>role_overrides.Arch.reviewer</code></li>
-      <li>Znovu evaluovat</li>
+      <li>If a strategic role (PM / BO / Arch) is systematically under-credited, the calibrator increases <code>signals.issue_comment</code> or <code>signals.pr_reviewer</code> weight</li>
+      <li>Run <code>python3 .claude/edpa/scripts/calibrate_signals.py --apply</code> to re-baseline against current ground truth</li>
+      <li>Re-run engine, verify invariants + new MAD</li>
     </ol>
 
     <h3>Iteration close — "config not found"</h3>
