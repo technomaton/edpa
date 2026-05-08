@@ -146,7 +146,7 @@ people:
 
 Create `.edpa/config/heuristics.yaml`:
 ```yaml
-version: "1.10.0-beta"
+version: "1.10.0-rc1"
 evidence_threshold: 1.0
 role_weights:
   owner: 1.0

@@ -2,11 +2,19 @@
 
 ## Unreleased
 
+## 1.10.0-rc1 — 2026-05-08
+
+Release candidate from `v1.10.0-beta` after a full pilot E2E
+re-validation (`docs/E2E-REPORT-2026-05-07-v1100-beta-full-pilot.md`)
+plus six paper-cut fixes. No new features vs. beta — same Stage 0
+preflight, capacity-override prep step, and `edpa-results.xlsx`
+consolidation. Promotion to stable is gated on the kashealth pilot
+PI-2026-1.1 close on ~2026-05-13/14 with no further regressions.
+
 ### Fixed (post-1.10.0-beta E2E)
 
-Six paper-cut issues surfaced by the full-pilot E2E
-(`docs/E2E-REPORT-2026-05-07-v1100-beta-full-pilot.md`). None block
-v1.10.0-beta but all fixed before promoting to RC.
+Six paper-cut issues surfaced by the full-pilot E2E. None blocked the
+beta release but all closed before promoting to RC.
 
 - **`sync.py` no longer crashes on empty `sync_state.json`**
   (`'NoneType' has no attribute 'get'`). Loads coalesce to `{}`; init
