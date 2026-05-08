@@ -197,37 +197,24 @@ Počítá se per úroveň nezávisle.</div>
       <li>Commit count se nepřevádí na čas</li>
     </ul>
 
-    <h3>5.3.1 Per-role korekce (role_overrides) <span class="badge" style="font-size:10px;background:var(--gn);color:var(--bg);padding:2px 6px;border-radius:4px;vertical-align:middle">Monte Carlo</span></h3>
-    <p>Per-role korekce validované Monte Carlo simulací (1000 scénářů). Git měří aktivitu, ne hodnotu — strategické role generují méně git signálů, přestože jejich přínos je srovnatelný nebo vyšší.</p>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Role</th><th style="text-align:right">Původní CW</th><th style="text-align:right">Kalibrovaná CW</th><th>Zdůvodnění</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>BO</strong> (consulted)</td><td style="text-align:right;color:var(--t3)">0.15</td><td style="text-align:right;color:var(--gn)">0.30</td><td>Business ownership — málo commitů, velký dopad na scope</td></tr>
-          <tr><td><strong>PM</strong> (consulted)</td><td style="text-align:right;color:var(--t3)">0.15</td><td style="text-align:right;color:var(--gn)">0.20</td><td>Koordinace, planning — projevuje se v komentářích</td></tr>
-          <tr><td><strong>Arch</strong> (reviewer)</td><td style="text-align:right;color:var(--t3)">0.25</td><td style="text-align:right;color:var(--gn)">0.30</td><td>Design decisions, review — nízká git stopa</td></tr>
-        </tbody>
-      </table>
-      <div class="note" style="margin-top:12px"><strong>Validace:</strong> 1000 Monte Carlo scénářů, 68 156 záznamů, p&lt;0.001. Korekce se aplikují automaticky v EDPA engine jako <code>role_overrides</code> v konfiguraci.</div>
-    </div>
+    <div class="note" style="margin-top:12px;border-left:3px solid var(--gn);padding-left:12px"><strong>v1.11 změna:</strong> Per-role korekce (<code>role_overrides</code>) byly v v1.11 odstraněny. CW se počítá výhradně signálovou agregací a per-item normalizací (viz § 5.4 níže). Strategická-role bias se nyní řeší kalibrací signálových vah proti ground truth — pokud BO/PM/Arch dostávají málo, kalibrátor zvedne <code>issue_comment</code> a <code>pr_reviewer</code> váhy. Detail v <a href="https://github.com/technomaton/edpa/blob/main/docs/auto-calibration.md" style="color:var(--ac2)">auto-calibration.md</a>.</div>
 
-    <h3>5.4 Výpočet — dvě varianty</h3>
-    <div class="formula"><strong>Auditní varianta (Full):</strong>
-Score[P, item] = JobSize[item] &times; CW[P, item] &times; RS[P, item]
-DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
-    <div class="formula"><strong>Provozní varianta (Simple):</strong>
-Score[P, item] = JobSize[item] &times; CW[P, item]
-DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
-    <div class="note">Doporučení: začít provozní variantou. Evidence Score a RS zachovat ve snapshotu pro auditní obhajobu.
-    <br>Pro konkrétní příklad s čísly viz <a href="/calculator/" style="color:var(--ac2);">Kalkulátor</a>.</div>
+    <h3>5.4 Výpočet (v1.11) — single source, sum-and-normalize</h3>
+    <div class="formula"><strong>contribution_score[P, item]</strong> = &Sigma; signal_weight &times; signal_fired(P, item)
+<strong>cw[P, item]</strong> = contribution_score[P, item] / &Sigma;<sub>persons</sub> contribution_score[*, item]
+<strong>score[P, item]</strong> = JobSize[item] &times; cw[P, item]
+<strong>ratio[P, item]</strong> = score[P, item] / &Sigma;<sub>items_of_P</sub> score
+<strong>DerivedHours[P, item]</strong> = ratio[P, item] &times; Capacity[P, I]</div>
+    <div class="note"><strong>Klíčová změna oproti v1.10:</strong> <code>cw</code> je teď per-item podíl (Σ napříč osobami = 1.0 na položce), ne absolutní [0,1] role-coupled hodnota. Žádný <code>RelevanceSignal</code>, žádný role priority lookup, žádné dva varianty Score formula. Signály sčítají additivně, normalizují se per-item, engine konzumuje hotové <code>cw</code>.
+    <br>Příklad: <a href="/calculator/" style="color:var(--ac2);">Kalkulátor</a>. Plná specifikace: <a href="https://github.com/technomaton/edpa/blob/main/docs/methodology.md#54-calculation--three-modes" style="color:var(--ac2)">methodology.md § 5.4</a>.</div>
 
-    <h3>5.5 Matematická garance</h3>
-    <div class="formula">&Sigma; DerivedHours[P, item] = Capacity[P, I]
+    <h3>5.5 Matematické garance (dvě)</h3>
+    <div class="formula"><strong>1. Per-item:</strong>   &Sigma;<sub>persons</sub> cw[*, item] = 1.0
+<strong>2. Per-person:</strong> &Sigma;<sub>items</sub> DerivedHours[P, *] = Capacity[P, I]
 
-Součet odvozených hodin je přesně kapacita osoby na Iteraci.
-Platí pro obě varianty. Vždy. Bez výjimky.</div>
+Obě platí strukturálně — z konstrukce sum-and-normalize aggregation
+a ratio normalizace per osobu napříč iteračními položkami.
+Engine je při běhu validuje a snapshot odmítne zapsat při porušení.</div>
   </section>
 
   <!-- 6. Dual-view -->

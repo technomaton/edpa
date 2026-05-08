@@ -198,36 +198,25 @@ Computed per level independently.</div>
       <li>Per-role corrections validated by Monte Carlo simulation (1,000 scenarios)</li>
     </ul>
 
-    <div class="card green" style="margin-top:16px">
-      <div class="tag" style="color:var(--gn)">Monte Carlo CW calibration</div>
-      <table>
-        <thead>
-          <tr><th>Role</th><th style="text-align:right">Original CW</th><th style="text-align:right">Calibrated CW</th><th style="text-align:right">Bias</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Business Owner</td><td style="text-align:right">1.0</td><td style="text-align:right">1.15</td><td style="text-align:right;color:var(--or)">+0.15</td></tr>
-          <tr><td>Product Manager</td><td style="text-align:right">0.6</td><td style="text-align:right">0.65</td><td style="text-align:right;color:var(--yl)">+0.05</td></tr>
-          <tr><td>Architect</td><td style="text-align:right">0.6</td><td style="text-align:right">0.65</td><td style="text-align:right;color:var(--yl)">+0.05</td></tr>
-          <tr><td>Developer</td><td style="text-align:right">1.0</td><td style="text-align:right">1.0</td><td style="text-align:right;color:var(--gn)">0.00</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <div class="note" style="margin-top:12px;border-left:3px solid var(--gn);padding-left:12px"><strong>v1.11 change:</strong> Per-role corrections (<code>role_overrides</code>) were removed in v1.11. CW is now computed purely via additive signal aggregation and per-item normalization (see § 5.4 below). Strategic-role bias correction is handled by calibrating signal weights against ground truth — if BO/PM/Arch are under-credited, the calibrator increases <code>issue_comment</code> and <code>pr_reviewer</code> weights. See <a href="https://github.com/technomaton/edpa/blob/main/docs/auto-calibration.md" style="color:var(--ac2)">auto-calibration.md</a>.</div>
 
-    <h3>5.4 Calculation — two variants</h3>
-    <div class="formula"><strong>Audit variant (Full):</strong>
-Score[P, item] = JobSize[item] &times; CW[P, item] &times; RS[P, item]
-DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
-    <div class="formula"><strong>Operational variant (Simple):</strong>
-Score[P, item] = JobSize[item] &times; CW[P, item]
-DerivedHours[P, item] = (Score[P, item] / &Sigma;Scores[P, I]) &times; Capacity[P, I]</div>
-    <div class="note">Recommendation: start with the operational variant. Keep Evidence Score and RS in the snapshot for audit defense.
-    <br>For a concrete worked example with numbers, see the <a href="/en/calculator/" style="color:var(--ac2);">Calculator</a>.</div>
+    <h3>5.4 Calculation (v1.11) — single source, sum-and-normalize</h3>
+    <div class="formula"><strong>contribution_score[P, item]</strong> = &Sigma; signal_weight &times; signal_fired(P, item)
+<strong>cw[P, item]</strong> = contribution_score[P, item] / &Sigma;<sub>persons</sub> contribution_score[*, item]
+<strong>score[P, item]</strong> = JobSize[item] &times; cw[P, item]
+<strong>ratio[P, item]</strong> = score[P, item] / &Sigma;<sub>items_of_P</sub> score
+<strong>DerivedHours[P, item]</strong> = ratio[P, item] &times; Capacity[P, I]</div>
+    <div class="note"><strong>Key change vs v1.10:</strong> <code>cw</code> is now a per-item share (Σ across persons = 1.0 per item), not an absolute [0,1] role-coupled value. No <code>RelevanceSignal</code>, no role priority lookup, no two-formula split. Signals add up, normalize per item, engine consumes ready-made <code>cw</code>.
+    <br>Worked example: <a href="/en/calculator/" style="color:var(--ac2);">Calculator</a>. Full spec: <a href="https://github.com/technomaton/edpa/blob/main/docs/methodology.md#54-calculation--three-modes" style="color:var(--ac2)">methodology.md § 5.4</a>.</div>
 
-    <h3>5.5 Mathematical guarantee</h3>
-    <div class="formula">&Sigma; DerivedHours[P, item] = Capacity[P, I]
+    <h3>5.5 Mathematical guarantees (two)</h3>
+    <div class="formula"><strong>1. Per-item:</strong>   &Sigma;<sub>persons</sub> cw[*, item] = 1.0
+<strong>2. Per-person:</strong> &Sigma;<sub>items</sub> DerivedHours[P, *] = Capacity[P, I]
 
-The sum of derived hours exactly equals the person's capacity for the Iteration.
-Holds for both variants. Always. No exceptions.</div>
+Both hold structurally — by construction of the sum-and-normalize
+aggregation and per-person ratio normalization across iteration items.
+Engine validates them at runtime and refuses to write the snapshot
+on violation.</div>
   </section>
 
   <!-- 6. Dual-view -->
