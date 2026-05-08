@@ -35,11 +35,11 @@ version: "1.11.0"
 # same surface stack additively.
 #
 signals:
-  assignee: 4.0             # GitHub issue assignee
-  pr_author: 2.0            # PR author referencing item
-  commit_author: 1.0        # Commit with item ID in branch/title/msg
-  pr_reviewer: 1.0          # PR review submitted (excluding self)
-  issue_comment: 0.5        # Comment on issue/PR (excluding bots)
+  assignee: 5.57             # GitHub issue assignee
+  pr_author: 9.34            # PR author referencing item
+  commit_author: 6.99        # Commit with item ID in branch/title/msg
+  pr_reviewer: 6.46          # PR review submitted (excluding self)
+  issue_comment: 2.99        # Comment on issue/PR (excluding bots)
 
 # ─────────────────────────────────────────────────────────────────────
 # GATE WEIGHTS (used only when engine runs with --mode gates)
@@ -116,18 +116,20 @@ rules:
 # CALIBRATION METADATA — populated by /edpa:calibrate
 # ─────────────────────────────────────────────────────────────────────
 calibration:
-  method: "(uncalibrated default — re-run /edpa:calibrate with ground truth)"
+  method: "MC random-sample + coordinate descent"
   monte_carlo:
-    scenarios: 0
-    records: 0
-  ground_truth_records: 0
-  mad: null
-  calibrated_at: null
+    scenarios: 1000
+    records: 32210
+  ground_truth_records: 0   # synthetic baseline; re-run with real data after first PI
+  mad_baseline: 0.0888
+  mad_calibrated: 0.0782
+  improvement_pct: 11.9
+  calibrated_at: "2026-05-08T17:28:42Z"
   calibrated_by_version: "1.11.0"
   notes: |
-    These are inherited starting values from the v1.0 Monte Carlo
-    calibration. v1.11 changed the signal aggregation formula
-    fundamentally (additive sum-and-normalize vs priority dominance),
-    so previous "optimal" weights are not directly comparable. Run
-    /edpa:calibrate after the first full PI close with ≥20 confirmed
-    CW ground truth records to establish the real v1.11 baseline.
+    Synthetic Monte Carlo baseline (1000 scenarios,
+    32210 records). Ground truth was generated
+    procedurally from a model where signal counts probabilistically
+    reflect each person's true cw share with role-based bias.
+    Re-run /edpa:calibrate after first real PI close with team-confirmed
+    cw records to derive a real-data baseline.
