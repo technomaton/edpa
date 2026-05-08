@@ -47,10 +47,12 @@ def get_version():
 
 VERSION = get_version()
 
-# Evidence roles the engine knows how to map. Anything else under
-# contributors[].as is rejected with a clear error so users don't
-# silently get 0h derived. Job roles (Dev/Arch/QA/PM) belong in
-# people.yaml, not in story contributors.
+# Evidence roles — kept as a constant for backward compatibility with
+# pre-v1.11 callers (validate_syntax.py, migrate_contributors.py). In
+# v1.11 the engine no longer uses role-based CW computation; cw values
+# are pre-computed by detect_contributors.py via per-item normalization
+# and consumed directly. This constant remains for tooling that still
+# emits role labels (e.g., display layer in reports.py).
 EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
 
 
@@ -92,114 +94,43 @@ def extract_item_refs(text):
     return re.findall(r'[SFEITD]-\d+', text)
 
 
-def detect_evidence(people, items, iteration_id):
+def extract_contributors(item):
+    """Extract pre-computed (person_id, cw, signals) tuples from an item.
+
+    v1.11: detect_contributors.py is the single source for CW
+    computation. Each contributors[] entry already has:
+      - person      (canonical id from people.yaml)
+      - cw          (per-item-normalized share, [0,1])
+      - contribution_score (raw sum of signal weights, ≥ 0)
+      - signals[]   (audit trail with type/ref/weight/...)
+
+    Engine reads cw verbatim — no role mapping, no signal scoring,
+    no /contribute regex. This function exists only to extract the
+    tuple format the rest of run_edpa expects, with safe handling
+    of legacy fixtures (older `as:` field is ignored, cw still read).
+
+    Returns: list of {"person": str, "cw": float, "signals": list}
     """
-    Detect contribution evidence from GitHub data.
-
-    Returns: dict of {(person_id, item_id): {"signals": [...], "evidence_score": float, "cw": float}}
-    """
-    evidence = {}
-
-    for item in items:
-        item_id = item.get("id", "")
-        assignees = [a.get("login", "") for a in item.get("assignees", [])]
-
-        for person in people:
-            pid = person["id"]
-
-            # Check evidence_scope
-            scope = person.get("evidence_scope")
-            if scope:
-                import fnmatch
-                if not any(fnmatch.fnmatch(item_id, pattern) for pattern in scope):
-                    # Item doesn't match this contract's scope
-                    if not person.get("evidence_default", False):
-                        continue  # Skip — not in scope and not default
-
-            signals = []
-            score = 0.0
-
-            # Check assignee
-            if pid in assignees or person.get("email", "") in assignees:
-                score += 4.0
-                signals.append("assignee")
-
-            # Check /contribute commands in body
-            body = item.get("body", "") or ""
-            contribute_pattern = rf'/contribute\s+@{re.escape(pid)}\s+weight:([0-9.]+)'
-            contribute_match = re.search(contribute_pattern, body)
-            if contribute_match:
-                score += 3.0
-                signals.append("contribute_command")
-
-            # Check PR author (simplified — looks at linked PRs)
-            if item.get("pr_author") == pid:
-                score += 2.0
-                signals.append("pr_author")
-
-            # Check commit author
-            if item.get("commit_authors") and pid in item["commit_authors"]:
-                score += 1.0
-                signals.append("commit_author")
-
-            # Check PR reviewer
-            if item.get("pr_reviewers") and pid in item["pr_reviewers"]:
-                score += 1.0
-                signals.append("pr_reviewer")
-
-            # Check comments
-            if item.get("commenters") and pid in item["commenters"]:
-                score += 0.5
-                signals.append("issue_comment")
-
-            if signals:
-                evidence[(pid, item_id)] = {
-                    "signals": signals,
-                    "evidence_score": score,
-                    "manual_cw": float(contribute_match.group(1)) if contribute_match else None
-                }
-
-    return evidence
-
-
-def compute_cw(evidence_entry, heuristics, person_role=None):
-    """Compute Contribution Weight from evidence signals.
-
-    Uses role_overrides (Monte Carlo calibrated) when person_role is known,
-    falling back to generic role_weights otherwise.
-    """
-    if evidence_entry.get("manual_cw") is not None:
-        return evidence_entry["manual_cw"]
-
-    signal_to_role = {
-        "assignee": "owner",
-        "contribute_command": "key",
-        "pr_author": "key",
-        "commit_author": "reviewer",
-        "pr_reviewer": "reviewer",
-        "issue_comment": "consulted",
-    }
-
-    role_priority = ["assignee", "contribute_command", "pr_author",
-                     "commit_author", "pr_reviewer", "issue_comment"]
-
-    role_weights = heuristics.get("role_weights", {})
-    role_overrides = heuristics.get("role_overrides", {})
-
-    for signal in role_priority:
-        if signal in evidence_entry["signals"]:
-            evidence_role = signal_to_role[signal]
-
-            # Check role_overrides first (Monte Carlo calibrated)
-            if person_role and person_role in role_overrides:
-                override = role_overrides[person_role]
-                if evidence_role in override:
-                    return override[evidence_role]
-
-            # Fallback to generic weights
-            return role_weights.get(evidence_role, 0.15)
-
-    return 0.15
+    out = []
+    for c in (item.get("contributors") or []):
+        if not isinstance(c, dict):
+            continue
+        person = c.get("person")
+        cw = c.get("cw")
+        if not person or cw is None:
+            continue
+        try:
+            cw_val = float(cw)
+        except (TypeError, ValueError):
+            continue
+        if not 0 <= cw_val <= 1:
+            continue
+        out.append({
+            "person": person,
+            "cw": cw_val,
+            "signals": c.get("signals", []),
+        })
+    return out
 
 
 def _load_iteration_people_overrides(edpa_root, iteration_id):
@@ -315,11 +246,25 @@ def run_edpa(capacity_config, heuristics, items, mode="gates", *,
     pre-v1.9 (every person uses people.yaml baseline only).
     """
     people = capacity_config.get("people", [])
-    threshold = heuristics.get("evidence_threshold", 1.0)
     overrides_map = _load_iteration_people_overrides(edpa_root, iteration_id)
 
-    # Detect evidence
-    evidence = detect_evidence(people, items, iteration_id or "computed")
+    # v1.11: pre-build (person, item) → (cw, signals) lookup from
+    # contributors[] blocks already populated by detect_contributors.py.
+    # No evidence detection, no CW computation here — engine is a thin
+    # consumer of pre-aggregated values.
+    contributors_by_item: dict[str, list[dict]] = {}
+    item_contribution_total: dict[str, float] = {}
+    for item in items:
+        contribs = extract_contributors(item)
+        contributors_by_item[item["id"]] = contribs
+        # Sanity: cw shares should sum to ~1.0 per item. We log but
+        # don't fail — re-running detect_contributors fixes drift.
+        s = sum(c["cw"] for c in contribs)
+        item_contribution_total[item["id"]] = s
+        if contribs and abs(s - 1.0) > 0.01:
+            print(f"WARN: {item['id']}: Σ contributors[].cw = {s:.4f} "
+                  f"(expected 1.0). Re-run detect_contributors to recompute.",
+                  file=sys.stderr)
 
     results = []
 
@@ -331,42 +276,37 @@ def run_edpa(capacity_config, heuristics, items, mode="gates", *,
 
         for item in items:
             item_id = item["id"]
-            key = (pid, item_id)
-
-            if key not in evidence:
-                continue
-
-            ev = evidence[key]
-            if ev["evidence_score"] < threshold:
-                continue
-
-            cw = compute_cw(ev, heuristics, person_role=person.get("role"))
             js = item.get("job_size", 0)
-
             if js <= 0:
                 continue
 
-            if mode == "full":
-                # Compute Relevance Signal
-                max_es = max(
-                    (evidence.get((p["id"], item_id), {}).get("evidence_score", 0)
-                     for p in people),
-                    default=1.0
-                )
-                rs = min(ev["evidence_score"] / max_es, 1.0) if max_es > 0 else 1.0
-            else:
-                rs = 1.0
+            # Find this person's pre-computed cw on this item.
+            person_cw = None
+            person_signals = []
+            for c in contributors_by_item.get(item_id, []):
+                if c["person"] == pid:
+                    person_cw = c["cw"]
+                    person_signals = c["signals"]
+                    break
+            if person_cw is None or person_cw <= 0:
+                continue  # no contribution to this item
 
-            score = js * cw * rs
+            # v1.11: cw is already per-item-normalized. score = JS × cw
+            # gives the person's effective work units on this item;
+            # `rs` (relevance signal) was a v1.7-era refinement that
+            # is now redundant — multi-signal evidence is already
+            # baked into cw via the additive aggregation in detect.
+            score = js * person_cw
+            rs = 1.0
 
             person_items.append({
                 "id": item_id,
                 "level": item.get("level", "Story"),
                 "js": js,
-                "cw": round(cw, 4),
+                "cw": round(person_cw, 4),
                 "rs": round(rs, 4),
                 "score": round(score, 4),
-                "evidence": ev["signals"],
+                "evidence": [s.get("type", "?") for s in person_signals],
             })
 
         # Calculate derived hours
@@ -512,133 +452,95 @@ def load_backlog_items(edpa_root, iteration_id=None):
             if not js or js <= 0:
                 continue
 
-            # Map contributors to engine evidence fields
-            assignees = []
-            pr_author = None
-            commit_authors = []
-            pr_reviewers = []
-            commenters = []
-            body_parts = []
-            contributors = data.get("contributors", []) or []
-
-            # Preserve top-level assignees (sync pull stores them as
-            # [{"login": "..."}, ...]) so /contribute body and assignee
-            # signals from GitHub aren't dropped on the floor.
-            top_assignees = data.get("assignees") or []
-            if isinstance(top_assignees, list):
-                for a in top_assignees:
-                    if isinstance(a, dict) and a.get("login"):
-                        if not any(x.get("login") == a["login"] for x in assignees):
-                            assignees.append({"login": a["login"]})
-                    elif isinstance(a, str):
-                        if not any(x.get("login") == a for x in assignees):
-                            assignees.append({"login": a})
-
-            # Assignee from top-level field
-            assignee = data.get("assignee") or data.get("owner")
-            if assignee and not any(a.get("login") == assignee for a in assignees):
-                assignees.append({"login": assignee})
-
-            item_pairs = 0
-            for idx, contrib in enumerate(contributors):
+            # v1.11: contributors[] is the single source of truth.
+            # Each entry has person + cw (per-item share) + signals[].
+            # Engine consumes cw verbatim; no role mapping, no /contribute
+            # body synthesis.
+            raw_contribs = data.get("contributors", []) or []
+            contributors = []
+            for idx, contrib in enumerate(raw_contribs):
                 if not isinstance(contrib, dict):
                     schema_warnings.append(
-                        f"{item_id}: contributors[{idx}] is not a mapping (got {type(contrib).__name__})"
+                        f"{item_id}: contributors[{idx}] is not a mapping "
+                        f"(got {type(contrib).__name__})"
                     )
                     continue
                 contributors_seen_total += 1
                 person = contrib.get("person", "")
-                # `as:` is the evidence role (owner|key|reviewer|consulted).
-                # `role:` is rejected — too easily confused with people.yaml's
-                # job role. `weight:` is rejected — canonical key is `cw`.
-                # Both have a clear migration message via validate_syntax.py
-                # so downstream tools can point users at the rename.
-                evidence_as = (contrib.get("as", "") or "").lower()
-                cw = contrib.get("cw")
-                if "role" in contrib and not evidence_as:
-                    schema_warnings.append(
-                        f"{item_id}: contributors[{idx}] uses legacy 'role' — "
-                        f"renamed to 'as' in v1.7. "
-                        f"Run plugin/edpa/scripts/migrate_contributors.py "
-                        f"or rewrite by hand. Skipping this contributor."
-                    )
-                    continue
-                if "weight" in contrib and cw is None:
-                    schema_warnings.append(
-                        f"{item_id}: contributors[{idx}] uses legacy 'weight' — "
-                        f"renamed to 'cw' in v1.7. "
-                        f"Run plugin/edpa/scripts/migrate_contributors.py. "
-                        f"Skipping this contributor."
-                    )
-                    continue
-
                 if not person:
                     schema_warnings.append(
-                        f"{item_id}: contributors[{idx}] missing 'person' (got {contrib!r})"
+                        f"{item_id}: contributors[{idx}] missing 'person'"
                     )
                     continue
 
-                if evidence_as and evidence_as not in EVIDENCE_ROLES:
+                # Reject legacy keys with a migration breadcrumb. v1.11
+                # is a hard schema cut — old fields cannot be silently
+                # interpreted.
+                if "role" in contrib:
                     schema_warnings.append(
-                        f"{item_id}: contributors[{idx}] as={evidence_as!r} is not an evidence role "
-                        f"({sorted(EVIDENCE_ROLES)}). Job roles (Dev/Arch/QA/PM) belong in people.yaml — "
-                        f"this contributor will not produce evidence."
+                        f"{item_id}: contributors[{idx}] uses legacy "
+                        f"'role' — rewritten in v1.11 (signals[] now "
+                        f"carries audit trail; cw carries the share). "
+                        f"Run detect_contributors.py to regenerate."
                     )
-                    # Still treat presence-of-cw as a manual CW override.
-                    if cw is not None:
-                        manual_cw_overrides[(person, item_id)] = float(cw)
                     continue
-
-                # Store manual CW override if present
-                if cw is not None:
-                    manual_cw_overrides[(person, item_id)] = float(cw)
-
-                # Map evidence role to engine evidence fields
-                if evidence_as == "owner":
-                    if not any(a.get("login") == person for a in assignees):
-                        assignees.append({"login": person})
-                elif evidence_as == "key":
-                    if pr_author is None:
-                        pr_author = person
-                    commit_authors.append(person)
-                elif evidence_as == "reviewer":
-                    pr_reviewers.append(person)
-                elif evidence_as == "consulted":
-                    commenters.append(person)
-                elif not evidence_as:
+                if "weight" in contrib:
                     schema_warnings.append(
-                        f"{item_id}: contributors[{idx}] missing 'as' (one of {sorted(EVIDENCE_ROLES)}). "
-                        f"Skipped — person={person!r} produces no evidence signal."
+                        f"{item_id}: contributors[{idx}] uses legacy "
+                        f"'weight' — replaced by 'cw' (since v1.7) and "
+                        f"'contribution_score' (since v1.11). "
+                        f"Run detect_contributors.py to regenerate."
+                    )
+                    continue
+                # Tolerate the v1.10 `as:` field for one transition: ignored
+                # but doesn't cause skip. Validator (validate_syntax.py)
+                # still rejects it on commit-time hooks.
+
+                cw = contrib.get("cw")
+                if cw is None:
+                    schema_warnings.append(
+                        f"{item_id}: contributors[{idx}] missing 'cw' "
+                        f"(per-item share). Run detect_contributors.py."
+                    )
+                    continue
+                try:
+                    cw_val = float(cw)
+                except (TypeError, ValueError):
+                    schema_warnings.append(
+                        f"{item_id}: contributors[{idx}] cw must be numeric"
                     )
                     continue
 
-                item_pairs += 1
+                contributors.append({
+                    "person": person,
+                    "cw": cw_val,
+                    "contribution_score": contrib.get("contribution_score", 0),
+                    "signals": contrib.get("signals", []),
+                })
+                evidence_pairs_total += 1
 
-                # Generate /contribute command for manual CW
-                if cw is not None:
-                    body_parts.append(f"/contribute @{person} weight:{cw}")
-
-            evidence_pairs_total += item_pairs
-
-            # Preserve top-level body (e.g., from sync pull) and append our
-            # generated /contribute lines so both signals contribute.
-            top_body = data.get("body", "") or ""
-            body_combined = top_body
-            if body_parts:
-                if body_combined:
-                    body_combined += "\n"
-                body_combined += "\n".join(body_parts)
+            # Top-level assignees are still tracked for the snapshot
+            # but no longer feed evidence detection (assignee evidence
+            # is now collected by detect_contributors and lives in
+            # contributors[].signals).
+            assignees = []
+            top_assignees = data.get("assignees") or []
+            if isinstance(top_assignees, list):
+                for a in top_assignees:
+                    if isinstance(a, dict) and a.get("login"):
+                        assignees.append({"login": a["login"]})
+                    elif isinstance(a, str):
+                        assignees.append({"login": a})
+            assignee = data.get("assignee") or data.get("owner")
+            if assignee and not any(a.get("login") == assignee for a in assignees):
+                assignees.append({"login": assignee})
 
             items.append({
                 "id": item_id,
                 "level": data.get("type", level),
                 "job_size": js,
                 "assignees": assignees,
-                "body": body_combined,
-                "pr_author": pr_author,
-                "commit_authors": commit_authors,
-                "pr_reviewers": pr_reviewers,
-                "commenters": commenters,
+                "contributors": contributors,
             })
 
     if schema_warnings:
@@ -652,9 +554,9 @@ def load_backlog_items(edpa_root, iteration_id=None):
         print(
             "WARN: 0 evidence pairs derived from "
             f"{contributors_seen_total} contributor entries. "
-            "Engine will allocate 0h. Check contributors[].as and "
-            f"contributors[].cw — required schema is as ∈ "
-            f"{sorted(EVIDENCE_ROLES)}, cw ∈ [0,1].",
+            "Engine will allocate 0h. Check contributors[].cw is set "
+            "for every entry — v1.11 schema requires per-item-normalized "
+            "cw shares produced by detect_contributors.py.",
             file=sys.stderr,
         )
 

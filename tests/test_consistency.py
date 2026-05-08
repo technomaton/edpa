@@ -178,32 +178,19 @@ def test_no_stray_files_in_web():
 
 
 # ---------------------------------------------------------------------------
-# 6. Role overrides applied in engine
+# 6. Role overrides — REMOVED in v1.11
 # ---------------------------------------------------------------------------
-
-def test_role_overrides_applied():
-    """Arch reviewer CW must be 0.30 (not generic 0.25) — catches v1.x bug."""
-    sys.path.insert(0, str(ROOT / "plugin" / "edpa" / "scripts"))
-    from engine import compute_cw
-
-    heuristics = {
-        "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15},
-        "role_overrides": {
-            "Arch": {"owner": 1.0, "key": 0.6, "reviewer": 0.30, "consulted": 0.15},
-        },
-    }
-
-    evidence_entry = {
-        "signals": ["pr_reviewer"],
-        "evidence_score": 1.0,
-        "manual_cw": None,
-    }
-
-    cw = compute_cw(evidence_entry, heuristics, person_role="Arch")
-    assert cw == 0.30, (
-        f"Arch reviewer CW should be 0.30 (role_override), got {cw}. "
-        "role_overrides not applied?"
-    )
+#
+# The role_overrides matrix (BO/PM/Arch reviewer = 0.30 etc.) was tied to
+# the engine's compute_cw() function. v1.11 moved CW computation to
+# detect_contributors.py, where it now uses additive signal aggregation
+# instead of priority-based role lookup. Calibration of strategic role
+# bias (PM/BO/Arch under-weighting) is handled by signal_weights that
+# autocalib finds against ground truth — no role_overrides table needed.
+#
+# If per-role signal multipliers return in v1.12 (e.g., to address
+# small-sample calibration issues for strategic roles), they will be
+# tested in tests/test_detect_contributors.py at the aggregation layer.
 
 
 # ---------------------------------------------------------------------------

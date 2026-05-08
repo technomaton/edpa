@@ -345,18 +345,24 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
         if iteration and not isinstance(iteration, str):
             errors.append(f"{path}: iteration must be a string (got {type(iteration).__name__})")
 
-    # Contributors schema. The evidence-role enum lives under `as:` since
-    # v1.7. Legacy keys `role:` and `weight:` are HARD errors with a
-    # migration pointer — there are no backwards-compatibility aliases,
-    # users have to run migrate_contributors.py once. Values outside the
-    # evidence enum are warnings by default (rich-doc backlogs use
-    # human-readable labels for documentation); --strict upgrades them.
+    # Contributors schema (v1.11+). Each entry carries:
+    #   - person   (required, person id from people.yaml)
+    #   - cw       (per-item normalized share, [0,1])
+    #   - contribution_score (raw sum of signal weights, ≥ 0)
+    #   - signals  (list of signal records with type/ref/weight/...)
+    #
+    # Legacy keys from earlier schema versions are HARD errors with a
+    # migration pointer:
+    #   - `role:` / `weight:` (pre-v1.7 names)
+    #   - `as:`               (pre-v1.11 role classifier — dropped in v1.11)
     contribs = data.get("contributors")
     if contribs is not None:
         bucket = errors if strict else warnings
         if not isinstance(contribs, list):
             errors.append(f"{path}: contributors must be a list (got {type(contribs).__name__})")
         else:
+            cw_sum = 0.0
+            cw_seen = 0
             for idx, entry in enumerate(contribs):
                 if not isinstance(entry, dict):
                     errors.append(
@@ -366,36 +372,37 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
                     continue
                 if not entry.get("person"):
                     bucket.append(f"{path}: contributors[{idx}] missing 'person'")
-                # Reject legacy keys outright with a migration breadcrumb.
+
+                # Reject legacy keys with migration breadcrumb.
                 if "role" in entry:
                     errors.append(
                         f"{path}: contributors[{idx}] uses legacy 'role' — "
-                        f"renamed to 'as' in v1.7 to disambiguate from "
-                        f"people[].role. Run "
-                        f"`python3 .claude/edpa/scripts/migrate_contributors.py` "
-                        f"to rewrite the whole backlog at once."
+                        f"renamed to 'as' in v1.7, then dropped in v1.11. "
+                        f"Re-run `detect_contributors.py --pr <N>` to regenerate "
+                        f"with v1.11 schema (signals[] + per-item cw share)."
                     )
                 if "weight" in entry:
                     errors.append(
                         f"{path}: contributors[{idx}] uses legacy 'weight' — "
-                        f"renamed to 'cw' in v1.7. Run "
-                        f"`python3 .claude/edpa/scripts/migrate_contributors.py`."
+                        f"replaced by 'cw' (since v1.7) and 'contribution_score' "
+                        f"(since v1.11). Run `detect_contributors.py` to migrate."
                     )
-                evidence_as = (entry.get("as") or "").lower()
-                if not evidence_as and "role" not in entry:
-                    bucket.append(
-                        f"{path}: contributors[{idx}] missing 'as' "
-                        f"(one of {sorted(EVIDENCE_ROLES)})"
+                if "as" in entry:
+                    errors.append(
+                        f"{path}: contributors[{idx}] uses legacy 'as' field — "
+                        f"role classification was dropped in v1.11 (role is now "
+                        f"derived from signals[].type at display time). Re-run "
+                        f"`detect_contributors.py --pr <N>` to regenerate."
                     )
-                elif evidence_as and evidence_as not in EVIDENCE_ROLES:
-                    bucket.append(
-                        f"{path}: contributors[{idx}] as={evidence_as!r} is not an evidence role "
-                        f"({sorted(EVIDENCE_ROLES)}). Job roles (Dev/Arch/QA/PM) "
-                        f"belong in people.yaml — engine will not credit this contributor."
-                    )
-                # cw — out-of-range is always an error (real correctness)
+
+                # cw — must be in [0,1]
                 cw_value = entry.get("cw")
-                if cw_value is not None:
+                if cw_value is None:
+                    bucket.append(
+                        f"{path}: contributors[{idx}] missing 'cw' "
+                        f"(per-item share, [0,1])"
+                    )
+                else:
                     try:
                         cw_num = float(cw_value)
                     except (TypeError, ValueError):
@@ -409,6 +416,68 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
                             f"{path}: contributors[{idx}] cw must be in [0,1] "
                             f"(got {cw_num})"
                         )
+                    cw_sum += cw_num
+                    cw_seen += 1
+
+                # contribution_score — informational, must be ≥ 0 if present
+                cs_value = entry.get("contribution_score")
+                if cs_value is not None:
+                    try:
+                        cs_num = float(cs_value)
+                        if cs_num < 0:
+                            errors.append(
+                                f"{path}: contributors[{idx}] "
+                                f"contribution_score must be ≥ 0 (got {cs_num})"
+                            )
+                    except (TypeError, ValueError):
+                        errors.append(
+                            f"{path}: contributors[{idx}] contribution_score "
+                            f"must be numeric (got {cs_value!r})"
+                        )
+
+                # signals — list of records with type/ref/weight at minimum
+                signals = entry.get("signals")
+                if signals is not None:
+                    if not isinstance(signals, list):
+                        errors.append(
+                            f"{path}: contributors[{idx}].signals must be a list"
+                        )
+                    else:
+                        for s_idx, sig in enumerate(signals):
+                            if not isinstance(sig, dict):
+                                errors.append(
+                                    f"{path}: contributors[{idx}].signals[{s_idx}] "
+                                    f"must be a mapping"
+                                )
+                                continue
+                            for required in ("type", "ref", "weight"):
+                                if required not in sig:
+                                    bucket.append(
+                                        f"{path}: contributors[{idx}].signals[{s_idx}] "
+                                        f"missing '{required}'"
+                                    )
+                            sw = sig.get("weight")
+                            if sw is not None:
+                                try:
+                                    if float(sw) < 0:
+                                        errors.append(
+                                            f"{path}: contributors[{idx}].signals"
+                                            f"[{s_idx}].weight must be ≥ 0"
+                                        )
+                                except (TypeError, ValueError):
+                                    errors.append(
+                                        f"{path}: contributors[{idx}].signals"
+                                        f"[{s_idx}].weight must be numeric"
+                                    )
+
+            # Per-item invariant: Σ cw = 1.0 (when contributors exist).
+            # Allow rounding tolerance because YAML values are
+            # rounded to 4 decimals by detect_contributors.
+            if cw_seen >= 2 and abs(cw_sum - 1.0) > 0.005:
+                bucket.append(
+                    f"{path}: Σ contributors[].cw = {cw_sum:.4f}, expected 1.0 "
+                    f"(tolerance 0.005). Re-run detect_contributors to recompute."
+                )
 
     return errors, warnings
 

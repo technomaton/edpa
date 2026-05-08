@@ -1,28 +1,39 @@
 #!/usr/bin/env python3
 """
-EDPA Contributor Auto-Detection
+EDPA Contributor Auto-Detection — v1.11 single-source CW pipeline.
 
-Two modes:
+Collects ALL evidence signals for an item (issue + linked PRs) and computes
+the final `contributors[]` block with per-item-normalized CW shares.
 
-1. CI mode (default — used by contributor-detect.yml GitHub Action):
-   reads PR_NUMBER / PR_AUTHOR / PR_TITLE / PR_BRANCH from the environment
-   and updates contributors[] for every item ID referenced in that PR.
+Signal types collected:
+  - assignee              ← issue assignee
+  - pr_author             ← PR author
+  - commit_author         ← PR commit author (excl. PR author)
+  - pr_reviewer           ← PR review submitted
+  - issue_comment         ← comment on issue
+  - manual:pr_body        ← /contribute @X weight:Y in PR description
+  - manual:commit_message ← /contribute in commit message body
+  - manual:issue_body     ← /contribute in issue description
+  - manual:issue_comment  ← /contribute in issue comment
+  - manual:pr_comment     ← /contribute in PR comment (issue-style)
 
-2. CLI / audit mode:
-     detect_contributors.py --item S-200 --since 7days
-     detect_contributors.py --pr 42
-   Walks merged PRs touching the named item (or scoped to a single PR
-   number) and updates the same contributors[] field. Use --dry-run to
-   see what would change without touching backlog YAMLs.
+Each signal has: type, ref (auditor-resolvable), weight (from heuristics),
+optional excerpt (for manual:*), detected_at timestamp.
 
-Evidence signals detected:
-  - PR author → key contributor
-  - PR reviewers → reviewer
-  - Commit authors → reviewer (when distinct from PR author)
-  - Item IDs from branch name, PR title, and commit messages
+Aggregation:
+  contribution_score[P, item] = Σ signal_weights for person P on item
+  cw[P, item]                 = score[P, item] / Σ_persons score[*, item]
+  → Σ_persons cw[*, item] = 1.0    (per-item invariant)
 
-Environment variables (CI mode):
-  PR_NUMBER, PR_AUTHOR, PR_TITLE, PR_BRANCH, GH_TOKEN
+Modes:
+  1. CI mode (env-driven, used by contributor-detect.yml):
+       PR_NUMBER, PR_AUTHOR, PR_TITLE, PR_BRANCH set by workflow
+  2. CLI audit:
+       detect_contributors.py --pr 42
+       detect_contributors.py --item S-200 [--since 7days]
+
+Edge case: 0 signals detected for an item → warn-and-skip; existing
+contributors[] is left untouched (caller decides whether to fail).
 """
 from __future__ import annotations
 
@@ -32,76 +43,30 @@ import os
 import re
 import subprocess
 import sys
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 try:
     import yaml
 except ImportError:
-    print("ERROR: PyYAML required")
+    print("ERROR: PyYAML required", file=sys.stderr)
     sys.exit(1)
 
 
-def run_gh(args, *, repo: str | None = None):
-    """Run gh CLI command and return JSON output."""
-    cmd = ["gh"] + list(args)
-    if repo and "--repo" not in cmd:
-        cmd.extend(["--repo", repo])
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"gh error: {result.stderr.strip()}", file=sys.stderr)
-        return None
-    return json.loads(result.stdout) if result.stdout.strip() else None
+# ─── Constants ──────────────────────────────────────────────────────────────
 
+# Default signal weights (overridden by .edpa/config/cw_heuristics.yaml).
+# These mirror the v1.0 calibrated values from Monte Carlo simulation.
+DEFAULT_SIGNAL_WEIGHTS = {
+    "assignee": 4.0,
+    "pr_author": 2.0,
+    "commit_author": 1.0,
+    "pr_reviewer": 1.0,
+    "issue_comment": 0.5,
+}
 
-def extract_item_ids(text):
-    """Extract EDPA item IDs (S-200, F-100, E-10, I-1, T-3, D-2) from text."""
-    return re.findall(r'\b([SFEITD]-\d+)\b', text or "")
-
-
-# /contribute manual override directive. Matches both forms:
-#   /contribute @person weight:0.5
-#   /contribute @person weight:0.5 as:owner
-# The `as:` clause is optional; when absent we default to `key` because
-# that is the most common manual-override case ("credit person X with
-# weight Y for this work"). When the directive specifies a role we honour
-# it as long as it is one of the four evidence roles the engine accepts.
-EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
-_CONTRIBUTE_PATTERN = re.compile(
-    r'/contribute\s+@([A-Za-z0-9_-]+)\s+weight:([0-9.]+)'
-    r'(?:\s+as:([A-Za-z]+))?',
-    re.IGNORECASE,
-)
-
-
-def parse_contribute_directives(body: str) -> dict:
-    """Extract `/contribute @person weight:X [as:role]` lines from a body.
-
-    Returns a dict {login: {"cw": float, "role": str|None}}. Login is
-    preserved verbatim (case-folded by callers via load_people_map);
-    role is None when the directive omits `as:`. A bad weight (out of
-    [0,1]) or unknown role causes that line to be silently dropped —
-    this keeps detect runs robust against typos in PR bodies.
-    """
-    out: dict[str, dict] = {}
-    for match in _CONTRIBUTE_PATTERN.finditer(body or ""):
-        login, weight_str, role = match.group(1), match.group(2), match.group(3)
-        try:
-            cw = float(weight_str)
-        except ValueError:
-            continue
-        if not (0.0 <= cw <= 1.0):
-            continue
-        norm_role = role.lower() if role else None
-        if norm_role and norm_role not in EVIDENCE_ROLES:
-            continue
-        # Last directive wins (by file order) so users can override
-        # an earlier line further down in the same body.
-        out[login] = {"cw": cw, "role": norm_role}
-    return out
-
-
-# Map type prefix → backlog directory
+# Map item-id prefix → backlog directory under .edpa/backlog/
 PREFIX_TO_DIR = {
     "S": "stories",
     "F": "features",
@@ -111,14 +76,75 @@ PREFIX_TO_DIR = {
     "D": "defects",
 }
 
+# /contribute manual directive — additive signal, no role clause.
+# Multiple matches for same login on same surface stack additively.
+_CONTRIBUTE_PATTERN = re.compile(
+    r'/contribute\s+@([A-Za-z0-9_-]+)\s+weight:([0-9]+(?:\.[0-9]+)?)',
+    re.IGNORECASE,
+)
 
-def find_backlog_file(edpa_root: Path, item_id: str):
-    """Find the YAML file for an item ID."""
+
+# ─── Helpers ────────────────────────────────────────────────────────────────
+
+
+def run_gh(args, *, repo: str | None = None):
+    """Run `gh` CLI command, return parsed JSON or None on failure."""
+    cmd = ["gh"] + list(args)
+    if repo and "--repo" not in cmd:
+        cmd.extend(["--repo", repo])
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        # Don't spam stderr for expected "not found" — caller decides.
+        return None
+    out = result.stdout.strip()
+    if not out:
+        return None
+    try:
+        return json.loads(out)
+    except json.JSONDecodeError:
+        return None
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def extract_item_ids(text: str) -> list[str]:
+    """Extract EDPA item IDs (S-200, F-100, E-10, I-1, T-3, D-2) from any text."""
+    return re.findall(r'\b([SFEITD]-\d+)\b', text or "")
+
+
+def parse_contribute_directives(text: str) -> dict[str, float]:
+    """Find `/contribute @person weight:X` directives in text.
+
+    Returns a dict {login: total_weight} where multiple directives for
+    the same login on the same surface stack additively. Negative or
+    non-numeric weights are silently dropped (typo safety).
+
+    No `as:role` parsing — the v1.11 design treats `/contribute` as a
+    pure additive signal without role classification (role is derived
+    from signal type by the display layer at render time).
+    """
+    result: dict[str, float] = defaultdict(float)
+    for m in _CONTRIBUTE_PATTERN.finditer(text or ""):
+        login, weight_str = m.group(1), m.group(2)
+        try:
+            w = float(weight_str)
+        except ValueError:
+            continue
+        if w < 0:
+            continue
+        result[login] += w
+    return dict(result)
+
+
+def find_backlog_file(edpa_root: Path, item_id: str) -> Path | None:
+    """Locate .edpa/backlog/<dir>/<item_id>.yaml; None if missing."""
     prefix = item_id.split("-")[0]
     type_dir = PREFIX_TO_DIR.get(prefix, "stories")
-    path = edpa_root / "backlog" / type_dir / f"{item_id}.yaml"
-    if path.exists():
-        return path
+    candidate = edpa_root / "backlog" / type_dir / f"{item_id}.yaml"
+    if candidate.exists():
+        return candidate
     for d in PREFIX_TO_DIR.values():
         p = edpa_root / "backlog" / d / f"{item_id}.yaml"
         if p.exists():
@@ -126,87 +152,510 @@ def find_backlog_file(edpa_root: Path, item_id: str):
     return None
 
 
-def load_people_map(edpa_root: Path):
-    """Load people.yaml and create github_login → person_id map."""
+def load_people_map(edpa_root: Path) -> dict[str, str]:
+    """Build github_login → person_id map from .edpa/config/people.yaml."""
     people_path = edpa_root / "config" / "people.yaml"
     if not people_path.exists():
         return {}
-    data = yaml.safe_load(people_path.read_text()) or {}
-    mapping = {}
-    for p in data.get("people", []):
+    try:
+        data = yaml.safe_load(people_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return {}
+    mapping: dict[str, str] = {}
+    for p in data.get("people", []) or []:
         pid = p.get("id", "")
-        email = p.get("email", "")
-        name = p.get("name", "")
         github = p.get("github", "")
         if github:
             mapping[github.lower()] = pid
-        if email:
-            mapping[email.lower()] = pid
-        if name:
-            mapping[name.lower()] = pid
+        # Fallback: bare email/name lookup for legacy data
+        if p.get("email"):
+            mapping[p["email"].lower()] = pid
+        if p.get("name"):
+            mapping[p["name"].lower()] = pid
     return mapping
 
 
-def update_contributors(yaml_path: Path, new_contributors: list, *, dry_run=False):
-    """Update contributors list in a backlog YAML file.
+def load_signal_weights(edpa_root: Path) -> dict[str, float]:
+    """Load signal weights from .edpa/config/cw_heuristics.yaml.
 
-    Only adds new contributors — never removes existing ones.
-
-    Update precedence:
-    1. Manual `/contribute` overrides (source contains `pr_body:`) are
-       authoritative — they always overwrite an existing entry's `cw`,
-       `as`, and `source`. Operator wrote them on purpose.
-    2. Auto-detected updates (source = `pr_author:` / `commit_author:` /
-       `pr_reviewer:`) only raise `cw` when the new value is higher.
-       This preserves the audit-conservative "highest signal wins"
-       behavior used since v1.7.
-
-    Returns True when something changed. New entries use the v1.7
-    schema (`as:` for evidence role, `cw:` for weight).
+    Falls back to DEFAULT_SIGNAL_WEIGHTS when missing or unparseable.
+    The `signals:` block at the top level holds the 5 base weights.
+    Manual directives (`manual:*` types) carry the user-supplied
+    `weight:X` value verbatim — they're not weighted by heuristics.
     """
-    data = yaml.safe_load(yaml_path.read_text()) or {}
-    existing = data.get("contributors", []) or []
+    h_path = edpa_root / "config" / "cw_heuristics.yaml"
+    if not h_path.exists():
+        return dict(DEFAULT_SIGNAL_WEIGHTS)
+    try:
+        data = yaml.safe_load(h_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return dict(DEFAULT_SIGNAL_WEIGHTS)
+    weights = dict(DEFAULT_SIGNAL_WEIGHTS)
+    for key in DEFAULT_SIGNAL_WEIGHTS:
+        if key in (data.get("signals") or {}):
+            try:
+                weights[key] = float(data["signals"][key])
+            except (TypeError, ValueError):
+                pass
+    return weights
 
-    existing_map = {}
-    for c in existing:
-        existing_map[c["person"]] = c
 
-    changed = False
-    for nc in new_contributors:
-        person = nc["person"]
-        is_manual = "pr_body:" in (nc.get("source") or "")
-        if person in existing_map:
-            if is_manual:
-                # Manual /contribute directive overrides auto-detected
-                # values regardless of relative cw. Operator's explicit
-                # instruction beats any auto-derived heuristic.
-                e = existing_map[person]
-                if (e.get("cw") != nc["cw"]
-                        or e.get("as") != nc["as"]
-                        or e.get("source") != nc["source"]):
-                    e["cw"] = nc["cw"]
-                    e["as"] = nc["as"]
-                    e["source"] = nc["source"]
-                    changed = True
-            elif existing_map[person].get("cw", 0) < nc.get("cw", 0):
-                existing_map[person]["cw"] = nc["cw"]
-                existing_map[person]["as"] = nc["as"]
-                changed = True
-        else:
-            existing.append(nc)
-            existing_map[person] = nc
-            changed = True
+def detect_repo_from_config(edpa_root: Path) -> str | None:
+    cfg = edpa_root / "config" / "edpa.yaml"
+    if not cfg.exists():
+        return None
+    try:
+        data = yaml.safe_load(cfg.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return None
+    sync = data.get("sync") or {}
+    org, repo = sync.get("github_org"), sync.get("github_repo")
+    return f"{org}/{repo}" if org and repo else None
 
-    if changed and not dry_run:
-        data["contributors"] = existing
-        yaml_path.write_text(
-            yaml.dump(data, default_flow_style=False, allow_unicode=True)
+
+def load_issue_map(edpa_root: Path) -> dict[str, int]:
+    """Map item_id → GH issue_number from .edpa/config/issue_map.yaml."""
+    path = edpa_root / "config" / "issue_map.yaml"
+    if not path.exists():
+        return {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return {}
+    items = data.get("items") if isinstance(data, dict) else data
+    if not isinstance(items, dict):
+        return {}
+    out: dict[str, int] = {}
+    for k, v in items.items():
+        if isinstance(v, dict) and "issue_number" in v:
+            out[k] = int(v["issue_number"])
+    return out
+
+
+# ─── Signal collection ──────────────────────────────────────────────────────
+
+
+def _signal(stype: str, ref: str, login: str, weight: float,
+            excerpt: str | None = None) -> dict:
+    """Build a normalized signal record with detected_at timestamp."""
+    sig: dict = {
+        "type": stype,
+        "ref": ref,
+        "login": login,
+        "weight": float(weight),
+        "detected_at": utc_now_iso(),
+    }
+    if excerpt:
+        sig["excerpt"] = excerpt.strip()
+    return sig
+
+
+def _excerpt_for(text: str, login: str) -> str:
+    """Return the first /contribute line mentioning @login, or empty string."""
+    for line in (text or "").splitlines():
+        if f"@{login}" in line and "/contribute" in line.lower():
+            return line.strip()
+    return ""
+
+
+def collect_assignee_signals(repo: str, issue_num: int,
+                             weight: float) -> list[dict]:
+    """Issue assignees → assignee signal per assignee."""
+    issue = run_gh(["issue", "view", str(issue_num), "--json", "assignees"],
+                   repo=repo)
+    if not issue:
+        return []
+    out: list[dict] = []
+    for a in issue.get("assignees", []) or []:
+        login = a.get("login", "")
+        if login:
+            out.append(_signal(
+                stype="assignee",
+                ref=f"issue#{issue_num}",
+                login=login,
+                weight=weight,
+            ))
+    return out
+
+
+def collect_pr_signals(repo: str, pr_num: int,
+                       weights: dict[str, float]) -> list[dict]:
+    """PR author + commit authors + reviewers + manual directives in body
+    and commit messages."""
+    pr = run_gh(["pr", "view", str(pr_num), "--json",
+                 "author,body,commits,reviews"], repo=repo)
+    if not pr:
+        return []
+
+    out: list[dict] = []
+    pr_author = (pr.get("author") or {}).get("login", "")
+    pr_body = pr.get("body", "") or ""
+
+    # 1. PR author
+    if pr_author:
+        out.append(_signal(
+            stype="pr_author",
+            ref=f"pr#{pr_num}",
+            login=pr_author,
+            weight=weights["pr_author"],
+        ))
+
+    # 2. Commit authors (exclude PR author to avoid double-count)
+    seen_commit_authors: set[str] = set()
+    for c in pr.get("commits", []) or []:
+        sha = (c.get("oid") or "")[:7]  # short sha for ref readability
+        for a in c.get("authors", []) or []:
+            login = a.get("login", "")
+            if login and login != pr_author:
+                key = (login, sha)
+                if key in seen_commit_authors:
+                    continue
+                seen_commit_authors.add(key)
+                out.append(_signal(
+                    stype="commit_author",
+                    ref=f"pr#{pr_num}/commit/{sha}",
+                    login=login,
+                    weight=weights["commit_author"],
+                ))
+
+        # 3. Manual /contribute in commit message
+        msg = (c.get("messageHeadline") or "") + "\n" + (c.get("messageBody") or "")
+        for login, w in parse_contribute_directives(msg).items():
+            out.append(_signal(
+                stype="manual:commit_message",
+                ref=f"commit/{sha}/message",
+                login=login,
+                weight=w,
+                excerpt=_excerpt_for(msg, login),
+            ))
+
+    # 4. PR reviewers
+    seen_reviews: set[tuple[str, str]] = set()
+    for r in pr.get("reviews", []) or []:
+        rid = str(r.get("id", ""))
+        login = (r.get("author") or {}).get("login", "")
+        if login and login != pr_author and (login, rid) not in seen_reviews:
+            seen_reviews.add((login, rid))
+            ref = f"pr#{pr_num}/review/{rid}" if rid else f"pr#{pr_num}/review"
+            out.append(_signal(
+                stype="pr_reviewer",
+                ref=ref,
+                login=login,
+                weight=weights["pr_reviewer"],
+            ))
+
+    # 5. Manual /contribute in PR body
+    for login, w in parse_contribute_directives(pr_body).items():
+        out.append(_signal(
+            stype="manual:pr_body",
+            ref=f"pr#{pr_num}/body",
+            login=login,
+            weight=w,
+            excerpt=_excerpt_for(pr_body, login),
+        ))
+
+    return out
+
+
+def collect_issue_signals(repo: str, issue_num: int,
+                          weights: dict[str, float]) -> list[dict]:
+    """Issue body + comments → issue_comment + manual:issue_body +
+    manual:issue_comment signals."""
+    issue = run_gh(["issue", "view", str(issue_num), "--json",
+                    "body,comments"], repo=repo)
+    if not issue:
+        return []
+
+    out: list[dict] = []
+    body = issue.get("body", "") or ""
+
+    # 1. /contribute in issue body
+    for login, w in parse_contribute_directives(body).items():
+        out.append(_signal(
+            stype="manual:issue_body",
+            ref=f"issue#{issue_num}/body",
+            login=login,
+            weight=w,
+            excerpt=_excerpt_for(body, login),
+        ))
+
+    # 2. Comments — both as issue_comment evidence + manual directives
+    for c in issue.get("comments", []) or []:
+        cid = str(c.get("id", ""))
+        login = (c.get("author") or {}).get("login", "")
+        comment_body = c.get("body", "") or ""
+
+        # Skip bot comments (edpa-bot, github-actions, etc.)
+        if login.endswith("[bot]") or login in {"edpa-bot", "github-actions"}:
+            continue
+
+        if login:
+            ref = (f"issue#{issue_num}/comment/{cid}" if cid
+                   else f"issue#{issue_num}/comment")
+            out.append(_signal(
+                stype="issue_comment",
+                ref=ref,
+                login=login,
+                weight=weights["issue_comment"],
+            ))
+
+        # /contribute inside the comment
+        for ovr_login, w in parse_contribute_directives(comment_body).items():
+            ref = (f"issue#{issue_num}/comment/{cid}" if cid
+                   else f"issue#{issue_num}/comment")
+            out.append(_signal(
+                stype="manual:issue_comment",
+                ref=ref,
+                login=ovr_login,
+                weight=w,
+                excerpt=_excerpt_for(comment_body, ovr_login),
+            ))
+
+    return out
+
+
+def collect_pr_comment_signals(repo: str, pr_num: int) -> list[dict]:
+    """/contribute directives in PR-level (issue-style) comments — separate
+    surface from PR review threads. Uses gh api directly since `gh pr view
+    --json comments` is not always populated."""
+    raw = run_gh(["api", f"repos/{repo}/issues/{pr_num}/comments"], repo=None)
+    if not isinstance(raw, list):
+        return []
+
+    out: list[dict] = []
+    for c in raw:
+        cid = str(c.get("id", ""))
+        login = (c.get("user") or {}).get("login", "")
+        body = c.get("body", "") or ""
+        if login.endswith("[bot]"):
+            continue
+        for ovr_login, w in parse_contribute_directives(body).items():
+            ref = f"pr#{pr_num}/comment/{cid}" if cid else f"pr#{pr_num}/comment"
+            out.append(_signal(
+                stype="manual:pr_comment",
+                ref=ref,
+                login=ovr_login,
+                weight=w,
+                excerpt=_excerpt_for(body, ovr_login),
+            ))
+    return out
+
+
+# ─── Aggregation ─────────────────────────────────────────────────────────────
+
+
+def aggregate_signals(signals: list[dict],
+                      people_map: dict[str, str]) -> list[dict] | None:
+    """Group signals by resolved person_id, compute contribution_score and
+    per-item-normalized cw share. Returns the contributors[] list ready
+    to write into the YAML — or None when no signals fired (caller's
+    edge-case handling, see Q1 in v1.11 RFC)."""
+    if not signals:
+        return None
+
+    # Resolve every signal's login → person_id, normalising case.
+    by_person: dict[str, list[dict]] = defaultdict(list)
+    total_score = 0.0
+    for sig in signals:
+        login = sig["login"]
+        person_id = people_map.get(login.lower(), login)
+        # Preserve a clean signal record for YAML — drop the working
+        # `login` field, add resolved person id later in contributor entry.
+        clean = {k: v for k, v in sig.items() if k != "login"}
+        by_person[person_id].append(clean)
+        total_score += sig["weight"]
+
+    if total_score <= 0:
+        return None
+
+    # Sort persons by contribution_score desc for deterministic YAML order.
+    contributors: list[dict] = []
+    person_scores = [
+        (pid, sum(s["weight"] for s in sigs), sigs)
+        for pid, sigs in by_person.items()
+    ]
+    person_scores.sort(key=lambda x: (-x[1], x[0]))
+
+    for pid, score, sigs in person_scores:
+        cw = score / total_score
+        # Sort signals deterministic by (type, ref) so two detect runs on
+        # identical GH state produce byte-identical YAML.
+        sigs_sorted = sorted(sigs, key=lambda s: (s["type"], s["ref"]))
+        contributors.append({
+            "person": pid,
+            "cw": round(cw, 4),
+            "contribution_score": round(score, 2),
+            "signals": sigs_sorted,
+        })
+    return contributors
+
+
+def write_contributors(yaml_path: Path,
+                       new_contributors: list[dict],
+                       *, dry_run: bool = False) -> bool:
+    """Replace `contributors[]` block in yaml_path with new_contributors.
+
+    v1.11 semantics: full rewrite, no merge-with-existing. Re-running
+    detect_contributors is idempotent — same signals → same output.
+    Returns True when the file changed.
+    """
+    data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+    old = data.get("contributors", []) or []
+
+    # Drop legacy `as:` field from any pre-v1.11 entries before comparing.
+    if old != new_contributors:
+        data["contributors"] = new_contributors
+        if not dry_run:
+            yaml_path.write_text(
+                yaml.safe_dump(
+                    data,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+        return True
+    return False
+
+
+# ─── Per-item processing ────────────────────────────────────────────────────
+
+
+def find_prs_touching_item(repo: str, item_id: str,
+                           since: datetime | None) -> list[int]:
+    """Search merged PRs whose title/branch/body references item_id."""
+    since_iso = since.strftime("%Y-%m-%d") if since else "2020-01-01"
+    query = f"is:pr is:merged merged:>={since_iso} {item_id}"
+    res = run_gh(["search", "prs", "--repo", repo,
+                  "--json", "number,title", "--limit", "100", query])
+    if not isinstance(res, list):
+        return []
+    return [int(p["number"]) for p in res if "number" in p]
+
+
+def process_item(edpa_root: Path, repo: str, item_id: str,
+                 *, weights: dict[str, float],
+                 people_map: dict[str, str],
+                 issue_map: dict[str, int],
+                 pr_scope: list[int] | None = None,
+                 since: datetime | None = None,
+                 dry_run: bool = False) -> tuple[bool, int]:
+    """Recompute contributors[] for a single item from all known sources.
+
+    pr_scope: optional explicit list of PR numbers to consider (CI mode
+    typically passes [PR_NUMBER]). When None, all merged PRs touching
+    the item since `since` are searched.
+
+    Returns (changed: bool, n_signals: int).
+    """
+    yaml_path = find_backlog_file(edpa_root, item_id)
+    if not yaml_path:
+        print(f"  {item_id}: no YAML file — skipping", file=sys.stderr)
+        return False, 0
+
+    issue_num = issue_map.get(item_id)
+    if pr_scope is None:
+        pr_nums = find_prs_touching_item(repo, item_id, since)
+    else:
+        pr_nums = list(pr_scope)
+
+    signals: list[dict] = []
+    if issue_num:
+        signals.extend(collect_assignee_signals(repo, issue_num, weights["assignee"]))
+        signals.extend(collect_issue_signals(repo, issue_num, weights))
+    for pr_num in sorted(set(pr_nums)):
+        signals.extend(collect_pr_signals(repo, pr_num, weights))
+        signals.extend(collect_pr_comment_signals(repo, pr_num))
+
+    n = len(signals)
+    if n == 0:
+        # Q1 edge case: warn-and-skip. Existing contributors[] left intact.
+        print(f"  {item_id}: 0 signals detected — leaving contributors[] untouched")
+        return False, 0
+
+    contributors = aggregate_signals(signals, people_map)
+    if not contributors:
+        print(f"  {item_id}: aggregation produced 0 contributors — skipping")
+        return False, n
+
+    changed = write_contributors(yaml_path, contributors, dry_run=dry_run)
+    verb = "would update" if dry_run else ("updated" if changed else "unchanged")
+    print(f"  {item_id}: {len(contributors)} contributors, {n} signals → {verb}")
+    return changed, n
+
+
+# ─── Entry-point flows ──────────────────────────────────────────────────────
+
+
+def cmd_pr(edpa_root: Path, repo: str, pr_number: int,
+           dry_run: bool = False) -> int:
+    """Recompute contributors[] for every item referenced by a single PR."""
+    weights = load_signal_weights(edpa_root)
+    people_map = load_people_map(edpa_root)
+    issue_map = load_issue_map(edpa_root)
+
+    pr = run_gh(["pr", "view", str(pr_number),
+                 "--json", "title,headRefName,body,commits"], repo=repo)
+    if not pr:
+        print(f"PR #{pr_number}: not found", file=sys.stderr)
+        return 1
+
+    item_ids: set[str] = set()
+    item_ids.update(extract_item_ids(pr.get("title", "")))
+    item_ids.update(extract_item_ids(pr.get("headRefName", "")))
+    item_ids.update(extract_item_ids(pr.get("body", "")))
+    for c in pr.get("commits", []) or []:
+        msg = (c.get("messageHeadline") or "") + " " + (c.get("messageBody") or "")
+        item_ids.update(extract_item_ids(msg))
+
+    if not item_ids:
+        print(f"PR #{pr_number}: no item IDs referenced", file=sys.stderr)
+        return 0
+
+    print(f"PR #{pr_number} touches: {sorted(item_ids)}")
+    updated = 0
+    for item_id in sorted(item_ids):
+        changed, _ = process_item(
+            edpa_root, repo, item_id,
+            weights=weights, people_map=people_map, issue_map=issue_map,
+            pr_scope=[pr_number],
+            dry_run=dry_run,
         )
-    return changed
+        if changed:
+            updated += 1
+    print(f"\n✓ {updated}/{len(item_ids)} item(s) updated")
+    return 0
+
+
+def cmd_item(edpa_root: Path, repo: str, item_id: str,
+             since: datetime | None, dry_run: bool = False) -> int:
+    """Walk all merged PRs touching item_id since `since` and recompute."""
+    weights = load_signal_weights(edpa_root)
+    people_map = load_people_map(edpa_root)
+    issue_map = load_issue_map(edpa_root)
+
+    changed, n = process_item(
+        edpa_root, repo, item_id,
+        weights=weights, people_map=people_map, issue_map=issue_map,
+        since=since, dry_run=dry_run,
+    )
+    return 0 if (changed or n == 0) else 0
+
+
+def cmd_ci(edpa_root: Path, repo: str, dry_run: bool = False) -> int:
+    """Driven by contributor-detect.yml workflow — env vars give PR context."""
+    pr_number = os.environ.get("PR_NUMBER", "").strip()
+    if not pr_number:
+        print("CI mode requires PR_NUMBER env var", file=sys.stderr)
+        return 1
+    return cmd_pr(edpa_root, repo, int(pr_number), dry_run=dry_run)
+
+
+# ─── _parse_relative_since (preserved API) ─────────────────────────────────
 
 
 def _parse_relative_since(since: str) -> datetime | None:
-    """Convert '7days' / '2weeks' / '1month' / 'YYYY-MM-DD' into UTC datetime."""
     if not since:
         return None
     s = since.strip().lower()
@@ -218,302 +667,63 @@ def _parse_relative_since(since: str) -> datetime | None:
             delta = timedelta(days=n)
         elif unit.startswith("w"):
             delta = timedelta(weeks=n)
-        else:  # month — approximate as 30 days
+        else:
             delta = timedelta(days=30 * n)
         return datetime.now(timezone.utc) - delta
     try:
-        return datetime.fromisoformat(since).replace(tzinfo=timezone.utc)
+        return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
     except ValueError:
         return None
 
 
-def gather_pr_evidence(repo: str, pr_number: str | int):
-    """Pull author / reviewers / commit authors / item IDs for a single PR.
-
-    Also fetches the PR body and parses any `/contribute` directives
-    found there. Those directives are returned in `info["overrides"]`
-    and applied at update time — they let a PR author manually credit
-    a contributor (e.g., a pair-programmer or silent reviewer) who
-    otherwise wouldn't show up in the auto-detected commit/review
-    metadata.
-    """
-    info = {"author": "", "title": "", "branch": "", "body": "",
-            "reviewers": set(), "commit_authors": set(),
-            "item_ids": set(), "overrides": {}}
-    pr = run_gh(["pr", "view", str(pr_number),
-                 "--json", "author,title,body,headRefName,commits,reviews"],
-                repo=repo)
-    if not pr:
-        return info
-    info["author"] = pr.get("author", {}).get("login", "") or ""
-    info["title"] = pr.get("title", "") or ""
-    info["branch"] = pr.get("headRefName", "") or ""
-    info["body"] = pr.get("body", "") or ""
-    info["item_ids"].update(extract_item_ids(info["title"]))
-    info["item_ids"].update(extract_item_ids(info["branch"]))
-    info["item_ids"].update(extract_item_ids(info["body"]))
-    for c in pr.get("commits", []) or []:
-        msg = (c.get("messageHeadline", "") + " "
-               + (c.get("messageBody") or ""))
-        info["item_ids"].update(extract_item_ids(msg))
-        for field in ("authors", "committers"):
-            for a in c.get(field, []) or []:
-                login = a.get("login", "")
-                if login and login != info["author"]:
-                    info["commit_authors"].add(login)
-    for r in pr.get("reviews", []) or []:
-        login = r.get("author", {}).get("login", "")
-        if login and login != info["author"]:
-            info["reviewers"].add(login)
-    info["overrides"] = parse_contribute_directives(info["body"])
-    return info
+# ─── Main ──────────────────────────────────────────────────────────────────
 
 
-def find_prs_touching_item(repo: str, item_id: str, since: datetime):
-    """Best-effort: list merged PRs whose title/branch references item_id
-    since the given timestamp. Uses gh search for portability.
-
-    `gh search prs` wants `--repo OWNER/NAME` as a flag plus the rest of
-    the query as positional terms; baking everything into one big
-    "repo:owner/name ..." string causes the CLI to wrap the lot in
-    quotes and reject it as an invalid query.
-    """
-    since_iso = since.strftime("%Y-%m-%d")
-    query = f"is:pr is:merged merged:>={since_iso} {item_id}"
-    res = run_gh(["search", "prs", "--repo", repo,
-                  "--json", "number,title", "--limit", "100", query])
-    return res or []
-
-
-def process_pr_evidence(edpa_root: Path, repo: str, pr_number: str,
-                        scope_item_id: str | None = None,
-                        dry_run: bool = False):
-    """Update backlog YAMLs for every item referenced by the given PR.
-
-    If scope_item_id is given, only that one item is updated (and only if
-    it appears in the PR's references).
-    """
-    info = gather_pr_evidence(repo, pr_number)
-    if not info["author"]:
-        print(f"PR #{pr_number}: not found or no author info", file=sys.stderr)
-        return 0
-
-    print(f"PR #{pr_number} by {info['author']}: {info['title']}")
-    if info["reviewers"]:
-        print(f"  reviewers: {sorted(info['reviewers'])}")
-    if info["commit_authors"]:
-        print(f"  commit authors: {sorted(info['commit_authors'])}")
-    if info["overrides"]:
-        ov_summary = ", ".join(
-            f"@{login}={meta['cw']}"
-            + (f"/{meta['role']}" if meta["role"] else "")
-            for login, meta in sorted(info["overrides"].items())
-        )
-        print(f"  /contribute overrides: {ov_summary}")
-    target_ids = sorted(info["item_ids"])
-    if scope_item_id:
-        target_ids = [scope_item_id] if scope_item_id in info["item_ids"] else []
-    if not target_ids:
-        print("  no item IDs to credit")
-        return 0
-    print(f"  items: {target_ids}")
-
-    people_map = load_people_map(edpa_root)
-    heuristics_path = edpa_root / "config" / "heuristics.yaml"
-    weights = {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15}
-    if heuristics_path.exists():
-        h = yaml.safe_load(heuristics_path.read_text()) or {}
-        weights.update(h.get("role_weights") or {})
-
-    def resolve(login):
-        return people_map.get(login.lower(), login)
-
-    overrides = info.get("overrides", {})
-
-    def _override_for(login: str):
-        """Return the /contribute directive matching this GH login (case
-        insensitive on login lookup; resolved person id is also tried so
-        directives may use either the login or the canonical id)."""
-        if not login:
-            return None
-        if login in overrides:
-            return overrides[login]
-        # Try case-insensitive login match
-        for k, v in overrides.items():
-            if k.lower() == login.lower():
-                return v
-        # Try people.yaml id (so `/contribute @bob` works when bob is the
-        # canonical id and the GH login is `bob-dev` or similar)
-        resolved = resolve(login)
-        if resolved in overrides:
-            return overrides[resolved]
-        for k, v in overrides.items():
-            if k.lower() == resolved.lower():
-                return v
-        return None
-
-    used_overrides: set[str] = set()
-
-    def _emit(login: str, default_role: str, default_source: str):
-        ov = _override_for(login)
-        if ov:
-            # Mark this override consumed so we don't double-emit it as
-            # a free-standing /contribute entry below.
-            for k in (login, login.lower(), resolve(login).lower()):
-                used_overrides.add(k)
-            cw = ov["cw"]
-            role = ov["role"] or default_role
-            source = f"{default_source}+pr_body:#{pr_number}"
-        else:
-            cw = weights.get(default_role, 0.25)
-            role = default_role
-            source = default_source
-        return {
-            "person": resolve(login),
-            "as": role,
-            "cw": cw,
-            "source": source,
-        }
-
-    updated = 0
-    for item_id in target_ids:
-        yaml_path = find_backlog_file(edpa_root, item_id)
-        if not yaml_path:
-            print(f"  {item_id}: no YAML file found, skipping")
-            continue
-        new_contribs = []
-        if info["author"]:
-            new_contribs.append(_emit(
-                info["author"], "key", f"pr_author:#{pr_number}"))
-        for login in sorted(info["reviewers"]):
-            new_contribs.append(_emit(
-                login, "reviewer", f"pr_reviewer:#{pr_number}"))
-        for login in sorted(info["commit_authors"]):
-            new_contribs.append(_emit(
-                login, "reviewer", f"commit_author:#{pr_number}"))
-        # Free-standing /contribute directives that didn't match any
-        # auto-detected contributor (e.g., silent pair-programmer or
-        # consultant). These are pure manual attributions.
-        for login, meta in sorted(overrides.items()):
-            if login in used_overrides or login.lower() in used_overrides:
-                continue
-            resolved_lower = resolve(login).lower()
-            if resolved_lower in used_overrides:
-                continue
-            role = meta["role"] or "key"
-            new_contribs.append({
-                "person": resolve(login),
-                "as": role,
-                "cw": meta["cw"],
-                "source": f"pr_body:#{pr_number}",
-            })
-        changed = update_contributors(yaml_path, new_contribs, dry_run=dry_run)
-        verb = "would update" if dry_run else ("updated" if changed else "unchanged")
-        print(f"  {item_id}: {len(new_contribs)} contributors → {verb}")
-        if changed:
-            updated += 1
-    return updated
-
-
-def detect_repo_from_config(edpa_root: Path) -> str | None:
-    cfg = edpa_root / "config" / "edpa.yaml"
-    if not cfg.exists():
-        return None
-    data = yaml.safe_load(cfg.read_text()) or {}
-    sync = data.get("sync") or {}
-    org = sync.get("github_org")
-    repo = sync.get("github_repo")
-    if org and repo:
-        return f"{org}/{repo}"
-    return None
-
-
-def cli_audit_mode(edpa_root: Path, repo: str, item_id: str | None,
-                   since: str, dry_run: bool):
-    since_dt = _parse_relative_since(since)
-    if not since_dt:
-        print(f"ERROR: cannot parse --since {since!r} (use 7days / 2weeks / "
-              f"1month / YYYY-MM-DD)", file=sys.stderr)
-        sys.exit(2)
-    if item_id:
-        prs = find_prs_touching_item(repo, item_id, since_dt)
-    else:
-        # Walk every merged PR in the window so we credit all items.
-        since_iso = since_dt.strftime("%Y-%m-%d")
-        prs = run_gh(["search", "prs", "--repo", repo,
-                      "--json", "number,title", "--limit", "100",
-                      f"is:pr is:merged merged:>={since_iso}"]) or []
-    if not prs:
-        print(f"No merged PRs found in window since {since_dt.isoformat()}")
-        return 0
-    print(f"Found {len(prs)} PR(s) since {since_dt.date()}")
-    total_updated = 0
-    for pr in prs:
-        total_updated += process_pr_evidence(
-            edpa_root, repo, str(pr["number"]),
-            scope_item_id=item_id, dry_run=dry_run)
-    return total_updated
-
-
-def ci_mode(edpa_root: Path, repo: str, dry_run: bool):
-    pr_number = os.environ.get("PR_NUMBER", "")
-    if not pr_number:
-        print("ERROR: PR_NUMBER not set. Use --pr <N> or --item <ID> for CLI mode.",
-              file=sys.stderr)
-        sys.exit(1)
-    return process_pr_evidence(edpa_root, repo, pr_number, dry_run=dry_run)
+def find_edpa_root() -> Path:
+    """Locate .edpa/ from cwd upward."""
+    cur = Path.cwd().resolve()
+    for parent in [cur, *cur.parents]:
+        if (parent / ".edpa").is_dir():
+            return parent / ".edpa"
+    print("ERROR: no .edpa/ directory found", file=sys.stderr)
+    sys.exit(2)
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="EDPA contributor auto-detection (CI + CLI audit modes)"
+    ap = argparse.ArgumentParser(
+        description="EDPA contributor auto-detection (v1.11 single-source CW)"
     )
-    parser.add_argument("--pr", help="PR number to scan (CLI alternative to PR_NUMBER env var)")
-    parser.add_argument("--item", help="Restrict updates to a single item ID (e.g. S-200)")
-    parser.add_argument(
-        "--since",
-        help="Look-back window for --item / audit mode "
-             "(e.g. 7days, 2weeks, 1month, YYYY-MM-DD). Default: 30days",
-        default="30days",
-    )
-    parser.add_argument("--repo",
-                        help="GitHub owner/repo (default: read from .edpa/config/edpa.yaml)")
-    parser.add_argument("--edpa-root", default=".edpa",
-                        help="Path to .edpa/ directory (default: .edpa)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Show what would change without writing YAML")
-    args = parser.parse_args()
+    ap.add_argument("--pr", type=int, help="Recompute contributors for items in this PR")
+    ap.add_argument("--item", help="Recompute contributors for a single item ID (e.g. S-200)")
+    ap.add_argument("--since", default="30days",
+                    help="With --item: how far back to scan PRs (default: 30days)")
+    ap.add_argument("--repo",
+                    help="GH repo (owner/name); defaults to .edpa/config/edpa.yaml")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="Show what would change without writing YAML")
+    args = ap.parse_args()
 
-    edpa_root = Path(args.edpa_root)
-    if not edpa_root.exists():
-        print(f"ERROR: {edpa_root} not found", file=sys.stderr)
-        sys.exit(1)
+    edpa_root = find_edpa_root()
 
-    repo = args.repo or detect_repo_from_config(edpa_root) or os.environ.get("GH_REPO", "")
+    repo = args.repo or detect_repo_from_config(edpa_root)
     if not repo:
-        print("ERROR: cannot determine repo. Pass --repo owner/name or configure "
-              "sync.github_org + sync.github_repo in .edpa/config/edpa.yaml.",
+        print("ERROR: --repo required (or set sync.github_org/_repo in edpa.yaml)",
               file=sys.stderr)
-        sys.exit(1)
+        sys.exit(2)
 
     if args.pr:
-        process_pr_evidence(edpa_root, repo, args.pr,
-                            scope_item_id=args.item,
-                            dry_run=args.dry_run)
-        return
+        return cmd_pr(edpa_root, repo, args.pr, dry_run=args.dry_run)
+    if args.item:
+        since = _parse_relative_since(args.since)
+        return cmd_item(edpa_root, repo, args.item, since, dry_run=args.dry_run)
 
-    if args.item or os.environ.get("PR_NUMBER", "") == "":
-        # CLI / audit mode
-        if not args.item:
-            print("ERROR: provide --item <ID> or set PR_NUMBER (CI mode)",
-                  file=sys.stderr)
-            sys.exit(1)
-        cli_audit_mode(edpa_root, repo, args.item, args.since, args.dry_run)
-        return
+    # CI mode (env-driven)
+    if os.environ.get("PR_NUMBER"):
+        return cmd_ci(edpa_root, repo, dry_run=args.dry_run)
 
-    # Fallback to CI mode (PR_NUMBER set)
-    ci_mode(edpa_root, repo, args.dry_run)
+    ap.print_help()
+    return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

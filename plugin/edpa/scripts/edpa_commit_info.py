@@ -7,7 +7,10 @@ Resolves:
   - evidence: from cw_heuristics.yaml
   - item: from .edpa/backlog/ matching branch or diff content
 
-Also re-exports compute_cw from engine for convenience.
+v1.11 note: previously re-exported compute_cw from engine. That helper
+was removed in v1.11 (CW computation moved to detect_contributors.py).
+Callers that need a CW for a commit-time hook should call
+detect_contributors directly post-merge instead of pre-commit.
 """
 
 import re
@@ -20,10 +23,6 @@ try:
 except ImportError:
     print("ERROR: PyYAML required. Install with: pip install pyyaml")
     sys.exit(1)
-
-# Re-export compute_cw from engine
-sys.path.insert(0, str(Path(__file__).parent))
-from engine import compute_cw  # noqa: E402, F401
 
 
 def git_config(key):

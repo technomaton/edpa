@@ -27,7 +27,6 @@ from edpa_commit_info import (
     load_people,
     load_heuristics,
     find_backlog_item,
-    compute_cw,
 )
 from validate_syntax import validate_yaml
 
@@ -325,42 +324,29 @@ class TestSchemaStrictness:
 # ---------------------------------------------------------------------------
 
 
-class TestEngineIntegration:
-    """Test engine integration from edpa_commit_info module."""
+class TestCWPipelineV1_11:
+    """v1.11: CW computation moved from engine to detect_contributors.
 
-    def test_compute_cw_importable(self):
-        """import compute_cw from edpa_commit_info module."""
-        from edpa_commit_info import compute_cw as cw_func
-        assert callable(cw_func)
+    The legacy `compute_cw(evidence_entry, heuristics, role)` function
+    no longer exists. Engine reads `cw` directly from
+    `contributors[].cw` (per-item-normalized share produced by
+    detect_contributors.py). Role-based overrides were removed in v1.11.
 
-    def test_compute_cw_with_role_override(self):
-        """Arch reviewer = 0.30."""
-        heuristics = {
-            "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15},
-            "role_overrides": {
-                "Arch": {"owner": 1.0, "key": 0.6, "reviewer": 0.30, "consulted": 0.15},
-            },
-        }
-        evidence_entry = {
-            "signals": ["pr_reviewer"],
-            "evidence_score": 1.0,
-            "manual_cw": None,
-        }
-        cw = compute_cw(evidence_entry, heuristics, person_role="Arch")
-        assert abs(cw - 0.30) < 0.001
+    Direct CW unit tests now live in tests/test_detect_contributors.py
+    (see TestAggregation block). Hooks-layer integration is covered by
+    the rest of test_hooks.py (resolve_person, find_backlog_item, etc.).
+    """
 
-    def test_compute_cw_fallback(self):
-        """Unknown role -> generic weights."""
-        heuristics = {
-            "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15},
-            "role_overrides": {
-                "Arch": {"owner": 1.0, "key": 0.6, "reviewer": 0.30, "consulted": 0.15},
-            },
-        }
-        evidence_entry = {
-            "signals": ["pr_reviewer"],
-            "evidence_score": 1.0,
-            "manual_cw": None,
-        }
-        cw = compute_cw(evidence_entry, heuristics, person_role="UnknownRole")
-        assert abs(cw - 0.25) < 0.001, f"Expected generic reviewer=0.25, got {cw}"
+    def test_compute_cw_no_longer_re_exported(self):
+        """edpa_commit_info no longer re-exports compute_cw."""
+        from edpa_commit_info import resolve_person, find_backlog_item
+        assert callable(resolve_person)
+        assert callable(find_backlog_item)
+        # compute_cw must NOT be importable — its absence is the v1.11 contract
+        try:
+            from edpa_commit_info import compute_cw  # noqa: F401
+            raise AssertionError(
+                "compute_cw was removed in v1.11; should not be importable"
+            )
+        except ImportError:
+            pass  # expected
