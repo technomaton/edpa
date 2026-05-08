@@ -90,18 +90,65 @@ class SyntheticScenario:
     contributions: list[SyntheticContribution]
 
 
-def generate_signals(true_cw: float, role: str, rng: random.Random) -> dict[str, int]:
+def generate_signals(true_cw: float, role: str, rng: random.Random,
+                     edge_case: str | None = None) -> dict[str, int]:
     """Emit a plausible signal mix for a person whose true_cw on this
-    item is `true_cw`. Roles bias which signals fire (Dev tends to
-    commit, PM tends to comment, Arch tends to review)."""
+    item is `true_cw`. Roles bias which signals fire (Dev commits,
+    PM comments, Arch reviews). `edge_case` injects atypical patterns:
+
+      - 'pm_driven_owner': PM is assignee but has no commits; their
+        work shows up as issue_comments + maybe pr_reviewer (specs,
+        AC reviews). Models items where PM owns scope, devs implement.
+      - 'silent_reviewer': contributor has only pr_reviewer (no
+        commits, no comments). Models a tech-review-only role.
+      - 'pair_partner': contributor has commits comparable to owner's
+        commit count (true_cw similar to ~0.45 each). Models pair
+        programming where authorship is split.
+      - 'arch_consultant': contributor has many issue_comments + pr
+        reviews but no commits, despite cw band being non-trivial.
+        Models Arch contribution that's invisible in commit history.
+
+    None means: use the base role-driven signal pattern.
+    """
     signals: dict[str, int] = {s: 0 for s in SIGNAL_TYPES}
+
+    if edge_case == "pm_driven_owner":
+        # PM as assignee/owner without commits — their work is in
+        # specifications, AC, and issue discussions.
+        signals["assignee"] += 1
+        signals["issue_comment"] += rng.randint(2, 5)
+        signals["pr_reviewer"] += rng.choices([0, 1], weights=[0.5, 0.5])[0]
+        return signals
+
+    if edge_case == "silent_reviewer":
+        # Tech reviewer who reviews PRs without committing or
+        # commenting on the issue. Common pattern for Architects.
+        signals["pr_reviewer"] += rng.randint(1, 3)
+        return signals
+
+    if edge_case == "pair_partner":
+        # Pair-programmed with the owner — full commit participation,
+        # often co-authored PR, but not the assignee.
+        signals["pr_author"] += rng.choices([0, 1], weights=[0.4, 0.6])[0]
+        signals["commit_author"] += rng.randint(2, 4)
+        signals["issue_comment"] += rng.randint(0, 1)
+        return signals
+
+    if edge_case == "arch_consultant":
+        # Arch consulted across multiple items: lots of design comments
+        # and reviews, no direct commits. true_cw is non-trivial
+        # because their input shaped the implementation.
+        signals["issue_comment"] += rng.randint(2, 4)
+        signals["pr_reviewer"] += rng.randint(1, 2)
+        return signals
+
+    # ── Base role-driven pattern (no edge case) ──────────────────
 
     # Owner band (cw >= 0.5)
     if true_cw >= 0.5:
         signals["assignee"] += 1
         signals["pr_author"] += rng.choices([0, 1], weights=[0.2, 0.8])[0]
         signals["commit_author"] += rng.randint(2, 5)
-        # Reviewers don't add much for owners; small chance of self-review
         signals["issue_comment"] += rng.randint(0, 2)
 
     # Key band (0.3 <= cw < 0.5)
@@ -122,7 +169,7 @@ def generate_signals(true_cw: float, role: str, rng: random.Random) -> dict[str,
         signals["issue_comment"] += rng.randint(1, 4)
         signals["pr_reviewer"] += rng.choices([0, 1], weights=[0.85, 0.15])[0]
 
-    # Role bias: PMs comment more, Devs commit more, Archs review more
+    # Role bias overlay
     if role == "PM":
         signals["issue_comment"] += rng.randint(0, 2)
     elif role == "Arch":
@@ -139,7 +186,20 @@ def generate_signals(true_cw: float, role: str, rng: random.Random) -> dict[str,
 
 
 def generate_scenario(scenario_id: int, rng: random.Random) -> SyntheticScenario:
-    """Single team×iteration with realistic-ish team and items."""
+    """Single team×iteration with realistic-ish team and items.
+
+    Each item gets one of these flavors (probability in parentheses):
+      - 'normal' (60%): base role-driven signal pattern
+      - 'pm_driven' (15%): PM is owner, devs are key/reviewer with commits
+      - 'pair_programmed' (10%): two near-equal contributors, both commit
+      - 'design_heavy' (10%): Arch consultant + dev implementer pattern
+      - 'minimal' (5%): single owner, very small team participation
+
+    Models real-world item heterogeneity better than uniform Dirichlet
+    sampling — calibrator sees patterns where signal-to-truth mapping
+    varies across item types, forcing weights to generalize rather
+    than overfit one mode.
+    """
     team_size = rng.randint(3, 7)
     team = []
     for i in range(team_size):
@@ -151,25 +211,112 @@ def generate_scenario(scenario_id: int, rng: random.Random) -> SyntheticScenario
 
     contributions = []
     for item_id in items:
-        # 2-5 contributors per item
+        flavor = rng.choices(
+            ["normal", "pm_driven", "pair", "design_heavy", "minimal"],
+            weights=[60, 15, 10, 10, 5],
+        )[0]
+
+        if flavor == "pair" and team_size >= 3:
+            # 2 near-equal contributors (~0.45 each) + 1 reviewer (~0.10)
+            picks = rng.sample(team, 3)
+            true_cws = [0.45 + rng.uniform(-0.05, 0.05),
+                        0.45 + rng.uniform(-0.05, 0.05),
+                        0.10]
+            # normalize
+            s = sum(true_cws); true_cws = [c/s for c in true_cws]
+            for idx, (person, true_cw) in enumerate(zip(picks, true_cws)):
+                edge = "pair_partner" if idx < 2 else None
+                contributions.append(SyntheticContribution(
+                    person=person["id"], role=person["role"],
+                    item_id=item_id, true_cw=true_cw,
+                    signal_counts=generate_signals(true_cw, person["role"], rng, edge_case=edge),
+                ))
+            continue
+
+        if flavor == "pm_driven":
+            # Find PM if any; if no PM, fall back to normal
+            pms = [p for p in team if p["role"] == "PM"]
+            devs = [p for p in team if p["role"] in ("Dev", "DevSecOps", "QA")]
+            if not pms or not devs:
+                flavor = "normal"  # graceful fallback
+            else:
+                pm = rng.choice(pms)
+                n_devs = min(rng.randint(1, 3), len(devs))
+                dev_picks = rng.sample(devs, n_devs)
+                # PM owner ~0.55, devs split ~0.45 among themselves
+                pm_cw = 0.50 + rng.uniform(-0.10, 0.05)
+                dev_share = 1.0 - pm_cw
+                # Distribute dev_share across devs
+                dev_raw = sorted([rng.random() for _ in dev_picks], reverse=True)
+                dev_total = sum(dev_raw)
+                dev_cws = [r / dev_total * dev_share for r in dev_raw]
+                contributions.append(SyntheticContribution(
+                    person=pm["id"], role="PM", item_id=item_id, true_cw=pm_cw,
+                    signal_counts=generate_signals(pm_cw, "PM", rng, edge_case="pm_driven_owner"),
+                ))
+                for d, cw in zip(dev_picks, dev_cws):
+                    contributions.append(SyntheticContribution(
+                        person=d["id"], role=d["role"], item_id=item_id,
+                        true_cw=cw,
+                        signal_counts=generate_signals(cw, d["role"], rng),
+                    ))
+                continue
+
+        if flavor == "design_heavy":
+            # Arch consultant + dev implementer
+            archs = [p for p in team if p["role"] == "Arch"]
+            devs = [p for p in team if p["role"] in ("Dev", "DevSecOps")]
+            if not archs or not devs:
+                flavor = "normal"  # fallback
+            else:
+                arch = rng.choice(archs)
+                dev = rng.choice(devs)
+                # Dev does ~0.65 of the work, Arch consults ~0.25, maybe one more reviewer ~0.10
+                contributions.append(SyntheticContribution(
+                    person=dev["id"], role=dev["role"], item_id=item_id, true_cw=0.65,
+                    signal_counts=generate_signals(0.65, dev["role"], rng),
+                ))
+                contributions.append(SyntheticContribution(
+                    person=arch["id"], role="Arch", item_id=item_id, true_cw=0.25,
+                    signal_counts=generate_signals(0.25, "Arch", rng, edge_case="arch_consultant"),
+                ))
+                # Optional silent reviewer
+                if team_size >= 4:
+                    rest = [p for p in team if p not in (arch, dev)]
+                    rev = rng.choice(rest)
+                    contributions.append(SyntheticContribution(
+                        person=rev["id"], role=rev["role"], item_id=item_id, true_cw=0.10,
+                        signal_counts=generate_signals(0.10, rev["role"], rng, edge_case="silent_reviewer"),
+                    ))
+                continue
+
+        if flavor == "minimal":
+            # Single owner + maybe 1 small reviewer
+            owner = rng.choice(team)
+            contributions.append(SyntheticContribution(
+                person=owner["id"], role=owner["role"], item_id=item_id, true_cw=0.85,
+                signal_counts=generate_signals(0.85, owner["role"], rng),
+            ))
+            if team_size >= 2 and rng.random() < 0.5:
+                rest = [p for p in team if p != owner]
+                rev = rng.choice(rest)
+                contributions.append(SyntheticContribution(
+                    person=rev["id"], role=rev["role"], item_id=item_id, true_cw=0.15,
+                    signal_counts=generate_signals(0.15, rev["role"], rng),
+                ))
+            continue
+
+        # Default: normal Dirichlet-ish flavor
         n_contribs = rng.randint(2, min(5, team_size))
         contribs = rng.sample(team, n_contribs)
-
-        # Build true_cw shares with one dominant contributor
-        # Dirichlet-ish via random weights, biased toward concentration
         raw = sorted([rng.random() ** 0.5 for _ in range(n_contribs)],
                      reverse=True)
         s = sum(raw)
         true_cws = [r / s for r in raw]
-
         for person, true_cw in zip(contribs, true_cws):
-            signals = generate_signals(true_cw, person["role"], rng)
             contributions.append(SyntheticContribution(
-                person=person["id"],
-                role=person["role"],
-                item_id=item_id,
-                true_cw=true_cw,
-                signal_counts=signals,
+                person=person["id"], role=person["role"], item_id=item_id, true_cw=true_cw,
+                signal_counts=generate_signals(true_cw, person["role"], rng),
             ))
 
     return SyntheticScenario(team=team, items=items, contributions=contributions)

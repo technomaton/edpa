@@ -35,11 +35,11 @@ version: "1.11.0"
 # same surface stack additively.
 #
 signals:
-  assignee: 5.57             # GitHub issue assignee
-  pr_author: 9.34            # PR author referencing item
-  commit_author: 6.99        # Commit with item ID in branch/title/msg
-  pr_reviewer: 6.46          # PR review submitted (excluding self)
-  issue_comment: 2.99        # Comment on issue/PR (excluding bots)
+  assignee: 4.0             # GitHub issue assignee
+  pr_author: 3.4            # PR author referencing item
+  commit_author: 2.78        # Commit with item ID in branch/title/msg
+  pr_reviewer: 2.25          # PR review submitted (excluding self)
+  issue_comment: 1.14        # Comment on issue/PR (excluding bots)
 
 # ─────────────────────────────────────────────────────────────────────
 # GATE WEIGHTS (used only when engine runs with --mode gates)
@@ -119,17 +119,26 @@ calibration:
   method: "MC random-sample + coordinate descent"
   monte_carlo:
     scenarios: 1000
-    records: 32210
+    records: 31041
   ground_truth_records: 0   # synthetic baseline; re-run with real data after first PI
-  mad_baseline: 0.0888
-  mad_calibrated: 0.0782
-  improvement_pct: 11.9
-  calibrated_at: "2026-05-08T17:28:42Z"
+  mad_baseline: 0.0861
+  mad_calibrated: 0.0805
+  improvement_pct: 6.5
+  calibrated_at: "2026-05-08T18:37:24Z"
   calibrated_by_version: "1.11.0"
   notes: |
     Synthetic Monte Carlo baseline (1000 scenarios,
-    32210 records). Ground truth was generated
+    31041 records). Ground truth was generated
     procedurally from a model where signal counts probabilistically
     reflect each person's true cw share with role-based bias.
     Re-run /edpa:calibrate after first real PI close with team-confirmed
     cw records to derive a real-data baseline.
+    Synthetic generator extends with 4 edge-case item flavors:
+    pm_driven (PM owner without commits), pair_programmed (2 near-equal
+    contributors), design_heavy (Arch consultant + dev impl + silent
+    reviewer), minimal (single owner). 60%% normal Dirichlet flavor +
+    40%% edge cases.
+
+    Weights post-calibration rescaled to set max signal weight = 4.0
+    (preserves cw ratios mod 2-decimal rounding; aligns auto weights
+    with manual /contribute weight: convention).
