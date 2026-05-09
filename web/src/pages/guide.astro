@@ -47,10 +47,15 @@ cd project-name`,
 Downloading EDPA plugin...
 ✓ Plugin installed to .claude/edpa/
 ✓ Created .edpa/ structure:
-  .claude/edpa/    ← skripty, skills, hooks
-  .edpa/config/    ← konfigurace týmu a iterací
-  .edpa/backlog/   ← work items (per-item YAML)
-  .edpa/reports/   ← generované výkazy
+  .claude/edpa/        ← skripty, skills, hooks
+  .edpa/config/        ← konfigurace týmu a iterací
+  .edpa/backlog/       ← work items (per-item YAML)
+  .edpa/reports/       ← generované výkazy
+✓ Installed .github/workflows/ (10 GitHub Actions)
+  branch-check, release, sync-git-to-projects,
+  sync-projects-to-git, iteration-close,
+  collaborators-sync, dispatch-hub-sync,
+  update-template, …
 
 Next: open Claude Code and run /edpa setup`,
   },
@@ -88,21 +93,37 @@ python3 .claude/edpa/scripts/create_project_views.py`,
     num: 5,
     title: 'Naplnit backlog',
     color: 'var(--or)',
-    desc: 'Vytvořte YAML soubory v .edpa/backlog/ — jeden soubor per item. Hierarchie: Initiative > Epic > Feature > Story. WSJF se počítá automaticky.',
+    desc: 'Vytvořte YAML soubory v .edpa/backlog/ — jeden soubor per item. Hierarchie: Initiative > Epic > Feature > Story (+ Defect na úrovni Story). WSJF se počítá automaticky.',
+    claude: `# .edpa/backlog/stories/S-1.yaml
+id: S-1
+type: Story
+title: "Implementovat login endpoint"
+js: 5              # Job Size (mod. Fibonacci 1..100)
+bv: 8              # Business Value
+tc: 5              # Time Criticality
+rr_oe: 3           # Risk Reduction & Opportunity Enablement
+status: Backlog
+parent: F-1        # Rodičovská Feature
+assignee: jnovak
+iteration: PI-2026-1.1
+
+# Po vytvoření YAMLů poproste Claude Code:
+"Zvaliduj backlog a ukaž mi strom"
+# Claude použije MCP edpa_validate + edpa_backlog`,
     code: `# .edpa/backlog/stories/S-1.yaml
 id: S-1
 type: Story
 title: "Implementovat login endpoint"
-js: 5              # Job Size (Fibonacci)
+js: 5              # Job Size (mod. Fibonacci 1..100)
 bv: 8              # Business Value
 tc: 5              # Time Criticality
-rr: 3              # Risk Reduction & Opportunity Enablement
+rr_oe: 3           # Risk Reduction & Opportunity Enablement
 status: Backlog
-parent: F-1      # Rodičovská Feature
+parent: F-1        # Rodičovská Feature
 assignee: jnovak
 iteration: PI-2026-1.1
 
-# Validace backlogu
+# CLI fallback (bez Claude Code)
 python3 .claude/edpa/scripts/backlog.py validate
 python3 .claude/edpa/scripts/backlog.py tree`,
     result: `✓ Backlog valid (12 items, 0 errors)
@@ -138,9 +159,11 @@ PR #42: "S-1: Login endpoint"
   → Review requested: pkral
   → Status: Approved ✓ → Merged
 
-Evidence detekována:
-  jnovak: assignee (+4), PR author (+2), commits (+1)
-  pkral:  PR reviewer (+1)`,
+Evidence detekována (signal weights → contribution_score):
+  jnovak: assignee 4.0 + pr_author 3.4 + commit_author 2.78 = 10.18
+  pkral:  pr_reviewer 2.25                                  =  2.25
+  → cw[jnovak, S-1] = 10.18 / 12.43 = 0.82
+  → cw[pkral,  S-1] =  2.25 / 12.43 = 0.18`,
   },
   {
     num: 7,
