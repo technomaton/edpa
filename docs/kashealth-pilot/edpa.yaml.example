@@ -35,17 +35,17 @@ project:
     - name: "Medicalc software s.r.o."
       legal_name: "Medicalc software s.r.o."
       role: "partner"
-      tax_id: ""                   # ICO — doplnit z ARES
-      vat_id: ""                   # DIC — doplnit
-      address:
-        street: ""
-        city: ""
-        postal_code: ""
+      tax_id: "26350513"           # ICO (ARES, RES status: AKTIVNI, DPH: AKTIVNI)
+      vat_id: "CZ26350513"         # DIC
+      address:                      # sídlo z ARES — pro fakturace + grant reporty
+        street: "Pod Švabinami 434/13"
+        city: "Plzeň"
+        postal_code: "312 00"
         country: "CZ"
       contact:
-        email: ""
-        phone: ""
-        website: "https://medicalc.com"
+        email: "medicalc@medicalc.cz"
+        phone: "+420 377 259 020"
+        website: "https://medicalc.cz"
 
 governance:
   methodology: "EDPA 1.12.0"
