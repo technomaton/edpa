@@ -1,21 +1,73 @@
 # EDPA Project Configuration
-# Edit this file to match your project
+# Edit this file to match your project. Only `project.name` is read by the
+# engine today (other fields populate audit metadata, snapshots, and
+# document generators). All optional fields default to empty strings.
 
 project:
-  name: "My Project"                          # ← Change this
-  registration: ""                            # Grant registration number (if applicable)
-  program: ""                                 # Funding program (e.g., OP TAK)
+  name: "My Project"                          # ← Display name (required)
+  description: ""                              # Free-text project description
+  domain: ""                                   # Optional domain URL (e.g., myproject.cz)
+
+  # Optional: external funding info (grants, subsidies, contracts).
+  # Drop this whole `funding:` block if the project has no external
+  # funding instrument. Used by document generators (grant reports,
+  # invoice headers) to reference the funding context.
+  funding:
+    program: ""                                # Funding program (e.g., "OP TAK", "Horizon Europe", "ARPA-H")
+    registration: ""                           # Grant/contract registration number
+    period_start: ""                           # YYYY-MM-DD (optional; project funding period start)
+    period_end: ""                             # YYYY-MM-DD (optional; project funding period end)
+
+  # Organizations involved in delivery — for audit trail, invoicing,
+  # and document generation. Each entry's identification + address
+  # populates reports and invoices without re-keying.
+  #
+  # Field naming notes (generic, internationally portable):
+  #   tax_id   → company / entity identifier
+  #              (CZ: ICO, USA: EIN, UK: CRN, EU: national tax ID)
+  #   vat_id   → VAT / sales-tax identifier
+  #              (CZ: DIC, EU: VAT-ID with country prefix e.g. DE123456789,
+  #               UK: VAT, USA: typically empty)
+  #   role     → free string; common values:
+  #              primary | partner | subcontractor | client | consortium-lead
+  #              (use whatever taxonomy your reporting requires)
+  #   country  → ISO 3166-1 alpha-2 (e.g., "CZ", "US", "DE", "UK")
   organizations:
-    - name: ""                                # Primary organization
-    - name: ""                                # Partner organization
-  domain: ""                                  # Domain URL (e.g., myproject.cz)
+    - name: ""                                 # Display name (e.g., "Acme Corp")
+      legal_name: ""                           # Full legal name on official documents
+      role: "primary"
+      tax_id: ""
+      vat_id: ""
+      address:
+        street: ""
+        city: ""
+        postal_code: ""
+        country: ""
+      contact:
+        email: ""
+        phone: ""
+        website: ""
+    - name: ""                                 # Partner organization (optional; remove block if N/A)
+      legal_name: ""
+      role: "partner"
+      tax_id: ""
+      vat_id: ""
+      address:
+        street: ""
+        city: ""
+        postal_code: ""
+        country: ""
+      contact:
+        email: ""
+        phone: ""
+        website: ""
 
 governance:
-  methodology: "EDPA 1.9.0"
-  calculation_mode: "gates"                   # gates (default) | simple (JS×CW) | full (JS×CW×RS)
+  methodology: "EDPA 1.12.0"
+  calculation_mode: "gates"                   # gates (default) | simple | full
                                               # gates credits each status transition; use simple
                                               # if your project does not record mid-life transitions
-  audit_mode: "full"                          # always store RS in snapshots
+  audit_mode: "full"                          # always store full signal trail in snapshots
 
 naming:
   pi_pattern: "PI-{year}-{pi_num}"            # e.g., PI-2026-1

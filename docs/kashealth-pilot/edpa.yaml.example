@@ -7,24 +7,57 @@
 
 project:
   name: "Medical Platform + Datový e-shop"
-  registration: "CZ.01.01.01/01/24_062/0007440"
-  program: "OP TAK"
-  organizations:
-    - name: "ČVUT FBMI"
-    - name: "Medicalc software s.r.o."
+  description: "OMOP datový e-shop a anonymizační pipeline pro CDC výzkum"
   domain: "kashealth.cz"
 
+  funding:
+    program: "OP TAK"
+    registration: "CZ.01.01.01/01/24_062/0007440"
+    period_start: "2024-01-01"
+    period_end: "2026-12-31"
+
+  organizations:
+    - name: "ČVUT FBMI"
+      legal_name: "České vysoké učení technické v Praze, Fakulta biomedicínského inženýrství"
+      role: "primary"
+      tax_id: "68407700"           # ICO
+      vat_id: "CZ68407700"         # DIC
+      address:
+        street: "Sítná 3105"
+        city: "Kladno"
+        postal_code: "272 01"
+        country: "CZ"
+      contact:
+        email: "info@fbmi.cvut.cz"
+        phone: "+420 224 359 999"
+        website: "https://fbmi.cvut.cz"
+
+    - name: "Medicalc software s.r.o."
+      legal_name: "Medicalc software s.r.o."
+      role: "partner"
+      tax_id: ""                   # ICO — doplnit z ARES
+      vat_id: ""                   # DIC — doplnit
+      address:
+        street: ""
+        city: ""
+        postal_code: ""
+        country: "CZ"
+      contact:
+        email: ""
+        phone: ""
+        website: "https://medicalc.com"
+
 governance:
-  methodology: "EDPA 1.9.0"
+  methodology: "EDPA 1.12.0"
   # Calculation mode:
   #   gates  (default) — credits per status transition on Initiative/Epic/Feature
   #                      + Story=Done. Doporučeno po validaci A/B vs simple.
   #   simple — only items with status=Done count. Audit-conservative;
   #            v 1. PI pilotu je rozumné spustit oba módy paralelně
   #            (viz KASHEALTH-PILOT.md § 9).
-  #   full   — JS × CW × RS (přidává Relevance Signal, většinou jen pro audit).
+  #   full   — same as simple but adds richer audit metadata to snapshot.
   calculation_mode: "gates"
-  audit_mode: "full"   # always store RS in snapshots
+  audit_mode: "full"   # always store full signal trail in snapshots
 
 naming:
   pi_pattern: "PI-{year}-{pi_num}"

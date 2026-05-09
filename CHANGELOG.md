@@ -2,7 +2,79 @@
 
 ## Unreleased
 
-## 1.11.0-beta — 2026-05-08
+## 1.12.0-beta — 2026-05-09
+
+### Project schema enhancement (non-breaking — new fields, old keys ignored)
+
+Refactors `plugin/edpa/templates/project.yaml.tmpl` (the file that
+`install.sh` copies to `.edpa/config/edpa.yaml`) to make the project
+metadata block more generic, internationally portable, and richer for
+document generation.
+
+**Old shape (v1.11 and earlier):**
+```yaml
+project:
+  name: "..."
+  registration: "..."          # grant-specific
+  program: "..."               # grant-specific
+  organizations:
+    - name: "..."              # display name only
+  domain: "..."
+```
+
+**New shape (v1.12):**
+```yaml
+project:
+  name: "..."                  # display name (required)
+  description: "..."           # NEW — free-text, replaces registration at top level
+  domain: "..."                # optional URL
+  funding:                     # NEW — optional block; drop if no external funding
+    program: "..."
+    registration: "..."
+    period_start: ""           # NEW — YYYY-MM-DD
+    period_end: ""             # NEW — YYYY-MM-DD
+  organizations:
+    - name: "..."
+      legal_name: "..."        # NEW — full legal name
+      role: "primary"          # NEW — free string (primary/partner/subcontractor/client/...)
+      tax_id: ""               # NEW — generic (CZ: ICO, USA: EIN, UK: CRN)
+      vat_id: ""               # NEW — generic (CZ: DIC, EU: VAT-ID, UK: VAT)
+      address:                 # NEW
+        street: ""
+        city: ""
+        postal_code: ""
+        country: ""            # ISO 3166-1 alpha-2
+      contact:                 # NEW
+        email: ""
+        phone: ""
+        website: ""
+```
+
+**Why generic field names** (`tax_id` / `vat_id` instead of `ico` /
+`dic`): EDPA is a generic product; CZ-specific terms in the schema
+would force foreign users to misuse fields. Comment in the template
+shows local-equivalent mapping.
+
+**Why `funding:` is a separate block:** projects without external
+funding just drop the block. Non-grant projects no longer carry
+empty `registration:` / `program:` keys at top level.
+
+**Backward compatibility.** Codebase reads only `project.name` from
+this file (verified across `engine.py`, `board.py`, `mcp_server.py`,
+`project_setup.py`). Old configs with `project.registration` /
+`project.program` at top level keep working — the keys just sit
+unused. New installs get the v1.12 layout from the template.
+
+**Updated:**
+- `plugin/edpa/templates/project.yaml.tmpl` — canonical template
+- `docs/kashealth-pilot/edpa.yaml.example` — kashealth pilot example,
+  filled with real ČVUT FBMI ICO/DIC/address; Medicalc placeholders
+  for the partner organization's tax/contact details
+- Version bumped to 1.12.0-beta in plugin.json, README badge,
+  methodology doc, skill metadata, kashealth runbook
+- 263/263 unit tests + 26-page web build remain green
+
+
 
 ### Single-source CW pipeline (BREAKING)
 

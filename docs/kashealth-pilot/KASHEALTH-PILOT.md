@@ -3,7 +3,7 @@
 - **Grant:** CZ.01.01.01/01/24_062/0007440 · OP TAK
 - **Org:** [`kashealth`](https://github.com/kashealth) (ČVUT FBMI + Medicalc software s.r.o.)
 - **Primary repo:** `kashealth/kas-platform-v1` (private monorepo)
-- **EDPA version:** **1.11.0-beta** — same domain logic as 1.9.0; folds
+- **EDPA version:** **1.12.0-beta** — same domain logic as 1.9.0; folds
   preflight + Issue Types + capacity overrides into the existing skills
   and consolidates per-iteration xlsx into one workbook.
 - **Pilot lead:** Jaroslav Urbánek (Lead Architect / Vedoucí VaV)
@@ -179,7 +179,7 @@ Pokud 5+ z 6 PASS → pilot úspěšný, pokračuj na PI-2026-2 (full prod) a zv
 
 ## 8. Reference
 
-- Methodology: [`docs/methodology.md`](../methodology.md) (EDPA 1.11.0-beta spec)
+- Methodology: [`docs/methodology.md`](../methodology.md) (EDPA 1.12.0-beta spec)
 - v1.10 RFC: [`docs/proposals/v1.10-skill-first-gaps-and-excel-consolidation.md`](../proposals/v1.10-skill-first-gaps-and-excel-consolidation.md)
 - v1.9.0 capacity overrides RFC: [`docs/proposals/per-iteration-capacity-overrides.md`](../proposals/per-iteration-capacity-overrides.md)
 - E2E test plan: [`docs/E2E-TEST-PLAN.md`](../E2E-TEST-PLAN.md)
