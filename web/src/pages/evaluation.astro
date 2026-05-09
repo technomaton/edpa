@@ -60,11 +60,6 @@ const categories = [
         description: 'Osoba s 0 items musí dostat 0h, bez pádu.',
         expected: 'Person with 0 items \u2192 0h, no crash',
       },
-      {
-        name: 'test_cw_ordering',
-        description: 'CW musí zachovat pořadí: owner \u2265 key \u2265 reviewer \u2265 consulted.',
-        expected: 'owner \u2265 key \u2265 reviewer \u2265 consulted',
-      },
     ],
   },
   {
@@ -198,49 +193,39 @@ const categories = [
         expected: 'cw[P, item] = Σ signal_weights / Σ_persons Σ signal_weights',
       },
       {
-        name: 'test_manual_override_precedence',
-        description: 'Manuální /contribute override musí mít přednost před auto-detekcí.',
-        expected: 'manual_cw \u2260 null \u2192 use manual_cw',
+        name: 'test_contribute_directive_additive',
+        description: 'Manuální /contribute @osoba weight:X přidá manual:* signál s váhou X — nepřepisuje auto-detekci.',
+        expected: 'cw_after = (cw_auto_score + X) / Σ_persons score',
       },
       {
-        name: 'test_cw_strict_ordering',
-        description: 'CW pořadí musí být striktní: owner \u2265 key \u2265 reviewer \u2265 consulted.',
-        expected: '1.0 \u2265 0.6 \u2265 0.25 \u2265 0.15 (strict)',
+        name: 'test_per_item_invariant',
+        description: 'Σ cw napříč osobami na jedné položce = 1.0 (engine invariant, ±0.001).',
+        expected: 'Σ_persons cw[*, item] = 1.0',
       },
       {
-        name: 'test_cw_minimum_floor',
-        description: 'Minimální CW je 0.15 (consulted floor) — žádná osoba nesmí mít nižší CW.',
-        expected: 'CW \u2265 0.15 (consulted floor)',
+        name: 'test_cw_range_0_1',
+        description: 'CW je per-item normalizovaný podíl, vždy v [0, 1.0]. Žádné fixní floor/ceiling per signál.',
+        expected: '0 ≤ cw[P, item] ≤ 1.0',
       },
       {
-        name: 'test_cw_maximum_ceiling',
-        description: 'Maximální CW je 1.0 (owner ceiling) — žádná automatická váha nepřesáhne 1.0.',
-        expected: 'CW \u2264 1.0 (owner ceiling)',
+        name: 'test_no_negative_contribution_score',
+        description: 'contribution_score se sčítá z pozitivních signal weights — žádný signál neodečítá.',
+        expected: 'contribution_score ≥ 0 vždy',
       },
       {
-        name: 'test_rs_normalization',
-        description: 'Relevance Signal se normalizuje: RS = min(ES/maxES, 1.0).',
-        expected: 'RS = min(ES / max_ES, 1.0)',
+        name: 'test_per_item_independence',
+        description: 'CW jedné osoby na itemu A je nezávislé na CW na itemu B (per-item normalizace).',
+        expected: 'cw[P, A] nezávisí na cw[P, B]',
       },
       {
-        name: 'test_rs_range_validation',
-        description: 'RS musí být v rozsahu 0 až 1.0 — nikdy záporné, nikdy větší než 1.',
-        expected: '0 \u2264 RS \u2264 1.0',
+        name: 'test_per_person_independence',
+        description: 'CW dvou osob na stejném itemu jsou nezávislé (oba pocházejí z vlastních signal aggregations).',
+        expected: 'cw[P1, item] nezávisí na cw[P2, item]',
       },
       {
-        name: 'test_multiple_people_same_item',
-        description: 'Více lidí na stejném itemu musí mít nezávislé CW pro každou osobu.',
-        expected: 'CW[P1, item] independent of CW[P2, item]',
-      },
-      {
-        name: 'test_same_person_multiple_items',
-        description: 'Stejná osoba na více itemech musí mít nezávislé CW pro každý item.',
-        expected: 'CW[P, item1] independent of CW[P, item2]',
-      },
-      {
-        name: 'test_architecture_role_detection',
-        description: 'Architektura/PM role detekována přes komentáře + /contribute příkaz.',
-        expected: 'comment + /contribute \u2192 key/consulted role',
+        name: 'test_strategic_role_via_signal_calibration',
+        description: 'PM/BO/Arch contribution se zachytí přes issue_comment + pr_reviewer + manual /contribute. Per-role multipliers se nepoužívají — bias se řeší kalibrací signal weights proti ground truth.',
+        expected: 'No role_overrides in heuristics',
       },
     ],
   },
@@ -985,18 +970,18 @@ import { VERSION } from '../lib/version';
       </table>
     </div>
 
-    <h3>Work items &amp; přiřazení</h3>
+    <h3>Work items &amp; přiřazení (CW per-item normalizované, &Sigma; na řádku = 1.0)</h3>
     <div class="card" style="margin-top:12px">
       <table>
         <thead>
-          <tr><th>Item</th><th>JS</th><th>Alice (CW)</th><th>Bob (CW)</th><th>Carol (CW)</th></tr>
+          <tr><th>Item</th><th>JS</th><th>Alice (CW)</th><th>Bob (CW)</th><th>Carol (CW)</th><th>&Sigma;</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>S-101</code></td><td>5</td><td>1.0 (owner)</td><td>0.25 (reviewer)</td><td>&mdash;</td></tr>
-          <tr><td><code>S-102</code></td><td>3</td><td>0.6 (key)</td><td>1.0 (owner)</td><td>&mdash;</td></tr>
-          <tr><td><code>S-103</code></td><td>8</td><td>&mdash;</td><td>1.0 (owner)</td><td>0.6 (key)</td></tr>
-          <tr><td><code>S-104</code></td><td>2</td><td>&mdash;</td><td>0.25 (reviewer)</td><td>1.0 (owner)</td></tr>
-          <tr><td><code>S-105</code></td><td>5</td><td>&mdash;</td><td>&mdash;</td><td>1.0 (owner)</td></tr>
+          <tr><td><code>S-101</code></td><td>5</td><td>0.70</td><td>0.30</td><td>&mdash;</td><td>1.00</td></tr>
+          <tr><td><code>S-102</code></td><td>3</td><td>0.55</td><td>0.45</td><td>&mdash;</td><td>1.00</td></tr>
+          <tr><td><code>S-103</code></td><td>8</td><td>&mdash;</td><td>0.65</td><td>0.35</td><td>1.00</td></tr>
+          <tr><td><code>S-104</code></td><td>2</td><td>&mdash;</td><td>0.30</td><td>0.70</td><td>1.00</td></tr>
+          <tr><td><code>S-105</code></td><td>5</td><td>&mdash;</td><td>&mdash;</td><td>1.00</td><td>1.00</td></tr>
         </tbody>
       </table>
     </div>
@@ -1008,12 +993,12 @@ import { VERSION } from '../lib/version';
           <tr><th>Item</th><th>JS</th><th>Alice Score</th><th>Bob Score</th><th>Carol Score</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>S-101</code></td><td>5</td><td>5.0</td><td>1.25</td><td>&mdash;</td></tr>
-          <tr><td><code>S-102</code></td><td>3</td><td>1.8</td><td>3.0</td><td>&mdash;</td></tr>
-          <tr><td><code>S-103</code></td><td>8</td><td>&mdash;</td><td>8.0</td><td>4.8</td></tr>
-          <tr><td><code>S-104</code></td><td>2</td><td>&mdash;</td><td>0.5</td><td>2.0</td></tr>
-          <tr><td><code>S-105</code></td><td>5</td><td>&mdash;</td><td>&mdash;</td><td>5.0</td></tr>
-          <tr style="border-top:2px solid var(--bd)"><td><strong>&Sigma;</strong></td><td></td><td><strong>6.8</strong></td><td><strong>12.75</strong></td><td><strong>11.8</strong></td></tr>
+          <tr><td><code>S-101</code></td><td>5</td><td>3.50</td><td>1.50</td><td>&mdash;</td></tr>
+          <tr><td><code>S-102</code></td><td>3</td><td>1.65</td><td>1.35</td><td>&mdash;</td></tr>
+          <tr><td><code>S-103</code></td><td>8</td><td>&mdash;</td><td>5.20</td><td>2.80</td></tr>
+          <tr><td><code>S-104</code></td><td>2</td><td>&mdash;</td><td>0.60</td><td>1.40</td></tr>
+          <tr><td><code>S-105</code></td><td>5</td><td>&mdash;</td><td>&mdash;</td><td>5.00</td></tr>
+          <tr style="border-top:2px solid var(--bd)"><td><strong>&Sigma;</strong></td><td></td><td><strong>5.15</strong></td><td><strong>8.65</strong></td><td><strong>9.20</strong></td></tr>
         </tbody>
       </table>
     </div>
@@ -1025,11 +1010,11 @@ import { VERSION } from '../lib/version';
           <tr><th>Item</th><th>Alice (40h)</th><th>Bob (80h)</th><th>Carol (60h)</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>S-101</code></td><td>29.41h</td><td>7.84h</td><td>&mdash;</td></tr>
-          <tr><td><code>S-102</code></td><td>10.59h</td><td>18.82h</td><td>&mdash;</td></tr>
-          <tr><td><code>S-103</code></td><td>&mdash;</td><td>50.20h</td><td>24.41h</td></tr>
-          <tr><td><code>S-104</code></td><td>&mdash;</td><td>3.14h</td><td>10.17h</td></tr>
-          <tr><td><code>S-105</code></td><td>&mdash;</td><td>&mdash;</td><td>25.42h</td></tr>
+          <tr><td><code>S-101</code></td><td>27.18h</td><td>13.87h</td><td>&mdash;</td></tr>
+          <tr><td><code>S-102</code></td><td>12.82h</td><td>12.49h</td><td>&mdash;</td></tr>
+          <tr><td><code>S-103</code></td><td>&mdash;</td><td>48.09h</td><td>18.26h</td></tr>
+          <tr><td><code>S-104</code></td><td>&mdash;</td><td>5.55h</td><td>9.13h</td></tr>
+          <tr><td><code>S-105</code></td><td>&mdash;</td><td>&mdash;</td><td>32.61h</td></tr>
           <tr class="total-row"><td><strong>&Sigma;</strong></td><td><strong style="color:var(--gn)">40.00h</strong></td><td><strong style="color:var(--gn)">80.00h</strong></td><td><strong style="color:var(--gn)">60.00h</strong></td></tr>
         </tbody>
       </table>

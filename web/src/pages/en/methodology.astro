@@ -62,13 +62,13 @@ import { VERSION } from '../../lib/version';
           <tr><td><strong>IP Iteration</strong></td><td>Innovation &amp; Planning iteration at the end of PI.</td><td>Last iteration in PI</td></tr>
           <tr><td><strong>Job Size (JS)</strong></td><td>Relative size estimate of a work item. Modified Fibonacci.</td><td>1, 2, 3, 5, 8, 13, 20</td></tr>
           <tr><td><strong>WSJF</strong></td><td>Prioritization score: (BV + TC + RR) / JS</td><td>Independent per level</td></tr>
-          <tr><td><strong>CW</strong></td><td>Contribution Weight — degree of a person's involvement on an item. Independent per person.</td><td>0.15&ndash;1.0</td></tr>
-          <tr><td><strong>Evidence Score</strong></td><td>Raw sum of activity signals from GitHub. Detection layer.</td><td>Automatic</td></tr>
-          <tr><td><strong>RS</strong></td><td>Relevance Signal — normalized signal derived from Evidence Score.</td><td>Automatic</td></tr>
+          <tr><td><strong>CW</strong></td><td>Contribution Weight — per-item normalized share of a person on an item (Σ across persons = 1.0 per item).</td><td>0&ndash;1.0</td></tr>
+          <tr><td><strong>Signal weight</strong></td><td>Weight of a single evidence signal type (assignee, pr_author, commit_author, pr_reviewer, issue_comment) aggregated by detect_contributors.py.</td><td>cw_heuristics.yaml</td></tr>
+          <tr><td><strong>contribution_score</strong></td><td>Σ fired signal_weights per (person, item). Input to per-item normalization.</td><td>Automatic</td></tr>
           <tr><td><strong>Derived Hours</strong></td><td>Derived hours, model output.</td><td>After Iteration Close</td></tr>
         </tbody>
       </table>
-      <div class="note">Evidence Score is the detection layer &rarr; Relevance Signal is the mathematical input &rarr; Contribution Weight is the share &rarr; Derived Hours are the output.</div>
+      <div class="note">Signal weights &rarr; contribution_score (Σ fired signal weights) &rarr; CW (per-item normalized share) &rarr; Derived Hours.</div>
     </div>
   </section>
 
@@ -166,10 +166,9 @@ Computed per level independently.</div>
         </thead>
         <tbody>
           <tr><td><code>Capacity[P, I]</code></td><td>Confirmed at Iteration Planning</td><td>40h</td></tr>
-          <tr><td><code>RelevantItems[P, I]</code></td><td>Automatic from GitHub evidence</td><td>6 items across 3 levels</td></tr>
+          <tr><td><code>RelevantItems[P, I]</code></td><td>Automatic from GitHub evidence (Story Done + Feature/Epic/Initiative gates)</td><td>6 items across 4 levels</td></tr>
           <tr><td><code>JobSize[item]</code></td><td>Custom field on issue</td><td>Fibonacci 1&ndash;20</td></tr>
-          <tr><td><code>CW[P, item]</code></td><td>From evidence / manual override</td><td>0.15&ndash;1.0</td></tr>
-          <tr><td><code>RS[P, item]</code></td><td>Normalized from Evidence Score</td><td>0.25&ndash;1.0</td></tr>
+          <tr><td><code>cw[P, item]</code></td><td>detect_contributors.py — additive aggregation + per-item normalization</td><td>0&ndash;1.0 (Σ on item = 1.0)</td></tr>
         </tbody>
       </table>
     </div>
@@ -178,23 +177,23 @@ Computed per level independently.</div>
     <div class="card">
       <table>
         <thead>
-          <tr><th>GitHub signal</th><th style="text-align:right">Evidence Score</th><th style="text-align:right">Typical CW</th></tr>
+          <tr><th>GitHub signal</th><th style="text-align:right">Signal weight</th><th>Detection</th></tr>
         </thead>
         <tbody>
-          <tr><td>Issue assignee</td><td style="text-align:right">+4</td><td style="text-align:right;color:var(--gn)">1.0 (owner)</td></tr>
-          <tr><td>Explicit <code>/contribute</code> command</td><td style="text-align:right">+3</td><td style="text-align:right;color:var(--cy)">explicit</td></tr>
-          <tr><td>PR author referencing item</td><td style="text-align:right">+2</td><td style="text-align:right;color:var(--cy)">0.6 (key)</td></tr>
-          <tr><td>Commit author with ref in message</td><td style="text-align:right">+1</td><td style="text-align:right;color:var(--yl)">0.25 (reviewer)</td></tr>
-          <tr><td>PR reviewer</td><td style="text-align:right">+1</td><td style="text-align:right;color:var(--yl)">0.25 (reviewer)</td></tr>
-          <tr><td>Issue / PR comment</td><td style="text-align:right">+0.5</td><td style="text-align:right;color:var(--or)">0.15 (consulted)</td></tr>
+          <tr><td>Issue assignee</td><td style="text-align:right;color:var(--gn)">4.0</td><td>GitHub issue assignee</td></tr>
+          <tr><td>PR author</td><td style="text-align:right;color:var(--cy)">3.4</td><td>PR author referencing the item</td></tr>
+          <tr><td>Commit author</td><td style="text-align:right;color:var(--yl)">2.78</td><td>Commit with S-/F-/E-/I-XXX in branch/message</td></tr>
+          <tr><td>PR reviewer</td><td style="text-align:right;color:var(--yl)">2.25</td><td>Submitted PR review (excluding self)</td></tr>
+          <tr><td>Issue / PR comment</td><td style="text-align:right;color:var(--or)">1.14</td><td>Comment (bots excluded)</td></tr>
+          <tr><td><code>/contribute @person weight:X</code></td><td style="text-align:right;color:var(--ac2)">explicit</td><td>Manual additive signal — weight X from the directive</td></tr>
         </tbody>
       </table>
     </div>
     <ul>
-      <li>Threshold: Evidence Score &ge; 1.0</li>
-      <li>Heuristic: strongest signal &rarr; default CW</li>
-      <li>Override: <code>/contribute @person weight:0.6</code></li>
-      <li>Commit count is not converted to time</li>
+      <li>Signals aggregate additively into <code>contribution_score</code> per (person, item) — no "highest wins"</li>
+      <li>Per-item normalization yields the cw share: <code>cw = contribution_score / Σ_persons contribution_score</code></li>
+      <li><code>/contribute</code> is a peer signal — it does not override auto-detection, it adds weight</li>
+      <li>Default weights above are calibrated by Monte Carlo simulation (1000 synthetic scenarios)</li>
       <li>Per-role corrections validated by Monte Carlo simulation (1,000 scenarios)</li>
     </ul>
 
@@ -399,7 +398,7 @@ feature/F-102-anon-engine</div>
       <li>GitHub delivery evidence</li>
       <li>Capacity registry (YAML)</li>
       <li>Frozen snapshot (reproducible input)</li>
-      <li>Reproducible calculation (Score = JS &times; CW &times; RS)</li>
+      <li>Reproducible calculation (Score = JS &times; CW; CW = additive aggregation + per-item normalization)</li>
       <li>Signed output (BankID, law 21/2020 Sb.)</li>
     </ol>
   </section>
