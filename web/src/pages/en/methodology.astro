@@ -198,16 +198,16 @@ Computed per level independently.</div>
       <li>Per-role corrections validated by Monte Carlo simulation (1,000 scenarios)</li>
     </ul>
 
-    <div class="note" style="margin-top:12px;border-left:3px solid var(--gn);padding-left:12px"><strong>v1.11 change:</strong> Per-role corrections (<code>role_overrides</code>) were removed in v1.11. CW is now computed purely via additive signal aggregation and per-item normalization (see § 5.4 below). Strategic-role bias correction is handled by calibrating signal weights against ground truth — if BO/PM/Arch are under-credited, the calibrator increases <code>issue_comment</code> and <code>pr_reviewer</code> weights. See <a href="https://github.com/technomaton/edpa/blob/main/docs/auto-calibration.md" style="color:var(--ac2)">auto-calibration.md</a>.</div>
+    <div class="note" style="margin-top:12px;border-left:3px solid var(--gn);padding-left:12px"><strong>No per-role corrections.</strong> CW is computed purely via additive signal aggregation and per-item normalization (see § 5.4 below). Strategic-role bias is handled by calibrating signal weights against ground truth — if BO/PM/Arch are under-credited, the calibrator increases <code>issue_comment</code> and <code>pr_reviewer</code> weights. See <a href="https://github.com/technomaton/edpa/blob/main/docs/auto-calibration.md" style="color:var(--ac2)">auto-calibration.md</a>.</div>
 
-    <h3>5.4 Calculation (v1.11) — single source, sum-and-normalize</h3>
+    <h3>5.4 Calculation — single source, sum-and-normalize</h3>
     <div class="formula"><strong>contribution_score[P, item]</strong> = &Sigma; signal_weight &times; signal_fired(P, item)
 <strong>cw[P, item]</strong> = contribution_score[P, item] / &Sigma;<sub>persons</sub> contribution_score[*, item]
 <strong>score[P, item]</strong> = JobSize[item] &times; cw[P, item]
 <strong>ratio[P, item]</strong> = score[P, item] / &Sigma;<sub>items_of_P</sub> score
 <strong>DerivedHours[P, item]</strong> = ratio[P, item] &times; Capacity[P, I]</div>
-    <div class="note"><strong>Key change vs v1.10:</strong> <code>cw</code> is now a per-item share (Σ across persons = 1.0 per item), not an absolute [0,1] role-coupled value. No <code>RelevanceSignal</code>, no role priority lookup, no two-formula split. Signals add up, normalize per item, engine consumes ready-made <code>cw</code>.
-    <br>Worked example: <a href="/en/calculator/" style="color:var(--ac2);">Calculator</a>. Full spec: <a href="https://github.com/technomaton/edpa/blob/main/docs/methodology.md#54-calculation--three-modes" style="color:var(--ac2)">methodology.md § 5.4</a>.</div>
+    <div class="note"><strong>CW is a per-item share</strong> (Σ across persons = 1.0 per item), not an absolute role-coupled value. Signals aggregate additively, normalize per item, and the engine consumes ready-made <code>cw</code>.
+    <br>Worked example: <a href="/en/calculator/" style="color:var(--ac2);">Calculator</a>. Full spec: <a href="https://github.com/technomaton/edpa/blob/main/docs/methodology.md" style="color:var(--ac2)">methodology.md § 5.4</a>.</div>
 
     <h3>5.5 Mathematical guarantees (two)</h3>
     <div class="formula"><strong>1. Per-item:</strong>   &Sigma;<sub>persons</sub> cw[*, item] = 1.0

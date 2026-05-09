@@ -1,3 +1,8 @@
+// EDPA web engine — TypeScript mirror of the Python engine for the
+// in-browser calculator on the marketing site. Gated calculation:
+// Story Done + Feature/Epic gate transitions. cw is the per-item
+// normalized share (Σ across persons = 1.0 per item).
+
 export interface Person {
   id: string;
   name: string;
@@ -5,15 +10,12 @@ export interface Person {
   team: string;
   fte: number;
   capacity: number;
-  contract?: string;           // "HPP", "DPČ", etc.
-  evidence_scope?: string[];   // item ID patterns for this contract
-  evidence_default?: boolean;  // true = fallback for unscoped evidence
+  contract?: string;           // "HPP", "DPČ", etc. (display label only)
 }
 
 export interface Contribution {
   personId: string;
-  cw: number;
-  rs: number;
+  cw: number;                  // per-item share (Σ across persons on this item = 1.0)
 }
 
 export interface WorkItem {
@@ -39,7 +41,6 @@ export interface Iteration {
 
 export interface ScoredItem extends WorkItem {
   cw: number;
-  rs: number;
   score: number;
   ratio: number;
   hours: number;
@@ -59,7 +60,6 @@ export interface ItemViewResult {
   contributors: {
     person: Person;
     cw: number;
-    rs: number;
     hours: number;
   }[];
   totalHours: number;
@@ -72,9 +72,14 @@ export interface Team {
 
 export interface ProjectConfig {
   name: string;
-  registration: string;
-  organization: string;
-  program: string;
+  description?: string;
+  domain?: string;
+  funding?: {
+    program?: string;
+    registration?: string;
+    period_start?: string;
+    period_end?: string;
+  };
 }
 
 /**
@@ -88,28 +93,24 @@ export function wsjf(item: WorkItem): number {
 }
 
 /**
- * EDPA Per-Person calculation.
+ * EDPA per-person calculation — gated.
  *
- * Computes derived hours for a person in an iteration.
+ * Stories at status==='Done' get credited; Feature/Epic parents get
+ * credited via gate transitions captured in git history (server-side
+ * only; this in-browser engine doesn't read git, so for the calculator
+ * we just credit non-Funnel parents declaratively).
  *
- * Relevant items:
- *  - Stories: must be in the iteration AND status === 'Done'
- *  - Features / Epics: must not be 'Planned'
- *  - The person must appear in the item's contributors
+ *   score = JS × cw          (cw is per-item normalized share)
+ *   ratio = score / Σ score  (per-person across their items)
+ *   hours = ratio × capacity
  *
- * Score formula:
- *  - Simple mode: Score = JS * CW
- *  - Full mode:   Score = JS * CW * RS
- *
- * DerivedHours = (Score / SumScores) * Capacity
- * Guarantee: Sum(DerivedHours) === Capacity (within 0.01h)
+ * Invariant: Σ hours === capacity (within 0.01h)
  */
 export function edpa(
   personId: string,
   iterationId: string,
   people: Person[],
-  items: WorkItem[],
-  mode: 'simple' | 'full'
+  items: WorkItem[]
 ): EdpaResult | null {
   const person = people.find((p) => p.id === personId);
   if (!person) return null;
@@ -125,9 +126,8 @@ export function edpa(
   const scored: ScoredItem[] = relevant.map((w) => {
     const cn = w.contributors.find((c) => c.personId === personId);
     const cw = cn ? cn.cw : 0;
-    const rs = cn ? cn.rs : 1;
-    const score = mode === 'full' ? w.js * cw * rs : w.js * cw;
-    return { ...w, cw, rs, score, ratio: 0, hours: 0 };
+    const score = w.js * cw;
+    return { ...w, cw, score, ratio: 0, hours: 0 };
   });
 
   const sum = scored.reduce((a, x) => a + x.score, 0);
@@ -152,16 +152,14 @@ export function edpa(
 }
 
 /**
- * EDPA Per-Item view.
- *
- * Shows all contributors to a work item and their derived hours for it.
+ * EDPA per-item view: all contributors to a work item and their
+ * derived hours for it.
  */
 export function itemView(
   itemId: string,
   iterationId: string,
   people: Person[],
-  items: WorkItem[],
-  mode: 'simple' | 'full'
+  items: WorkItem[]
 ): ItemViewResult | null {
   const item = items.find((w) => w.id === itemId);
   if (!item || !item.contributors) return null;
@@ -171,10 +169,13 @@ export function itemView(
 
   const contributors = item.contributors.map((cn) => {
     const person = people.find((p) => p.id === cn.personId);
-    if (!person) return { person: { id: '', name: '?', role: '', team: '', fte: 0, capacity: 0 }, cw: cn.cw, rs: cn.rs, hours: 0 };
-    const d = edpa(cn.personId, itId, people, items, mode);
+    if (!person) return {
+      person: { id: '', name: '?', role: '', team: '', fte: 0, capacity: 0 },
+      cw: cn.cw, hours: 0
+    };
+    const d = edpa(cn.personId, itId, people, items);
     const my = d ? d.items.find((x) => x.id === itemId) : null;
-    return { person, cw: cn.cw, rs: cn.rs, hours: my ? my.hours : 0 };
+    return { person, cw: cn.cw, hours: my ? my.hours : 0 };
   });
 
   contributors.sort((a, b) => b.hours - a.hours);

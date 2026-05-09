@@ -187,8 +187,6 @@ people:
 
 governance:
   methodology: "EDPA v{VERSION}"
-  calculation_mode: "simple"            # simple (JS x CW) nebo full (JS x CW x RS)
-  audit_mode: "full"
 
 naming:
   pi_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;"
@@ -563,17 +561,11 @@ python3 .claude/edpa/scripts/sync.py status</code></pre>
 .edpa/snapshots/
   PI-2026-1.1.json       # Zmrazený snapshot</code></pre>
 
-    <p><strong>Režim výpočtu:</strong></p>
+    <p><strong>Gated calculation:</strong> kreditujeme Story <code>Done</code> + Feature/Epic/Initiative gate transitions z git historie.</p>
     <div class="card">
-      <table>
-        <thead>
-          <tr><th>Režim</th><th>Vzorec</th><th>Použití</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>simple</td><td>JS &times; CW</td><td>Výchozí — Job Size &times; Contribution Weight</td></tr>
-          <tr><td>full</td><td>JS &times; CW &times; RS</td><td>S Role Strength — pro přesnější alokaci</td></tr>
-        </tbody>
-      </table>
+      <pre><code>Score        = JobSize &times; CW
+DerivedHours = (Score / &Sigma;Scores) &times; Capacity</code></pre>
+      <p style="margin-top:8px;">CW je per-item normalizovaný podíl (&Sigma; přes osoby na itemu = 1.0), počítaný v <code>detect_contributors.py</code> z evidence (assignee, PR author/reviewer, commit author, issue comment, <code>/contribute</code> direktivy). Engine konzumuje CW verbatim.</p>
     </div>
 
     <p><strong>Invarianty</strong> (engine automaticky kontroluje):</p>
@@ -934,7 +926,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
               | Výkazy   |       |  Validate|
               +----------+       +----------+</code></pre>
 
-    <h3>Evidence detection (v1.11 baseline)</h3>
+    <h3>Evidence detection</h3>
     <div class="card">
       <table>
         <thead>
@@ -950,18 +942,18 @@ TOTAL_DEVIATION=0.824000</code></pre>
         </tbody>
       </table>
     </div>
-    <p>Signály se v v1.11 <strong>sčítají additivně</strong> do contribution_score per (osoba, item), pak se normalizují per-item: <code>cw = score / Σ_persons score</code> (Σ napříč osobami = 1.0). Role label se odvozuje z dominantního signál typu jen pro display, neukládá se.</p>
+    <p>Signály se <strong>sčítají additivně</strong> do contribution_score per (osoba, item), pak se normalizují per-item: <code>cw = score / Σ_persons score</code> (Σ napříč osobami = 1.0). Role label se odvozuje z dominantního signál typu jen pro display, neukládá se.</p>
 
-    <h3>Výpočet EDPA (single path, v1.14+)</h3>
+    <h3>Výpočet EDPA — gated calculation</h3>
     <p>Pro každou osobu v iteraci:</p>
     <ol>
       <li>Detekovat evidence signály per (osoba, item) přes <code>detect_contributors.py</code></li>
       <li>Per-item normalizace: <code>cw_i = contribution_score_i / Σ_persons contribution_score</code> (Σ cw na položce = 1.0)</li>
-      <li>Stories <code>status: Done</code> a parent gate transitions z git history: <code>score = JS × cw</code> (parents s <code>JS × gate_weight × cw</code>)</li>
+      <li>Stories <code>status: Done</code> a Feature/Epic/Initiative gate transitions z git history: <code>score = JS × cw</code> (gates: <code>JS × gate_weight × cw</code>)</li>
       <li>Per osobu: <code>ratio_i = score_i / Σ scores</code></li>
       <li>Odvozené hodiny: <code>hours_i = ratio_i × capacity</code></li>
     </ol>
-    <div class="note"><strong>Invariants:</strong> <code>Σ hours = capacity</code> per osobě AND <code>Σ cw = 1.0</code> per položce — vždy, garantováno konstrukcí. v1.14 dropla pre-existing simple/full/gates mode selector — gates byl strict superset, single path je matematicky ekvivalentní.</div>
+    <div class="note"><strong>Invariants:</strong> <code>Σ hours = capacity</code> per osobě AND <code>Σ cw = 1.0</code> per položce — vždy, garantováno konstrukcí.</div>
   </section>
 
   <!-- Troubleshooting -->
@@ -1029,7 +1021,7 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
     <p><strong>Řešení:</strong> formát <code>feature/S-200-omop-parser</code>. Typy: <code>feature</code>, <code>defect</code>, <code>hotfix</code>, <code>chore</code>. <code>main</code>, <code>develop</code>, <code>release/*</code> jsou výjimky.</p>
 
     <h3>MAD příliš vysoké (&gt; 0.10)</h3>
-    <p><strong>Řešení (v1.11):</strong></p>
+    <p><strong>Řešení:</strong></p>
     <ol>
       <li>Analyzovat záznamy s největším <code>abs(predicted_cw - confirmed_cw)</code> per (osoba, item)</li>
       <li>Seskupit dle dominant signal type (assignee / pr_author / commit_author / pr_reviewer / issue_comment)</li>

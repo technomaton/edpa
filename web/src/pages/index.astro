@@ -46,11 +46,11 @@ import { VERSION } from '../lib/version';
     </div>
   </section>
 
-  <!-- What's New v{VERSION} -->
+  <!-- What's New -->
   <section class="section" id="whats-new">
     <div class="container">
-      <p class="tag">Novinky v{VERSION}</p>
-      <h2 class="section-title">Co přibylo v této verzi</h2>
+      <p class="tag">Novinky</p>
+      <h2 class="section-title">Co je v EDPA v této vlně</h2>
       <div class="grid grid-3">
         <div class="card cyan">
           <h3 class="card-heading">Gates mode (default)</h3>
@@ -126,7 +126,7 @@ import { VERSION } from '../lib/version';
     <div class="container">
       <p class="tag">Řešení</p>
       <h2 class="section-title">Jak EDPA funguje</h2>
-      <div class="formula">cw[P, item] = Σ signal_weights / Σ_persons Σ signal_weights   (v1.11: per-item share, Σ = 1.0)
+      <div class="formula">cw[P, item] = Σ signal_weights / Σ_persons Σ signal_weights   (per-item share, Σ = 1.0)
 Score[P, item] = JobSize × cw   →   DerivedHours = (Score / ΣScores) × Capacity
 
 Garance: Σ DerivedHours = Capacity per osobě a Σ cw = 1.0 per položce — vždy.</div>
@@ -169,59 +169,57 @@ Garance: Σ DerivedHours = Capacity per osobě a Σ cw = 1.0 per položce — v�
       <p class="tag">Detekce evidence</p>
       <h2 class="section-title">Signály z GitHubu</h2>
       <p class="desc">
-        EDPA automaticky detekuje příspěvky vývojářů z GitHub aktivit.
-        Každý signál má přiřazenou váhu (prioritu) a odpovídající ContributionWeight.
+        EDPA detekuje příspěvky z GitHub aktivit napříč všemi úrovněmi (Story, Feature, Epic, Initiative).
+        Každý signál přidává váhu do <code>contribution_score</code> per (osoba, item).
+        Výsledné CW je pak per-item normalizovaný podíl: <code>cw = score / Σ_persons score</code> (Σ na položce = 1.0).
       </p>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Signál</th>
-              <th>Priorita</th>
-              <th>CW</th>
+              <th>Váha</th>
               <th>Popis</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><code>Assignee</code></td>
-              <td class="td-priority">+4</td>
-              <td class="td-cw">1.0</td>
-              <td>Hlavní řešitel issue</td>
+              <td><code>assignee</code></td>
+              <td class="td-cw">4.0</td>
+              <td>GitHub issue assignee</td>
             </tr>
             <tr>
-              <td><code>/contribute</code></td>
-              <td class="td-priority">+3</td>
-              <td class="td-cw">0.6</td>
-              <td>Explicitní přihlášení ke spolupráci</td>
+              <td><code>pr_author</code></td>
+              <td class="td-cw">3.4</td>
+              <td>Autor PR referencujícího item</td>
             </tr>
             <tr>
-              <td><code>PR author</code></td>
-              <td class="td-priority">+2</td>
-              <td class="td-cw">0.6</td>
-              <td>Autor pull requestu</td>
+              <td><code>commit_author</code></td>
+              <td class="td-cw">2.78</td>
+              <td>Commit s S-XXX/F-XXX/E-XXX/I-XXX v branchi/zprávě</td>
             </tr>
             <tr>
-              <td><code>Commit</code></td>
-              <td class="td-priority">+1</td>
-              <td class="td-cw">0.25</td>
-              <td>Commit v relevantní větvi</td>
+              <td><code>pr_reviewer</code></td>
+              <td class="td-cw">2.25</td>
+              <td>Schválený PR review</td>
             </tr>
             <tr>
-              <td><code>PR reviewer</code></td>
-              <td class="td-priority">+1</td>
-              <td class="td-cw">0.25</td>
-              <td>Code review pull requestu</td>
+              <td><code>issue_comment</code></td>
+              <td class="td-cw">1.14</td>
+              <td>Komentář na issue/PR (boti vyloučeni)</td>
             </tr>
             <tr>
-              <td><code>Comment</code></td>
-              <td class="td-priority">+0.5</td>
-              <td class="td-cw">0.15</td>
-              <td>Komentář v issue nebo PR</td>
+              <td><code>/contribute @osoba weight:X</code></td>
+              <td class="td-cw">explicit</td>
+              <td>Manuální additivní signál — váha <code>X</code> z direktivy</td>
             </tr>
           </tbody>
         </table>
       </div>
+      <p class="desc" style="margin-top:16px;font-size:13px;color:var(--t3);">
+        Signály se <strong>sčítají additivně</strong>; není „highest wins". Default váhy nahoře jsou kalibrované Monte Carlo simulací (1000 syntetických scénářů).
+        <code>/contribute</code> je rovnocenný signál — jeho explicit váhu detect_contributors.py přidá do součtu, nepřepisuje.
+      </p>
     </div>
   </section>
 

@@ -187,8 +187,6 @@ people:
 
 governance:
   methodology: "EDPA v{VERSION}"
-  calculation_mode: "simple"            # simple (JS x CW) nebo full (JS x CW x RS)
-  audit_mode: "full"
 
 naming:
   pi_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;"
@@ -566,17 +564,11 @@ python3 .claude/edpa/scripts/sync.py status</code></pre>
 .edpa/snapshots/
   PI-2026-1.1.json       # Zmrazený snapshot</code></pre>
 
-    <p><strong>Režim výpočtu:</strong></p>
+    <p><strong>Gated calculation:</strong> the engine credits Story <code>Done</code> + Feature/Epic/Initiative gate transitions from git history.</p>
     <div class="card">
-      <table>
-        <thead>
-          <tr><th>Režim</th><th>Vzorec</th><th>Použití</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>simple</td><td>JS &times; CW</td><td>Výchozí — Job Size &times; Contribution Weight</td></tr>
-          <tr><td>full</td><td>JS &times; CW &times; RS</td><td>S Role Strength — pro přesnější alokaci</td></tr>
-        </tbody>
-      </table>
+      <pre><code>Score        = JobSize &times; CW
+DerivedHours = (Score / &Sigma;Scores) &times; Capacity</code></pre>
+      <p style="margin-top:8px;">CW is a per-item normalized share (&Sigma; across persons on an item = 1.0), computed in <code>detect_contributors.py</code> from evidence (assignee, PR author/reviewer, commit author, issue comment, <code>/contribute</code> directives). The engine consumes CW verbatim.</p>
     </div>
 
     <p><strong>Invarianty</strong> (engine automaticky kontroluje):</p>
@@ -937,7 +929,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
               | Výkazy   |       |  Validate|
               +----------+       +----------+</code></pre>
 
-    <h3>Evidence detection (v1.11 baseline)</h3>
+    <h3>Evidence detection</h3>
     <div class="card">
       <table>
         <thead>
@@ -953,18 +945,18 @@ TOTAL_DEVIATION=0.824000</code></pre>
         </tbody>
       </table>
     </div>
-    <p>v1.11 signals <strong>aggregate additively</strong> into contribution_score per (person, item), then normalize per-item: <code>cw = score / Σ_persons score</code> (Σ across persons = 1.0). Role label is derived from dominant signal type for display only, not stored.</p>
+    <p>Signals <strong>aggregate additively</strong> into contribution_score per (person, item), then normalize per-item: <code>cw = score / Σ_persons score</code> (Σ across persons = 1.0). Role label is derived from dominant signal type for display only, not stored.</p>
 
-    <h3>EDPA calculation (single path, v1.14+)</h3>
+    <h3>EDPA calculation — gated</h3>
     <p>For each person in an iteration:</p>
     <ol>
       <li>Detect evidence signals per (person, item) via <code>detect_contributors.py</code></li>
       <li>Per-item normalization: <code>cw_i = contribution_score_i / Σ_persons contribution_score</code> (Σ cw per item = 1.0)</li>
-      <li>Stories at <code>status: Done</code> + parent gate transitions from git history: <code>score = JS × cw</code> (parents weighted by <code>JS × gate_weight × cw</code>)</li>
+      <li>Stories at <code>status: Done</code> + Feature/Epic/Initiative gate transitions from git history: <code>score = JS × cw</code> (gates: <code>JS × gate_weight × cw</code>)</li>
       <li>Per person: <code>ratio_i = score_i / Σ scores</code></li>
       <li>Derived hours: <code>hours_i = ratio_i × capacity</code></li>
     </ol>
-    <div class="note"><strong>Invariants:</strong> <code>Σ hours = capacity</code> per person AND <code>Σ cw = 1.0</code> per item — always, by construction. v1.14 dropped the previous simple/full/gates mode selector — gates was a strict superset, so the single-path engine is mathematically equivalent.</div>
+    <div class="note"><strong>Invariants:</strong> <code>Σ hours = capacity</code> per person AND <code>Σ cw = 1.0</code> per item — always, by construction.</div>
   </section>
 
   <!-- Troubleshooting -->

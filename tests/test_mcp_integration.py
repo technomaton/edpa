@@ -137,7 +137,6 @@ def edpa_workspace(tmp_path: Path) -> Path:
         "  name: 'MCP Integration Test Project'\n"
         "governance:\n"
         "  methodology: 'EDPA test'\n"
-        "  calculation_mode: 'gates'\n"
     )
     (edpa / "iterations" / "PI-2026-1.yaml").write_text(
         "pi:\n"

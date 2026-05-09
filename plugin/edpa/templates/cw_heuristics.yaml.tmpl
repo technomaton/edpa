@@ -1,9 +1,8 @@
-# EDPA CW Heuristics — v1.11 single-source signal weights
+# EDPA CW Heuristics — single-source signal weights
 #
-# CW computation moved from engine to detect_contributors.py in v1.11.
-# This file holds the signal weights that detect_contributors uses to
-# score evidence; engine consumes the resulting per-item-normalized
-# cw values directly without any further role mapping or multi-signal
+# CW is computed in detect_contributors.py from these signal weights;
+# the engine consumes the resulting per-item-normalized cw values
+# directly, without any further role mapping or multi-signal
 # aggregation logic of its own.
 #
 # Mathematics:
@@ -13,11 +12,12 @@
 #   → Σ_persons cw[*, item] = 1.0   (per-item invariant)
 #
 # Calibrate with `/edpa:calibrate` after collecting ≥20 ground-truth
-# CW records. Monte Carlo over the 6 signal weights, then Nelder-Mead
+# CW records. Monte Carlo over the 5 signal weights, then Nelder-Mead
 # refinement around the best candidates. Lower MAD vs. ground truth
 # indicates a better calibration.
 
-version: "1.11.0"
+# Schema version for this heuristics file (independent of methodology version).
+schema_version: "1.0"
 
 # ─────────────────────────────────────────────────────────────────────
 # EVIDENCE SIGNAL WEIGHTS
@@ -42,19 +42,19 @@ signals:
   issue_comment: 1.14        # Comment on issue/PR (excluding bots)
 
 # ─────────────────────────────────────────────────────────────────────
-# GATE WEIGHTS (used only when engine runs with --mode gates)
+# GATE WEIGHTS — Feature / Epic / Initiative status transitions
 # ─────────────────────────────────────────────────────────────────────
 #
-# Each status transition on Feature/Epic/Initiative is a deliverable
-# event. Weights split the parent's Job Size across its lifecycle, so
-# prep work (LBC, decomposition, validation) is credited as it
-# happens — not only at terminal Done. Weights MUST sum to 1.0 per
-# item type. The gate event inherits the parent's contributors[]
-# verbatim (per-item shares are unchanged by the gate split).
+# Each status transition on Feature, Epic, or Initiative parents is a
+# deliverable event the engine credits inside the iteration window.
+# Weights split the parent's Job Size across its lifecycle, so prep
+# work (LBC, decomposition, validation) is credited as it happens —
+# not only at terminal Done. Weights MUST sum to 1.0 per item type.
+# The gate event inherits the parent's contributors[] verbatim
+# (per-item shares are unchanged by the gate split).
 #
-# Modes:
-#   simple / full  → ignore this section, use status==Done filter
-#   gates          → emit one scoring event per transition in iteration
+# Stories stay Done-only and flow through the regular backlog scan;
+# they are never emitted as gate events.
 #
 gate_weights:
   Feature:                          # 7 transitions across 8 SAFe statuses
@@ -81,15 +81,14 @@ gate_weights:
     "Implementing→Done":        0.50
 
 # ─────────────────────────────────────────────────────────────────────
-# RULES (v1.11)
+# RULES
 # ─────────────────────────────────────────────────────────────────────
 rules:
   - "All evidence signals contribute additively to contribution_score; no priority dominance"
   - "cw is per-item normalized: Σ cw[*, item] = 1.0 (engine invariant)"
   - "Manual /contribute directives stack as additional signals — they don't override auto-detection"
   - "ALL commits are delivery evidence — including governance (.edpa/, config/)"
-  - "mode=gates (default): each parent status transition is credited per gate_weight; Story stays Done-only"
-  - "mode=simple|full: only Done items are credited (no transition tracking required)"
+  - "Stories at status=Done are credited; Feature/Epic/Initiative gate transitions are credited per gate_weight"
   - "Role labels (Owner/Key/Reviewer/Consulted) are derived at display time from signal types; never stored"
 
 # ─────────────────────────────────────────────────────────────────────
@@ -104,13 +103,12 @@ rules:
 # activity translates to cw share.
 #
 # Strategic-role bias correction (PM/BO/Arch under-weighting in Git):
-# v1.10 used per-role multipliers (role_overrides). v1.11 drops that
-# and addresses the bias purely through calibration: signal_weights
-# get tuned against ground truth that includes strategic-role
-# contributions, so calibrator naturally finds weights that match
-# observed reality. If a small-pilot calibration shows persistent
-# bias for strategic roles, per-role signal multipliers can return
-# in v1.12 as a calibration extension.
+# EDPA addresses this purely through calibration. signal_weights get
+# tuned against ground truth that includes strategic-role
+# contributions, so the calibrator naturally finds weights that match
+# observed reality. Per-role signal multipliers may return as a
+# calibration extension if small-pilot calibration shows persistent
+# bias for strategic roles.
 
 # ─────────────────────────────────────────────────────────────────────
 # CALIBRATION METADATA — populated by /edpa:calibrate

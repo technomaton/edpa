@@ -43,8 +43,8 @@ import { VERSION } from '../../../lib/version';
         <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--t1);">{project.name}</span>
         <span class="badge badge-blue">{config.pi}</span>
         {activeIteration && <span class="badge badge-green">{activeIteration.name} ({activeIteration.dates})</span>}
-        <div class="mode-toggle" style="margin-left: auto;">
-          <span class="badge badge-yellow" style="cursor: pointer;" id="modeLabel">Operational (Simple): JS × CW</span>
+        <div style="margin-left: auto;">
+          <span class="badge badge-yellow">Score = JS × CW</span>
         </div>
       </div>
       <div class="dash-meta" style="margin-top: 6px;">{project.program} | {project.organization} | {project.registration} | EDPA v{VERSION}</div>
@@ -74,11 +74,9 @@ import { VERSION } from '../../../lib/version';
         <div class="kpi-sub">{closedIterations.length} closed iterations</div>
       </div>
       <div class="card orange text-center">
-        <div class="tag">Mode</div>
-        <div id="modeDisplay" class="kpi-value" style="font-size: 14px; color: var(--or);">JS x CW</div>
-        <div style="margin-top: 6px;">
-          <button class="btn btn-secondary" id="toggleMode" style="font-size: 10px; padding: 4px 10px;">Toggle</button>
-        </div>
+        <div class="tag">Formula</div>
+        <div class="kpi-value" style="font-size: 14px; color: var(--or);">JS × CW</div>
+        <div class="kpi-sub" style="margin-top: 4px;">Story Done + Feature/Epic/Initiative gates</div>
       </div>
     </div>
 
@@ -169,7 +167,6 @@ import { VERSION } from '../../../lib/version';
     import Chart from 'chart.js/auto';
     import { edpa, itemView, wsjf } from '../../../lib/edpa-engine';
     import { people, items, iterations } from '../../../lib/demo-data-kashealth';
-    let mode: 'simple' | 'full' = 'simple';
     const charts: Record<string, Chart> = {};
 
     // Velocity chart
@@ -222,16 +219,6 @@ import { VERSION } from '../../../lib/version';
     }
 
     // Mode toggle
-    const toggleBtn = document.getElementById('toggleMode');
-    const modeDisplay = document.getElementById('modeDisplay');
-    const modeLabel = document.getElementById('modeLabel');
-    if (toggleBtn) {
-      toggleBtn.addEventListener('click', () => {
-        mode = mode === 'simple' ? 'full' : 'simple';
-        if (modeDisplay) modeDisplay.textContent = mode === 'full' ? 'JS x CW x RS' : 'JS x CW';
-        if (modeLabel) modeLabel.textContent = mode === 'full' ? 'Audit (Full): JS × CW × RS' : 'Operational (Simple): JS × CW';
-      });
-    }
 
     // Level colors
     const levelColors: Record<string, string> = { Epic: 'var(--ac2)', Feature: 'var(--cy)', Story: 'var(--or)', Init: 'var(--pk)' };
@@ -243,7 +230,7 @@ import { VERSION } from '../../../lib/version';
       btnEdpa.addEventListener('click', () => {
         const pid = (document.getElementById('selPerson') as HTMLSelectElement).value;
         const itId = (document.getElementById('selIteration') as HTMLSelectElement).value;
-        const result = edpa(pid, itId, people, items, mode);
+        const result = edpa(pid, itId, people, items);
         if (!result) { document.getElementById('edpaResult')!.innerHTML = '<div class="note">No data found.</div>'; return; }
 
         const it = iterations.find(i => i.id === result.iteration);
@@ -260,11 +247,10 @@ import { VERSION } from '../../../lib/version';
         </div>`;
 
         h += `<div style="font-size: 11px; color: var(--t3); margin-bottom: 8px; font-family: 'JetBrains Mono', monospace;">
-          Score = JS x CW${mode === 'full' ? ' x RS' : ''} | DerivedHours = (Score / TotalScores) x Capacity
+          Score = JS × CW | DerivedHours = (Score / TotalScores) × Capacity
         </div>`;
 
         h += `<table><thead><tr><th>Item</th><th>Type</th><th>JS</th><th>CW</th>`;
-        if (mode === 'full') h += `<th>RS</th>`;
         h += `<th>Score</th><th>Ratio</th><th>Hours</th><th></th></tr></thead><tbody>`;
 
         for (const x of result.items) {
@@ -273,7 +259,6 @@ import { VERSION } from '../../../lib/version';
             <td>${x.id}: ${x.title}</td>
             <td><span class="badge ${levelBadge[x.level] || 'badge-blue'}">${x.level}</span></td>
             <td>${x.js}</td><td>${x.cw}</td>`;
-          if (mode === 'full') h += `<td>${x.rs}</td>`;
           h += `<td style="color: var(--yl);">${x.score.toFixed(2)}</td>
             <td>${pct.toFixed(1)}%</td>
             <td style="font-weight: 600;">${x.hours.toFixed(1)}</td>
@@ -283,7 +268,7 @@ import { VERSION } from '../../../lib/version';
         }
 
         h += `<tr style="border-top: 2px solid var(--bd);">
-          <td colspan="${mode === 'full' ? 5 : 4}"></td>
+          <td colspan="4"></td>
           <td style="font-weight: 600;">${result.totalScore.toFixed(2)}</td>
           <td style="font-weight: 600;">100%</td>
           <td style="font-weight: 700;">${result.totalHours.toFixed(1)}</td>
@@ -345,7 +330,7 @@ import { VERSION } from '../../../lib/version';
 
         const epics = items.filter(i => i.level === 'Epic').sort((a, b) => wsjf(b) - wsjf(a));
         for (const epic of epics) {
-          const eiv = itemView(epic.id, itId, people, items, mode);
+          const eiv = itemView(epic.id, itId, people, items);
           h += `<div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--ac2); margin: 20px 0 8px; display: flex; align-items: center; gap: 8px;">
             ${epic.id}: ${epic.title} (JS:${epic.js}, WSJF:${wsjf(epic)})
             ${eiv ? `<span style="font-size: 11px; color: var(--t2);">${eiv.totalHours.toFixed(1)}h total</span>` : ''}
@@ -354,7 +339,7 @@ import { VERSION } from '../../../lib/version';
 
           const feats = items.filter(f => f.level === 'Feature' && f.parentId === epic.id).sort((a, b) => wsjf(b) - wsjf(a));
           for (const feat of feats) {
-            const fiv = itemView(feat.id, itId, people, items, mode);
+            const fiv = itemView(feat.id, itId, people, items);
             h += `<div style="margin-left: 24px;">
               <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--cy); margin: 10px 0 4px;">
                 &#x2514; ${feat.id}: ${feat.title} (JS:${feat.js}, ${feat.status})
@@ -364,7 +349,7 @@ import { VERSION } from '../../../lib/version';
 
             const storyItems = items.filter(s => s.level === 'Story' && s.parentId === feat.id && s.iteration === itId && s.status === 'Done').sort((a, b) => wsjf(b) - wsjf(a));
             for (const story of storyItems) {
-              const siv = itemView(story.id, itId, people, items, mode);
+              const siv = itemView(story.id, itId, people, items);
               h += `<div style="margin-left: 24px;">
                 <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--gn); margin: 6px 0 3px;">
                   &#x2514; ${story.id}: ${story.title} (JS:${story.js})

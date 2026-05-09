@@ -1,4 +1,4 @@
-// EDPA version — reads from package.json (single source of truth)
-// To bump: edit web/package.json "version" field → rebuild
-import pkg from '../../package.json';
-export const VERSION = pkg.version;
+// EDPA methodology version — stable in product copy.
+// The plugin/build version (web/package.json) is intentionally NOT surfaced
+// to readers; methodology semantics are what changes in product narrative.
+export const VERSION = '1.0';

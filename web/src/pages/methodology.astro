@@ -197,16 +197,16 @@ Počítá se per úroveň nezávisle.</div>
       <li>Commit count se nepřevádí na čas</li>
     </ul>
 
-    <div class="note" style="margin-top:12px;border-left:3px solid var(--gn);padding-left:12px"><strong>v1.11 změna:</strong> Per-role korekce (<code>role_overrides</code>) byly v v1.11 odstraněny. CW se počítá výhradně signálovou agregací a per-item normalizací (viz § 5.4 níže). Strategická-role bias se nyní řeší kalibrací signálových vah proti ground truth — pokud BO/PM/Arch dostávají málo, kalibrátor zvedne <code>issue_comment</code> a <code>pr_reviewer</code> váhy. Detail v <a href="https://github.com/technomaton/edpa/blob/main/docs/auto-calibration.md" style="color:var(--ac2)">auto-calibration.md</a>.</div>
+    <div class="note" style="margin-top:12px;border-left:3px solid var(--gn);padding-left:12px"><strong>Bez per-role korekcí.</strong> CW se počítá výhradně signálovou agregací a per-item normalizací (viz § 5.4 níže). Strategická-role bias se řeší kalibrací signálových vah proti ground truth — pokud BO/PM/Arch dostávají málo, kalibrátor zvedne <code>issue_comment</code> a <code>pr_reviewer</code> váhy. Detail v <a href="https://github.com/technomaton/edpa/blob/main/docs/auto-calibration.md" style="color:var(--ac2)">auto-calibration.md</a>.</div>
 
-    <h3>5.4 Výpočet (v1.11) — single source, sum-and-normalize</h3>
+    <h3>5.4 Výpočet — single source, sum-and-normalize</h3>
     <div class="formula"><strong>contribution_score[P, item]</strong> = &Sigma; signal_weight &times; signal_fired(P, item)
 <strong>cw[P, item]</strong> = contribution_score[P, item] / &Sigma;<sub>persons</sub> contribution_score[*, item]
 <strong>score[P, item]</strong> = JobSize[item] &times; cw[P, item]
 <strong>ratio[P, item]</strong> = score[P, item] / &Sigma;<sub>items_of_P</sub> score
 <strong>DerivedHours[P, item]</strong> = ratio[P, item] &times; Capacity[P, I]</div>
-    <div class="note"><strong>Klíčová změna oproti v1.10:</strong> <code>cw</code> je teď per-item podíl (Σ napříč osobami = 1.0 na položce), ne absolutní [0,1] role-coupled hodnota. Žádný <code>RelevanceSignal</code>, žádný role priority lookup, žádné dva varianty Score formula. Signály sčítají additivně, normalizují se per-item, engine konzumuje hotové <code>cw</code>.
-    <br>Příklad: <a href="/calculator/" style="color:var(--ac2);">Kalkulátor</a>. Plná specifikace: <a href="https://github.com/technomaton/edpa/blob/main/docs/methodology.md#54-calculation--three-modes" style="color:var(--ac2)">methodology.md § 5.4</a>.</div>
+    <div class="note"><strong>CW je per-item podíl</strong> (Σ napříč osobami = 1.0 na položce), ne absolutní role-coupled hodnota. Signály sčítají additivně, normalizují se per-item, engine konzumuje hotové <code>cw</code>.
+    <br>Příklad: <a href="/calculator/" style="color:var(--ac2);">Kalkulátor</a>. Plná specifikace: <a href="https://github.com/technomaton/edpa/blob/main/docs/methodology.md" style="color:var(--ac2)">methodology.md § 5.4</a>.</div>
 
     <h3>5.5 Matematické garance (dvě)</h3>
     <div class="formula"><strong>1. Per-item:</strong>   &Sigma;<sub>persons</sub> cw[*, item] = 1.0

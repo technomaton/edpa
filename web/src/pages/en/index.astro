@@ -87,7 +87,7 @@ import { VERSION } from '../../lib/version';
     <div class="container">
       <p class="tag">Solution</p>
       <h2 class="section-title">How EDPA works</h2>
-      <div class="formula">cw[P, item] = Σ signal_weights / Σ_persons Σ signal_weights   (v1.11: per-item share, Σ = 1.0)
+      <div class="formula">cw[P, item] = Σ signal_weights / Σ_persons Σ signal_weights   (per-item share, Σ = 1.0)
 Score[P, item] = JobSize × cw   →   DerivedHours = (Score / ΣScores) × Capacity
 
 Guarantee: Σ DerivedHours = Capacity per person AND Σ cw = 1.0 per item — always.</div>
@@ -130,59 +130,57 @@ Guarantee: Σ DerivedHours = Capacity per person AND Σ cw = 1.0 per item — al
       <p class="tag">Evidence detection</p>
       <h2 class="section-title">Signals from GitHub</h2>
       <p class="desc">
-        EDPA automatically detects developer contributions from GitHub activities.
-        Each signal has an assigned weight (priority) and corresponding ContributionWeight.
+        EDPA detects contributions from GitHub activity across all levels (Story, Feature, Epic, Initiative).
+        Each signal adds weight to <code>contribution_score</code> per (person, item).
+        The resulting CW is a per-item normalized share: <code>cw = score / Σ_persons score</code> (Σ per item = 1.0).
       </p>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Signal</th>
-              <th>Priority</th>
-              <th>CW</th>
+              <th>Weight</th>
               <th>Description</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><code>Assignee</code></td>
-              <td class="td-priority">+4</td>
-              <td class="td-cw">1.0</td>
-              <td>Primary issue resolver</td>
+              <td><code>assignee</code></td>
+              <td class="td-cw">4.0</td>
+              <td>GitHub issue assignee</td>
             </tr>
             <tr>
-              <td><code>/contribute</code></td>
-              <td class="td-priority">+3</td>
-              <td class="td-cw">0.6</td>
-              <td>Explicit collaboration sign-up</td>
+              <td><code>pr_author</code></td>
+              <td class="td-cw">3.4</td>
+              <td>PR author referencing the item</td>
             </tr>
             <tr>
-              <td><code>PR author</code></td>
-              <td class="td-priority">+2</td>
-              <td class="td-cw">0.6</td>
-              <td>Pull request author</td>
+              <td><code>commit_author</code></td>
+              <td class="td-cw">2.78</td>
+              <td>Commit with S-XXX/F-XXX/E-XXX/I-XXX in branch/message</td>
             </tr>
             <tr>
-              <td><code>Commit</code></td>
-              <td class="td-priority">+1</td>
-              <td class="td-cw">0.25</td>
-              <td>Commit in a relevant branch</td>
+              <td><code>pr_reviewer</code></td>
+              <td class="td-cw">2.25</td>
+              <td>Submitted PR review</td>
             </tr>
             <tr>
-              <td><code>PR reviewer</code></td>
-              <td class="td-priority">+1</td>
-              <td class="td-cw">0.25</td>
-              <td>Pull request code review</td>
+              <td><code>issue_comment</code></td>
+              <td class="td-cw">1.14</td>
+              <td>Comment on issue/PR (bots excluded)</td>
             </tr>
             <tr>
-              <td><code>Comment</code></td>
-              <td class="td-priority">+0.5</td>
-              <td class="td-cw">0.15</td>
-              <td>Comment in issue or PR</td>
+              <td><code>/contribute @person weight:X</code></td>
+              <td class="td-cw">explicit</td>
+              <td>Manual additive signal — weight <code>X</code> from the directive</td>
             </tr>
           </tbody>
         </table>
       </div>
+      <p class="desc" style="margin-top:16px;font-size:13px;color:var(--t3);">
+        Signals <strong>aggregate additively</strong>; there is no "highest wins". Default weights above are calibrated by Monte Carlo simulation (1000 synthetic scenarios).
+        <code>/contribute</code> is a peer signal — detect_contributors.py adds its explicit weight to the sum, it does not override.
+      </p>
     </div>
   </section>
 

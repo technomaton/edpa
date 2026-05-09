@@ -122,13 +122,13 @@ const S=[
 <div class="qt fade d2">A person declares capacity. The system identifies work items they contributed to. Capacity is proportionally split based on evidence.</div>
 <div class="cols fade d3">
 <div class="col">
-<div class="fm">Score = JobSize x CW x RS
+<div class="fm">Score = JobSize x CW
 
 DerivedHours = (Score / &#x2211;Scores) x Capacity
 
 <b>Guarantee: &#x2211; DerivedHours = Capacity</b>
 Always. No exceptions.</div>
-<div class="s-p">Two variants: <code>JS x CW</code> (operational) and <code>JS x CW x RS</code> (audit)</div>
+<div class="s-p">Gated calculation: we credit Story <code>Done</code> + Feature/Epic/Initiative gate transitions from git history. CW is the per-item normalized share from evidence.</div>
 </div>
 <div class="col">
 <div class="sc g" style="margin-bottom:8px"><div class="sc-l"><b>Nobody logs hours.</b> The report is a byproduct of delivery.</div></div>

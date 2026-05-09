@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-EDPA v1.11 Monte Carlo signal-weight calibrator.
+EDPA Monte Carlo signal-weight calibrator.
 
 Search space: 5D (assignee, pr_author, commit_author, pr_reviewer,
 issue_comment) signal weights from cw_heuristics.yaml.signals.
@@ -57,6 +57,14 @@ import random
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+# Reuse the engine's version-resolution logic so calibration metadata
+# always matches the running plugin build.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from engine import VERSION  # type: ignore
+finally:
+    sys.path.pop(0)
 
 try:
     import yaml
@@ -516,7 +524,7 @@ def apply_to_heuristics(report: dict, target: Path):
         f'  mad_calibrated: {report["calibrated_mad"]:.4f}\n'
         f'  improvement_pct: {report["improvement_pct"]:.1f}\n'
         f'  calibrated_at: "{now}"\n'
-        f'  calibrated_by_version: "1.11.0"\n'
+        f'  calibrated_by_version: "{VERSION}"\n'
         f'  notes: |\n'
         f'    Synthetic Monte Carlo baseline ({report["n_scenarios"]} scenarios,\n'
         f'    {report["n_records"]} records). Ground truth was generated\n'

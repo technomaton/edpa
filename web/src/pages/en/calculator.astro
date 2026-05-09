@@ -6,8 +6,8 @@ import { people, items, iterations } from '../../lib/demo-data-walkthrough';
 const defaultHpw = 40;
 const defaultIterPerPI = 5;
 const iter = iterations[0];
-const results = people.map(p => edpa(p.id, iter.id, people, items, 'simple')!);
-const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simple')!);
+const results = people.map(p => edpa(p.id, iter.id, people, items)!);
+const itemResults = items.map(w => itemView(w.id, iter.id, people, items)!);
 ---
 
 <Layout title="EDPA Calculator" description="EDPA step by step — a concrete calculation example with real numbers. From inputs to derived hours." lang="en">
@@ -21,10 +21,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
         A concrete calculation example with real numbers.<br>
         From inputs to derived hours — verifiable by hand.
       </p>
-      <div class="mode-switch" id="modeSwitch">
-        <button class="mode-btn active" data-mode="simple">Simple: JS &times; CW</button>
-        <button class="mode-btn" data-mode="full">Full: JS &times; CW &times; RS</button>
-      </div>
+      <div class="formula-pill">Score = JobSize &times; CW</div>
     </div>
   </section>
 
@@ -68,7 +65,8 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
         <h2 class="section-title">Team and work items</h2>
         <p class="calc-desc">
           Three people with different capacities work on four Stories in one iteration.
-          Each person has a different level of involvement (CW) on different items.
+          Each person has a different share (CW) on different items. CW is a per-item
+          normalized share — the sum of all CWs on a single item = 1.0.
         </p>
       </div>
 
@@ -96,34 +94,35 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
                 <th>Alice (Arch)</th>
                 <th>Bob (Dev)</th>
                 <th>Carol (PM)</th>
+                <th>&Sigma; CW</th>
               </tr>
             </thead>
             <tbody>
-              {items.map(w => (
-                <tr>
-                  <td><code>{w.id}</code> {w.title}</td>
-                  <td class="td-js">{w.js}</td>
-                  {people.map(p => {
-                    const cn = w.contributors.find(c => c.personId === p.id);
-                    return (
-                      <td class={cn ? 'td-cw-active' : 'td-cw-empty'}>
-                        {cn ? (
-                          <span>
-                            <span class="cw-val">{cn.cw}</span>
-                            <span class="rs-val" data-rs={cn.rs}> / {cn.rs}</span>
-                          </span>
-                        ) : '—'}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+              {items.map(w => {
+                const sumCw = w.contributors.reduce((a, c) => a + c.cw, 0);
+                return (
+                  <tr>
+                    <td><code>{w.id}</code> {w.title}</td>
+                    <td class="td-js">{w.js}</td>
+                    {people.map(p => {
+                      const cn = w.contributors.find(c => c.personId === p.id);
+                      return (
+                        <td class={cn ? 'td-cw-active' : 'td-cw-empty'}>
+                          {cn ? <span class="cw-val">{cn.cw}</span> : '—'}
+                        </td>
+                      );
+                    })}
+                    <td class="td-sum">{sumCw.toFixed(2)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
         <div class="note" style="margin-top:12px;">
-          CW = Contribution Weight (level of involvement). RS = Relevance Signal (in Full mode).
-          Shown as <span class="cw-val">CW</span> / <span class="rs-val">RS</span>.
+          CW = Contribution Weight (per-item normalized share). In the full pipeline,
+          CW is computed from evidence (PRs, commits, reviews, comments, /contribute directives)
+          in <code>detect_contributors.py</code> and the engine consumes it verbatim.
         </div>
       </div>
 
@@ -154,7 +153,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
             <div class="person-role">{r.person.role} &middot; <span class="cap-display">{r.person.capacity}h</span></div>
             <table class="score-table">
               <thead>
-                <tr><th>Item</th><th>JS</th><th>CW</th><th class="rs-col">RS</th><th>Score</th></tr>
+                <tr><th>Item</th><th>JS</th><th>CW</th><th>Score</th></tr>
               </thead>
               <tbody>
                 {r.items.map(x => (
@@ -162,14 +161,11 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
                     <td><code>{x.id}</code></td>
                     <td class="td-js">{x.js}</td>
                     <td class="td-cw">{x.cw}</td>
-                    <td class="td-rs rs-col">{x.rs}</td>
                     <td class="td-score">{x.score.toFixed(2)}</td>
                   </tr>
                 ))}
                 <tr class="total-row">
-                  <td colspan="3" class="rs-hide-span">Total</td>
-                  <td colspan="4" class="rs-show-span" style="display:none;">Total</td>
-                  <td></td>
+                  <td colspan="3">Total</td>
                   <td class="td-score total-score">&Sigma; {r.totalScore.toFixed(2)}</td>
                 </tr>
               </tbody>
@@ -353,21 +349,9 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
   import { edpa, itemView } from '../../lib/edpa-engine';
   import { people, items, iterations } from '../../lib/demo-data-walkthrough';
 
-  let mode: 'simple' | 'full' = 'simple';
   let hpw = 40;
   let iterPerPI = 5;
   const iter = iterations[0];
-
-  const btns = document.querySelectorAll('.mode-btn');
-  btns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const newMode = (btn as HTMLElement).dataset.mode as 'simple' | 'full';
-      if (newMode === mode) return;
-      mode = newMode;
-      btns.forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.mode === mode));
-      recompute();
-    });
-  });
 
   const cfgHpwEl = document.getElementById('cfgHpw') as HTMLInputElement;
   const cfgIterPIEl = document.getElementById('cfgIterPI') as HTMLInputElement;
@@ -406,19 +390,8 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
   }
 
   function recompute() {
-    const results = people.map(p => edpa(p.id, iter.id, people, items, mode)!);
-    const itemResults = items.map(w => itemView(w.id, iter.id, people, items, mode)!);
-    const isFullMode = mode === 'full';
-
-    const formulaBox = document.getElementById('formulaBox');
-    if (formulaBox) {
-      formulaBox.innerHTML = isFullMode
-        ? '<strong>Score</strong> = JobSize × CW × RS<br><strong>DerivedHours</strong> = (Score / ΣScores) × Capacity'
-        : '<strong>Score</strong> = JobSize × CW<br><strong>DerivedHours</strong> = (Score / ΣScores) × Capacity';
-    }
-
-    document.querySelectorAll('.rs-col').forEach(el => { (el as HTMLElement).style.display = isFullMode ? '' : 'none'; });
-    document.querySelectorAll('.rs-val').forEach(el => { (el as HTMLElement).style.display = isFullMode ? '' : 'none'; });
+    const results = people.map(p => edpa(p.id, iter.id, people, items)!);
+    const itemResults = items.map(w => itemView(w.id, iter.id, people, items)!);
 
     const scoreCards = document.getElementById('scoreCards');
     if (scoreCards) {
@@ -435,8 +408,7 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
           const cells = row.querySelectorAll('td');
           cells[1].textContent = String(x.js);
           cells[2].textContent = String(x.cw);
-          cells[3].textContent = String(x.rs);
-          cells[4].textContent = x.score.toFixed(2);
+          cells[3].textContent = x.score.toFixed(2);
         });
         const totalCell = card.querySelector('.total-score');
         if (totalCell) totalCell.innerHTML = '&Sigma; ' + r.totalScore.toFixed(2);
@@ -523,9 +495,6 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
   }
   document.addEventListener('DOMContentLoaded', initFadeIn);
   document.addEventListener('astro:page-load', initFadeIn);
-
-  document.querySelectorAll('.rs-col').forEach(el => { (el as HTMLElement).style.display = 'none'; });
-  document.querySelectorAll('.rs-val').forEach(el => { (el as HTMLElement).style.display = 'none'; });
 </script>
 
 </Layout>
@@ -540,10 +509,11 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
     margin-bottom: 12px;
   }
   .calc-subtitle { font-size: 15px; color: var(--t2); line-height: 1.6; margin-bottom: 24px; }
-  .mode-switch { display: inline-flex; background: var(--s1); border: 1px solid var(--bd); border-radius: 8px; overflow: hidden; }
-  .mode-btn { font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 8px 16px; background: none; border: none; color: var(--t3); cursor: pointer; transition: all 0.2s; }
-  .mode-btn.active { background: rgba(99,102,241,0.15); color: var(--ac2); }
-  .mode-btn:hover:not(.active) { color: var(--t1); }
+  .formula-pill {
+    display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    padding: 8px 16px; background: rgba(99,102,241,0.10); color: var(--ac2);
+    border: 1px solid rgba(99,102,241,0.25); border-radius: 8px; font-weight: 600;
+  }
   .config-panel { margin-bottom: 0; }
   .config-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 12px; }
   .config-item { display: flex; flex-direction: column; gap: 4px; }
@@ -566,12 +536,11 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
   .td-js { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--yl); }
   .td-cw-active { font-family: 'JetBrains Mono', monospace; }
   .td-cw-empty { color: var(--t3); text-align: center; }
+  .td-sum { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--gn); text-align: center; }
   .cw-val { color: var(--cy); font-weight: 600; }
-  .rs-val { color: var(--gn); font-size: 11px; }
   .score-table { margin-top: 10px; }
   .score-table th, .score-table td { padding: 4px 8px; font-size: 12px; }
   .td-cw { color: var(--cy); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
-  .td-rs { color: var(--gn); font-family: 'JetBrains Mono', monospace; }
   .td-score { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--ac2); }
   .total-row { border-top: 2px solid var(--bd); }
   .total-row td { font-weight: 600; padding-top: 8px; }
@@ -597,13 +566,11 @@ const itemResults = items.map(w => itemView(w.id, iter.id, people, items, 'simpl
   .cta-box p { font-size: 15px; color: var(--t2); margin-bottom: 16px; }
   .fade-in { opacity: 0; transform: translateY(16px); transition: opacity 0.5s ease, transform 0.5s ease; }
   .fade-in.visible { opacity: 1; transform: translateY(0); }
-  .rs-col { display: none; }
   @media (max-width: 768px) {
     .calc-hero { padding-top: 60px; }
     .grid-3 { grid-template-columns: 1fr; }
     .grid-2 { grid-template-columns: 1fr; }
     .config-grid { grid-template-columns: 1fr 1fr; }
-    .mode-btn { font-size: 10px; padding: 6px 10px; }
     .td-computation { display: none; }
   }
 </style>

@@ -73,83 +73,68 @@ const categories = [
     icon: '\uD83D\uDD0D',
     color: 'cy',
     cardClass: 'cyan',
-    description: 'Verification of correct GitHub signal detection and their mapping to Evidence Score and Contribution Weight. Each signal must be correctly identified and scored.',
+    description: 'Verification of GitHub signal detection and additive aggregation into contribution_score. Signals add up; the resulting CW is the per-item normalized share (Σ across persons = 1.0 per item).',
     expandedCount: 5,
     tests: [
       {
-        name: 'test_assignee_detection_cw',
-        description: 'Issue assignee must be detected as owner with CW = 1.0.',
-        expected: 'assignee signal \u2192 CW = 1.0 (owner)',
+        name: 'test_assignee_signal',
+        description: 'GitHub issue assignee adds signals.assignee weight (default 4.0) to contribution_score.',
+        expected: 'assignee → +4.0 to score',
       },
       {
-        name: 'test_pr_author_without_assignee',
-        description: 'PR author without assignee role must get CW = 0.6 (key contributor).',
-        expected: 'pr_author signal \u2192 CW = 0.6 (key)',
+        name: 'test_pr_author_signal',
+        description: 'Author of a merged PR referencing the item adds signals.pr_author (default 3.4).',
+        expected: 'pr_author → +3.4 to score',
       },
       {
-        name: 'test_commit_author_only',
-        description: 'Person with only a commit (no assignee/PR) gets CW = 0.25.',
-        expected: 'commit_author signal \u2192 CW = 0.25 (reviewer)',
+        name: 'test_commit_author_signal',
+        description: 'Commit with S-XXX/F-XXX/E-XXX/I-XXX in branch/message adds signals.commit_author (default 2.78).',
+        expected: 'commit_author → +2.78 to score',
       },
       {
-        name: 'test_pr_reviewer_detection',
-        description: 'PR reviewer must be detected with CW = 0.25 (reviewer role).',
-        expected: 'pr_reviewer signal \u2192 CW = 0.25 (reviewer)',
+        name: 'test_pr_reviewer_signal',
+        description: 'Submitted PR review (excluding self) adds signals.pr_reviewer (default 2.25).',
+        expected: 'pr_reviewer → +2.25 to score',
       },
       {
-        name: 'test_issue_comment_only',
-        description: 'Person with only an issue comment gets CW = 0.15 (consulted).',
-        expected: 'issue_comment signal \u2192 CW = 0.15 (consulted)',
+        name: 'test_issue_comment_signal',
+        description: 'Issue/PR comment (bots excluded) adds signals.issue_comment (default 1.14).',
+        expected: 'issue_comment → +1.14 to score',
       },
       {
-        name: 'test_multiple_signals_highest_wins',
-        description: 'With multiple signals (assignee + commit) the strongest signal wins.',
-        expected: 'assignee + commit \u2192 CW = 1.0 (highest wins)',
+        name: 'test_signals_aggregate_additively',
+        description: 'When a person has assignee + commit + comment, weights sum (4.0 + 2.78 + 1.14 = 7.92); there is no highest-wins.',
+        expected: 'Σ fired signal_weights, not max',
       },
       {
-        name: 'test_contribute_command_detection',
-        description: '/contribute command in issue body must be detected with CW = 0.6.',
-        expected: '/contribute @user \u2192 CW = 0.6 (key)',
+        name: 'test_contribute_directive_additive',
+        description: '/contribute @person weight:0.6 adds a manual:* signal with weight 0.6 — it does not override auto-detection.',
+        expected: '/contribute @user weight:X → +X to score',
       },
       {
-        name: 'test_contribute_weight_override',
-        description: '/contribute with explicit weight overrides automatically detected CW.',
-        expected: '/contribute @user weight:0.8 \u2192 CW = 0.8',
+        name: 'test_per_item_normalization',
+        description: 'After aggregation, CW is normalized per item: cw = score / Σ persons. Invariant Σ cw[*, item] = 1.0.',
+        expected: 'Σ cw per item = 1.0 (±0.001)',
       },
       {
-        name: 'test_branch_naming_story_extraction',
-        description: 'Branch feature/S-200-omop-parser must extract reference S-200.',
-        expected: 'Branch regex: S-\\d+ \u2192 S-200',
+        name: 'test_branch_naming_extraction_S_F_E_I',
+        description: 'Branch regex extracts S-/F-/E-/I-XXX for Story, Feature, Epic, Initiative.',
+        expected: 'Detect: S-200, F-15, E-3, I-1',
       },
       {
-        name: 'test_branch_naming_feature_extraction',
-        description: 'Branch feature/F-15-auth-module must extract reference F-15.',
-        expected: 'Branch regex: F-\\d+ \u2192 F-15',
+        name: 'test_no_signals_no_contributor',
+        description: 'A person with no fired signal does not appear in contributors[] after aggregation.',
+        expected: 'score = 0 → excluded',
       },
       {
-        name: 'test_branch_naming_epic_extraction',
-        description: 'Branch epic/E-3-platform must extract reference E-3.',
-        expected: 'Branch regex: E-\\d+ \u2192 E-3',
-      },
-      {
-        name: 'test_no_matching_signals_excluded',
-        description: 'Person with no signals on an item must not be assigned.',
-        expected: 'No signals \u2192 person excluded from item',
-      },
-      {
-        name: 'test_evidence_score_threshold',
-        description: 'Evidence Score below threshold (< 1.0) causes person exclusion from item.',
-        expected: 'ES < threshold \u2192 excluded',
-      },
-      {
-        name: 'test_in_progress_items_excluded',
-        description: 'Items in In-Progress status are not included in iteration calculation.',
-        expected: 'Status: In-Progress \u2192 excluded from calculation',
+        name: 'test_bot_comments_filtered',
+        description: 'Comments from GitHub apps / bots do not count as issue_comment signals.',
+        expected: 'Bot login → signal does not fire',
       },
       {
         name: 'test_commit_count_no_time_effect',
-        description: 'Commit count does not affect time (only relevance). 1 commit = 10 commits for CW.',
-        expected: 'commit_count independent of time allocation',
+        description: 'Many commits by one author on an item count as a single commit_author signal (relevance, not volume).',
+        expected: '1 commit = 10 commits in terms of score',
       },
     ],
   },
@@ -159,12 +144,12 @@ const categories = [
     icon: '\u2696',
     color: 'yl',
     cardClass: 'yellow',
-    description: 'Verification of heuristic signal weight correctness and rules for determining Contribution Weight (v1.11). The heuristic must be consistent and reproducible.',
+    description: 'Verification of heuristic signal weight correctness and rules for determining Contribution Weight. The heuristic must be consistent and reproducible.',
     expandedCount: 4,
     tests: [
       {
         name: 'test_signal_weight_ordering',
-        description: 'v1.11 hierarchy: assignee > pr_author > commit_author ≈ pr_reviewer > issue_comment.',
+        description: 'Hierarchy: assignee > pr_author > commit_author ≈ pr_reviewer > issue_comment.',
         expected: 'sw.assignee >= sw.pr_author >= sw.commit_author ≥ sw.pr_reviewer ≥ sw.issue_comment',
       },
       {
@@ -178,38 +163,38 @@ const categories = [
         expected: 'Σ_items DerivedHours[P, *] = Capacity[P, I]',
       },
       {
-        name: 'test_no_role_overrides_in_v1_11',
-        description: 'v1.11 dropped role_overrides — calibration runs on 5 signal weights.',
+        name: 'test_no_role_overrides_in_heuristics',
+        description: 'Calibration runs on 5 signal weights.',
         expected: 'cw_heuristics.yaml.role_overrides not present',
       },
       {
         name: 'test_signal_weights_assignee',
-        description: 'Assignee signal must have Evidence Score +4.0 (v1.11 baseline).',
+        description: 'Assignee signal must have Evidence Score +4.0.',
         expected: 'signals.assignee = 4.0',
       },
       {
         name: 'test_signal_weights_pr_author',
-        description: 'PR author signal must have Evidence Score +3.4 (v1.11 baseline).',
+        description: 'PR author signal must have Evidence Score +3.4.',
         expected: 'signals.pr_author = 3.4',
       },
       {
         name: 'test_signal_weights_commit',
-        description: 'Commit author signal must have Evidence Score +2.78 (v1.11 baseline).',
+        description: 'Commit author signal must have Evidence Score +2.78.',
         expected: 'signals.commit_author = 2.78',
       },
       {
         name: 'test_signal_weights_pr_reviewer',
-        description: 'PR reviewer signal must have Evidence Score +2.25 (v1.11 baseline).',
+        description: 'PR reviewer signal must have Evidence Score +2.25.',
         expected: 'signals.pr_reviewer = 2.25',
       },
       {
         name: 'test_signal_weights_issue_comment',
-        description: 'Issue comment signal must have Evidence Score +1.14 (v1.11 baseline).',
+        description: 'Issue comment signal must have Evidence Score +1.14.',
         expected: 'signals.issue_comment = 1.14',
       },
       {
         name: 'test_signals_aggregate_additively',
-        description: 'CW is computed by additive signal aggregation + per-item normalization (v1.11). No highest-signal-wins.',
+        description: 'CW is computed by additive signal aggregation + per-item normalization. No highest-signal-wins.',
         expected: 'cw[P, item] = Σ signal_weights / Σ_persons Σ signal_weights',
       },
       {
@@ -285,7 +270,7 @@ const categories = [
       },
       {
         name: 'test_no_transitions_degenerates_to_done_credit',
-        description: 'When git history records no Feature/Epic transitions, engine credits only Done items (v1.14: single path, no mode selector).',
+        description: 'When git history records no Feature/Epic transitions, engine credits only Done items.',
         expected: 'gate_events empty \u2192 only Story Done credit fires',
       },
       {
@@ -860,7 +845,7 @@ import { VERSION } from '../../lib/version';
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card cyan">
         <div class="tag" style="color:var(--cy)">Derived role labels <span class="badge" style="margin-left:8px;font-size:10px;background:var(--yl);color:var(--bg);padding:2px 6px;border-radius:4px">Display layer only</span></div>
-        <p style="color:var(--t2);font-size:13px;padding:8px 0">v1.11 doesn't store roles per person — derives them from dominant signal type for UX (timesheets, reports). Engine math sees only <code>cw</code> values.</p>
+        <p style="color:var(--t2);font-size:13px;padding:8px 0">EDPA doesn't store roles per person — derives them from dominant signal type for UX (timesheets, reports). Engine math sees only <code>cw</code> values.</p>
         <table>
           <thead>
             <tr><th>Dominant signal</th><th>Display role</th></tr>
@@ -875,7 +860,7 @@ import { VERSION } from '../../lib/version';
       </div>
 
       <div class="card yellow">
-        <div class="tag" style="color:var(--yl)">Signal weights (v1.11 baseline)</div>
+        <div class="tag" style="color:var(--yl)">Signal weights</div>
         <table>
           <thead>
             <tr><th>Signal</th><th style="text-align:right">Score</th></tr>
@@ -892,13 +877,13 @@ import { VERSION } from '../../lib/version';
       </div>
     </div>
 
-    <div class="note" style="margin-top:16px"><strong>Rule (v1.11):</strong> Signals add additively into <code>contribution_score</code> per (person, item). Per-item normalization gives <code>cw = score / Σ_persons score</code>. No "highest signal wins", no threshold — even one comment yields a proportional share.</div>
+    <div class="note" style="margin-top:16px"><strong>Rule:</strong> Signals add additively into <code>contribution_score</code> per (person, item). Per-item normalization gives <code>cw = score / Σ_persons score</code>. No "highest signal wins", no threshold — even one comment yields a proportional share.</div>
 
-    <!-- v1.11 Monte Carlo synthetic baseline -->
+    <!-- Monte Carlo synthetic baseline -->
     <div class="card green" style="margin-top:24px">
-      <div class="tag" style="color:var(--gn)">Monte Carlo calibration (v1.11)</div>
+      <div class="tag" style="color:var(--gn)">Monte Carlo calibration</div>
       <p>1,000 synthetic scenarios (32,210 records); 5 candidates converged to MAD 0.0805 after Nelder-Mead refinement.</p>
-      <p style="margin-top:8px"><strong>Strategic-role bias correction:</strong> v1.10 used per-role multipliers (<code>role_overrides</code>). v1.11 dropped that and addresses bias purely via signal weight calibration:</p>
+      <p style="margin-top:8px"><strong>Strategic-role bias correction:</strong> EDPA addresses strategic-role bias purely via signal weight calibration:</p>
       <ul style="font-size:13px;line-height:1.6">
         <li>BO/PM contributions show via <code>issue_comment</code> + manual <code>/contribute</code> directives. Calibrator boosts <code>issue_comment</code> weight if BO/PM are under-credited.</li>
         <li>Arch contributions show via <code>pr_reviewer</code>. Calibrator boosts <code>pr_reviewer</code> weight similarly.</li>

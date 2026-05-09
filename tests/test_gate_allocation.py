@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-EDPA Gate Allocation Tests — verifies --mode gates behaviour.
+EDPA Gate Allocation Tests — verifies single-path engine credits gate transitions (v1.14+).
 
 Covers:
   - transitions.py git-log diff parsing
   - gate_weights validity (sum to 1.0 per item type)
-  - capacity invariant under mode=gates
-  - backwards-compat: mode=simple bit-identical on demo data
+  - capacity invariant when gates contribute to score
   - edge cases: status revert, status skip, item with no transitions
 
 Run: python -m pytest tests/test_gate_allocation.py -v

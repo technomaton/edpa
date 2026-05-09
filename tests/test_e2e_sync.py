@@ -129,7 +129,7 @@ def make_workspace(tmp_path: Path, org: str, repo: str, items: list[dict]) -> Pa
     # Minimal edpa.yaml — sync section gets populated by setup
     (edpa / "config/edpa.yaml").write_text(yaml.dump({
         "project": {"name": "E2E Test Project"},
-        "governance": {"methodology": "EDPA 1.0.0-beta", "calculation_mode": "simple"},
+        "governance": {"methodology": "EDPA 1.0.0-beta"},
         "sync": {
             "github_org": org,
             "github_repo": repo,
@@ -442,7 +442,7 @@ def test_iteration_field_roundtrips(fresh_workspace):
 
 
 def test_engine_sees_status_transition_after_sync(fresh_workspace):
-    """A3.1 + integration: a Done transition synced from GH gets credited by engine --mode gates.
+    """A3.1 + integration: a Done transition synced from GH gets credited by the engine via gate detection.
 
     This is the proof that the full chain works: GH UI → pull → YAML+git → engine credits gate.
     """

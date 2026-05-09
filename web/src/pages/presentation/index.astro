@@ -122,13 +122,13 @@ const S=[
 <div class="qt fade d2">Člověk deklaruje kapacitu. Systém identifikuje work items, na nichž se podílel. Kapacita se rozpadne poměrově podle evidence.</div>
 <div class="cols fade d3">
 <div class="col">
-<div class="fm">Score = JobSize x CW x RS
+<div class="fm">Score = JobSize x CW
 
 DerivedHours = (Score / &#x2211;Scores) x Capacity
 
 <b>Garance: &#x2211; DerivedHours = Capacity</b>
 Vždy. Bez výjimky.</div>
-<div class="s-p">Dvě varianty: <code>JS x CW</code> (provozní) a <code>JS x CW x RS</code> (auditní)</div>
+<div class="s-p">Gated calculation: kreditujeme Story <code>Done</code> + Feature/Epic/Initiative gate transitions z git historie. CW je per-item normalizovaný podíl z evidence.</div>
 </div>
 <div class="col">
 <div class="sc g" style="margin-bottom:8px"><div class="sc-l"><b>Nikdo neloguje hodiny.</b> Výkaz je vedlejší produkt dodávky.</div></div>
@@ -206,7 +206,7 @@ Garance: &#x2211; podilu = 100%</div>
 <div class="sc c" style="margin-bottom:8px"><div class="sc-t">Override</div><div class="sc-l"><code>/contribute @username weight:0.6</code></div></div>
 <div class="sc y" style="margin-bottom:8px"><div class="sc-t">Branch naming</div><div class="sc-l"><code>feature/S-200-omop-parser</code><br>CI blokuje PR bez reference</div></div>
 <div class="sc o"><div class="sc-t">Commit &#x2260; cas</div><div class="sc-l">Commity = signál relevance, ne hodiny. AI mění patterns.</div></div>
-<div class="sc p"><div class="sc-t">v1.11 calibrace</div><div class="sc-l">5 signal weights (assignee 4.0, pr_author 3.4, commit_author 2.78, pr_reviewer 2.25, issue_comment 1.14) &middot; Monte Carlo na 1000 syntetických scénářích</div></div>
+<div class="sc p"><div class="sc-t">Signal calibrace</div><div class="sc-l">5 signal weights (assignee 4.0, pr_author 3.4, commit_author 2.78, pr_reviewer 2.25, issue_comment 1.14) &middot; Monte Carlo na 1000 syntetických scénářích</div></div>
 </div></div>`,
 
 // 10: SKILLS
