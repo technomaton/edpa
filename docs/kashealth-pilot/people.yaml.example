@@ -78,15 +78,32 @@ people:
     availability: confirmed
 
 # ─────────────────────────────────────────────────────────────────────
-# Multi-role (volitelně) — pokud má někdo dva kontrakty (např. full-time
-# Dev + part-time PM), vytvořte pro každý kontrakt zvlášť entry s
-# odlišným id a odpovídajícím evidence_default / evidence_scope.
-# Příklad v plugin/edpa/templates/people.yaml.tmpl § "MULTI-ROLE".
+# Multi-role (volitelně, v1.11+)
+# ─────────────────────────────────────────────────────────────────────
+# Pokud má někdo dva kontrakty (např. full-time Dev + part-time PM),
+# vytvořte pro každý kontrakt zvlášť entry s distinct id (např.
+# `smith-dev` + `smith-pm`). Auto-detekce routuje podle github: pole;
+# když oba kontrakty sdílí stejný GH login, vyhraje první entry. Pro
+# rozdělení kontribucí mezi kontrakty použijte manuální directivu
+# `/contribute @smith-pm weight:N` v PR/issue/commit bodies.
+#
+# Pozn.: pre-v1.11 mělo evidence_default / evidence_scope pole pro
+# automatické routování podle item-ID patternů. v1.11 to dropla
+# (jednodušší schema, žádné dead-code větve v engine). Pokud bys chtěl
+# scope routing zpět, dej vědět pro v1.14 design discussion.
+# Plný příklad v plugin/edpa/templates/people.yaml.tmpl § "MULTI-ROLE".
 # ─────────────────────────────────────────────────────────────────────
 
-# Backlog item evidence schema:
-#   contributors[].as = evidence role: owner | key | reviewer | consulted
-#                       (NE job role z people[].role výše)
-#   contributors[].cw = 0..1 manuální contribution weight
+# Backlog item evidence schema (v1.11):
+#   contributors[].person                = person id z people[].id výše
+#   contributors[].cw                    = per-item share (Σ napříč osobami = 1.0)
+#   contributors[].contribution_score    = raw suma signal weights (audit input)
+#   contributors[].signals[]             = audit trail (type/ref/weight/detected_at)
 #
-# Plný example backlog story v docs/KASHEALTH-PILOT.md § 5.
+# Engine v v1.11 čte cw přímo bez další transformace. Auto-populates
+# přes detect_contributors.py (z real PR/commit/review evidence).
+# Manuální override přes `/contribute @person weight:N` (additive signal,
+# detail v docs/contribute-directive.md).
+#
+# Plný appendix backlog story formats v docs/KASHEALTH-PILOT.md +
+# docs/audit-references.md (canonical audit ref taxonomy per signal type).
