@@ -20,7 +20,7 @@ import { VERSION } from '../../lib/version';
   <Header currentPath="/presentation/" />
   <div class="deck" id="deck"></div>
   <div class="pres-nav">
-    <div class="nav-l"><span class="logo">EDPA v{VERSION}</span><span class="nav-label">&middot; Open Source Governance</span></div>
+    <div class="nav-l"><a href="/" class="pres-exit" title="Back to website" style="color:var(--t3);text-decoration:none;margin-right:12px;font-family:'JetBrains Mono',monospace;font-size:12px;border:1px solid var(--bd);padding:4px 8px;border-radius:4px;">&larr; Web</a><span class="logo">EDPA v{VERSION}</span><span class="nav-label">&middot; Open Source Governance</span></div>
     <div class="nav-c" id="dots"></div>
     <div class="nav-r">
       <button class="pres-btn" id="btnPrev">&larr; Zpět</button>
@@ -237,41 +237,42 @@ Garance: &#x2211; podilu = 100%</div>
 
 // 12: REPO TEMPLATE
 `<div class="s-tag fade">GitHub Template</div>
-<div class="s-h1 fade d1">30 souborů, okamžitě použitelné</div>
+<div class="s-h1 fade d1">Plugin + GitHub Actions, okamžitě použitelné</div>
 <div class="cols fade d2">
 <div class="col">
-<div class="fm" style="font-size:10px;line-height:1.7;border-left-color:var(--ac)"><b>.claude/skills/edpa-governance/</b>
-&#x251C;&#x2500;&#x2500; edpa-setup/SKILL.md
-&#x251C;&#x2500;&#x2500; edpa-engine/SKILL.md
-&#x251C;&#x2500;&#x2500; edpa-reports/SKILL.md
-&#x251C;&#x2500;&#x2500; edpa-autocalib/SKILL.md
-&#x251C;&#x2500;&#x2500; references/ (7 souborů)
-&#x251C;&#x2500;&#x2500; scripts/evaluate_cw.py    &larr; .claude/edpa/scripts/
-&#x251C;&#x2500;&#x2500; docs/examples/capacity-example.yaml
-&#x2514;&#x2500;&#x2500; plugin.json
+<div class="fm" style="font-size:10px;line-height:1.7;border-left-color:var(--ac)"><b>.claude/edpa/</b> (instalováno z plugin/)
+&#x251C;&#x2500;&#x2500; commands/edpa/ (6 slash commands)
+&#x2502;    &#x2514;&#x2500;&#x2500; setup, sync, calibrate, board, reports, close-iteration
+&#x251C;&#x2500;&#x2500; skills/ (6 SKILL.md)
+&#x2502;    &#x2514;&#x2500;&#x2500; edpa-setup, -engine, -reports, -autocalib, -sync, -sync-people
+&#x251C;&#x2500;&#x2500; edpa/scripts/ (engine.py, sync.py, detect_contributors.py, &hellip;)
+&#x251C;&#x2500;&#x2500; edpa/templates/ (cw_heuristics, project, people, &hellip;)
+&#x251C;&#x2500;&#x2500; edpa/schemas/, hooks/
+&#x2514;&#x2500;&#x2500; .claude-plugin/plugin.json
 
-<b>.github/</b>
-&#x251C;&#x2500;&#x2500; workflows/branch-naming.yml
-&#x251C;&#x2500;&#x2500; ISSUE_TEMPLATE/ (epic, feature, story)
-&#x2514;&#x2500;&#x2500; PULL_REQUEST_TEMPLATE.md
+<b>.github/workflows/</b> (11 GitHub Actions)
+&#x251C;&#x2500;&#x2500; branch-check, validate-item, traceability-check
+&#x251C;&#x2500;&#x2500; sync-git-to-projects, sync-projects-to-git
+&#x251C;&#x2500;&#x2500; iteration-close, pi-close, velocity-track
+&#x251C;&#x2500;&#x2500; wsjf-calculate, contributor-detect
+&#x2514;&#x2500;&#x2500; collaborators-sync
 
-<b>.edpa/config/</b> (capacity, heuristics, project)
-<b>docs/</b> methodology.md
-<b>.edpa/data/</b> ground_truth.yaml
-<b>.edpa/snapshots/</b> + <b>.edpa/reports/</b> (auto-generated)</div>
+<b>.edpa/</b> (vyt&#x2202;voří install.sh ve va&scaron;em projektu)
+&#x251C;&#x2500;&#x2500; config/ (heuristics.yaml, edpa.yaml, people.yaml)
+&#x251C;&#x2500;&#x2500; backlog/ (initiatives, epics, features, stories)
+&#x2514;&#x2500;&#x2500; iterations/, reports/, snapshots/, data/</div>
 </div>
 <div class="col">
 <div class="sc g" style="margin-bottom:8px"><div class="sc-t">Pro vas projekt</div><div class="sc-l">
 <code>curl -fsSL edpa.technomaton.com/install.sh | sh</code><br>
-<code>/edpa setup "Projekt"</code><br><br>
+<code>/edpa:setup "Projekt"</code><br><br>
 Plugin + setup &#x2192; hotovo.
 </div></div>
-<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Pro jiny projekt</div><div class="sc-l">
-"Use this template" na GitHubu.<br>
-<code>.edpa/config/people.yaml</code> = tvůj tým.<br>
-Claude Code: "Set up EDPA for My Project"
+<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Migrace existuj&iacute;c&iacute;ho repa</div><div class="sc-l">
+Stejn&yacute; <code>install.sh</code> &mdash; idempotentn&iacute;, p&aacute;ruje se s aktu&aacute;ln&iacute;m <code>.edpa/</code>.<br>
+v1.14 &rarr; v1.15: <code>tools/migrate_rr_to_rr_oe.py</code>
 </div></div>
-<div class="sc a"><div class="sc-t">Obsah</div><div class="sc-l">4 skills + 7 references + 3 configs + 5 GitHub templates + CI workflow + evaluator + metodika</div></div>
+<div class="sc a"><div class="sc-t">Obsah</div><div class="sc-l">6 skills + 6 slash commands + 11 GitHub Actions + engine + sync + auto-kalibrace + metodika</div></div>
 </div></div>`,
 
 // 13: AUTO-CALIBRATION
