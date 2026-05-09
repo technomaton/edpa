@@ -2,6 +2,47 @@
 
 ## Unreleased
 
+## 1.16.0-beta — 2026-05-09
+
+### Fixed — E2E pilot defects (4)
+
+End-to-end pilot run against `technomaton/edpa-e2e-pilot` (synthetic
+4-person team, 5-iteration PI, real GitHub Project) surfaced four
+defects on the day-1 happy path. All four are now patched.
+
+- **`backlog.py add --rr-oe` raised `NameError: rr`.** Two leftover
+  references to the pre-v1.11 `rr` variable were not migrated when the
+  field renamed to `rr_oe`. Replacing them unblocks the very first
+  `backlog.py add` invocation in the kashealth runbook.
+- **`backlog.py add --contributor` emitted a legacy `as:` role field
+  that `validate_syntax.py --strict` rejects.** v1.11 dropped role
+  classification (roles are derived from `signals[].type` at display
+  time), but the CLI was still writing the old shape — the tool's own
+  validator marked everything it produced as invalid. CLI now emits
+  `{person, cw}` only.
+- **`project_setup.py` left the `Iteration` single-select field with
+  only the `TBD` placeholder.** Bootstrap created
+  `.edpa/iterations/PI-{year}-1.{1..5}.yaml`, but those iteration IDs
+  were never seeded as options on the GitHub Project. Every subsequent
+  `sync.py push` failed with `no option_id for
+  'Iteration':'PI-2026-1.X'` until the operator discovered the
+  undocumented `sync.py add-iteration <id>` workaround. STEP 9 now
+  scans `.edpa/iterations/` for child iteration files, calls
+  `_extend_iteration_options_via_graphql`, and refetches the field
+  options so `option_ids` persists into `edpa.yaml` in the same step.
+- **`reports.py` printed `Mode: **?**` on every timesheet** and
+  `(None)` on every PI summary bullet. The `mode` field was retired in
+  v1.14 (single calculation path) but the templates still tried to
+  read it. The lines are dropped — auditors no longer see a literal
+  `?` next to "Methodology" on every timesheet.
+
+### Fixed — preflight nag on current installs
+
+`docs/kashealth-pilot/preflight.sh` carried a hardcoded
+`latest=1.8.1-beta` constant and warned every fresh install that it
+was "outdated". The check now resolves the latest tag dynamically via
+`gh release list` so a current install reports as current.
+
 ## 1.15.0-beta — 2026-05-09
 
 ### BREAKING — WSJF field rename: `rr` → `rr_oe`

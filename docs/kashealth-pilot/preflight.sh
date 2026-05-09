@@ -168,8 +168,14 @@ step 8 "EDPA plugin state"
 if [ -d ".claude/edpa/scripts" ]; then
     PLUGIN_VERSION=$(python3 -c 'import json; print(json.load(open(".claude/.claude-plugin/plugin.json"))["version"])' 2>/dev/null || echo "?")
     ok "Plugin installed: v$PLUGIN_VERSION"
-    if [ "$PLUGIN_VERSION" != "1.8.1-beta" ]; then
-        warn "Plugin version $PLUGIN_VERSION (latest published: 1.8.1-beta)"
+    # Look up the latest published release dynamically. A hardcoded
+    # version would silently lie to operators on every release bump
+    # and (worse) flag a perfectly current install as "outdated" on
+    # day 1 of the pilot.
+    LATEST=$(gh release list --repo technomaton/edpa --limit 1 --json tagName \
+        --jq '.[0].tagName' 2>/dev/null | sed 's/^v//')
+    if [ -n "$LATEST" ] && [ "$PLUGIN_VERSION" != "$LATEST" ]; then
+        warn "Plugin version $PLUGIN_VERSION (latest published: $LATEST)"
         hint "curl -fsSL https://edpa.technomaton.com/install.sh | sh   # to upgrade"
     fi
 else

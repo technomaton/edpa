@@ -957,7 +957,7 @@ def cmd_add(root, backlog, args):
             print(color(f"  Error: --contributor cw must be in [0,1] "
                         f"(got {cw} in {raw!r})", C.ERR))
             sys.exit(1)
-        contributors.append({"person": person, "as": role, "cw": cw})
+        contributors.append({"person": person, "cw": cw})
 
     # Validate type
     if item_type not in TYPE_DIRS:
@@ -992,7 +992,7 @@ def cmd_add(root, backlog, args):
         item_data["bv"] = bv
     if tc is not None:
         item_data["tc"] = tc
-    if rr is not None:
+    if rr_oe is not None:
         item_data["rr_oe"] = rr_oe
     if assignee:
         item_data["assignee"] = assignee
@@ -1005,7 +1005,7 @@ def cmd_add(root, backlog, args):
     if js and js > 0:
         _bv = bv or 0
         _tc = tc or 0
-        _rr = rr or 0
+        _rr = rr_oe or 0
         if _bv or _tc or _rr:
             item_data["wsjf"] = round((_bv + _tc + _rr) / js, 2)
 

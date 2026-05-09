@@ -121,7 +121,6 @@ def _format_override_summary(override: dict | None, baseline) -> str:
 
 def _format_person_md(person: dict, results: dict) -> str:
     iteration = results.get("iteration", "?")
-    mode = results.get("mode", "?")
     methodology = results.get("methodology", "EDPA")
     capacity = person.get("capacity", 0)
     derived = person.get("total_derived", 0)
@@ -139,12 +138,14 @@ def _format_person_md(person: dict, results: dict) -> str:
     else:
         capacity_line = f"- Capacity: **{capacity}h**"
 
+    # `mode` field was retired in v1.14 (single calculation path). The
+    # template no longer prints it — emitting `Mode: ?` on every timesheet
+    # confused auditors who reasonably asked "what mode are we in?".
     lines = [
         f"# Timesheet — {person.get('name', person.get('id', '?'))} "
         f"({person.get('role', '?')})",
         "",
         f"- Iteration: **{iteration}**",
-        f"- Mode: **{mode}**",
         f"- Methodology: **{methodology}**",
         capacity_line,
         f"- Derived: **{derived}h**",
@@ -181,7 +182,6 @@ def _format_person_md(person: dict, results: dict) -> str:
 
 def _format_team_md(results: dict) -> str:
     iteration = results.get("iteration", "?")
-    mode = results.get("mode", "?")
     methodology = results.get("methodology", "EDPA")
     pf = results.get("planning_factor", 0.8)
     people = results.get("people", []) or []
@@ -192,10 +192,10 @@ def _format_team_md(results: dict) -> str:
     # everyone runs at baseline.
     has_overrides = any(p.get("capacity_override") for p in people)
 
+    # See _format_person_md — `mode` retired in v1.14, no longer emitted.
     lines = [
         f"# Team Rollup — {iteration}",
         "",
-        f"- Mode: **{mode}**",
         f"- Methodology: **{methodology}**",
         f"- Planning factor: **{pf}**",
         f"- Team capacity: **{capacity_total}h**",
@@ -335,8 +335,10 @@ def write_pi_summary(edpa_root: Path, pi_id: str,
 
     lines += ["", "## Per-iteration breakdown", ""]
     for r in iteration_results:
+        # `mode` retired in v1.14 — was producing "(None)" in every
+        # bullet for the post-v1.14 single-path engine output.
         lines.append(
-            f"- **{r.get('iteration')}** ({r.get('mode')}): "
+            f"- **{r.get('iteration')}**: "
             f"team_total={r.get('team_total', 0)}h, "
             f"invariants_passed={r.get('all_invariants_passed', '?')}"
         )

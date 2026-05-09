@@ -21,6 +21,7 @@ Prerequisite:
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import textwrap
@@ -828,7 +829,54 @@ def main():
         # AI-native defaults: 1-week iterations × 5 per PI. Customer
         # creates the per-iteration files (PI-{id}.{n}.yaml) as the team
         # plans them; gaps surface via edpa_validate.
-        _bootstrap_pi_stub_if_empty(Path(".edpa/iterations"))
+        iter_dir = Path(".edpa/iterations")
+        _bootstrap_pi_stub_if_empty(iter_dir)
+
+        # Seed the Iteration field with one option per bootstrapped child
+        # iteration. Without this, every subsequent `sync.py push` for
+        # items with `iteration:` set fails with
+        # "no option_id for 'Iteration':'PI-2026-1.X'" until the operator
+        # finds the (undocumented) `sync.py add-iteration` workaround.
+        # Re-query field options after the mutation so option_ids picks
+        # up the new IDs and persists them to edpa.yaml in this same step.
+        iter_ids = []
+        for p in sorted(iter_dir.glob("PI-*.yaml")):
+            sub_id = p.stem
+            # Match child iteration format PI-{year}-{n}.{i}; skip parent
+            # PI-{year}-{n} which has only one segment after the year.
+            if re.match(r"^PI-\d+-\d+\.\d+$", sub_id):
+                iter_ids.append(sub_id)
+        if iter_ids:
+            added = _extend_iteration_options_via_graphql(
+                project_id=project_id, wanted=iter_ids,
+            )
+            if added is None:
+                info("Iteration options NOT seeded "
+                     "(GraphQL update unavailable). Run "
+                     "`sync.py add-iteration <id>` per iter or re-run setup.")
+            elif added:
+                ok(f"Iteration field: seeded {len(added)} option(s) "
+                   f"({', '.join(added)})")
+                # Refetch options so edpa.yaml gets the freshly-created IDs.
+                refetch = run(
+                    f"gh project field-list {project_num} --owner {args.org} "
+                    f"--format json --limit 100"
+                )
+                if refetch:
+                    try:
+                        for f in json.loads(refetch).get("fields", []):
+                            for opt in f.get("options", []):
+                                option_ids[f"{f['name']}:{opt['name']}"] = opt["id"]
+                    except (ValueError, TypeError):
+                        pass
+            else:
+                info("Iteration field: all wanted options already present")
+
+        # Persist the (possibly extended) option_ids before writing edpa.yaml.
+        sync["option_ids"] = dict(option_ids)
+        config["sync"] = sync
+        with open(config_path, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
     issue_map_path = Path(".edpa/config/issue_map.yaml")
     serializable_map = {
