@@ -186,6 +186,7 @@ td {
 .wi-epic { color: var(--ac2); }
 .wi-feature { color: var(--cy); }
 .wi-story { color: var(--or); }
+.wi-defect { color: var(--rd); }
 .wi-task { color: var(--yl); }
 
 /* WSJF component colors */

@@ -60,7 +60,7 @@ import { VERSION } from '../../lib/version';
           <tr><td><strong>Iteration</strong></td><td>Delivery cycle. Stories are planned, delivered, and closed.</td><td>1w (AI-native) / 2w (classic)</td></tr>
           <tr><td><strong>Planning Interval</strong></td><td>Planning cycle. Features are planned, coordinated, and evaluated.</td><td>5w (4+1 IP) / 10w (8+2 IP)</td></tr>
           <tr><td><strong>IP Iteration</strong></td><td>Innovation &amp; Planning iteration at the end of PI.</td><td>Last iteration in PI</td></tr>
-          <tr><td><strong>Job Size (JS)</strong></td><td>Relative size estimate of a work item. Modified Fibonacci.</td><td>1, 2, 3, 5, 8, 13, 20</td></tr>
+          <tr><td><strong>Job Size (JS)</strong></td><td>Relative size estimate of a work item. Modified Fibonacci per WSJF (SAFe 6).</td><td>1, 2, 3, 5, 8, 13, 20, 40, 100</td></tr>
           <tr><td><strong>WSJF</strong></td><td>Prioritization score: (BV + TC + RR) / JS</td><td>Independent per level</td></tr>
           <tr><td><strong>CW</strong></td><td>Contribution Weight — per-item normalized share of a person on an item (Σ across persons = 1.0 per item).</td><td>0&ndash;1.0</td></tr>
           <tr><td><strong>Signal Weight</strong></td><td>Weight of a single evidence signal type (<code>assignee</code>, <code>pr_author</code>, <code>commit_author</code>, <code>pr_reviewer</code>, <code>issue_comment</code>) aggregated by <code>detect_contributors.py</code>. In the config under the <code>signals.*</code> key.</td><td><code>cw_heuristics.yaml</code></td></tr>
@@ -100,13 +100,15 @@ import { VERSION } from '../../lib/version';
     <div class="formula" style="white-space:pre;line-height:2;font-size:16px"><span class="wi-initiative"><b>Initiative</b></span> (entire project, business case)
   └── <span class="wi-epic"><b>Epic</b></span> (strategic goal, 6-9 months)
        └── <span class="wi-feature"><b>Feature</b></span> (must fit within a Planning Interval)
-            └── <span class="wi-story"><b>Story</b></span> (delivered in an Iteration)
-                 └── <span class="wi-task"><b>Task</b></span> (technical work, optional)</div>
+            ├── <span class="wi-story"><b>Story</b></span> (delivered in an Iteration)
+            │    └── <span class="wi-task"><b>Task</b></span> (technical work, optional)
+            └── <span class="wi-defect"><b>Defect</b></span> (fix, at the Story level)</div>
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:var(--pk)"></div> Initiative</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--ac2)"></div> Epic</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--cy)"></div> Feature</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--or)"></div> Story</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--rd)"></div> Defect</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--yl)"></div> Task</div>
     </div>
     <p>Each level has its <strong>own independent Job Size and WSJF</strong>. Feature WSJF is not computed from Stories below it.</p>
@@ -114,19 +116,19 @@ import { VERSION } from '../../lib/version';
     <div class="card" style="margin-top:16px">
       <table>
         <thead>
-          <tr><th>Level</th><th>JS max</th><th>GitHub mapping</th></tr>
+          <tr><th>Level</th><th>Job Size range</th><th>GitHub mapping</th></tr>
         </thead>
         <tbody>
-          <tr><td class="wi-epic"><b>Epic</b></td><td>20</td><td>Issue Type: Epic</td></tr>
-          <tr><td class="wi-feature"><b>Feature</b></td><td>13</td><td>Issue Type: Feature</td></tr>
-          <tr><td class="wi-story"><b>Story</b> (2/10)</td><td>8</td><td>Issue Type: Story</td></tr>
-          <tr><td class="wi-story"><b>Story</b> (1/5)</td><td>5</td><td>Issue Type: Story</td></tr>
-          <tr><td class="wi-task"><b>Task</b></td><td>&mdash;</td><td>Issue Type: Task</td></tr>
+          <tr><td class="wi-initiative"><b>Initiative</b></td><td>1&ndash;100 (mod. Fibonacci)</td><td>Issue Type: Initiative</td></tr>
+          <tr><td class="wi-epic"><b>Epic</b></td><td>1&ndash;100 (mod. Fibonacci)</td><td>Issue Type: Epic</td></tr>
+          <tr><td class="wi-feature"><b>Feature</b></td><td>1&ndash;100 (mod. Fibonacci)</td><td>Issue Type: Feature</td></tr>
+          <tr><td class="wi-story"><b>Story</b></td><td>1&ndash;100 (mod. Fibonacci)</td><td>Issue Type: Story</td></tr>
+          <tr><td class="wi-defect"><b>Defect</b></td><td>1&ndash;100 (mod. Fibonacci)</td><td>Issue Type: Defect</td></tr>
+          <tr><td class="wi-task"><b>Task</b></td><td>&mdash; (sub-Story checklist)</td><td>Issue Type: Task</td></tr>
         </tbody>
       </table>
+      <div class="note" style="margin-top:12px">Modified Fibonacci scale (1, 2, 3, 5, 8, 13, 20, 40, 100) per WSJF in SAFe 6. No fixed per-level caps &mdash; granularity is the team's responsibility during refinement. With AI-assisted work even a Story at JS=20+ can realistically ship within an iteration.</div>
     </div>
-
-    <p style="margin-top:16px">Items above the limit are broken down. Granularity guardrails enforce reasonable granularity.</p>
 
     <div class="formula"><strong>WSJF:</strong> (<span class="wsjf-bv">BV</span> + <span class="wsjf-tc">TC</span> + <span class="wsjf-rr">RR</span>) / <span class="wsjf-js">JS</span>
 <span class="wsjf-bv">BV</span> = Business Value, <span class="wsjf-tc">TC</span> = Time Criticality, <span class="wsjf-rr">RR</span> = Risk Reduction
@@ -167,7 +169,7 @@ Computed per level independently.</div>
         <tbody>
           <tr><td><code>Capacity[P, I]</code></td><td>Confirmed at Iteration Planning</td><td>40h</td></tr>
           <tr><td><code>RelevantItems[P, I]</code></td><td>Automatic from GitHub evidence (Story Done + Feature/Epic/Initiative gates)</td><td>6 items across 4 levels</td></tr>
-          <tr><td><code>JobSize[item]</code></td><td>Custom field on issue</td><td>Fibonacci 1&ndash;20</td></tr>
+          <tr><td><code>JobSize[item]</code></td><td>Custom field on issue</td><td>Mod. Fibonacci 1&ndash;100</td></tr>
           <tr><td><code>cw[P, item]</code></td><td>detect_contributors.py — additive aggregation + per-item normalization</td><td>0&ndash;1.0 (Σ on item = 1.0)</td></tr>
         </tbody>
       </table>
@@ -356,8 +358,8 @@ Accuracy = Actual / Planned &times; 100 %</div>
           <tr><th>Custom field</th><th>Type</th><th>Values</th></tr>
         </thead>
         <tbody>
-          <tr><td>Job Size</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
-          <tr><td>BV / TC / RR</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
+          <tr><td>Job Size</td><td>Number</td><td>Mod. Fibonacci 1&ndash;100</td></tr>
+          <tr><td>BV / TC / RR</td><td>Number</td><td>Mod. Fibonacci 1&ndash;100</td></tr>
           <tr><td>WSJF Score</td><td>Number</td><td>Auto (Action)</td></tr>
           <tr><td>Planning Interval</td><td>Iteration</td><td>5 or 10 weeks</td></tr>
           <tr><td>Iteration</td><td>Iteration</td><td>1 or 2 weeks</td></tr>

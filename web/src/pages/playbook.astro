@@ -421,13 +421,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     </div>
     <p>Konfigurace: projekt &rarr; <strong>...</strong> menu &rarr; <strong>Workflows</strong> &rarr; zapnout jen doporučené.</p>
 
-    <p><strong>Granularity guardrails:</strong></p>
-    <ul>
-      <li>Story: max Job Size <strong>8</strong> (classic 2/10) nebo <strong>5</strong> (AI-native 1/5)</li>
-      <li>Feature: max Job Size <strong>13</strong></li>
-      <li>Epic: max Job Size <strong>20</strong></li>
-      <li>Překročení limitu &rarr; rozdělit na menší položky</li>
-    </ul>
+    <p><strong>Granularita</strong> &mdash; všechny úrovně používají stejnou modifikovanou Fibonacci škálu (1, 2, 3, 5, 8, 13, 20, 40, 100) bez fixního stropu per úroveň. Granularita je odpovědnost týmu při refinementu &mdash; pokud se Story s JS=20+ vejde do iterace, je to v pořádku. AI-asistovaná práce mění reálný throughput a stará lidská heuristika („Story max 8") už neplatí.</p>
 
     <p><strong>Definition of Ready</strong> &mdash; žádná položka nevstupuje do delivery bez:</p>
     <ul>
@@ -978,8 +972,8 @@ gh auth status  # ověřit</code></pre>
     <h3>Backlog validate — chyby</h3>
     <pre><code>ERROR: S-200 references non-existent feature F-999</code></pre>
     <p><strong>Řešení:</strong> ověřit že všechny <code>feature:</code> reference v stories ukazují na existující features.</p>
-    <pre><code>WARNING: S-200 Job Size exceeds maximum (JS=13, max=8)</code></pre>
-    <p><strong>Řešení:</strong> Story JS max 8 (classic) nebo 5 (AI-native). Rozdělit velkou story na menší.</p>
+    <pre><code>WARNING: S-200 Job Size out of range (JS=120, range=1..100)</code></pre>
+    <p><strong>Řešení:</strong> Job Size mimo modifikovanou Fibonacci škálu (1, 2, 3, 5, 8, 13, 20, 40, 100). Pokud je položka opravdu tak velká, zvážit rozpad &mdash; ale fixní per-úrovňové stropy už neplatí, granularita je odpovědnost týmu při refinementu.</p>
 
     <h3>EDPA engine — invariant failure</h3>
     <pre><code>INVARIANT FAILURE -- check results

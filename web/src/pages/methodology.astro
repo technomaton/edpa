@@ -60,7 +60,7 @@ import { VERSION } from '../lib/version';
           <tr><td><strong>Iterace</strong></td><td>Delivery cyklus. Stories se plánují, dodávají a uzavírají.</td><td>1t (AI-native) / 2t (klasicky)</td></tr>
           <tr><td><strong>Planning Interval</strong></td><td>Plánovací cyklus. Features se plánují, koordinují a vyhodnocují.</td><td>5t (4+1 IP) / 10t (8+2 IP)</td></tr>
           <tr><td><strong>IP Iterace</strong></td><td>Innovation &amp; Planning iterace na konci PI.</td><td>Poslední iterace v PI</td></tr>
-          <tr><td><strong>Job Size (JS)</strong></td><td>Relativní odhad velikosti work itemu. Upravená Fibonacci.</td><td>1, 2, 3, 5, 8, 13, 20</td></tr>
+          <tr><td><strong>Job Size (JS)</strong></td><td>Relativní odhad velikosti work itemu. Modifikovaná Fibonacci podle WSJF (SAFe 6).</td><td>1, 2, 3, 5, 8, 13, 20, 40, 100</td></tr>
           <tr><td><strong>WSJF</strong></td><td>Prioritizační skóre: (BV + TC + RR) / JS</td><td>Per úroveň nezávisle</td></tr>
           <tr><td><strong>CW</strong></td><td>Contribution Weight — per-item normalizovaný podíl osoby na itemu (Σ napříč osobami = 1.0 na položce).</td><td>0&ndash;1.0</td></tr>
           <tr><td><strong>Signal Weight</strong></td><td>Váha jednoho typu evidence signálu (<code>assignee</code>, <code>pr_author</code>, <code>commit_author</code>, <code>pr_reviewer</code>, <code>issue_comment</code>), kterou agreguje <code>detect_contributors.py</code>. V configu pod klíčem <code>signals.*</code>.</td><td><code>cw_heuristics.yaml</code></td></tr>
@@ -100,13 +100,15 @@ import { VERSION } from '../lib/version';
     <div class="formula" style="white-space:pre;line-height:2;font-size:16px"><span class="wi-initiative"><b>Initiative</b></span> (celý projekt, business case)
   └── <span class="wi-epic"><b>Epic</b></span> (strategický cíl, 6-9 měsíců)
        └── <span class="wi-feature"><b>Feature</b></span> (musí se vejít do Planning Intervalu)
-            └── <span class="wi-story"><b>Story</b></span> (dodáváno v Iteraci)
-                 └── <span class="wi-task"><b>Task</b></span> (technická práce, volitelné)</div>
+            ├── <span class="wi-story"><b>Story</b></span> (dodáváno v Iteraci)
+            │    └── <span class="wi-task"><b>Task</b></span> (technická práce, volitelné)
+            └── <span class="wi-defect"><b>Defect</b></span> (oprava, na úrovni Story)</div>
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:var(--pk)"></div> Initiative</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--ac2)"></div> Epic</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--cy)"></div> Feature</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--or)"></div> Story</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--rd)"></div> Defect</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--yl)"></div> Task</div>
     </div>
     <p>Každá úroveň má <strong>vlastní nezávislý Job Size a WSJF</strong>. Feature WSJF se nepočítá ze Stories pod ní.</p>
@@ -114,19 +116,19 @@ import { VERSION } from '../lib/version';
     <div class="card" style="margin-top:16px">
       <table>
         <thead>
-          <tr><th>Úroveň</th><th>JS max</th><th>GitHub mapping</th></tr>
+          <tr><th>Úroveň</th><th>Job Size rozsah</th><th>GitHub mapping</th></tr>
         </thead>
         <tbody>
-          <tr><td class="wi-epic"><b>Epic</b></td><td>20</td><td>Issue Type: Epic</td></tr>
-          <tr><td class="wi-feature"><b>Feature</b></td><td>13</td><td>Issue Type: Feature</td></tr>
-          <tr><td class="wi-story"><b>Story</b> (2/10)</td><td>8</td><td>Issue Type: Story</td></tr>
-          <tr><td class="wi-story"><b>Story</b> (1/5)</td><td>5</td><td>Issue Type: Story</td></tr>
-          <tr><td class="wi-task"><b>Task</b></td><td>&mdash;</td><td>Issue Type: Task</td></tr>
+          <tr><td class="wi-initiative"><b>Initiative</b></td><td>1&ndash;100 (mod. Fibonacci)</td><td>Issue Type: Initiative</td></tr>
+          <tr><td class="wi-epic"><b>Epic</b></td><td>1&ndash;100 (mod. Fibonacci)</td><td>Issue Type: Epic</td></tr>
+          <tr><td class="wi-feature"><b>Feature</b></td><td>1&ndash;100 (mod. Fibonacci)</td><td>Issue Type: Feature</td></tr>
+          <tr><td class="wi-story"><b>Story</b></td><td>1&ndash;100 (mod. Fibonacci)</td><td>Issue Type: Story</td></tr>
+          <tr><td class="wi-defect"><b>Defect</b></td><td>1&ndash;100 (mod. Fibonacci)</td><td>Issue Type: Defect</td></tr>
+          <tr><td class="wi-task"><b>Task</b></td><td>&mdash; (sub-Story checklist)</td><td>Issue Type: Task</td></tr>
         </tbody>
       </table>
+      <div class="note" style="margin-top:12px">Modifikovaná Fibonacci škála (1, 2, 3, 5, 8, 13, 20, 40, 100) podle WSJF metodiky SAFe 6. Žádné fixní stropy per úroveň &mdash; granularita je odpovědnost týmu při refinementu. Při AI-asistované práci může být i Story s JS=20+ realisticky odpracovatelná v iteraci.</div>
     </div>
-
-    <p style="margin-top:16px">Nad limitem se item rozpadá. Granularity guardrails vynucují rozumnou granularitu.</p>
 
     <div class="formula"><strong>WSJF:</strong> (<span class="wsjf-bv">BV</span> + <span class="wsjf-tc">TC</span> + <span class="wsjf-rr">RR</span>) / <span class="wsjf-js">JS</span>
 <span class="wsjf-bv">BV</span> = Business Value, <span class="wsjf-tc">TC</span> = Time Criticality, <span class="wsjf-rr">RR</span> = Risk Reduction
@@ -167,7 +169,7 @@ Počítá se per úroveň nezávisle.</div>
         <tbody>
           <tr><td><code>Capacity[P, I]</code></td><td>Potvrzeno při Iteration Planning</td><td>40h</td></tr>
           <tr><td><code>RelevantItems[P, I]</code></td><td>Automaticky z GitHub evidence (Story Done + Feature/Epic/Initiative gates)</td><td>6 items přes 4 úrovně</td></tr>
-          <tr><td><code>JobSize[item]</code></td><td>Custom field na issue</td><td>Fibonacci 1&ndash;20</td></tr>
+          <tr><td><code>JobSize[item]</code></td><td>Custom field na issue</td><td>Mod. Fibonacci 1&ndash;100</td></tr>
           <tr><td><code>cw[P, item]</code></td><td>detect_contributors.py — additivní agregace + per-item normalizace</td><td>0&ndash;1.0 (Σ na itemu = 1.0)</td></tr>
         </tbody>
       </table>
@@ -354,8 +356,8 @@ Accuracy = Actual / Planned &times; 100 %</div>
           <tr><th>Custom field</th><th>Typ</th><th>Hodnoty</th></tr>
         </thead>
         <tbody>
-          <tr><td>Job Size</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
-          <tr><td>BV / TC / RR</td><td>Number</td><td>Fibonacci 1&ndash;20</td></tr>
+          <tr><td>Job Size</td><td>Number</td><td>Mod. Fibonacci 1&ndash;100</td></tr>
+          <tr><td>BV / TC / RR</td><td>Number</td><td>Mod. Fibonacci 1&ndash;100</td></tr>
           <tr><td>WSJF Score</td><td>Number</td><td>Auto (Action)</td></tr>
           <tr><td>Planning Interval</td><td>Iteration</td><td>5 nebo 10 týdnů</td></tr>
           <tr><td>Iteration</td><td>Iteration</td><td>1 nebo 2 týdny</td></tr>

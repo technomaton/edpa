@@ -424,13 +424,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     </div>
     <p>Configure: project &rarr; <strong>...</strong> menu &rarr; <strong>Workflows</strong> &rarr; enable only recommended ones.</p>
 
-    <p><strong>Granularity guardrails:</strong></p>
-    <ul>
-      <li>Story: max Job Size <strong>8</strong> (classic 2/10) or <strong>5</strong> (AI-native 1/5)</li>
-      <li>Feature: max Job Size <strong>13</strong></li>
-      <li>Epic: max Job Size <strong>20</strong></li>
-      <li>Over limit &rarr; break down into smaller items</li>
-    </ul>
+    <p><strong>Granularity</strong> &mdash; all levels share the same modified Fibonacci scale (1, 2, 3, 5, 8, 13, 20, 40, 100) with no fixed per-level cap. Granularity is the team's responsibility during refinement &mdash; if a Story at JS=20+ fits within the iteration, that's fine. AI-assisted work shifts real throughput, and the old human heuristic ("Story max 8") no longer applies.</p>
 
     <p><strong>Definition of Ready</strong> &mdash; no item enters delivery without:</p>
     <ul>
@@ -981,8 +975,8 @@ gh auth status  # ověřit</code></pre>
     <h3>Backlog validate — chyby</h3>
     <pre><code>ERROR: S-200 references non-existent feature F-999</code></pre>
     <p><strong>Řešení:</strong> ověřit že všechny <code>feature:</code> reference v stories ukazují na existující features.</p>
-    <pre><code>WARNING: S-200 Job Size exceeds maximum (JS=13, max=8)</code></pre>
-    <p><strong>Řešení:</strong> Story JS max 8 (classic) nebo 5 (AI-native). Rozdělit velkou story na menší.</p>
+    <pre><code>WARNING: S-200 Job Size out of range (JS=120, range=1..100)</code></pre>
+    <p><strong>Fix:</strong> Job Size is outside the modified Fibonacci scale (1, 2, 3, 5, 8, 13, 20, 40, 100). If the item really is that large, consider breaking it down &mdash; but fixed per-level caps no longer apply, granularity is the team's responsibility during refinement.</p>
 
     <h3>EDPA engine — invariant failure</h3>
     <pre><code>INVARIANT FAILURE -- check results
