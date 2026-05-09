@@ -106,41 +106,28 @@ issue_comment → consulted (0.15)
 
 Allow manual override: check issue body for `/contribute @person weight:X`.
 
-### 4. Calculate EDPA scores
+### 4. Calculate EDPA scores (v1.14: single path)
 
-**Gates mode (default):**
-For each Initiative/Epic/Feature status transition that fired during the
-iteration, credit the parent's contributors with `JobSize × gate_weight`.
-Story still uses the Done filter. Requires git history to record status
-transitions (sync `pull --commit` produces these automatically).
+The engine credits two kinds of work events:
 
 ```
+Score[P, story_done] = JobSize[story]  × CW[P, story]
 Score[P, gate_event] = JobSize[parent] × gate_weight × CW[P, parent]
-Score[P, story_done] = JobSize[story] × CW[P, story]
 ```
 
-**Simple mode (`--mode simple`):**
-Falls back to Done-only filter for every level. Use when the project
-doesn't record mid-life status transitions in git.
+- **Story Done credit** for every Story at `status: Done`.
+- **Parent gate transitions** for every Feature/Epic/Initiative
+  status transition captured in git history (via `sync pull --commit`
+  auto-commits within the iteration date window).
 
-> **Quirk:** simple/full modes credit **only items with `status: Done`**.
-> A fresh backlog with everything in `Backlog` / `Implementing`
-> produces 0 derived hours and emits `WARN: 0 evidence pairs derived
-> from N contributor entries`. This is by design (audit-conservative).
-> Use `gates` for partial credit before iteration close.
+When git history records no transitions, only Story Done credit fires
+— the calculation degenerates gracefully to the pre-v1.14 "simple"
+behaviour without any mode selector.
 
-```
-Score[P, item] = JobSize[item] × CW[P, item]   # only items with status: Done
-```
-
-**Full mode (`--mode full`):**
-Same as simple but adds RS audit detail in the snapshot. Same Done-only
-filter applies.
-
-```
-Score[P, item] = JobSize[item] × CW[P, item] × RS[P, item]
-RS = min(evidence_score / max_evidence_score_on_item, 1.0)
-```
+> **Pre-v1.14 mode selector removed.** v1.13 and earlier had
+> `--mode {simple, full, gates}`. v1.14 dropped it: `gates` was
+> a strict superset of the others, so the single-path engine is
+> mathematically equivalent and operationally simpler.
 
 ### 5. Derive hours
 
@@ -167,7 +154,6 @@ Write results to `.edpa/reports/iteration-{ID}/edpa_results.json`:
 ```json
 {
   "iteration": "$ARGUMENTS",
-  "mode": "gates|simple|full",
   "computed_at": "ISO-8601",
   "people": [
     {

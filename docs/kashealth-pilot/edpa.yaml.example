@@ -48,16 +48,12 @@ project:
         website: "https://medicalc.cz"
 
 governance:
-  methodology: "EDPA 1.13.0"
-  # Calculation mode:
-  #   gates  (default) — credits per status transition on Initiative/Epic/Feature
-  #                      + Story=Done. Doporučeno po validaci A/B vs simple.
-  #   simple — only items with status=Done count. Audit-conservative;
-  #            v 1. PI pilotu je rozumné spustit oba módy paralelně
-  #            (viz KASHEALTH-PILOT.md § 9).
-  #   full   — same as simple but adds richer audit metadata to snapshot.
-  calculation_mode: "gates"
-  audit_mode: "full"   # always store full signal trail in snapshots
+  methodology: "EDPA 1.14.0"
+  # v1.14: jediná calculation path. Engine kredituje Done Stories
+  # + Feature/Epic/Initiative status transitions z git history.
+  # Pre-v1.14 simple/full/gates mode selector dropnut — gates byl
+  # strict superset simple. audit_mode taky dropnut — snapshots vždy
+  # nesou plný signals[] audit trail.
 
 naming:
   pi_pattern: "PI-{year}-{pi_num}"

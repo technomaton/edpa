@@ -24,7 +24,7 @@ from engine import run_edpa, generate_demo_data, load_backlog_items, extract_con
 def test_sum_equals_capacity():
     """Derived hours must sum to declared capacity for each person."""
     capacity, heuristics, items = generate_demo_data()
-    results = run_edpa(capacity, heuristics, items, mode="simple")
+    results = run_edpa(capacity, heuristics, items)
 
     for person in results:
         if person["items"]:
@@ -38,7 +38,7 @@ def test_sum_equals_capacity():
 def test_ratio_sum_equals_one():
     """Ratios must sum to 1.0 for each person with items."""
     capacity, heuristics, items = generate_demo_data()
-    results = run_edpa(capacity, heuristics, items, mode="simple")
+    results = run_edpa(capacity, heuristics, items)
 
     for person in results:
         if person["items"]:
@@ -51,7 +51,7 @@ def test_ratio_sum_equals_one():
 def test_no_negative_hours():
     """No person should have negative derived hours."""
     capacity, heuristics, items = generate_demo_data()
-    results = run_edpa(capacity, heuristics, items, mode="simple")
+    results = run_edpa(capacity, heuristics, items)
 
     for person in results:
         for item in person["items"]:
@@ -63,7 +63,7 @@ def test_no_negative_hours():
 def test_no_negative_scores():
     """No score should be negative."""
     capacity, heuristics, items = generate_demo_data()
-    results = run_edpa(capacity, heuristics, items, mode="simple")
+    results = run_edpa(capacity, heuristics, items)
 
     for person in results:
         for item in person["items"]:
@@ -75,7 +75,7 @@ def test_no_negative_scores():
 def test_score_formula_simple():
     """In simple mode: Score = JS x CW."""
     capacity, heuristics, items = generate_demo_data()
-    results = run_edpa(capacity, heuristics, items, mode="simple")
+    results = run_edpa(capacity, heuristics, items)
 
     for person in results:
         for item in person["items"]:
@@ -88,7 +88,7 @@ def test_score_formula_simple():
 def test_score_formula_full():
     """In full mode: Score = JS x CW x RS."""
     capacity, heuristics, items = generate_demo_data()
-    results = run_edpa(capacity, heuristics, items, mode="full")
+    results = run_edpa(capacity, heuristics, items)
 
     for person in results:
         for item in person["items"]:
@@ -101,7 +101,7 @@ def test_score_formula_full():
 def test_full_mode_invariants():
     """Full mode should also maintain sum = capacity invariant."""
     capacity, heuristics, items = generate_demo_data()
-    results = run_edpa(capacity, heuristics, items, mode="full")
+    results = run_edpa(capacity, heuristics, items)
 
     for person in results:
         if person["items"]:
@@ -115,7 +115,7 @@ def test_full_mode_invariants():
 def test_all_invariants_flag():
     """The all_invariants_passed flag should reflect actual invariant checks."""
     capacity, heuristics, items = generate_demo_data()
-    results = run_edpa(capacity, heuristics, items, mode="simple")
+    results = run_edpa(capacity, heuristics, items)
 
     for person in results:
         if person["items"]:
@@ -145,7 +145,7 @@ def test_empty_items_no_crash():
          "pr_reviewers": [], "commenters": []}
     ]
 
-    results = run_edpa(capacity, heuristics, items, mode="simple")
+    results = run_edpa(capacity, heuristics, items)
     assert len(results) == 1
     assert results[0]["total_derived"] == 0.0
     assert results[0]["items"] == []
@@ -226,7 +226,7 @@ def test_multi_contract_isolation():
          ]},
     ]
 
-    results = run_edpa(capacity, heuristics, items, mode="simple")
+    results = run_edpa(capacity, heuristics, items)
 
     result_map = {r["id"]: r for r in results}
 
@@ -474,7 +474,7 @@ class TestLoadBacklogItems:
              "pr_reviewers": [], "commenters": []}
         ]
 
-        results = run_edpa(capacity, heuristics, items, mode="simple")
+        results = run_edpa(capacity, heuristics, items)
 
         assert len(results) == 1
         assert results[0]["capacity"] == 0, (

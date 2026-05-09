@@ -2,6 +2,71 @@
 
 ## Unreleased
 
+## 1.14.0-beta — 2026-05-09
+
+### BREAKING — Single calculation path; simple/full/gates mode selector removed
+
+The engine no longer has a `--mode` argument. The pre-v1.14
+selector (`simple` | `full` | `gates`) collapsed into one path
+because:
+
+- `simple` and `full` were functionally identical in v1.11+
+  (Relevance Signal was dropped). `full` only added richer audit
+  metadata that v1.11 ships in every snapshot regardless.
+- `gates` was a strict superset of `simple`: when git history
+  records no transitions, gate event extraction returns 0 entries
+  and the engine credits only Done items — same output as
+  `simple`.
+
+So the three-mode surface was carrying maintenance weight without
+delivering distinct semantics. v1.14 collapses to one path:
+
+- Stories at `status: Done` get credited.
+- Feature/Epic/Initiative status transitions captured in git
+  history (via `sync pull --commit`) become synthetic gate events
+  weighted by `gate_weights[type][transition]`.
+- When no transitions exist, only Done credit fires.
+
+Backward compatibility: **none**. Pre-v1.14 callers passing
+`--mode <X>` get an `unrecognized arguments` error from argparse.
+Pre-v1.14 `mode=` kwarg in `run_edpa()` calls — same. Test fixtures
+and example configs across the repo were swept clean.
+
+**Removed:**
+- `--mode` CLI argument from `engine.py`
+- `mode` parameter from `run_edpa()` Python signature
+- `args.mode == "gates"` / `"simple"` / `"full"` branches in main
+- `print_summary(results, mode, ...)` mode parameter
+- `engine_output["mode"]` field (and snapshot's `mode:` key)
+- `calculation_mode` field from `plugin/edpa/templates/project.yaml.tmpl`
+- `audit_mode` field — was never read by any code (dead config)
+- `mode` workflow input from `plugin/edpa/workflows/iteration-close.yml`
+- `--demo` / mode-fallback noise in CLI dispatch
+
+**Updated:**
+- `docs/methodology.md` § 5.4 — rewritten as "Calculation (single
+  path, v1.14+)" with Story Done + parent gate transitions
+  explained together. Mode selector history noted.
+- `plugin/skills/edpa-engine/SKILL.md` § 4 — single-path math; mode
+  refs in JSON output schema example dropped.
+- `plugin/edpa/templates/project.yaml.tmpl` governance: section —
+  no calculation_mode/audit_mode; explanatory comment instead.
+- `docs/kashealth-pilot/edpa.yaml.example` — same.
+- `tests/test_invariants.py`, `tests/test_capacity_overrides.py`,
+  `tests/test_gate_allocation.py` — all `mode=` kwargs and
+  `--mode` subprocess args removed; tests renamed where mode-name
+  was load-bearing.
+- Web pages (calculator, dashboard, evaluation) still mention
+  modes in narrative text — flagged for v1.14.x cosmetic patch.
+
+**Verified:**
+- 293/293 unit tests green
+- `engine.py --demo` produces TEAM TOTAL = capacity, all invariants
+  OK, no mode flag needed
+- Sandbox engine run works via the new single-path CLI
+
+Version bumped 1.13.0-beta → 1.14.0-beta.
+
 ## 1.13.0-beta — 2026-05-09
 
 ### Added: organization lookup helper

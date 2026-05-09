@@ -2,7 +2,7 @@
 
 *Capacity derivation from delivery evidence*
 
-**Version 1.13.0-beta — May 2026 — Jaroslav Urbanek, Lead Architect**
+**Version 1.14.0-beta — May 2026 — Jaroslav Urbanek, Lead Architect**
 
 ---
 
@@ -145,22 +145,34 @@ See [`docs/evidence-detection.md`](evidence-detection.md) for the full
 detection algorithm and [`docs/contribute-directive.md`](contribute-directive.md)
 for `/contribute` usage patterns.
 
-### 5.4 Calculation — Three Modes
+### 5.4 Calculation (single path, v1.14+)
 
-The engine supports three modes, selected via `engine.py --mode {simple,full,gates}`:
+The engine has **one calculation path**. It credits two kinds of work
+events together and lets per-person ratio normalization split the
+person's capacity across whichever items they touched:
 
-| Mode | Crediting rule | Use case |
-|------|----------------|----------|
-| `simple` | Credits items at **`status: Done`** only. | Audit-defensive baseline. |
-| `full` | Same as `simple` plus full audit metadata in snapshot. | Audit-grade close. |
-| `gates` *(default)* | Credits each gate transition on Feature/Epic/Initiative parents per `gate_weights`, plus Story Done events. | Mid-iteration visibility; partial credit. |
+1. **Story Done credit** — Stories at `status: Done` get `JS × cw`
+   per their contributors[]. cw shares come pre-computed from
+   `detect_contributors.py` (per-item normalized).
+2. **Parent gate transitions** — Feature/Epic/Initiative status
+   transitions captured in git history (via `sync pull --commit`
+   auto-commits) become synthetic events with effective JS =
+   `parent.JS × gate_weights[type][transition]`. Parent contributors
+   inherit cw shares from the parent's contributors[] block.
 
-> **`status: Done` requirement for simple/full.** Items still in
-> `status: Backlog` / `Implementing` / `Validating` produce **0
-> derived hours** in `simple` and `full` modes. Use `gates` for
-> partial credit during the iteration.
+When git history records no transitions (e.g., backlog with no
+sync-driven status updates), only Story Done credit fires. The
+calculation is feature-preserving across both setups.
 
-**v1.11 unified formula** (no role dominance, no Relevance Signal):
+> **`status: Done` requirement for Stories.** Stories still in
+> `Backlog` / `Implementing` / `Validating` don't fire Done credit.
+> If you want partial credit before iteration close, drive parent
+> status transitions on the Feature/Epic that contains them — gate
+> events fire on parent transitions even while their child Stories
+> are mid-flight.
+
+**v1.14 unified formula** (no role dominance, no Relevance Signal,
+no mode selector):
 
 ```text
 contribution_score[P, item] = Σ signal_weight × signal_fired(P, item)
@@ -171,10 +183,10 @@ ratio[P, item]              = score[P, item] / Σ_items_of_P score
 DerivedHours[P, item]       = ratio[P, item] × Capacity[P, I]
 ```
 
-The pre-v1.11 `RelevanceSignal` term is gone — multi-signal evidence
-is now baked into `cw` directly via the additive aggregation in
-detect_contributors. Pre-v1.11 `--mode full` differs from `--mode simple`
-only in metadata richness (full audit trail), not in the math.
+The pre-v1.14 `simple` / `full` / `gates` mode selector was removed.
+`gates` was a strict superset of the others (degenerated to Done-only
+when no transitions existed), so the single-path engine is
+mathematically equivalent and operationally simpler.
 
 ### 5.5 Mathematical Guarantees
 

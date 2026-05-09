@@ -63,11 +63,13 @@ project:
         website: ""
 
 governance:
-  methodology: "EDPA 1.13.0"
-  calculation_mode: "gates"                   # gates (default) | simple | full
-                                              # gates credits each status transition; use simple
-                                              # if your project does not record mid-life transitions
-  audit_mode: "full"                          # always store full signal trail in snapshots
+  methodology: "EDPA 1.14.0"
+  # v1.14: single calculation path. Engine credits Done items (Stories
+  # at status: Done) plus Feature/Epic/Initiative status transition
+  # events when git history records them. The pre-v1.14 simple/full/gates
+  # mode selector was dropped — gates was a strict superset of simple
+  # (degenerated to Done-only when no transitions). audit_mode field
+  # also dropped — snapshots always carry the full signals[] audit trail.
 
 naming:
   pi_pattern: "PI-{year}-{pi_num}"            # e.g., PI-2026-1

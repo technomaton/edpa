@@ -7,15 +7,6 @@ on:
         description: 'Iteration ID (e.g., PI-2026-1.3)'
         required: true
         type: string
-      mode:
-        description: 'Calculation mode (simple/full=Done items only, gates=credit per status transition)'
-        required: false
-        default: 'simple'
-        type: choice
-        options:
-          - simple
-          - full
-          - gates
 
 jobs:
   close-iteration:
@@ -47,9 +38,7 @@ jobs:
         run: |
           python3 .claude/edpa/scripts/engine.py \
             --iteration "${{ inputs.iteration_id }}" \
-            --mode "${{ inputs.mode }}" \
-            --capacity .edpa/config/people.yaml \
-            --heuristics .edpa/config/heuristics.yaml
+            --edpa-root .edpa
 
       - name: Verify invariants
         run: |

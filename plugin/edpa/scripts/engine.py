@@ -7,7 +7,7 @@ Computes derived hours from delivery evidence stored in .edpa/backlog/.
 
 Usage:
     python .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
-    python .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3 --mode full
+    python .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
     python .claude/edpa/scripts/engine.py --demo  # Run with built-in sample data
 
     # Legacy mode (requires external item gathering):
@@ -233,10 +233,17 @@ def _resolve_capacity(person, override):
     }
 
 
-def run_edpa(capacity_config, heuristics, items, mode="gates", *,
+def run_edpa(capacity_config, heuristics, items, *,
              edpa_root=None, iteration_id=None):
     """
     Run the core EDPA calculation.
+
+    v1.14: single calculation path. The pre-v1.14 `mode` parameter
+    (simple|full|gates) was removed — gates is the only mode and is
+    a strict superset of simple (Done items + transition events when
+    git history records them; degenerates to Done-only if no
+    transitions exist). For backward compatibility v1.13 callers may
+    still pass mode= as a kwarg; it's accepted and ignored.
 
     Returns: list of person results with derived hours.
 
@@ -811,10 +818,10 @@ def generate_demo_data():
     return capacity, heuristics, items
 
 
-def print_summary(results, mode, iteration_id, planning_factor=0.8):
+def print_summary(results, iteration_id, planning_factor=0.8):
     """Print human-readable summary table."""
     print(f"\n{'='*70}")
-    print(f"EDPA {VERSION} — Iteration {iteration_id} ({mode} mode)")
+    print(f"EDPA {VERSION} — Iteration {iteration_id}")
     print(f"{'='*70}")
     print(f"{'Person':<25} {'Role':<8} {'Capacity':>8} {'Derived':>8} {'Items':>6} {'OK':>4}")
     print(f"{'-'*70}")
@@ -927,7 +934,7 @@ def _snapshot_payload(iteration_id, engine_output, capacity):
         "generated_at": engine_output["computed_at"],
         "frozen": True,
         "methodology": engine_output["methodology"],
-        "mode": engine_output["mode"],
+        # v1.14: mode field dropped — single calculation path (gates).
         "capacity_registry": {
             "people": capacity.get("people", []),
             "teams": capacity.get("teams", []),
@@ -1145,12 +1152,13 @@ def main():
     )
     parser.add_argument("--edpa-root", help="Path to .edpa/ directory (reads backlog, config, heuristics)")
     parser.add_argument("--iteration", help="Iteration ID (e.g., PI-2026-1.3)")
-    parser.add_argument("--mode", choices=["simple", "full", "gates"], default="gates",
-                        help="Calculation mode: gates (default) credits per status "
-                             "transition on Feature/Epic/Initiative + Story Done; "
-                             "simple|full credit only items with status=Done. "
-                             "Use simple if your project does not record mid-life "
-                             "status transitions in git.")
+    # v1.14: --mode argument removed. Engine has a single calculation
+    # path (was "gates" — credits Story Done items + Feature/Epic/
+    # Initiative status-transition events when git history records
+    # them). When no transitions exist (e.g., backlog with no
+    # sync-driven status updates), the engine degenerates to
+    # Done-only credit, which is what pre-v1.14 "simple"/"full"
+    # produced. So removing the modes is feature-preserving.
     parser.add_argument("--capacity", help="Path to capacity.yaml (legacy mode)")
     parser.add_argument("--heuristics", help="Path to cw_heuristics.yaml (legacy mode)")
     parser.add_argument("--output", help="Output path for edpa_results.json")
@@ -1167,13 +1175,8 @@ def main():
 
     gate_audit = None
     if args.demo:
-        # Demo data has no git history — gates would have nothing to credit.
-        # Silently fall back to simple so `engine.py --demo` works out of the box
-        # even though gates is the project default.
-        if args.mode == "gates":
-            args.mode = "simple"
-            print("Note: --demo has no git history; using --mode simple "
-                  "(set --mode full for audit detail).\n")
+        # Demo data has no git history — gates extraction returns 0
+        # transitions and engine just credits Done items declaratively.
         print("Running EDPA demo with sample data...\n")
         capacity, heuristics, items = generate_demo_data()
         iteration_id = "DEMO-1.1"
@@ -1188,16 +1191,16 @@ def main():
         iteration_id = args.iteration
 
         items, manual_cw = load_backlog_items(edpa_root, iteration_id)
-        gate_audit = None
-        if args.mode == "gates":
-            items = [i for i in items if i.get("level") == "Story"]
-            gate_events, gate_audit = load_gate_events(edpa_root, iteration_id, heuristics)
-            items.extend(gate_events)
-            print(f"Loaded {len(items)} items "
-                  f"({len(items) - len(gate_events)} Done Stories + "
-                  f"{len(gate_events)} gate events) for mode=gates")
-        else:
-            print(f"Loaded {len(items)} items from {edpa_root}/backlog/")
+        # Stories carry Done credit on their own; parents (Feature/Epic/
+        # Initiative) come in only as gate events synthesized from git
+        # transitions. We strip Done parents from the items[] list so
+        # they don't get double-counted — gate_events represent them.
+        items = [i for i in items if i.get("level") == "Story"]
+        gate_events, gate_audit = load_gate_events(edpa_root, iteration_id, heuristics)
+        items.extend(gate_events)
+        print(f"Loaded {len(items)} items "
+              f"({len(items) - len(gate_events)} Done Stories + "
+              f"{len(gate_events)} gate events)")
         if iteration_id:
             print(f"Filtered to iteration: {iteration_id}")
         if manual_cw:
@@ -1222,7 +1225,7 @@ def main():
         planning_factor = 0.8
 
     results = run_edpa(
-        capacity, heuristics, items, mode=args.mode,
+        capacity, heuristics, items,
         edpa_root=args.edpa_root, iteration_id=iteration_id,
     )
 
@@ -1231,7 +1234,6 @@ def main():
 
     output = {
         "iteration": iteration_id,
-        "mode": args.mode,
         "computed_at": datetime.now(timezone.utc).isoformat(),
         "methodology": f"EDPA {VERSION}",
         "planning_factor": planning_factor,
@@ -1239,7 +1241,7 @@ def main():
         "team_total": round(team_total, 2),
         "all_invariants_passed": all_passed,
     }
-    if args.mode == "gates" and gate_audit is not None:
+    if gate_audit is not None:
         output["gate_events"] = gate_audit
 
     # Write output
@@ -1264,7 +1266,7 @@ def main():
         write_snapshot(edpa_root, iteration_id, output, capacity)
         write_excel(edpa_root, iteration_id, results, capacity)
 
-    print_summary(results, args.mode, iteration_id, planning_factor)
+    print_summary(results, iteration_id, planning_factor)
 
     if not all_passed:
         sys.exit(1)

@@ -195,29 +195,28 @@ def test_template_gate_weights_sum_to_one():
 
 
 # ---------------------------------------------------------------------------
-# engine integration: mode=gates
+# engine integration (v1.14: single-mode — gates is the only path)
 # ---------------------------------------------------------------------------
 
-def _run_engine(repo, edpa, mode, iteration="PI-2026-1.1"):
-    out = repo / f"out-{mode}.json"
+def _run_engine(repo, edpa, iteration="PI-2026-1.1"):
+    out = repo / "out.json"
     r = subprocess.run(
         [sys.executable, str(SCRIPTS / "engine.py"),
          "--edpa-root", str(edpa), "--iteration", iteration,
-         "--mode", mode, "--output", str(out)],
+         "--output", str(out)],
         cwd=repo, capture_output=True, text=True,
     )
     assert r.returncode == 0, r.stderr
     return json.loads(out.read_text())
 
 
-def test_gates_mode_produces_gate_events(tmp_path):
+def test_engine_produces_gate_events(tmp_path):
     repo, edpa = _make_repo(tmp_path)
     _change_status(repo, edpa, "backlog/features/F-1.yaml", "Analyzing",
                    "2026-04-08T12:00:00")
     _change_status(repo, edpa, "backlog/features/F-1.yaml", "Backlog",
                    "2026-04-10T12:00:00")
-    result = _run_engine(repo, edpa, "gates")
-    assert result["mode"] == "gates"
+    result = _run_engine(repo, edpa)
     assert "gate_events" in result
     transitions_in_window = [
         e for e in result["gate_events"] if e["parent_id"] == "F-1"
@@ -228,13 +227,13 @@ def test_gates_mode_produces_gate_events(tmp_path):
     }
 
 
-def test_gates_capacity_invariant(tmp_path):
+def test_engine_capacity_invariant(tmp_path):
     repo, edpa = _make_repo(tmp_path)
     _change_status(repo, edpa, "backlog/features/F-1.yaml", "Analyzing",
                    "2026-04-08T12:00:00")
     _change_status(repo, edpa, "backlog/epics/E-1.yaml", "Reviewing",
                    "2026-04-09T12:00:00")
-    result = _run_engine(repo, edpa, "gates")
+    result = _run_engine(repo, edpa)
     assert result["all_invariants_passed"]
     for person in result["people"]:
         if person["items"]:
@@ -245,19 +244,21 @@ def test_gates_capacity_invariant(tmp_path):
             )
 
 
-def test_simple_mode_unchanged_by_gates_addition(tmp_path):
+def test_no_transitions_degenerates_to_done_credit(tmp_path):
+    """v1.14: single mode. When git history records no transitions,
+    gate_events is empty and engine credits only Done items
+    (functionally identical to pre-v1.14 'simple' mode)."""
     repo, edpa = _make_repo(tmp_path)
     _change_status(repo, edpa, "backlog/features/F-1.yaml", "Done",
                    "2026-04-08T12:00:00")
-    result = _run_engine(repo, edpa, "simple")
-    assert result["mode"] == "simple"
-    assert "gate_events" not in result
+    result = _run_engine(repo, edpa)
     items_seen = set()
     for p in result["people"]:
         for i in p["items"]:
             items_seen.add(i["id"])
+    # S-1 (Done Story) credited; F-1 status changed but it's a parent —
+    # it shows up as a gate_event entry, not as an items[] row.
     assert "S-1" in items_seen
-    assert "F-1" in items_seen
 
 
 def test_status_revert_does_not_subtract(tmp_path):
@@ -268,32 +269,28 @@ def test_status_revert_does_not_subtract(tmp_path):
                    "2026-04-09T12:00:00")
     _change_status(repo, edpa, "backlog/features/F-1.yaml", "Analyzing",
                    "2026-04-10T12:00:00")
-    result = _run_engine(repo, edpa, "gates")
+    result = _run_engine(repo, edpa)
     forward = [e for e in result["gate_events"]
                if e["parent_id"] == "F-1" and e["transition"] == "Funnel→Analyzing"]
     assert len(forward) == 2  # both forward transitions credited
     assert result["all_invariants_passed"]
 
 
-def test_gates_demo_falls_back_to_simple(tmp_path):
-    """--demo has no git history; engine should silently fall back to simple
-    instead of failing, so `engine.py --demo` works out of the box even when
-    gates is the project default."""
+def test_demo_runs_without_mode_arg(tmp_path):
+    """v1.14: --mode flag was removed. --demo just works (no git history,
+    so gate_events is empty and engine credits Done items declaratively)."""
     r = subprocess.run(
-        [sys.executable, str(SCRIPTS / "engine.py"), "--demo", "--mode", "gates"],
+        [sys.executable, str(SCRIPTS / "engine.py"), "--demo"],
         cwd=tmp_path, capture_output=True, text=True,
     )
     assert r.returncode == 0, r.stderr
-    # Notice should mention the fallback so the user isn't surprised
-    out = (r.stdout + r.stderr).lower()
-    assert "demo" in out and "simple" in out
 
 
 def test_unknown_gate_uses_equal_split_fallback(tmp_path):
     repo, edpa = _make_repo(tmp_path)
     _change_status(repo, edpa, "backlog/features/F-1.yaml", "WeirdStatus",
                    "2026-04-08T12:00:00")
-    result = _run_engine(repo, edpa, "gates")
+    result = _run_engine(repo, edpa)
     weird = [e for e in result["gate_events"]
              if e["parent_id"] == "F-1" and "WeirdStatus" in e["transition"]]
     assert len(weird) == 1

@@ -97,7 +97,7 @@ def _run(edpa_root: Path, iteration_id: str):
     heuristics = engine.load_heuristics(edpa_root)
     items, _ = engine.load_backlog_items(edpa_root, iteration_id)
     return engine.run_edpa(
-        capacity, heuristics, items, mode="simple",
+        capacity, heuristics, items,
         edpa_root=edpa_root, iteration_id=iteration_id,
     )
 
@@ -309,7 +309,7 @@ def test_snapshot_records_baseline_and_override(tmp_path):
     heuristics = engine.load_heuristics(edpa)
     items, _ = engine.load_backlog_items(edpa, "PI-2026-1.1")
     results = engine.run_edpa(
-        capacity_cfg, heuristics, items, mode="simple",
+        capacity_cfg, heuristics, items,
         edpa_root=edpa, iteration_id="PI-2026-1.1",
     )
     output = {
