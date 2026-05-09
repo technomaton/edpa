@@ -93,7 +93,7 @@ SYNC_ICON = "\u21c4"  # bidirectional arrow
 # -- Validation ---------------------------------------------------------------
 
 FIBONACCI = {1, 2, 3, 5, 8, 13, 20}
-FIBONACCI_FIELDS = {"js", "bv", "tc", "rr"}
+FIBONACCI_FIELDS = {"js", "bv", "tc", "rr_oe"}
 
 # -- SAFe Status Workflows -----------------------------------------------------
 
@@ -102,7 +102,7 @@ DELIVERY_STATUSES = ["Funnel", "Analyzing", "Backlog", "Implementing", "Validati
 
 
 def validate_fibonacci(items):
-    """Validate that JS, BV, TC, RR use Fibonacci values. Returns list of warnings."""
+    """Validate that JS, BV, TC, RR&OE use Fibonacci values. Returns list of warnings."""
     warnings = []
     for item_id, item in items.items():
         for field in FIBONACCI_FIELDS:
@@ -210,7 +210,7 @@ DEFAULT_SYNC_CONFIG = {
         "js": "Job Size",
         "bv": "Business Value",
         "tc": "Time Criticality",
-        "rr": "Risk Reduction",
+        "rr_oe": "Risk Reduction & Opportunity Enablement",
         "wsjf": "WSJF Score",
         "iteration": "Iteration",
         "team": "Team",
@@ -262,7 +262,7 @@ def collect_items_flat(root):
                 "js": item.get("js", 0),
                 "bv": item.get("bv", 0),
                 "tc": item.get("tc", 0),
-                "rr": item.get("rr", 0),
+                "rr_oe": item.get("rr_oe", 0),
                 "wsjf": item.get("wsjf", 0),
                 "type": item.get("epic_type", ""),
             }
@@ -279,7 +279,7 @@ def compute_backlog_checksum(root):
 
 # -- GitHub CLI Interface ------------------------------------------------------
 
-SYNC_FIELDS = ["js", "bv", "tc", "rr", "wsjf", "iteration", "status"]
+SYNC_FIELDS = ["js", "bv", "tc", "rr_oe", "wsjf", "iteration", "status"]
 
 
 def gh_fetch_project_items(sync_config):
@@ -345,9 +345,38 @@ NUMBER_FIELDS = {
     "js": "Job Size",
     "bv": "Business Value",
     "tc": "Time Criticality",
-    "rr": "Risk Reduction",
+    "rr_oe": "Risk Reduction & Opportunity Enablement",
     "wsjf": "WSJF Score",
 }
+
+# Backward-compat: GitHub Projects created before v1.15 may still have the
+# "Risk Reduction" custom field. Sync code that looks up GH fields should fall
+# back to these legacy names if the canonical name is missing. New projects
+# always create the canonical name (NUMBER_FIELDS mapping above).
+LEGACY_FIELD_FALLBACKS = {
+    "rr_oe": ["Risk Reduction"],
+}
+
+
+def resolve_gh_field_name(internal_key, available_field_names):
+    """Return the GH field name to use for a given internal key.
+
+    Tries the canonical name from NUMBER_FIELDS first; falls back to legacy
+    aliases if the canonical name is not present in the project. Returns the
+    canonical name if neither exists (caller will then create the field).
+    """
+    canonical = NUMBER_FIELDS.get(internal_key, internal_key)
+    if canonical in available_field_names:
+        return canonical
+    for legacy in LEGACY_FIELD_FALLBACKS.get(internal_key, []):
+        if legacy in available_field_names:
+            print(
+                f"WARN: GitHub field '{legacy}' is a legacy name; please rename to "
+                f"'{canonical}' in Project settings (one-time migration).",
+                file=__import__("sys").stderr,
+            )
+            return legacy
+    return canonical
 
 
 def load_people_handles(root):
@@ -586,7 +615,7 @@ def gh_create_issue(state, item, item_level, people_handles=None):
     full_title = f"{item_id}: {title}" if item_id else title
 
     body_parts = [item_level]
-    for k in ("js", "bv", "tc", "rr", "wsjf"):
+    for k in ("js", "bv", "tc", "rr_oe", "wsjf"):
         v = item.get(k)
         if v:
             body_parts.append(f"{k.upper()}={v}")
@@ -737,7 +766,7 @@ def map_gh_items_to_edpa(gh_data, fields_mapping):
 
     # Build reverse lookup: "job size" -> "js", "business value" -> "bv", ...
     reverse_fields = {v.lower(): k for k, v in fields_mapping.items()}
-    numeric_fields = {"js", "bv", "tc", "rr", "wsjf"}
+    numeric_fields = {"js", "bv", "tc", "rr_oe", "wsjf"}
 
     for gh_item in gh_data["items"]:
         title = gh_item.get("title", "")
@@ -789,7 +818,7 @@ def map_gh_items_to_edpa(gh_data, fields_mapping):
             if key_lower in reverse_fields:
                 edpa_key = reverse_fields[key_lower]
             # Check if it's already an EDPA key name (e.g., "js", "bv", ...)
-            elif key_lower in ("js", "bv", "tc", "rr", "wsjf", "iteration",
+            elif key_lower in ("js", "bv", "tc", "rr_oe", "wsjf", "iteration",
                                "assignee", "owner", "team"):
                 edpa_key = key_lower
 
@@ -910,7 +939,7 @@ def compute_diff(local_items, remote_items):
             continue
 
         # Both exist -- compare fields
-        compare_fields = ["status", "title", "js", "bv", "tc", "rr", "wsjf",
+        compare_fields = ["status", "title", "js", "bv", "tc", "rr_oe", "wsjf",
                           "iteration", "assignee", "owner"]
         for field in compare_fields:
             local_val = local.get(field, "")
@@ -978,7 +1007,7 @@ def apply_remote_changes(root, changes):
     Finds the per-item YAML file by ID, loads it, updates the field, and writes back.
     """
     applied = 0
-    updatable_fields = {"status", "js", "bv", "tc", "rr", "wsjf", "owner",
+    updatable_fields = {"status", "js", "bv", "tc", "rr_oe", "wsjf", "owner",
                         "assignee", "iteration", "title"}
 
     for change in changes:
@@ -1232,7 +1261,7 @@ def cmd_push(root, sync_config, args):
             # Set initial fields on newly created item (number + status + iteration)
             proj_item_id = result.get("project_item_id", "")
             if proj_item_id:
-                for fkey in ("js", "bv", "tc", "rr", "wsjf"):
+                for fkey in ("js", "bv", "tc", "rr_oe", "wsjf"):
                     val = local.get(fkey)
                     if val:
                         gh_set_field_value(setup_state, proj_item_id, fkey, val, level)
@@ -2092,7 +2121,7 @@ def cmd_conflicts(root, sync_config, args):
 
 def _coerce_typed(field, value):
     """Coerce a stringified changelog value back to its expected type."""
-    if field in ("js", "bv", "tc", "rr", "wsjf"):
+    if field in ("js", "bv", "tc", "rr_oe", "wsjf"):
         try:
             return float(value)
         except (ValueError, TypeError):

@@ -139,15 +139,15 @@ def render_card(item, people, items_by_id):
     wsjf_html = ""
     bv = item.get("bv")
     tc_val = item.get("tc")
-    rr = item.get("rr")
-    if any(v is not None for v in [bv, tc_val, rr]):
+    rr_oe = item.get("rr_oe")
+    if any(v is not None for v in [bv, tc_val, rr_oe]):
         dots = []
         if bv is not None:
             dots.append(f'<span class="wsjf-dot wsjf-bv" title="BV: {bv}">{bv}</span>')
         if tc_val is not None:
             dots.append(f'<span class="wsjf-dot wsjf-tc" title="TC: {tc_val}">{tc_val}</span>')
-        if rr is not None:
-            dots.append(f'<span class="wsjf-dot wsjf-rr" title="RR: {rr}">{rr}</span>')
+        if rr_oe is not None:
+            dots.append(f'<span class="wsjf-dot wsjf-rr" title="RR&OE: {rr_oe}">{rr_oe}</span>')
         wsjf_html = f'<div class="card__wsjf">{"".join(dots)}</div>'
 
     # JS badge

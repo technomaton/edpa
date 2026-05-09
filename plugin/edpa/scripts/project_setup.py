@@ -324,7 +324,7 @@ def main():
                 "js": raw.get("js", 0),
                 "bv": raw.get("bv", 0),
                 "tc": raw.get("tc", 0),
-                "rr": raw.get("rr", 0),
+                "rr_oe": raw.get("rr_oe", 0),
                 "wsjf": raw.get("wsjf", 0),
                 "status": raw.get("status", "Active"),
                 "owner": raw.get("owner", ""),
@@ -439,7 +439,7 @@ def main():
             print(f"      {C.GRAY}{result.stderr.strip()}{C.RESET}")
 
     number_fields = ["Job Size", "Business Value", "Time Criticality",
-                     "Risk Reduction", "WSJF Score"]
+                     "Risk Reduction & Opportunity Enablement", "WSJF Score"]
     for name in number_fields:
         _create_field(name, data_type="NUMBER")
 
@@ -642,7 +642,7 @@ def main():
         if item.get("js"): body_parts.append(f"JS={item['js']}")
         if item.get("bv"): body_parts.append(f"BV={item['bv']}")
         if item.get("tc"): body_parts.append(f"TC={item['tc']}")
-        if item.get("rr"): body_parts.append(f"RR={item['rr']}")
+        if item.get("rr_oe"): body_parts.append(f"RR&OE={item['rr_oe']}")
         if item.get("wsjf"): body_parts.append(f"WSJF={item['wsjf']}")
         if item.get("assignee"): body_parts.append(f"owner={item['assignee']}")
         if item.get("iteration"): body_parts.append(f"iteration={item['iteration']}")
@@ -760,8 +760,8 @@ def main():
             set_field("Business Value", number=item["bv"])
         if item.get("tc"):
             set_field("Time Criticality", number=item["tc"])
-        if item.get("rr"):
-            set_field("Risk Reduction", number=item["rr"])
+        if item.get("rr_oe"):
+            set_field("Risk Reduction & Opportunity Enablement", number=item["rr_oe"])
         if item.get("wsjf"):
             set_field("WSJF Score", number=item["wsjf"])
 

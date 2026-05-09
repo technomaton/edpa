@@ -4,7 +4,7 @@ title: Unit testy OMOP
 js: 5
 bv: 5
 tc: 3
-rr: 2
+rr_oe: 2
 status: Done
 parent: F-100
 assignee: turyna

@@ -41,127 +41,127 @@ export const iterations: Iteration[] = [
 
 export const items: WorkItem[] = [
   // Initiative
-  { id: 'I-1', title: 'Medical Platform & Datovy e-shop', level: 'Init', js: 0, bv: 0, tc: 0, rr: 0, parentId: null, status: 'Implementing', iteration: null, contributors: [] },
+  { id: 'I-1', title: 'Medical Platform & Datovy e-shop', level: 'Init', js: 0, bv: 0, tc: 0, rr_oe: 0, parentId: null, status: 'Implementing', iteration: null, contributors: [] },
 
   // Epics
-  { id: 'E-10', title: 'Anonymizacni modul', level: 'Epic', js: 13, bv: 13, tc: 8, rr: 8, parentId: 'I-1', status: 'Implementing', iteration: null, contributors: [
+  { id: 'E-10', title: 'Anonymizacni modul', level: 'Epic', js: 13, bv: 13, tc: 8, rr_oe: 8, parentId: 'I-1', status: 'Implementing', iteration: null, contributors: [
     { personId: 'urbanek', cw: 0.20 }, { personId: 'pm', cw: 0.60 }, { personId: 'turyna', cw: 0.10 }, { personId: 'd1', cw: 0.10 }
   ]},
-  { id: 'E-11', title: 'Datovy e-shop API', level: 'Epic', js: 8, bv: 8, tc: 13, rr: 5, parentId: 'I-1', status: 'Implementing', iteration: null, contributors: [
+  { id: 'E-11', title: 'Datovy e-shop API', level: 'Epic', js: 8, bv: 8, tc: 13, rr_oe: 5, parentId: 'I-1', status: 'Implementing', iteration: null, contributors: [
     { personId: 'urbanek', cw: 0.15 }, { personId: 'pm', cw: 0.60 }, { personId: 'matousek', cw: 0.15 }, { personId: 'd2', cw: 0.10 }
   ]},
-  { id: 'E-12', title: 'OMOP CDM integrace', level: 'Epic', js: 5, bv: 5, tc: 5, rr: 13, parentId: 'I-1', status: 'Implementing', iteration: null, contributors: [
+  { id: 'E-12', title: 'OMOP CDM integrace', level: 'Epic', js: 5, bv: 5, tc: 5, rr_oe: 13, parentId: 'I-1', status: 'Implementing', iteration: null, contributors: [
     { personId: 'urbanek', cw: 0.15 }, { personId: 'pm', cw: 0.60 }, { personId: 'tuma', cw: 0.25 }
   ]},
 
   // Features
-  { id: 'F-100', title: 'OMOP CDM Parser', level: 'Feature', js: 8, bv: 8, tc: 5, rr: 5, parentId: 'E-10', status: 'Done', iteration: null, contributors: [
+  { id: 'F-100', title: 'OMOP CDM Parser', level: 'Feature', js: 8, bv: 8, tc: 5, rr_oe: 5, parentId: 'E-10', status: 'Done', iteration: null, contributors: [
     { personId: 'urbanek', cw: 0.30 }, { personId: 'tuma', cw: 0.30 }, { personId: 'turyna', cw: 0.40 }
   ]},
-  { id: 'F-101', title: 'Data Upload API', level: 'Feature', js: 5, bv: 5, tc: 8, rr: 3, parentId: 'E-10', status: 'Done', iteration: null, contributors: [
+  { id: 'F-101', title: 'Data Upload API', level: 'Feature', js: 5, bv: 5, tc: 8, rr_oe: 3, parentId: 'E-10', status: 'Done', iteration: null, contributors: [
     { personId: 'tuma', cw: 0.35 }, { personId: 'matousek', cw: 0.40 }, { personId: 'd1', cw: 0.25 }
   ]},
-  { id: 'F-102', title: 'Anonymizacni engine', level: 'Feature', js: 13, bv: 13, tc: 13, rr: 8, parentId: 'E-10', status: 'Implementing', iteration: null, contributors: [
+  { id: 'F-102', title: 'Anonymizacni engine', level: 'Feature', js: 13, bv: 13, tc: 13, rr_oe: 8, parentId: 'E-10', status: 'Implementing', iteration: null, contributors: [
     { personId: 'urbanek', cw: 0.35 }, { personId: 'turyna', cw: 0.35 }, { personId: 'd1', cw: 0.30 }
   ]},
-  { id: 'F-110', title: 'Katalog datasetu', level: 'Feature', js: 8, bv: 8, tc: 8, rr: 3, parentId: 'E-11', status: 'Implementing', iteration: null, contributors: [
+  { id: 'F-110', title: 'Katalog datasetu', level: 'Feature', js: 8, bv: 8, tc: 8, rr_oe: 3, parentId: 'E-11', status: 'Implementing', iteration: null, contributors: [
     { personId: 'matousek', cw: 0.45 }, { personId: 'd2', cw: 0.40 }, { personId: 'pm', cw: 0.20 }
   ]},
-  { id: 'F-111', title: 'Objednavkovy system', level: 'Feature', js: 5, bv: 5, tc: 13, rr: 5, parentId: 'E-11', status: 'Implementing', iteration: null, contributors: [
+  { id: 'F-111', title: 'Objednavkovy system', level: 'Feature', js: 5, bv: 5, tc: 13, rr_oe: 5, parentId: 'E-11', status: 'Implementing', iteration: null, contributors: [
     { personId: 'd1', cw: 0.40 }, { personId: 'd2', cw: 0.35 }, { personId: 'pm', cw: 0.20 }
   ]},
-  { id: 'F-120', title: 'FHIR bridge', level: 'Feature', js: 8, bv: 5, tc: 5, rr: 13, parentId: 'E-12', status: 'Implementing', iteration: null, contributors: [
+  { id: 'F-120', title: 'FHIR bridge', level: 'Feature', js: 8, bv: 5, tc: 5, rr_oe: 13, parentId: 'E-12', status: 'Implementing', iteration: null, contributors: [
     { personId: 'tuma', cw: 0.40 }, { personId: 'do', cw: 0.45 }, { personId: 'urbanek', cw: 0.15 }
   ]},
 
   // Stories PI-2026-1.1 (all Done)
-  { id: 'S-200', title: 'OMOP parser impl.', level: 'Story', js: 8, bv: 8, tc: 5, rr: 3, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.1', contributors: [
+  { id: 'S-200', title: 'OMOP parser impl.', level: 'Story', js: 8, bv: 8, tc: 5, rr_oe: 3, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.1', contributors: [
     { personId: 'turyna', cw: 1 }, { personId: 'tuma', cw: 0.6 }, { personId: 'urbanek', cw: 0.30 }
   ]},
-  { id: 'S-201', title: 'Unit testy OMOP', level: 'Story', js: 5, bv: 5, tc: 3, rr: 2, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.1', contributors: [
+  { id: 'S-201', title: 'Unit testy OMOP', level: 'Story', js: 5, bv: 5, tc: 3, rr_oe: 2, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.1', contributors: [
     { personId: 'turyna', cw: 1 }, { personId: 'urbanek', cw: 0.30 }
   ]},
-  { id: 'S-202', title: 'OMOP validace schemat', level: 'Story', js: 3, bv: 3, tc: 2, rr: 2, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.1', contributors: [
+  { id: 'S-202', title: 'OMOP validace schemat', level: 'Story', js: 3, bv: 3, tc: 2, rr_oe: 2, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.1', contributors: [
     { personId: 'tuma', cw: 1 }, { personId: 'turyna', cw: 0.25 }
   ]},
-  { id: 'S-203', title: 'Upload endpoint', level: 'Story', js: 5, bv: 5, tc: 5, rr: 2, parentId: 'F-101', status: 'Done', iteration: 'PI-2026-1.1', contributors: [
+  { id: 'S-203', title: 'Upload endpoint', level: 'Story', js: 5, bv: 5, tc: 5, rr_oe: 2, parentId: 'F-101', status: 'Done', iteration: 'PI-2026-1.1', contributors: [
     { personId: 'tuma', cw: 1 }, { personId: 'matousek', cw: 0.6 }
   ]},
-  { id: 'S-204', title: 'Upload UI komponenta', level: 'Story', js: 3, bv: 3, tc: 3, rr: 1, parentId: 'F-101', status: 'Done', iteration: 'PI-2026-1.1', contributors: [
+  { id: 'S-204', title: 'Upload UI komponenta', level: 'Story', js: 3, bv: 3, tc: 3, rr_oe: 1, parentId: 'F-101', status: 'Done', iteration: 'PI-2026-1.1', contributors: [
     { personId: 'matousek', cw: 1 }, { personId: 'd1', cw: 0.25 }
   ]},
 
   // Stories PI-2026-1.2 (all Done)
-  { id: 'S-205', title: 'Upload testy', level: 'Story', js: 2, bv: 2, tc: 2, rr: 1, parentId: 'F-101', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
+  { id: 'S-205', title: 'Upload testy', level: 'Story', js: 2, bv: 2, tc: 2, rr_oe: 1, parentId: 'F-101', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
     { personId: 'd1', cw: 1 }
   ]},
-  { id: 'S-206', title: 'Anon pipeline MVP', level: 'Story', js: 8, bv: 8, tc: 8, rr: 5, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
+  { id: 'S-206', title: 'Anon pipeline MVP', level: 'Story', js: 8, bv: 8, tc: 8, rr_oe: 5, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
     { personId: 'urbanek', cw: 1 }, { personId: 'turyna', cw: 0.6 }, { personId: 'd1', cw: 0.15 }
   ]},
-  { id: 'S-207', title: 'K-anonymity algoritmus', level: 'Story', js: 5, bv: 5, tc: 5, rr: 3, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
+  { id: 'S-207', title: 'K-anonymity algoritmus', level: 'Story', js: 5, bv: 5, tc: 5, rr_oe: 3, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
     { personId: 'turyna', cw: 1 }, { personId: 'urbanek', cw: 0.30 }
   ]},
-  { id: 'S-208', title: 'Anonymizace testy', level: 'Story', js: 3, bv: 3, tc: 3, rr: 2, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
+  { id: 'S-208', title: 'Anonymizace testy', level: 'Story', js: 3, bv: 3, tc: 3, rr_oe: 2, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
     { personId: 'd1', cw: 1 }, { personId: 'turyna', cw: 0.25 }
   ]},
-  { id: 'S-209', title: 'Katalog UI', level: 'Story', js: 5, bv: 5, tc: 5, rr: 2, parentId: 'F-110', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
+  { id: 'S-209', title: 'Katalog UI', level: 'Story', js: 5, bv: 5, tc: 5, rr_oe: 2, parentId: 'F-110', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
     { personId: 'matousek', cw: 1 }, { personId: 'd2', cw: 0.6 }
   ]},
-  { id: 'S-210', title: 'Katalog API', level: 'Story', js: 5, bv: 5, tc: 5, rr: 3, parentId: 'F-110', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
+  { id: 'S-210', title: 'Katalog API', level: 'Story', js: 5, bv: 5, tc: 5, rr_oe: 3, parentId: 'F-110', status: 'Done', iteration: 'PI-2026-1.2', contributors: [
     { personId: 'd2', cw: 1 }, { personId: 'matousek', cw: 0.25 }
   ]},
 
   // Stories PI-2026-1.3 (all Done)
-  { id: 'S-211', title: 'Katalog search', level: 'Story', js: 3, bv: 3, tc: 2, rr: 1, parentId: 'F-110', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
+  { id: 'S-211', title: 'Katalog search', level: 'Story', js: 3, bv: 3, tc: 2, rr_oe: 1, parentId: 'F-110', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
     { personId: 'matousek', cw: 1 }
   ]},
-  { id: 'S-212', title: 'Objednavka workflow', level: 'Story', js: 5, bv: 5, tc: 8, rr: 3, parentId: 'F-111', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
+  { id: 'S-212', title: 'Objednavka workflow', level: 'Story', js: 5, bv: 5, tc: 8, rr_oe: 3, parentId: 'F-111', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
     { personId: 'd1', cw: 1 }, { personId: 'd2', cw: 0.6 }, { personId: 'pm', cw: 0.20 }
   ]},
-  { id: 'S-213', title: 'Objednavka notifikace', level: 'Story', js: 3, bv: 3, tc: 3, rr: 2, parentId: 'F-111', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
+  { id: 'S-213', title: 'Objednavka notifikace', level: 'Story', js: 3, bv: 3, tc: 3, rr_oe: 2, parentId: 'F-111', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
     { personId: 'd2', cw: 1 }, { personId: 'd1', cw: 0.25 }
   ]},
-  { id: 'S-214', title: 'FHIR parser', level: 'Story', js: 5, bv: 5, tc: 3, rr: 5, parentId: 'F-120', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
+  { id: 'S-214', title: 'FHIR parser', level: 'Story', js: 5, bv: 5, tc: 3, rr_oe: 5, parentId: 'F-120', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
     { personId: 'tuma', cw: 1 }, { personId: 'do', cw: 0.6 }
   ]},
-  { id: 'S-215', title: 'FHIR mapping', level: 'Story', js: 8, bv: 5, tc: 5, rr: 8, parentId: 'F-120', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
+  { id: 'S-215', title: 'FHIR mapping', level: 'Story', js: 8, bv: 5, tc: 5, rr_oe: 8, parentId: 'F-120', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
     { personId: 'do', cw: 1 }, { personId: 'tuma', cw: 0.6 }, { personId: 'urbanek', cw: 0.15 }
   ]},
-  { id: 'S-216', title: 'CI/CD pipeline', level: 'Story', js: 5, bv: 5, tc: 5, rr: 3, parentId: 'F-101', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
+  { id: 'S-216', title: 'CI/CD pipeline', level: 'Story', js: 5, bv: 5, tc: 5, rr_oe: 3, parentId: 'F-101', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
     { personId: 'tuma', cw: 1 }, { personId: 'do', cw: 0.25 }
   ]},
-  { id: 'S-217', title: 'Security scan setup', level: 'Story', js: 3, bv: 3, tc: 3, rr: 5, parentId: 'F-120', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
+  { id: 'S-217', title: 'Security scan setup', level: 'Story', js: 3, bv: 3, tc: 3, rr_oe: 5, parentId: 'F-120', status: 'Done', iteration: 'PI-2026-1.3', contributors: [
     { personId: 'tuma', cw: 1 }
   ]},
 
   // Stories PI-2026-1.4 (mix: Done + In Progress)
-  { id: 'S-218', title: 'API dokumentace', level: 'Story', js: 2, bv: 2, tc: 1, rr: 1, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.4', contributors: [
+  { id: 'S-218', title: 'API dokumentace', level: 'Story', js: 2, bv: 2, tc: 1, rr_oe: 1, parentId: 'F-100', status: 'Done', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'urbanek', cw: 1 }, { personId: 'tuma', cw: 0.15 }
   ]},
-  { id: 'S-219', title: 'Architektura review', level: 'Story', js: 3, bv: 3, tc: 2, rr: 3, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.4', contributors: [
+  { id: 'S-219', title: 'Architektura review', level: 'Story', js: 3, bv: 3, tc: 2, rr_oe: 3, parentId: 'F-102', status: 'Done', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'urbanek', cw: 1 }, { personId: 'turyna', cw: 0.25 }, { personId: 'pm', cw: 0.20 }
   ]},
-  { id: 'S-220', title: 'Performance testy', level: 'Story', js: 5, bv: 5, tc: 3, rr: 3, parentId: 'F-111', status: 'Done', iteration: 'PI-2026-1.4', contributors: [
+  { id: 'S-220', title: 'Performance testy', level: 'Story', js: 5, bv: 5, tc: 3, rr_oe: 3, parentId: 'F-111', status: 'Done', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'd1', cw: 1 }, { personId: 'tuma', cw: 0.25 }
   ]},
-  { id: 'S-221', title: 'Data validace modul', level: 'Story', js: 5, bv: 5, tc: 5, rr: 5, parentId: 'F-102', status: 'Implementing', iteration: 'PI-2026-1.4', contributors: [
+  { id: 'S-221', title: 'Data validace modul', level: 'Story', js: 5, bv: 5, tc: 5, rr_oe: 5, parentId: 'F-102', status: 'Implementing', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'turyna', cw: 1 }, { personId: 'd1', cw: 0.6 }
   ]},
-  { id: 'S-222', title: 'DB migrace scripts', level: 'Story', js: 3, bv: 3, tc: 2, rr: 2, parentId: 'F-110', status: 'Done', iteration: 'PI-2026-1.4', contributors: [
+  { id: 'S-222', title: 'DB migrace scripts', level: 'Story', js: 3, bv: 3, tc: 2, rr_oe: 2, parentId: 'F-110', status: 'Done', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'd2', cw: 1 }, { personId: 'matousek', cw: 0.25 }
   ]},
-  { id: 'S-223', title: 'E2E integration testy', level: 'Story', js: 3, bv: 3, tc: 2, rr: 2, parentId: 'F-101', status: 'Implementing', iteration: 'PI-2026-1.4', contributors: [
+  { id: 'S-223', title: 'E2E integration testy', level: 'Story', js: 3, bv: 3, tc: 2, rr_oe: 2, parentId: 'F-101', status: 'Implementing', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'matousek', cw: 1 }, { personId: 'd2', cw: 0.25 }
   ]},
-  { id: 'S-224', title: 'Auth modul', level: 'Story', js: 5, bv: 5, tc: 5, rr: 5, parentId: 'F-111', status: 'Implementing', iteration: 'PI-2026-1.4', contributors: [
+  { id: 'S-224', title: 'Auth modul', level: 'Story', js: 5, bv: 5, tc: 5, rr_oe: 5, parentId: 'F-111', status: 'Implementing', iteration: 'PI-2026-1.4', contributors: [
     { personId: 'd1', cw: 1 }, { personId: 'tuma', cw: 0.6 }, { personId: 'urbanek', cw: 0.15 }
   ]},
 
   // Stories PI-2026-1.5 (IP -- all Planned)
-  { id: 'S-225', title: 'Anon edge cases', level: 'Story', js: 5, bv: 5, tc: 5, rr: 5, parentId: 'F-102', status: 'Backlog', iteration: 'PI-2026-1.5', contributors: [
+  { id: 'S-225', title: 'Anon edge cases', level: 'Story', js: 5, bv: 5, tc: 5, rr_oe: 5, parentId: 'F-102', status: 'Backlog', iteration: 'PI-2026-1.5', contributors: [
     { personId: 'turyna', cw: 1 }, { personId: 'urbanek', cw: 0.30 }
   ]},
-  { id: 'S-226', title: 'Monitoring setup', level: 'Story', js: 3, bv: 3, tc: 3, rr: 3, parentId: 'F-120', status: 'Backlog', iteration: 'PI-2026-1.5', contributors: [
+  { id: 'S-226', title: 'Monitoring setup', level: 'Story', js: 3, bv: 3, tc: 3, rr_oe: 3, parentId: 'F-120', status: 'Backlog', iteration: 'PI-2026-1.5', contributors: [
     { personId: 'do', cw: 1 }, { personId: 'tuma', cw: 0.25 }
   ]},
 ];

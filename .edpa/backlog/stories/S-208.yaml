@@ -4,7 +4,7 @@ title: Anonymizace testy
 js: 3
 bv: 3
 tc: 3
-rr: 2
+rr_oe: 2
 status: Done
 parent: F-102
 assignee: d1

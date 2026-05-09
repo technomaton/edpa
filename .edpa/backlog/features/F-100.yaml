@@ -4,7 +4,7 @@ title: OMOP CDM Parser
 js: 8
 bv: 8
 tc: 5
-rr: 5
+rr_oe: 5
 wsjf: 2.25
 status: Done
 iteration: PI-2026-2.1

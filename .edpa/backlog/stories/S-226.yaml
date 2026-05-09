@@ -4,7 +4,7 @@ title: Monitoring setup
 js: 3
 bv: 3
 tc: 3
-rr: 3
+rr_oe: 3
 status: Backlog
 parent: F-120
 assignee: do

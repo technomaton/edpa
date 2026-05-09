@@ -4,7 +4,7 @@ title: Security scan setup
 js: 3
 bv: 3
 tc: 3
-rr: 5
+rr_oe: 5
 status: Done
 parent: F-120
 assignee: tuma

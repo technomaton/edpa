@@ -25,7 +25,7 @@ export interface WorkItem {
   js: number;
   bv: number;
   tc: number;
-  rr: number;
+  rr_oe: number;
   parentId: string | null;
   status: string;
   iteration: string | null;
@@ -87,7 +87,7 @@ export interface ProjectConfig {
  */
 export function wsjf(item: WorkItem): number {
   if (item.js > 0 && item.bv) {
-    return Math.round(((item.bv + item.tc + item.rr) / item.js) * 100) / 100;
+    return Math.round(((item.bv + item.tc + item.rr_oe) / item.js) * 100) / 100;
   }
   return 0;
 }

@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+## 1.15.0-beta — 2026-05-09
+
+### BREAKING — WSJF field rename: `rr` → `rr_oe`
+
+The WSJF Cost-of-Delay component is renamed across all surfaces from
+the abbreviated `rr` (Risk Reduction) to the full SAFe term
+`rr_oe` (Risk Reduction & Opportunity Enablement). The previous
+shorthand was incomplete — SAFe 6 defines this component as
+"Risk Reduction & Opportunity Enablement" together, and the docs
+already call it that everywhere; this release closes the gap in
+the field key itself.
+
+**Changed:**
+
+- YAML field key in backlog items: `rr:` → `rr_oe:` (36 files in
+  `.edpa/backlog/` migrated automatically; new template + schema use
+  `rr_oe:`).
+- Engine scripts (`sync.py`, `project_setup.py`, `backlog.py`,
+  `validate_syntax.py`, `board.py`): all internal field references
+  use `rr_oe`.
+- CLI flag on `backlog add`: `--rr-oe` is the canonical name; legacy
+  `--rr` is accepted as a deprecated alias for one release.
+- Web TS engine: `WorkItem.rr_oe` replaces `WorkItem.rr`. Demo data
+  for the calculator + dashboards updated.
+- GitHub Projects custom field: new projects create
+  "Risk Reduction & Opportunity Enablement". Existing projects with
+  the old "Risk Reduction" field continue to work — sync.py detects
+  the legacy name and emits a one-line warning so you can rename
+  in the Projects UI on your own schedule.
+
+**Migration for existing projects:**
+
+```bash
+# In your project root (with .edpa/ initialized):
+python3 .claude/edpa/scripts/../tools/migrate_rr_to_rr_oe.py
+# (or wherever you keep the script; or copy it from the EDPA repo)
+```
+
+Or by hand: `find .edpa/backlog -name '*.yaml' -exec sed -i ''
+'s/^\(\s*\)rr:/\1rr_oe:/' {} +`. Then validate with
+`backlog.py validate`.
+
+The GitHub custom field can be renamed in the Projects UI when
+convenient — sync.py keeps working through the rename.
+
 ## 1.14.0-beta — 2026-05-09
 
 ### BREAKING — Single calculation path; simple/full/gates mode selector removed

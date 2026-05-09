@@ -287,14 +287,14 @@ def level_color(level):
 
 
 def wsjf_score(item):
-    """Compute WSJF = (bv + tc + rr) / js. Returns 0 if js is 0."""
+    """Compute WSJF = (bv + tc + rr_oe) / js. Returns 0 if js is 0."""
     js = item.get("js", 0)
     if not js or js == 0:
         return 0.0
     bv = item.get("bv", 0)
     tc = item.get("tc", 0)
-    rr = item.get("rr", 0)
-    return round((bv + tc + rr) / js, 2)
+    rr_oe = item.get("rr_oe", 0)
+    return round((bv + tc + rr_oe) / js, 2)
 
 
 def next_id_for_type(root, item_type):
@@ -442,14 +442,14 @@ def cmd_show(backlog, args, root=None):
     if js:
         bv = item.get("bv", 0)
         tc = item.get("tc", 0)
-        rr = item.get("rr", 0)
+        rr_oe = item.get("rr_oe", 0)
         w = wsjf_score(item)
         print()
         print(f"  {bold('SAFe Scores:')}")
         print(f"    Job Size (JS):          {js}")
         print(f"    Business Value (BV):     {bv}")
         print(f"    Time Criticality (TC):   {tc}")
-        print(f"    Risk Reduction (RR):     {rr}")
+        print(f"    Risk Reduction & Opportunity Enablement (RR&OE): {rr_oe}")
         print(f"    WSJF:                    {color(str(w), C.HEADER)}")
 
     # Epic Hypothesis Statement (SAFe 6)
@@ -716,7 +716,7 @@ def cmd_wsjf(backlog, args):
         status = c.get("status", "?")
 
         print(f"  {rank:>4}  {color(c['id'], lc):18s}  {title:30s}  {wsjf_str}  "
-              f"{c.get('js',0):>4}  {c.get('bv',0):>4}  {c.get('tc',0):>4}  {c.get('rr',0):>4}  "
+              f"{c.get('js',0):>4}  {c.get('bv',0):>4}  {c.get('tc',0):>4}  {c.get('rr_oe',0):>4}  "
               f"{status_badge(status):22s}  {color(c['level'], lc)}")
 
     print()
@@ -825,7 +825,7 @@ def cmd_validate(backlog, args):
     # 11. Validate Fibonacci values for JS, BV, TC, RR
     fibonacci = {1, 2, 3, 5, 8, 13, 20}
     for item in items:
-        for field in ("js", "bv", "tc", "rr"):
+        for field in ("js", "bv", "tc", "rr_oe"):
             val = item.get(field)
             if val is not None and val != 0:
                 try:
@@ -923,7 +923,7 @@ def cmd_add(root, backlog, args):
     iteration = getattr(args, "iteration", None)
     bv = getattr(args, "bv", None)
     tc = getattr(args, "tc", None)
-    rr = getattr(args, "rr", None)
+    rr_oe = getattr(args, "rr_oe", None)
     raw_contributors = getattr(args, "contributor", None) or []
 
     # Parse --contributor PERSON:ROLE:CW triplets up front so a typo on
@@ -993,7 +993,7 @@ def cmd_add(root, backlog, args):
     if tc is not None:
         item_data["tc"] = tc
     if rr is not None:
-        item_data["rr"] = rr
+        item_data["rr_oe"] = rr_oe
     if assignee:
         item_data["assignee"] = assignee
     if iteration:
@@ -1065,7 +1065,7 @@ def main():
     p_add.add_argument("--js", type=int, help="Job Size")
     p_add.add_argument("--bv", type=int, help="Business Value")
     p_add.add_argument("--tc", type=int, help="Time Criticality")
-    p_add.add_argument("--rr", type=int, help="Risk Reduction")
+    p_add.add_argument("--rr-oe", "--rr", dest="rr_oe", type=int, help="Risk Reduction & Opportunity Enablement (legacy --rr alias accepted)")
     p_add.add_argument("--assignee", help="Assignee (person ID)")
     p_add.add_argument("--status", default="Funnel", help="Status (default: Funnel)")
     p_add.add_argument("--iteration", help="Iteration ID (e.g. PI-2026-1.3)")

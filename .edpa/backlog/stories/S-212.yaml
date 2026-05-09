@@ -4,7 +4,7 @@ title: Objednavka workflow
 js: 5
 bv: 5
 tc: 8
-rr: 3
+rr_oe: 3
 status: Done
 parent: F-111
 assignee: tuma

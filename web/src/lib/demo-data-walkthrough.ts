@@ -11,7 +11,7 @@ export const people: Person[] = [
 export const items: WorkItem[] = [
   {
     id: 'S-1', title: 'Auth service', level: 'Story', js: 8,
-    bv: 8, tc: 5, rr: 3, parentId: null, status: 'Done', iteration: 'demo-1',
+    bv: 8, tc: 5, rr_oe: 3, parentId: null, status: 'Done', iteration: 'demo-1',
     contributors: [
       { personId: 'alice', cw: 0.23 },
       { personId: 'bob',   cw: 0.77 },
@@ -19,7 +19,7 @@ export const items: WorkItem[] = [
   },
   {
     id: 'S-2', title: 'API endpoints', level: 'Story', js: 5,
-    bv: 5, tc: 3, rr: 2, parentId: null, status: 'Done', iteration: 'demo-1',
+    bv: 5, tc: 3, rr_oe: 2, parentId: null, status: 'Done', iteration: 'demo-1',
     contributors: [
       { personId: 'bob',   cw: 0.80 },
       { personId: 'carol', cw: 0.20 },
@@ -27,7 +27,7 @@ export const items: WorkItem[] = [
   },
   {
     id: 'S-3', title: 'Architecture review', level: 'Story', js: 3,
-    bv: 3, tc: 2, rr: 5, parentId: null, status: 'Done', iteration: 'demo-1',
+    bv: 3, tc: 2, rr_oe: 5, parentId: null, status: 'Done', iteration: 'demo-1',
     contributors: [
       { personId: 'alice', cw: 0.69 },
       { personId: 'bob',   cw: 0.17 },
@@ -36,7 +36,7 @@ export const items: WorkItem[] = [
   },
   {
     id: 'S-4', title: 'Project planning', level: 'Story', js: 2,
-    bv: 2, tc: 3, rr: 1, parentId: null, status: 'Done', iteration: 'demo-1',
+    bv: 2, tc: 3, rr_oe: 1, parentId: null, status: 'Done', iteration: 'demo-1',
     contributors: [
       { personId: 'alice', cw: 0.13 },
       { personId: 'carol', cw: 0.87 },
