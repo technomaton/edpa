@@ -347,7 +347,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     <ol>
       <li>Creates labels (Enabler)</li>
       <li>Creates GitHub Project v2 at org level</li>
-      <li>Creates custom fields: Job Size, BV, TC, RR, WSJF Score, Team + 4 Status fields (Initiative/Epic/Feature/Story Status with SAFe workflows)</li>
+      <li>Creates custom fields: Job Size, BV, TC, RR&amp;OE, WSJF Score, Team + 4 Status fields (Initiative/Epic/Feature/Story Status with SAFe workflows)</li>
       <li>Links project to repository</li>
       <li>Queries native Issue Types from organization</li>
       <li>Creates issues from item files in <code>.edpa/</code> with native Issue Types</li>
@@ -431,7 +431,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
       <li>Issue Type set</li>
       <li>Parent issue linked (sub-issue)</li>
       <li>Job Size estimated</li>
-      <li>BV + TC + RR filled</li>
+      <li>BV + TC + RR&amp;OE filled</li>
       <li>Primary Owner assigned</li>
       <li>Iteration or Planning Interval assigned</li>
     </ul>
@@ -1050,8 +1050,8 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
           <tr><td><strong>JS</strong></td><td>Job Size — relativní velikost práce (Fibonacci)</td></tr>
           <tr><td><strong>BV</strong></td><td>Business Value — obchodní hodnota</td></tr>
           <tr><td><strong>TC</strong></td><td>Time Criticality — časová kritičnost</td></tr>
-          <tr><td><strong>RR</strong></td><td>Risk Reduction — snížení rizika</td></tr>
-          <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR)/JS</td></tr>
+          <tr><td><strong>RR&amp;OE</strong></td><td>Risk Reduction &amp; Opportunity Enablement — snížení rizika a odblokování budoucích příležitostí</td></tr>
+          <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR&amp;OE)/JS</td></tr>
           <tr><td><strong>cw</strong></td><td>Contribution Weight — per-item share (Σ across persons = 1.0)</td></tr>
           <tr><td><strong>contribution_score</strong></td><td>Raw sum of signal weights (audit input)</td></tr>
           <tr><td><strong>signals[]</strong></td><td>Audit trail: type/ref/weight/detected_at per signal</td></tr>

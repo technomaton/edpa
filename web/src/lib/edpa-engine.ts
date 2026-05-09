@@ -83,7 +83,7 @@ export interface ProjectConfig {
 }
 
 /**
- * WSJF prioritization score: (BV + TC + RR) / JS
+ * WSJF prioritization score: (BV + TC + RR&OE) / JS  (RR&OE = Risk Reduction & Opportunity Enablement, stored in `rr` field)
  */
 export function wsjf(item: WorkItem): number {
   if (item.js > 0 && item.bv) {

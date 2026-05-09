@@ -345,7 +345,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     <ol>
       <li>Vytvoří labels (Enabler)</li>
       <li>Vytvoří GitHub Project v2 na org úrovni</li>
-      <li>Vytvoří custom fields: Job Size, BV, TC, RR, WSJF Score, Team + 4 Status fields (Initiative/Epic/Feature/Story Status se SAFe workflow)</li>
+      <li>Vytvoří custom fields: Job Size, BV, TC, RR&amp;OE, WSJF Score, Team + 4 Status fields (Initiative/Epic/Feature/Story Status se SAFe workflow)</li>
       <li>Linkuje projekt k repozitáři</li>
       <li>Dotáže nativní Issue Types z organizace</li>
       <li>Vytvoří issues z item files v <code>.edpa/</code> s nativními Issue Types</li>
@@ -428,7 +428,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
       <li>Issue Type nastaven</li>
       <li>Parent issue propojen (sub-issue)</li>
       <li>Job Size odhadnut</li>
-      <li>BV + TC + RR vyplněny</li>
+      <li>BV + TC + RR&amp;OE vyplněny</li>
       <li>Primary Owner přiřazen</li>
       <li>Iteration nebo Planning Interval přiřazen</li>
     </ul>
@@ -1046,8 +1046,8 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
           <tr><td><strong>JS</strong></td><td>Job Size — relativní velikost práce (Fibonacci)</td></tr>
           <tr><td><strong>BV</strong></td><td>Business Value — obchodní hodnota</td></tr>
           <tr><td><strong>TC</strong></td><td>Time Criticality — časová kritičnost</td></tr>
-          <tr><td><strong>RR</strong></td><td>Risk Reduction — snížení rizika</td></tr>
-          <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR)/JS</td></tr>
+          <tr><td><strong>RR&amp;OE</strong></td><td>Risk Reduction &amp; Opportunity Enablement — snížení rizika a odblokování budoucích příležitostí</td></tr>
+          <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR&amp;OE)/JS</td></tr>
           <tr><td><strong>cw</strong></td><td>Contribution Weight — per-item share (Σ napříč osobami = 1.0)</td></tr>
           <tr><td><strong>contribution_score</strong></td><td>Raw suma signal weights (audit input)</td></tr>
           <tr><td><strong>signals[]</strong></td><td>Audit trail: type/ref/weight/detected_at per signál</td></tr>

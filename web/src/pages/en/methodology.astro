@@ -61,7 +61,7 @@ import { VERSION } from '../../lib/version';
           <tr><td><strong>Planning Interval</strong></td><td>Planning cycle. Features are planned, coordinated, and evaluated.</td><td>5w (4+1 IP) / 10w (8+2 IP)</td></tr>
           <tr><td><strong>IP Iteration</strong></td><td>Innovation &amp; Planning iteration at the end of PI.</td><td>Last iteration in PI</td></tr>
           <tr><td><strong>Job Size (JS)</strong></td><td>Relative size estimate of a work item. Modified Fibonacci per WSJF (SAFe 6).</td><td>1, 2, 3, 5, 8, 13, 20, 40, 100</td></tr>
-          <tr><td><strong>WSJF</strong></td><td>Prioritization score: (BV + TC + RR) / JS</td><td>Independent per level</td></tr>
+          <tr><td><strong>WSJF</strong></td><td>Prioritization score: (BV + TC + RR&amp;OE) / JS</td><td>Independent per level</td></tr>
           <tr><td><strong>CW</strong></td><td>Contribution Weight — per-item normalized share of a person on an item (Σ across persons = 1.0 per item).</td><td>0&ndash;1.0</td></tr>
           <tr><td><strong>Signal Weight</strong></td><td>Weight of a single evidence signal type (<code>assignee</code>, <code>pr_author</code>, <code>commit_author</code>, <code>pr_reviewer</code>, <code>issue_comment</code>) aggregated by <code>detect_contributors.py</code>. In the config under the <code>signals.*</code> key.</td><td><code>cw_heuristics.yaml</code></td></tr>
           <tr><td><strong>Contribution Score</strong></td><td>Σ fired signal weights per (person, item). Input to per-item normalization. In code as <code>contribution_score</code>.</td><td>Automatic</td></tr>
@@ -130,13 +130,13 @@ import { VERSION } from '../../lib/version';
       <div class="note" style="margin-top:12px">Modified Fibonacci scale (1, 2, 3, 5, 8, 13, 20, 40, 100) per WSJF in SAFe 6. No fixed per-level caps &mdash; granularity is the team's responsibility during refinement. With AI-assisted work even a Story at JS=20+ can realistically ship within an iteration.</div>
     </div>
 
-    <div class="formula"><strong>WSJF:</strong> (<span class="wsjf-bv">BV</span> + <span class="wsjf-tc">TC</span> + <span class="wsjf-rr">RR</span>) / <span class="wsjf-js">JS</span>
-<span class="wsjf-bv">BV</span> = Business Value, <span class="wsjf-tc">TC</span> = Time Criticality, <span class="wsjf-rr">RR</span> = Risk Reduction
+    <div class="formula"><strong>WSJF:</strong> (<span class="wsjf-bv">BV</span> + <span class="wsjf-tc">TC</span> + <span class="wsjf-rr">RR&amp;OE</span>) / <span class="wsjf-js">JS</span>
+<span class="wsjf-bv">BV</span> = Business Value, <span class="wsjf-tc">TC</span> = Time Criticality, <span class="wsjf-rr">RR&amp;OE</span> = Risk Reduction
 Computed per level independently.</div>
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:var(--gn)"></div> BV — Business Value</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--or)"></div> TC — Time Criticality</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--cy)"></div> RR — Risk Reduction</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--cy)"></div> RR&amp;OE — Risk Reduction &amp; Opportunity Enablement</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--yl)"></div> JS — Job Size</div>
     </div>
   </section>
@@ -359,7 +359,7 @@ Accuracy = Actual / Planned &times; 100 %</div>
         </thead>
         <tbody>
           <tr><td>Job Size</td><td>Number</td><td>Mod. Fibonacci 1&ndash;100</td></tr>
-          <tr><td>BV / TC / RR</td><td>Number</td><td>Mod. Fibonacci 1&ndash;100</td></tr>
+          <tr><td>BV / TC / RR&amp;OE</td><td>Number</td><td>Mod. Fibonacci 1&ndash;100</td></tr>
           <tr><td>WSJF Score</td><td>Number</td><td>Auto (Action)</td></tr>
           <tr><td>Planning Interval</td><td>Iteration</td><td>5 or 10 weeks</td></tr>
           <tr><td>Iteration</td><td>Iteration</td><td>1 or 2 weeks</td></tr>
@@ -390,7 +390,7 @@ Accuracy = Actual / Planned &times; 100 %</div>
     <div class="formula" style="white-space:pre">feature/S-200-omop-parser
 defect/D-215-upload-validation
 feature/F-102-anon-engine</div>
-    <p>CI check blocks PRs without reference to an issue (<code>S-XXX</code>, <code>F-XXX</code>, <code>E-XXX</code>). DoR: Issue Type, Parent, Job Size, BV+TC+RR, Owner.</p>
+    <p>CI check blocks PRs without reference to an issue (<code>S-XXX</code>, <code>F-XXX</code>, <code>E-XXX</code>). DoR: Issue Type, Parent, Job Size, BV+TC+RR&amp;OE, Owner.</p>
   </section>
 
   <!-- 10. Reports and audit -->
