@@ -214,6 +214,26 @@ Počítá se per úroveň nezávisle.</div>
 Obě platí strukturálně — z konstrukce sum-and-normalize aggregation
 a ratio normalizace per osobu napříč iteračními položkami.
 Engine je při běhu validuje a snapshot odmítne zapsat při porušení.</div>
+
+    <h3 id="item-types">5.6 Co engine kredituje per typ položky</h3>
+    <p>EDPA pracuje se 6 typy issues (<code>S-</code>, <code>F-</code>, <code>E-</code>, <code>I-</code>, <code>D-</code>, <code>T-</code>). Ne všechny se ale zahrnují do výpočtu hodin stejně:</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Typ</th><th>Detekce evidence</th><th>Engine kredituje</th><th>Iteration filter</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Story</strong> (<code>S-</code>)</td><td>ano</td><td>ano, jen <code>status==Done</code></td><td>exact match (<code>PI-2026-1.1</code>)</td></tr>
+          <tr><td><strong>Feature</strong> (<code>F-</code>)</td><td>ano</td><td>ano, Done + gate transitions</td><td>PI match (<code>PI-2026-1.x</code>)</td></tr>
+          <tr><td><strong>Epic</strong> (<code>E-</code>)</td><td>ano</td><td>ano, Done + gate transitions</td><td>always (cross-PI)</td></tr>
+          <tr><td><strong>Initiative</strong> (<code>I-</code>)</td><td>ano</td><td>ano, Done + gate transitions</td><td>always (cross-PI)</td></tr>
+          <tr><td><strong>Defect</strong> (<code>D-</code>)</td><td>ano</td><td>ano, jen <code>status==Done</code></td><td>always (cross-PI) &mdash; záměrně</td></tr>
+          <tr><td><strong>Task</strong> (<code>T-</code>)</td><td>ano</td><td><strong>ne</strong> &mdash; engine <code>tasks/</code> neprochází</td><td>n/a</td></tr>
+        </tbody>
+      </table>
+      <div class="note" style="margin-top:12px"><strong>Defect cross-PI je záměrné.</strong> Defekt se nemusí stihnout opravit v iteraci, ve které byl založen &mdash; může přetéct i přes hranici PI. Engine ho proto kredituje vždy v iteraci, kdy přejde do Done, bez filtru na původ. To zachycuje skutečnou délku trvání defektu jako evidenci.</div>
+      <div class="note" style="margin-top:8px"><strong>Task není deliverable v EDPA modelu.</strong> Tasks jsou míněny jako sub-Story breakdown (checklist na issue), ne samostatná položka pro výpočet hodin. Pokud tým commit referencuje <code>T-XXX</code>, evidence se sice detekuje, ale engine pro tu práci nezíská žádný score &mdash; práce by se měla připojit k parent Story.</div>
+    </div>
   </section>
 
   <!-- 6. Dual-view -->

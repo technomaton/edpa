@@ -216,6 +216,26 @@ Both hold structurally — by construction of the sum-and-normalize
 aggregation and per-person ratio normalization across iteration items.
 Engine validates them at runtime and refuses to write the snapshot
 on violation.</div>
+
+    <h3 id="item-types">5.6 What the engine credits per item type</h3>
+    <p>EDPA works with 6 issue types (<code>S-</code>, <code>F-</code>, <code>E-</code>, <code>I-</code>, <code>D-</code>, <code>T-</code>). Not all of them participate in the hours calculation the same way:</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Type</th><th>Evidence detection</th><th>Engine credits</th><th>Iteration filter</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Story</strong> (<code>S-</code>)</td><td>yes</td><td>yes, only <code>status==Done</code></td><td>exact match (<code>PI-2026-1.1</code>)</td></tr>
+          <tr><td><strong>Feature</strong> (<code>F-</code>)</td><td>yes</td><td>yes, Done + gate transitions</td><td>PI match (<code>PI-2026-1.x</code>)</td></tr>
+          <tr><td><strong>Epic</strong> (<code>E-</code>)</td><td>yes</td><td>yes, Done + gate transitions</td><td>always (cross-PI)</td></tr>
+          <tr><td><strong>Initiative</strong> (<code>I-</code>)</td><td>yes</td><td>yes, Done + gate transitions</td><td>always (cross-PI)</td></tr>
+          <tr><td><strong>Defect</strong> (<code>D-</code>)</td><td>yes</td><td>yes, only <code>status==Done</code></td><td>always (cross-PI) &mdash; intentional</td></tr>
+          <tr><td><strong>Task</strong> (<code>T-</code>)</td><td>yes</td><td><strong>no</strong> &mdash; engine does not walk <code>tasks/</code></td><td>n/a</td></tr>
+        </tbody>
+      </table>
+      <div class="note" style="margin-top:12px"><strong>Cross-PI defects are intentional.</strong> A defect may not get fixed within the iteration where it was opened &mdash; it can spill across a PI boundary. The engine therefore credits it whenever it transitions to Done, with no origin filter. This captures the actual lifetime of the defect as evidence.</div>
+      <div class="note" style="margin-top:8px"><strong>Tasks are not deliverables in the EDPA model.</strong> Tasks are intended as sub-Story breakdown (checklist on an issue), not standalone items for hour calculation. If a team commits with a <code>T-XXX</code> reference, the evidence is detected, but the engine assigns it no score &mdash; the work should be attached to the parent Story.</div>
+    </div>
   </section>
 
   <!-- 6. Dual-view -->
