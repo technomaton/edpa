@@ -1,4 +1,6 @@
-// EDPA methodology version — stable in product copy.
-// The plugin/build version (web/package.json) is intentionally NOT surfaced
-// to readers; methodology semantics are what changes in product narrative.
-export const VERSION = '1.0';
+// EDPA version — reads from web/package.json (single source of truth).
+// Surfacing the live build version in product copy makes it visible
+// that the project is actively maintained and ties what the reader
+// sees on the site to a specific commit / changelog entry.
+import pkg from '../../package.json';
+export const VERSION = pkg.version;

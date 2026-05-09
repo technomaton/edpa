@@ -193,17 +193,17 @@ Garance: &#x2211; podilu = 100%</div>
 <div class="s-h1 fade d1">Automatická detekce kontributorů</div>
 <div class="cols fade d2">
 <div class="col">
-<table><thead><tr><th>GitHub signal</th><th style="text-align:right">Body</th><th style="text-align:right">CW</th></tr></thead><tbody>
-<tr><td>Assignee na issue</td><td style="text-align:right"><b>+4</b></td><td style="text-align:right;color:var(--gn)">1.0</td></tr>
-<tr><td><code>/contribute</code> příkaz</td><td style="text-align:right"><b>+3</b></td><td style="text-align:right;color:var(--cy)">0.6</td></tr>
-<tr><td>PR author &#x2192; item</td><td style="text-align:right"><b>+2</b></td><td style="text-align:right;color:var(--cy)">0.6</td></tr>
-<tr><td>Commit s S-/F-/E-XXX</td><td style="text-align:right"><b>+1</b></td><td style="text-align:right;color:var(--yl)">0.25</td></tr>
-<tr><td>PR reviewer</td><td style="text-align:right"><b>+1</b></td><td style="text-align:right;color:var(--yl)">0.25</td></tr>
-<tr><td>Issue comment</td><td style="text-align:right"><b>+0.5</b></td><td style="text-align:right;color:var(--or)">0.15</td></tr>
+<table><thead><tr><th>GitHub signal</th><th style="text-align:right">Signal weight</th></tr></thead><tbody>
+<tr><td>Assignee na issue</td><td style="text-align:right;color:var(--gn)"><b>4.0</b></td></tr>
+<tr><td>PR author &#x2192; item</td><td style="text-align:right;color:var(--cy)"><b>3.4</b></td></tr>
+<tr><td>Commit s S-/F-/E-/I-XXX</td><td style="text-align:right;color:var(--yl)"><b>2.78</b></td></tr>
+<tr><td>PR reviewer</td><td style="text-align:right;color:var(--yl)"><b>2.25</b></td></tr>
+<tr><td>Issue / PR comment</td><td style="text-align:right;color:var(--or)"><b>1.14</b></td></tr>
+<tr><td><code>/contribute @osoba weight:X</code></td><td style="text-align:right;color:var(--ac2)"><b>explicit</b></td></tr>
 </tbody></table>
 </div>
 <div class="col">
-<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Threshold</div><div class="sc-l">Evidence Score &#x2265; 1.0 &#x2192; relevantní kontributor</div></div>
+<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Additivní agregace</div><div class="sc-l">Signály se sčítají do <code>contribution_score</code>; CW je per-item normalizovaný podíl (&Sigma; = 1.0 na položce)</div></div>
 <div class="sc c" style="margin-bottom:8px"><div class="sc-t">Override</div><div class="sc-l"><code>/contribute @urbanek weight:0.6</code></div></div>
 <div class="sc y" style="margin-bottom:8px"><div class="sc-t">Branch naming</div><div class="sc-l"><code>feature/S-200-omop-parser</code><br>CI blokuje PR bez reference</div></div>
 <div class="sc o"><div class="sc-t">Commit &#x2260; cas</div><div class="sc-l">Commity = signál relevance, ne hodiny. AI mění patterns.</div></div>

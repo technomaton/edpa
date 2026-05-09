@@ -164,27 +164,27 @@ const categories = [
       },
       {
         name: 'test_signal_weights_assignee',
-        description: 'Assignee signal must have Evidence Score +4.0.',
+        description: 'Assignee signal must have signal weight 4.0 in cw_heuristics.yaml.',
         expected: 'signals.assignee = 4.0',
       },
       {
         name: 'test_signal_weights_pr_author',
-        description: 'PR author signal must have Evidence Score +3.4.',
+        description: 'PR author signal must have signal weight 3.4 in cw_heuristics.yaml.',
         expected: 'signals.pr_author = 3.4',
       },
       {
         name: 'test_signal_weights_commit',
-        description: 'Commit author signal must have Evidence Score +2.78.',
+        description: 'Commit author signal must have signal weight 2.78 in cw_heuristics.yaml.',
         expected: 'signals.commit_author = 2.78',
       },
       {
         name: 'test_signal_weights_pr_reviewer',
-        description: 'PR reviewer signal must have Evidence Score +2.25.',
+        description: 'PR reviewer signal must have signal weight 2.25 in cw_heuristics.yaml.',
         expected: 'signals.pr_reviewer = 2.25',
       },
       {
         name: 'test_signal_weights_issue_comment',
-        description: 'Issue comment signal must have Evidence Score +1.14.',
+        description: 'Issue comment signal must have signal weight 1.14 in cw_heuristics.yaml.',
         expected: 'signals.issue_comment = 1.14',
       },
       {
@@ -255,7 +255,7 @@ const categories = [
       },
       {
         name: 'test_no_transitions_degenerates_to_done_credit',
-        description: 'When git history records no Feature/Epic transitions, engine credits only Done items.',
+        description: 'When git history records no Feature/Epic/Initiative transitions, the engine credits only Story Done items.',
         expected: 'gate_events empty \u2192 only Story Done credit fires',
       },
       {

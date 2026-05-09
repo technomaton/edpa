@@ -164,27 +164,27 @@ const categories = [
       },
       {
         name: 'test_signal_weights_assignee',
-        description: 'Signál assignee musí mít Evidence Score +4.0.',
+        description: 'Signál assignee musí mít signal weight 4.0 v cw_heuristics.yaml.',
         expected: 'signals.assignee = 4.0',
       },
       {
         name: 'test_signal_weights_pr_author',
-        description: 'Signál pr_author musí mít Evidence Score +3.4.',
+        description: 'Signál pr_author musí mít signal weight 3.4 v cw_heuristics.yaml.',
         expected: 'signals.pr_author = 3.4',
       },
       {
         name: 'test_signal_weights_commit',
-        description: 'Signál commit_author musí mít Evidence Score +2.78.',
+        description: 'Signál commit_author musí mít signal weight 2.78 v cw_heuristics.yaml.',
         expected: 'signals.commit_author = 2.78',
       },
       {
         name: 'test_signal_weights_pr_reviewer',
-        description: 'Signál pr_reviewer musí mít Evidence Score +2.25.',
+        description: 'Signál pr_reviewer musí mít signal weight 2.25 v cw_heuristics.yaml.',
         expected: 'signals.pr_reviewer = 2.25',
       },
       {
         name: 'test_signal_weights_issue_comment',
-        description: 'Signál issue_comment musí mít Evidence Score +1.14.',
+        description: 'Signál issue_comment musí mít signal weight 1.14 v cw_heuristics.yaml.',
         expected: 'signals.issue_comment = 1.14',
       },
       {
@@ -255,7 +255,7 @@ const categories = [
       },
       {
         name: 'test_no_transitions_degenerates_to_done_credit',
-        description: 'Když git history nezachycuje Feature/Epic transitions, engine kredituje pouze Done items.',
+        description: 'Když git history nezachycuje žádné Feature/Epic/Initiative transitions, engine kredituje pouze Story Done items.',
         expected: 'gate_events empty → kredituje jen Story Done',
       },
       {
