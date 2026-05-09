@@ -952,15 +952,16 @@ TOTAL_DEVIATION=0.824000</code></pre>
     </div>
     <p>Signály se v v1.11 <strong>sčítají additivně</strong> do contribution_score per (osoba, item), pak se normalizují per-item: <code>cw = score / Σ_persons score</code> (Σ napříč osobami = 1.0). Role label se odvozuje z dominantního signál typu jen pro display, neukládá se.</p>
 
-    <h3>Výpočet EDPA (simple mode)</h3>
+    <h3>Výpočet EDPA (single path, v1.14+)</h3>
     <p>Pro každou osobu v iteraci:</p>
     <ol>
-      <li>Detekovat evidence na každé položce</li>
-      <li>Pro každý pár (osoba, položka): <code>score = JS &times; CW</code></li>
-      <li>Pro každou osobu: <code>ratio_i = score_i / sum(scores)</code></li>
-      <li>Odvozené hodiny: <code>hours_i = ratio_i &times; capacity</code></li>
+      <li>Detekovat evidence signály per (osoba, item) přes <code>detect_contributors.py</code></li>
+      <li>Per-item normalizace: <code>cw_i = contribution_score_i / Σ_persons contribution_score</code> (Σ cw na položce = 1.0)</li>
+      <li>Stories <code>status: Done</code> a parent gate transitions z git history: <code>score = JS × cw</code> (parents s <code>JS × gate_weight × cw</code>)</li>
+      <li>Per osobu: <code>ratio_i = score_i / Σ scores</code></li>
+      <li>Odvozené hodiny: <code>hours_i = ratio_i × capacity</code></li>
     </ol>
-    <div class="note"><strong>Invariant:</strong> <code>sum(hours) = capacity</code> (přesně, ne přibližně).</div>
+    <div class="note"><strong>Invariants:</strong> <code>Σ hours = capacity</code> per osobě AND <code>Σ cw = 1.0</code> per položce — vždy, garantováno konstrukcí. v1.14 dropla pre-existing simple/full/gates mode selector — gates byl strict superset, single path je matematicky ekvivalentní.</div>
   </section>
 
   <!-- Troubleshooting -->
@@ -1061,8 +1062,9 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
           <tr><td><strong>TC</strong></td><td>Time Criticality — časová kritičnost</td></tr>
           <tr><td><strong>RR</strong></td><td>Risk Reduction — snížení rizika</td></tr>
           <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR)/JS</td></tr>
-          <tr><td><strong>CW</strong></td><td>Contribution Weight — váha příspěvku (0.0 - 1.0)</td></tr>
-          <tr><td><strong>RS</strong></td><td>Role Strength — síla role (volitelné v full mode)</td></tr>
+          <tr><td><strong>cw</strong></td><td>Contribution Weight — per-item share (Σ napříč osobami = 1.0)</td></tr>
+          <tr><td><strong>contribution_score</strong></td><td>Raw suma signal weights (audit input)</td></tr>
+          <tr><td><strong>signals[]</strong></td><td>Audit trail: type/ref/weight/detected_at per signál</td></tr>
           <tr><td><strong>MAD</strong></td><td>Mean Absolute Deviation — průměrná absolutní odchylka</td></tr>
           <tr><td><strong>Evidence</strong></td><td>Doklad o práci (commit, PR, assignee, komentář)</td></tr>
           <tr><td><strong>Ground truth</strong></td><td>Potvrzená realita od týmu (pro kalibraci)</td></tr>

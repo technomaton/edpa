@@ -36,19 +36,19 @@ const categories = [
         expected: 'All scores \u2265 0',
       },
       {
-        name: 'test_score_formula_simple',
-        description: 'In simple mode: Score is calculated as JS multiplied by CW.',
-        expected: 'Score = JS \u00D7 CW',
+        name: 'test_score_formula',
+        description: 'Score is calculated as JS multiplied by cw (per-item normalized share).',
+        expected: 'Score = JS \u00D7 cw',
       },
       {
-        name: 'test_score_formula_full',
-        description: 'In full mode: Score is calculated as JS multiplied by CW multiplied by RS.',
-        expected: 'Score = JS \u00D7 CW \u00D7 RS',
+        name: 'test_per_item_cw_sums_to_one',
+        description: 'Per-item invariant: \u03A3 cw across all persons on an item equals 1.0.',
+        expected: '\u03A3_persons cw[*, item] = 1.0',
       },
       {
-        name: 'test_full_mode_invariants',
-        description: 'Full mode also guarantees that sum equals capacity.',
-        expected: 'Full mode: \u03A3 = capacity \u00B1 0.01h',
+        name: 'test_capacity_invariant',
+        description: 'Per-person invariant: \u03A3 derived hours equals declared capacity.',
+        expected: '\u03A3_items DerivedHours[P, *] = Capacity[P, I] \u00B1 0.01h',
       },
       {
         name: 'test_all_invariants_flag',
@@ -284,9 +284,9 @@ const categories = [
         expected: 'per-person hours consistent with per-item shares',
       },
       {
-        name: 'test_mode_switch_preserves_guarantee',
-        description: 'Switching mode simple \u2192 full preserves the \u03A3 = Capacity guarantee.',
-        expected: 'simple \u2192 full: \u03A3 = Capacity still holds',
+        name: 'test_no_transitions_degenerates_to_done_credit',
+        description: 'When git history records no Feature/Epic transitions, engine credits only Done items (v1.14: single path, no mode selector).',
+        expected: 'gate_events empty \u2192 only Story Done credit fires',
       },
       {
         name: 'test_per_person_hours_sum_cross_items',
