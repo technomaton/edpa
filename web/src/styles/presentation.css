@@ -7,6 +7,10 @@
   flex-direction: column;
 }
 .presentation-body main { display: none; }
+/* Hide the global site header in presentation mode — slides take the
+   full viewport, navigation lives in .pres-nav at the bottom. */
+.presentation-body .site-header,
+.presentation-body .mobile-menu { display: none !important; }
 
 .deck { flex: 1; position: relative; overflow: hidden; }
 
