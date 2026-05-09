@@ -2,7 +2,7 @@
 
 *Capacity derivation from delivery evidence*
 
-**Version 1.12.0-beta — May 2026 — Jaroslav Urbanek, Lead Architect**
+**Version 1.13.0-beta — May 2026 — Jaroslav Urbanek, Lead Architect**
 
 ---
 

@@ -2,6 +2,62 @@
 
 ## Unreleased
 
+## 1.13.0-beta — 2026-05-09
+
+### Added: organization lookup helper
+
+New script `plugin/edpa/scripts/lookup_org.py` fetches official
+company data from public registries to fill
+`project.organizations[]` in `.edpa/config/edpa.yaml` without manual
+re-keying.
+
+**v1.13 ships with one provider:** ARES (CZ) — https://ares.gov.cz
+public REST API, no auth required. Returns: name, legal_name, tax_id
+(ICO), vat_id (DIC), legal seat address, founded date, registry
+status. Mockable for tests (no live API hits in CI).
+
+**Pluggable provider model:** future country additions just register
+a function that returns the standard dict shape:
+```python
+PROVIDERS["GB"] = lookup_uk_companies_house  # one line to register
+```
+
+CLI:
+```bash
+# Direct ID lookup
+python3 lookup_org.py --ico 26350513
+python3 lookup_org.py --country CZ --id 26350513
+
+# Search by name
+python3 lookup_org.py --search "Medicalc software"
+
+# Output formats
+python3 lookup_org.py --ico 26350513 --yaml      # YAML block to paste
+python3 lookup_org.py --ico 26350513 --json      # full machine-readable
+
+# Patch .edpa/config/edpa.yaml directly
+python3 lookup_org.py --ico 26350513 --apply --org-index 1 --role partner
+python3 lookup_org.py --ico 26350513 --apply --org-index 1 --yes  # CI
+```
+
+`--apply` preserves operator-set contact info (ARES doesn't carry
+email/phone/website) and existing role values; replaces only identity
++ address fields. Pads organizations[] when --org-index is beyond
+current length.
+
+**Tests:** 30 unit tests (mocked HTTP) covering normalization,
+formatters, --apply patching semantics (contact preservation, role
+preservation, padding, missing config), provider registry contract.
+
+**Docs:** new `docs/org-lookup.md` with full usage, ARES specifics
+(sídlo vs operating offices, VAT status semantics), and steps to add
+a future provider (UK Companies House, EU OpenCorporates, USA SEC
+EDGAR).
+
+Version bumped 1.12.0-beta → 1.13.0-beta. Codebase otherwise
+unchanged from v1.12; install.sh fetches the new tarball
+automatically.
+
 ## 1.12.0-beta — 2026-05-09
 
 ### Project schema enhancement (non-breaking — new fields, old keys ignored)

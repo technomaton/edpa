@@ -48,7 +48,7 @@ project:
         website: "https://medicalc.cz"
 
 governance:
-  methodology: "EDPA 1.12.0"
+  methodology: "EDPA 1.13.0"
   # Calculation mode:
   #   gates  (default) — credits per status transition on Initiative/Epic/Feature
   #                      + Story=Done. Doporučeno po validaci A/B vs simple.
