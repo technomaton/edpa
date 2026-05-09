@@ -9,6 +9,11 @@ name: Release
 # Maintainer flow becomes: bump versions, update CHANGELOG, commit
 # release: vX.Y.Z, then `git tag vX.Y.Z && git push --tags`. The
 # workflow does the rest.
+#
+# "Bump versions" = update BOTH files together so the site mirrors
+# the engine release in product copy:
+#   - plugin/.claude-plugin/plugin.json   (engine, single source of truth)
+#   - web/package.json                    (mirror, drives Vercel deploys)
 
 on:
   push:
