@@ -144,14 +144,23 @@ def find_repo_root():
 def load_backlog(root):
     """Load backlog from file-per-item directory structure.
 
-    Reads project/people metadata from people.yaml, then globs all item
-    files from backlog/initiatives/, backlog/epics/, backlog/features/, backlog/stories/ subdirectories.
+    Reads team metadata from people.yaml + project metadata from edpa.yaml,
+    then globs all item files from backlog/initiatives/, backlog/epics/,
+    backlog/features/, backlog/stories/, backlog/defects/.
     """
     edpa = root / ".edpa"
 
-    # Load project/people metadata
+    # Load team metadata (people, teams, cadence)
     people_path = edpa / "config" / "people.yaml"
     backlog = yaml.safe_load(open(people_path, encoding="utf-8")) if people_path.exists() else {}
+
+    # Merge project metadata from edpa.yaml so cmd_tree/cmd_status can
+    # render project name + funding without reaching for None["project"].
+    edpa_path = edpa / "config" / "edpa.yaml"
+    if edpa_path.exists():
+        edpa_cfg = yaml.safe_load(open(edpa_path, encoding="utf-8")) or {}
+        if "project" in edpa_cfg and "project" not in backlog:
+            backlog["project"] = edpa_cfg["project"]
 
     # Load all items from type directories
     items = []
@@ -341,7 +350,8 @@ def cmd_tree(backlog, args):
 
     print()
     print(bold(color("  EDPA Backlog Tree", C.HEADER)))
-    print(color(f"  {backlog['project']['name']}", C.MUTED))
+    project_name = (backlog.get("project") or {}).get("name") or "(unnamed project)"
+    print(color(f"  {project_name}", C.MUTED))
     print()
 
     # Get all initiatives (items with no parent / parent=null)
@@ -580,10 +590,15 @@ def cmd_status(backlog, args):
 
     pct = round(done_sp / total_sp * 100) if total_sp else 0
 
+    project = backlog.get("project") or {}
+    funding = project.get("funding") or {}
+    project_name = project.get("name") or "(unnamed project)"
+    registration = project.get("registration") or funding.get("registration") or "—"
+    program = project.get("program") or funding.get("program") or "—"
     print()
     print(bold(color("  EDPA Project Status", C.HEADER)))
-    print(color(f"  {backlog['project']['name']}", C.MUTED))
-    print(color(f"  {backlog['project']['registration']}  |  {backlog['project']['program']}", C.MUTED))
+    print(color(f"  {project_name}", C.MUTED))
+    print(color(f"  {registration}  |  {program}", C.MUTED))
     print()
 
     # Progress bar

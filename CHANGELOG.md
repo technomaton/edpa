@@ -2,6 +2,55 @@
 
 ## Unreleased
 
+## 1.17.1-beta — 2026-05-10
+
+### Fixed — surfaced via 2-PI × 5-iteration end-to-end run
+
+Three real bugs in the 1.17.0 engine + CLI, all reproducible via a
+synthetic 4-person team across 10 iteration closes:
+
+- **engine.py — IP-iteration gate events were orphaned (0h derived).**
+  `load_gate_events` synthesised events from Feature/Epic/Initiative
+  status transitions and inherited the parent's `contributors[]` via
+  `_passthrough_contributors`. When the parent was seeded with
+  title+js+status only (the realistic state for an Initiative or
+  Feature being progressively elaborated), the contributor list was
+  empty and every gate event derived 0h despite real strategic work.
+  Now `load_gate_events(..., people=...)` accepts the `people:` block
+  and falls back to crediting the transition's commit author at
+  `cw=1.0` with a `gate_transition_author` signal in the audit trail.
+  In the E2E sandbox this took PI-2026-1.5 from 0h → 120h.
+
+- **engine.py — Defects (and Tasks) bypassed the iteration filter.**
+  The filter at `engine.py:539-547` had explicit branches for `Story`
+  (exact-match) and `Feature` (PI-prefix match); `Defect` and `Task`
+  fell through to the `Epic`/`Initiative` "always include if Done"
+  path, so a Defect with `iteration: PI-2026-2.4` was credited in
+  every iteration close in PI-2026-2 — once correctly in iter .4 and
+  again in iter .5, doubling its hours in the PI rollup. The branch
+  now reads `if item_type in ("Story", "Defect", "Task")`.
+
+- **backlog.py — `tree` and `status` crashed with `KeyError: 'project'`**
+  on every project using the canonical pilot `people.yaml` template.
+  `load_backlog()` was reading project metadata from `people.yaml` (it
+  has never lived there in the post-v1.10 schema); now it merges the
+  `project:` block from `edpa.yaml`, and `cmd_tree` / `cmd_status`
+  use `.get()` so an unconfigured project prints `(unnamed project)`
+  instead of dying.
+
+### Added
+
+- `_build_person_resolver(people)` helper extracted from
+  `_enrich_items_with_yaml_edit_signals` so the same login/email/id
+  resolution logic now powers gate-event author resolution too.
+
+### Notes
+
+- No CW recalibration needed — signal weights are unchanged.
+- No backlog data migration — these are read-path fixes only.
+- Existing snapshots remain valid; re-running the engine for any
+  iteration produces a corrected `derived_hours` distribution.
+
 ## 1.17.0-beta — 2026-05-10
 
 ### New — yaml_edit signals (8 structural diff-derived signals)

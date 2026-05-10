@@ -530,14 +530,14 @@ def load_backlog_items(edpa_root, iteration_id=None):
                 continue
 
             # Filter by iteration — SAFe hierarchy-aware:
-            #   Story → exact iteration match (e.g., PI-2026-1.1)
+            #   Story / Defect / Task → exact iteration match (e.g., PI-2026-1.1)
             #   Feature → PI match (e.g., PI-2026-1 matches PI-2026-1.x)
             #   Epic/Initiative → always included if Done (cross-PI)
             item_type = data.get("type", level)
             item_iter = data.get("iteration", "")
 
             if iteration_id:
-                if item_type == "Story":
+                if item_type in ("Story", "Defect", "Task"):
                     if item_iter != iteration_id:
                         continue
                 elif item_type == "Feature":
@@ -694,7 +694,21 @@ def _passthrough_contributors(item_data):
     return contribs
 
 
-def load_gate_events(edpa_root, iteration_id, heuristics):
+def _build_person_resolver(people):
+    """Build login/email/id → person_id resolver from people.yaml entries."""
+    resolver = {}
+    for p in people or []:
+        pid = p.get("id")
+        if not pid:
+            continue
+        for key in ("github", "email", "id"):
+            v = p.get(key)
+            if v:
+                resolver[str(v).lower()] = pid
+    return resolver
+
+
+def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
     """Convert status transitions into scoring 'events' for mode=gates.
 
     For Feature/Epic/Initiative parents, every status transition that occurred
@@ -703,12 +717,19 @@ def load_gate_events(edpa_root, iteration_id, heuristics):
     its parent's contributor list as evidence, so run_edpa() scores it with
     the same math as a Done item.
 
+    v1.17.1 fix (Finding #1): when the parent has no contributors[] (typical
+    for IP-iter strategic items seeded with title+js but no team yet), fall
+    back to crediting the transition's commit author (`changed_by`) at cw=1.0.
+    Without this fallback, IP iterations with real strategic work derive 0h
+    because gate events inherit empty contributor lists.
+
     Stories are NOT emitted here — they continue to flow through
     load_backlog_items() with the Done filter.
     """
     edpa_root = Path(edpa_root)
     if not iteration_id:
         return [], []
+    resolver = _build_person_resolver(people or [])
 
     iter_file = edpa_root / "iterations" / f"{iteration_id}.yaml"
     if not iter_file.is_file():
@@ -766,11 +787,36 @@ def load_gate_events(edpa_root, iteration_id, heuristics):
         effective_js = round(parent_js * weight, 6)
         synth_id = f"{t['item_id']}@{t['from_status'] or 'init'}->{t['to_status']}"
 
+        contribs = _passthrough_contributors(parent)
+        if not contribs:
+            # v1.17.1 fallback: parent has no contributors[] yet → credit the
+            # transition's git author. Resolves email/login via people.yaml.
+            changed_by = (t.get("changed_by") or "").lower()
+            resolved = resolver.get(changed_by)
+            # Some signals carry just the local-part of email (e.g. "jurby"
+            # from "jurby@noreply.github.com"). Try a relaxed match too.
+            if not resolved and "@" in changed_by:
+                resolved = resolver.get(changed_by.split("@", 1)[0])
+            if resolved:
+                contribs = [{
+                    "person": resolved,
+                    "cw": 1.0,
+                    "contribution_score": float(weight),
+                    "signals": [{
+                        "type": "gate_transition_author",
+                        "ref": t.get("commit_hash"),
+                        "weight": float(weight),
+                        "transition": gate_key,
+                        "parent_id": t["item_id"],
+                        "detected_at": t.get("changed_at"),
+                    }],
+                }]
+
         events.append({
             "id": synth_id,
             "level": item_type,
             "job_size": effective_js,
-            "contributors": _passthrough_contributors(parent),
+            "contributors": contribs,
         })
         audit.append({
             "synth_id": synth_id,
@@ -1290,7 +1336,10 @@ def main():
         # without their own gate ladder); v1.17 fix to the v1.16 silent
         # drop. Tasks behave the same way.
         items = [i for i in items if i.get("level") in ("Story", "Defect", "Task")]
-        gate_events, gate_audit = load_gate_events(edpa_root, iteration_id, heuristics)
+        gate_events, gate_audit = load_gate_events(
+            edpa_root, iteration_id, heuristics,
+            people=(capacity or {}).get("people", []) or [],
+        )
         items.extend(gate_events)
         # v1.17: collect yaml_edit signals from git diff over backlog/.
         # These augment existing contributors[] additively (signals stack
