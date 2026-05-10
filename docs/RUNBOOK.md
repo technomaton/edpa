@@ -162,25 +162,32 @@ delivery evidence and produce the per-person reports.
 python3.13 plugin/edpa/scripts/engine.py \
   --edpa-root .edpa \
   --iteration PI-2026-1.4 \
-  --mode gates \
   --output .edpa/reports/iteration-PI-2026-1.4/edpa_results.json
 
 # Step 2: reports skill — reads the JSON and writes timesheets, snapshots, XLSX
 # (the edpa-reports skill is invoked by Claude; no separate script)
 ```
 
-**Mode choices** (current default: `gates`):
+**Single calculation path (v1.14+, extended in v1.17):** the mode
+selector (`--mode simple|gates`) was retired in 1.14 because `gates`
+was a strict superset of the others. The current path credits three
+event kinds together:
 
-- `gates` (default) — credit each status transition on
-  Initiative/Epic/Feature as a mini-deliverable using `gate_weights` from
-  heuristics; Story stays Done-only. Validated against the
-  `edpa-simulation-gates` harness (avg MAD 7.8 %, stable to ±20 % CW
-  perturbation). **Requires git history of status changes** —
-  `sync pull --commit` produces these automatically.
-- `simple` — credit only items with `status: Done`. Use when the project
-  doesn't record mid-life status transitions in git (legacy projects,
-  pre-EDPA backlogs, archive replays).
-- `full` — same as `simple` but stores RS/RSV detail in the audit trail.
+- **Story / Defect / Task Done credit** — items at `status: Done` get
+  `JS × cw` per their contributors[]. (v1.17 fix: pre-1.17 Defects
+  were silently dropped at a `level == "Story"` filter.)
+- **Parent gate transitions** — Feature / Epic / Initiative status
+  changes captured in git history become synthetic events with
+  `effective_js = parent.JS × gate_weights[type][transition]`.
+  Validated against `edpa-simulation-gates` harness (avg MAD 7.8%,
+  stable to ±20% CW perturbation). **Requires git history of status
+  changes** — `sync pull --commit` produces these automatically.
+- **YAML-edit signals (v1.17)** — every commit on a backlog YAML in
+  the iteration window contributes structural signals (create,
+  block_add, list_grow, scalar_change, lines_volume,
+  contributors_rebalance, revert). Captures progressive elaboration
+  on parents (LBC, benefit hypothesis, AC, NFRs, risks) that is
+  invisible to PR-only or status-only collectors.
 
 **Verification:** `python3.13 -m pytest tests/test_invariants.py -v` ensures
 score formula, capacity invariant, and ratio sums hold for any output.

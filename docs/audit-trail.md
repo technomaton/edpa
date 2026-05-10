@@ -119,9 +119,20 @@ Note the v1.11 structure:
 - **`contributors[].contribution_score`** is the raw signal-weight
   sum, the input to per-item normalization.
 - **`contributors[].signals[]`** is the per-signal audit trail with
-  resolvable `ref` for each evidence source. See
-  [`docs/audit-references.md`](audit-references.md) for verification
-  commands per signal type.
+  resolvable `ref` for each evidence source. Two collectors feed
+  this list:
+  - **`detect_contributors.py`** (v1.11) — PR/issue API surfaces:
+    `pr_author`, `pr_reviewer`, `commit_author`, `assignee`,
+    `issue_comment`, `manual:*`.
+  - **`yaml_edit_signals.py`** (v1.17) — git diff over
+    `.edpa/backlog/<typ>/<id>.yaml` per iteration window:
+    `yaml_edit:create`, `yaml_edit:block_add`, `yaml_edit:list_grow`,
+    `yaml_edit:scalar_change`, `yaml_edit:lines_volume`,
+    `yaml_edit:contributors_rebalance`, `yaml_edit:revert`. Each
+    signal carries `ref = commit/<sha>/<file>` so an auditor opens
+    the commit diff to verify what changed.
+  See [`docs/audit-references.md`](audit-references.md) for
+  verification commands per signal type.
 - **No `as:` field** — role labels are derived at display time from
   the highest-priority signal type.
 

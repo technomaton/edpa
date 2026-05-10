@@ -1,11 +1,15 @@
-# Kashealth Pilot Runbook (v1.10)
+# Kashealth Pilot Runbook (v1.17)
 
 - **Grant:** CZ.01.01.01/01/24_062/0007440 · OP TAK
 - **Org:** [`kashealth`](https://github.com/kashealth) (ČVUT FBMI + Medicalc software s.r.o.)
 - **Primary repo:** `kashealth/kas-platform-v1` (private monorepo)
-- **EDPA version:** **1.14.0-beta** — same domain logic as 1.9.0; folds
-  preflight + Issue Types + capacity overrides into the existing skills
-  and consolidates per-iteration xlsx into one workbook.
+- **EDPA version:** **1.17.0-beta** — adds yaml_edit structural
+  signals (8 types) so progressive elaboration on Initiatives /
+  Epics / Features (LBC, benefit hypothesis, acceptance criteria,
+  NFRs, risks) is credited automatically. Fixes Bug A (Defects were
+  silently dropped from engine output at the level-filter). Single
+  calculation path inherited from 1.14, gates + yaml_edit + Done
+  credit converge through the same per-item normalization.
 - **Pilot lead:** Jaroslav Urbánek (Lead Architect / Vedoucí VaV)
 - **Pilot kickoff:** 2026-05-07
 - **Pilot duration:** 1 PI (5 weeks, target close 2026-06-11)
@@ -19,7 +23,7 @@ Pilot ověří, že EDPA produkuje audit-grade per-person hodiny **z reálné de
 - ✅ Per-person `timesheet-<id>.md` pro 4 členy
 - ✅ Single `edpa-results.xlsx` per iteration (Team Summary + Item Costs tabs)
 - ✅ Frozen snapshot `iteration-PI-2026-1.<n>.json` se signature + frozen_at
-- ✅ A/B porovnání: `--mode simple` vs `--mode gates`, MAD ≤ 15 % vůči manuálnímu odhadu PM-a
+- ✅ MAD ≤ 15 % engine-output vs manuální odhad PM-a (v1.14+ má jediný calculation path; mode selector dropnut)
 - ✅ Per-iteration capacity overrides ošetřeny pro IP iteraci (PI-2026-1.5) i ad-hoc PTO/sick
 
 ## 1. Day-1 setup
@@ -134,25 +138,33 @@ python3 .claude/edpa/scripts/capacity_override.py PI-2026-1.3 \
 
 Standalone `--list` / `--remove` viz `--help`.
 
-### 5.2 A/B simple vs gates
+### 5.2 MAD validation vs PM ground truth
 
-První PI **paralelně** počítej oba módy. Cíl: validovat, že gates
-output dává smysl proti manual baseline od PM-a.
+Mode selector (`--mode simple|gates`) byl odebrán v 1.14 — jediný
+calculation path teď konverguje přes Story/Defect Done credit + gate
+events + (v1.17) yaml_edit signals. PI-1 close porovnej engine output
+s manuálním PM odhadem:
 
 ```bash
-python3 .claude/edpa/scripts/engine.py --iteration PI-2026-1.1 --mode simple \
-  --output .edpa/reports/iteration-PI-2026-1.1/edpa_results_simple.json
-python3 .claude/edpa/scripts/engine.py --iteration PI-2026-1.1 --mode gates \
-  --output .edpa/reports/iteration-PI-2026-1.1/edpa_results_gates.json
+# Engine spuštěný přes /edpa:close-iteration vyrobí kanonický výstup
+python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1 \
+  --output .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
+
+# PM napíše per-person odhad ručně (gut estimate) do PI close retro;
+# evaluate_cw.py spočítá MAD proti seedovaným contributors[].cw
+python3 .claude/edpa/scripts/evaluate_cw.py --iteration PI-2026-1.1 \
+  --ground-truth .edpa/reports/pm-baseline-PI-2026-1.1.yaml
 ```
 
-Acceptance: žádná osoba `gates` < `simple`; MAD vůči PM odhadu ≤ 15 %;
-Σ team derived = Σ capacity (tvrdý invariant).
+Acceptance: MAD ≤ 15 % vůči PM gut estimate; **Σ team derived ≤ Σ
+capacity** (per-person rule `derived ≤ cap`, ne tvrdá rovnost — IP
+iter může mít víc strategie/přípravy než delivery, vyšlí se přes
+yaml_edit signaly automaticky).
 
 ### 5.3 Rollback
 
 - Pilot lze stoplý smazáním GH Projectu (`gh project delete N --owner kashealth`); repo + `.edpa/` zůstávají.
-- Engine warns `0 evidence pairs` → přepni na `--mode simple` (audit-conservative fallback).
+- Engine warns `0 evidence pairs` → ověř, že `.edpa/backlog/` má seedované Stories s `iteration:` polem a status=Done; v1.17 yaml_edit signals naběhnou automaticky pokud jsou commits ve window.
 - Setup `--check-only` můžeš spustit kdykoli pro re-validation.
 
 ## 6. Success criteria
@@ -179,7 +191,8 @@ Pokud 5+ z 6 PASS → pilot úspěšný, pokračuj na PI-2026-2 (full prod) a zv
 
 ## 8. Reference
 
-- Methodology: [`docs/methodology.md`](../methodology.md) (EDPA 1.14.0-beta spec)
+- Methodology: [`docs/methodology.md`](../methodology.md) (EDPA 1.17.0-beta spec)
+- v1.17 yaml_edit calibration corpus: [`docs/proposals/v1.17-yaml-edit-calibration-corpus.md`](../proposals/v1.17-yaml-edit-calibration-corpus.md) — pre-Monte Carlo edge case memo
 - v1.10 RFC: [`docs/proposals/v1.10-skill-first-gaps-and-excel-consolidation.md`](../proposals/v1.10-skill-first-gaps-and-excel-consolidation.md)
 - v1.9.0 capacity overrides RFC: [`docs/proposals/per-iteration-capacity-overrides.md`](../proposals/per-iteration-capacity-overrides.md)
 - E2E test plan: [`docs/E2E-TEST-PLAN.md`](../E2E-TEST-PLAN.md)

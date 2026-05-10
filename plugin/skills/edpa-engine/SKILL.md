@@ -106,23 +106,33 @@ issue_comment → consulted (0.15)
 
 Allow manual override: check issue body for `/contribute @person weight:X`.
 
-### 4. Calculate EDPA scores (v1.14: single path)
+### 4. Calculate EDPA scores (v1.14 single path, v1.17 yaml_edit)
 
-The engine credits two kinds of work events:
+The engine credits three kinds of work events:
 
 ```
-Score[P, story_done] = JobSize[story]  × CW[P, story]
-Score[P, gate_event] = JobSize[parent] × gate_weight × CW[P, parent]
+Score[P, story_done]   = JobSize[story]   × CW[P, story]      # also Defect / Task in v1.17
+Score[P, gate_event]   = JobSize[parent]  × gate_weight × CW[P, parent]
+Score[P, yaml_edit]    = signal_weight    × CW[P, item]       # v1.17 (in-memory enrichment)
 ```
 
-- **Story Done credit** for every Story at `status: Done`.
-- **Parent gate transitions** for every Feature/Epic/Initiative
+- **Story / Defect / Task Done credit** for every item at `status: Done`.
+  (v1.17 fix: pre-1.17 the engine silently dropped Defects via a
+  `level == "Story"` filter at engine.py:1198.)
+- **Parent gate transitions** for every Feature / Epic / Initiative
   status transition captured in git history (via `sync pull --commit`
-  auto-commits within the iteration date window).
+  auto-commits) within the iteration date window.
+- **YAML-edit structural signals (v1.17)** — every commit on
+  `.edpa/backlog/<typ>/<id>.yaml` in the iteration window contributes
+  structural signals (`yaml_edit:create`, `yaml_edit:block_add`,
+  `yaml_edit:list_grow`, `yaml_edit:scalar_change`,
+  `yaml_edit:lines_volume`, `yaml_edit:contributors_rebalance`,
+  `yaml_edit:revert`). These augment contributors[] in-memory before
+  run_edpa; the frozen snapshot captures the augmented state.
 
-When git history records no transitions, only Story Done credit fires
-— the calculation degenerates gracefully to the pre-v1.14 "simple"
-behaviour without any mode selector.
+When git history records no transitions and no yaml_edit activity,
+only Done-item credit fires — the calculation degenerates gracefully
+to the pre-v1.14 "simple" behaviour without any mode selector.
 
 > **Pre-v1.14 mode selector removed.** v1.13 and earlier had
 > `--mode {simple, full, gates}`. v1.14 dropped it: `gates` was

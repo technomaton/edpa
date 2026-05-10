@@ -29,7 +29,7 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 ```
 $ python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
 
-EDPA 1.14.0-beta — Iteration PI-2026-1.3 (gates mode)
+EDPA 1.17.0-beta — Iteration PI-2026-1.3
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -84,7 +84,7 @@ EDPA Installer
   mcp (MCP SDK) ✓
   openpyxl ✓
   ...
-EDPA 1.14.0-beta installed successfully!
+EDPA 1.17.0-beta installed successfully!
 ```
 
 Three config files were seeded from templates:
@@ -125,7 +125,7 @@ python3 .claude/edpa/scripts/engine.py --status
 ```
 
 ```
-EDPA 1.14.0-beta — Status
+EDPA 1.17.0-beta — Status
 ========================================
 ✓ .edpa/ found at .edpa
 ✓ people.yaml — 2 members, 1.5 FTE, 60h/iteration
@@ -193,7 +193,7 @@ python3 .claude/edpa/scripts/engine.py \
 
 ```
 ======================================================================
-EDPA 1.14.0-beta — Iteration PI-2026-1.1 (gates mode)
+EDPA 1.17.0-beta — Iteration PI-2026-1.1
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------

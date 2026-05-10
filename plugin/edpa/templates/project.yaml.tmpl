@@ -63,11 +63,14 @@ project:
         website: ""
 
 governance:
-  methodology: "EDPA 1.14.0"
-  # v1.14: single calculation path. Engine credits Done items (Stories
-  # at status: Done) plus Feature/Epic/Initiative status transition
-  # events when git history records them. The pre-v1.14 simple/full/gates
-  # mode selector was dropped — gates was a strict superset of simple
+  methodology: "EDPA 1.17.0"
+  # v1.14: single calculation path. v1.17: extended with yaml_edit
+  # signals — every commit on .edpa/backlog/<typ>/<id>.yaml in the
+  # iteration window contributes structural credit (create / block_add
+  # / list_grow / scalar_change / lines_volume / contributors_rebalance
+  # / revert). v1.17 also fixes Bug A (Defects were silently dropped
+  # at engine.py level filter). The pre-v1.14 simple/full/gates mode
+  # selector remains dropped — gates was a strict superset of simple
   # (degenerated to Done-only when no transitions). audit_mode field
   # also dropped — snapshots always carry the full signals[] audit trail.
 

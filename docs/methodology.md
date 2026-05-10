@@ -108,13 +108,21 @@ For person **P** and Iteration **I**:
 | `cw[P, item]` | Per-item share, computed by detect_contributors | 0.0–1.0 (Σ across persons = 1.0) |
 | `contribution_score[P, item]` | Σ signal weights for P on item (audit input) | 0.5–10+ |
 
-### 5.3 Evidence Detection (v1.11)
+### 5.3 Evidence Detection (v1.11 + v1.17 yaml_edit)
 
-CW computation lives in `detect_contributors.py` (v1.11). It collects
-**all** evidence signals per (person, item) pair from real GitHub
-state, sums them additively into a `contribution_score`, then
-normalizes to per-item shares so the engine sees a clean
-`contributors[].cw` table.
+CW computation lives in two collectors that feed the same additive
+signal pool:
+
+- `detect_contributors.py` (v1.11) — PR/issue API surfaces. Runs at
+  PR merge via the `contributor-detect.yml` workflow.
+- `yaml_edit_signals.py` (v1.17) — git diff over `.edpa/backlog/*.yaml`.
+  Runs at engine close, scoped to the iteration window.
+
+Both feed the same `contributors[].signals[]` aggregation. Signal
+weights sum into `contribution_score`, which normalizes to per-item
+`cw[P, item]` shares.
+
+#### 5.3.1 PR / issue API signals (v1.11)
 
 | Signal type | Default weight | Source | Auditor `ref` |
 |-------------|---------------:|--------|---------------|
@@ -129,11 +137,41 @@ normalizes to per-item shares so the engine sees a clean
 | `manual:issue_comment` | explicit | `/contribute` in issue comment | `issue#<num>/comment/<id>` |
 | `manual:pr_comment` | explicit | `/contribute` in PR-level comment | `pr#<num>/comment/<id>` |
 
-Auto-detected signal weights (the first 5) live in
-`.edpa/config/cw_heuristics.yaml` and are calibrated by
-`/edpa:calibrate`. Manual `/contribute @person weight:X` directives
-carry the operator-supplied `weight:` value verbatim — they are
-**additive signals**, not overrides.
+#### 5.3.2 YAML-edit structural signals (v1.17)
+
+Every commit touching `.edpa/backlog/<typ>/<id>.yaml` is itself
+evidence of work on that item. Detection is **structural** (count
+list bullets, top-level blocks, scalar changes) — it never tries to
+semantically classify content (operator field-naming drift makes
+that brittle). Auditor reviewing per-signal `ref` opens the commit
+and sees the actual diff.
+
+| Signal type | Default weight | Source | Auditor `ref` |
+|-------------|---------------:|--------|---------------|
+| `yaml_edit:create` | 5.00 | New file with +id+type+title | `commit/<sha>/<file>` |
+| `yaml_edit:block_add` | 2.00 | Per top-level nested block added | `commit/<sha>/<file>` |
+| `yaml_edit:list_grow` | 1.00 (cap 10) | Per net `- ` bullet added | `commit/<sha>/<file>` |
+| `yaml_edit:scalar_change` | 0.50 | Per top-level scalar set | `commit/<sha>/<file>` |
+| `yaml_edit:lines_volume` | min(3.0, n/30) | Substantive-edit proxy | `commit/<sha>/<file>` |
+| `yaml_edit:contributors_rebalance` | 0.30 | Per new person added (NOT cw shifts) | `commit/<sha>/<file>` |
+| `yaml_edit:revert` | -0.50 | Per net-removed block (negative) | `commit/<sha>/<file>` |
+
+Built-in mitigations against gaming:
+
+- **Bot authors** (`*[bot]@*`, `github-actions@*`) → 0 weight
+- **Tool-generated commits** (`EDPA sync push:`, `EDPA: capacity override`,
+  `EDPA setup state committed`) → 0 weight
+- **Whitespace-only diffs** → 0 weight
+- **Status-only changes** → 0 weight (transitions.py owns gate-event credit)
+- **File renames / moves** → 0 weight (metadata only)
+- **Bulk migrations** (`chore: rename`, `EDPA migrate`) → ×0.1 multiplier
+- **Backdated commits** use `GIT_AUTHOR_DATE` for iteration-window check
+
+Auto-detected signal weights live in `.edpa/config/cw_heuristics.yaml`
+under `signals:` (PR/issue) and `yaml_edit_weights:` (v1.17). Both
+are calibrated by `/edpa:calibrate`. Manual `/contribute @person weight:X`
+directives carry the operator-supplied `weight:` value verbatim —
+they are **additive signals**, not overrides.
 
 Rules:
 - All signals contribute additively to `contribution_score`; no priority dominance
@@ -145,24 +183,35 @@ See [`docs/evidence-detection.md`](evidence-detection.md) for the full
 detection algorithm and [`docs/contribute-directive.md`](contribute-directive.md)
 for `/contribute` usage patterns.
 
-### 5.4 Calculation (single path, v1.14+)
+### 5.4 Calculation (single path, v1.14+ extended in v1.17)
 
-The engine has **one calculation path**. It credits two kinds of work
-events together and lets per-person ratio normalization split the
-person's capacity across whichever items they touched:
+The engine has **one calculation path**. It credits three kinds of
+work events together and lets per-person ratio normalization split
+the person's capacity across whichever items they touched:
 
-1. **Story Done credit** — Stories at `status: Done` get `JS × cw`
-   per their contributors[]. cw shares come pre-computed from
-   `detect_contributors.py` (per-item normalized).
+1. **Story / Defect / Task Done credit** — items at `status: Done`
+   get `JS × cw` per their contributors[]. cw shares come pre-computed
+   from `detect_contributors.py` and (v1.17+) augmented in-memory by
+   `yaml_edit_signals.py` before run_edpa. (v1.17 fix: pre-v1.17 the
+   engine silently dropped Defects via a `level == "Story"` filter.)
 2. **Parent gate transitions** — Feature/Epic/Initiative status
    transitions captured in git history (via `sync pull --commit`
    auto-commits) become synthetic events with effective JS =
    `parent.JS × gate_weights[type][transition]`. Parent contributors
-   inherit cw shares from the parent's contributors[] block.
+   inherit cw shares from the parent's contributors[] block — and
+   when the parent had no contributors[] populated (e.g., seeded
+   without `--contributor`), v1.17 yaml_edit signals automatically
+   credit the commit author who wrote the LBC / AC / NFRs.
+3. **YAML-edit signals (v1.17)** — every commit on a backlog YAML
+   inside the iteration window contributes structural signals
+   (create / block_add / list_grow / scalar_change / lines_volume /
+   contributors_rebalance / revert). These augment contributors[]
+   in-memory before run_edpa; the frozen snapshot captures the
+   augmented state for full audit trail.
 
-When git history records no transitions (e.g., backlog with no
-sync-driven status updates), only Story Done credit fires. The
-calculation is feature-preserving across both setups.
+When git history records no transitions and no yaml_edit activity,
+only Done-item credit fires. The calculation is feature-preserving
+across all setups.
 
 > **`status: Done` requirement for Stories.** Stories still in
 > `Backlog` / `Implementing` / `Validating` don't fire Done credit.
