@@ -2,6 +2,74 @@
 
 ## Unreleased
 
+## 1.17.0-beta — 2026-05-10
+
+### New — yaml_edit signals (8 structural diff-derived signals)
+
+Every commit touching `.edpa/backlog/*.yaml` is now an explicit signal
+of work on that item. Previously only PR-API surfaces (pr_author,
+pr_reviewer, commit_author from PR commits) and gate-event status
+transitions produced credit; pure content elaboration on Initiatives,
+Epics, Features, and Defects (writing business case, drafting
+acceptance criteria, expanding NFR/FR lists, recording risks) was
+invisible to the engine.
+
+The new collector `yaml_edit_signals.py` walks `git log -p` over the
+backlog YAMLs in the iteration window and scores each commit-file
+diff via 8 **structural** signals — never trying to semantically
+classify content (operator naming drift makes that brittle):
+
+- `yaml_edit:create` — new file with +id+type+title (item born; 5.0)
+- `yaml_edit:block_add` — new top-level nested object (2.0 each)
+- `yaml_edit:list_grow` — net `- ` bullets added (1.0 each, capped at 10/commit)
+- `yaml_edit:scalar_change` — top-level scalar field set (0.5 each)
+- `yaml_edit:lines_volume` — substantive-edit proxy (capped at 3.0)
+- `yaml_edit:contributors_rebalance` — new person added to contributors[] (0.3 each)
+- `yaml_edit:revert` — net-removal commit (negative weight)
+- `yaml_edit:bulk_migration_discount` — `chore: rename / migrate` commits get ×0.1
+
+Mitigations baked in:
+
+- **Bot authors** (`*[bot]@*`, `github-actions@*`) → 0 weight
+- **Tool-generated commits** (`EDPA sync push:`, `EDPA: capacity override`,
+  `EDPA setup state committed`) → 0 weight
+- **Whitespace-only diffs** → 0 weight
+- **File renames / moves** → 0 weight (metadata only)
+- **Status-only changes** → 0 weight (transitions.py owns gate-event credit)
+- **Backdated commits** (`GIT_AUTHOR_DATE`) → use author date for window check
+- **Bulk migrations** (rr→rr_oe across 36 files) → ×0.1 per file
+
+Engine integration is in-memory: yaml_edit signal weights are merged
+into existing contributors[] before run_edpa, then cw is re-normalized
+per item. No YAML files are mutated during engine close; the frozen
+snapshot captures the augmented contributors so the audit trail is
+complete. Tunable weights live in `cw_heuristics.yaml` →
+`yaml_edit_weights:` and are subject to future calibration via
+`/edpa:calibrate`.
+
+### Fixed — Bug A: Defects silently dropped from engine
+
+Engine.py:1198 filtered `items = [i for i in items if i.get("level") == "Story"]`,
+discarding Done Defects (and Tasks) loaded from `.edpa/backlog/defects/`.
+Defects passed all earlier filters (TYPE_DIRS, status=Done, js>0) but
+the level-filter dropped them silently. Bug fix promotes the predicate
+to `level in ("Story", "Defect", "Task")`.
+
+Found during E2E pilot run: D-1 (whitespace bug, status=Done, js=2,
+contributors=[turyna 0.7, matousek 0.3]) was loaded then immediately
+discarded → 0h credit despite the team closing it.
+
+### Calibration deferred
+
+Default `yaml_edit_weights` are conservative round numbers anchored to
+existing detect_contributors weights (assignee=4.0, pr_author=3.4).
+Monte Carlo prior calibration (1000 scenarios, optimize 8D parameter
+space against MAD) is deferred — first kashealth pilot PI close will
+provide ground truth for posterior calibration via `/edpa:calibrate`.
+Pre-calibration weights are intentionally over-conservative on
+yaml_edit:create (5.0) and block_add (2.0); over-credit shows up
+quickly in operator review and is straightforward to tune down.
+
 ## 1.16.0-beta — 2026-05-09
 
 ### Fixed — E2E pilot defects (4)

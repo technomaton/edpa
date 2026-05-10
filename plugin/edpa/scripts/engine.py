@@ -133,6 +133,97 @@ def extract_contributors(item):
     return out
 
 
+def _enrich_items_with_yaml_edit_signals(items, yaml_edit_signals, people):
+    """v1.17: merge yaml_edit signals into items' contributors[] in-memory.
+
+    For each (item, person) pair, add yaml_edit weights to the existing
+    contribution_score (or seed a new entry if the person wasn't
+    previously credited), then re-normalize cw across all persons for
+    that item. The mutation is in-memory only — YAML files on disk are
+    not touched. The frozen snapshot captures the augmented contributors
+    so the audit trail is complete.
+
+    Item id resolution: gate_event ids look like `F-7@Funnel→Analyzing`;
+    we strip the `@...` suffix so all gate_events of the same parent
+    share the parent's enriched contributors[].
+    """
+    from collections import defaultdict
+
+    # Build login → person_id resolver. People may register one of:
+    #   github (login),  email,  or just id. yaml_edit_signals.py emits
+    #   `login` populated with whichever resolved at the commit-author
+    #   level, so we accept all three.
+    resolver = {}
+    for p in people:
+        pid = p.get("id")
+        if not pid:
+            continue
+        for key in ("github", "email", "id"):
+            v = p.get(key)
+            if v:
+                resolver[str(v).lower()] = pid
+
+    for item in items:
+        raw_id = item.get("id", "")
+        item_id = raw_id.split("@", 1)[0]  # strip gate-event suffix
+        sigs = yaml_edit_signals.get(item_id) or []
+        if not sigs:
+            continue
+
+        # Aggregate yaml_edit weight + signals per person.
+        weight_per_person = defaultdict(float)
+        signals_per_person = defaultdict(list)
+        for s in sigs:
+            login = (s.get("login") or "").lower()
+            person_id = resolver.get(login)
+            if not person_id:
+                # Unknown commit author — skip silently; auditor sees the
+                # commit ref in the iteration's signal log either way.
+                continue
+            weight_per_person[person_id] += float(s.get("weight", 0))
+            signals_per_person[person_id].append(s)
+
+        if not weight_per_person:
+            continue
+
+        # Existing contributors (from detect_contributors or seed). Their
+        # contribution_score is the canonical raw weight. When missing
+        # (legacy YAMLs), fall back to cw — this means cw is treated as
+        # if it were already a score, which preserves relative shares.
+        existing = item.get("contributors") or []
+        contrib_score = {}
+        signal_pool: dict[str, list] = {}
+        for c in existing:
+            pid = c.get("person")
+            if not pid:
+                continue
+            base = c.get("contribution_score")
+            if base is None:
+                base = float(c.get("cw", 0))
+            contrib_score[pid] = float(base)
+            signal_pool[pid] = list(c.get("signals", []) or [])
+
+        # Stack yaml_edit weights on top.
+        for pid, yaml_w in weight_per_person.items():
+            contrib_score[pid] = contrib_score.get(pid, 0) + yaml_w
+            signal_pool.setdefault(pid, []).extend(signals_per_person[pid])
+
+        total = sum(s for s in contrib_score.values() if s > 0)
+        if total <= 0:
+            continue
+
+        item["contributors"] = [
+            {
+                "person": pid,
+                "cw": round(score / total, 4),
+                "contribution_score": round(score, 2),
+                "signals": signal_pool.get(pid, []),
+            }
+            for pid, score in contrib_score.items()
+            if score > 0
+        ]
+
+
 def _load_iteration_people_overrides(edpa_root, iteration_id):
     """Read iteration-level `people:` overrides from
     .edpa/iterations/<id>.yaml. Reuses the same schema as
@@ -1195,12 +1286,39 @@ def main():
         # Initiative) come in only as gate events synthesized from git
         # transitions. We strip Done parents from the items[] list so
         # they don't get double-counted — gate_events represent them.
-        items = [i for i in items if i.get("level") == "Story"]
+        # Defects ARE credited at Done status (small bug-fix items
+        # without their own gate ladder); v1.17 fix to the v1.16 silent
+        # drop. Tasks behave the same way.
+        items = [i for i in items if i.get("level") in ("Story", "Defect", "Task")]
         gate_events, gate_audit = load_gate_events(edpa_root, iteration_id, heuristics)
         items.extend(gate_events)
+        # v1.17: collect yaml_edit signals from git diff over backlog/.
+        # These augment existing contributors[] additively (signals stack
+        # on top of detect_contributors output). When a parent Feature/
+        # Epic/Initiative was seeded without contributors[], the commit
+        # author who wrote the LBC + AC + NFRs gets credit automatically.
+        yaml_edit_signals = {}
+        try:
+            sys.path.insert(0, str(Path(__file__).parent))
+            from yaml_edit_signals import collect_yaml_edit_signals  # noqa: E402
+            sys.path.pop(0)
+            yaml_edit_signals = collect_yaml_edit_signals(
+                edpa_root, iteration_id,
+                heuristics.get("yaml_edit_weights"),
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"WARN: yaml_edit_signals collection skipped: {exc}",
+                  file=sys.stderr)
+        if yaml_edit_signals:
+            people_for_resolve = (capacity or {}).get("people", []) or []
+            _enrich_items_with_yaml_edit_signals(
+                items, yaml_edit_signals, people_for_resolve,
+            )
+        n_yaml = sum(len(v) for v in yaml_edit_signals.values())
         print(f"Loaded {len(items)} items "
-              f"({len(items) - len(gate_events)} Done Stories + "
-              f"{len(gate_events)} gate events)")
+              f"({len(items) - len(gate_events)} Done Stories/Defects + "
+              f"{len(gate_events)} gate events"
+              f"{', ' + str(n_yaml) + ' yaml_edit signals' if n_yaml else ''})")
         if iteration_id:
             print(f"Filtered to iteration: {iteration_id}")
         if manual_cw:

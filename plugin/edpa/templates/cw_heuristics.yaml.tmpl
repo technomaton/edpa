@@ -81,6 +81,35 @@ gate_weights:
     "Implementing→Done":        0.50
 
 # ─────────────────────────────────────────────────────────────────────
+# YAML EDIT SIGNALS (v1.17+) — structural deltas in .edpa/backlog/*.yaml
+# ─────────────────────────────────────────────────────────────────────
+# Every commit touching backlog YAML is a signal of work on that item.
+# Detection is purely structural — we count list bullets, top-level
+# blocks, scalar changes — never try to semantically classify content
+# (operator naming drift makes that brittle). Auditor reviewing per-
+# signal `ref` opens the commit and sees the actual diff.
+#
+# Caps prevent gaming:
+#   list_grow_cap_per_commit  — 100-AC spam yields max 10 weight
+#   lines_volume_cap          — multi-thousand-line dumps capped
+#   bulk_migration_discount   — bulk renames (rr→rr_oe) get ×0.1
+#   tool-generated commits    — auto-commits (sync, capacity_override)
+#                               and bot authors get 0 weight
+#
+yaml_edit_weights:
+  yaml_edit:create:                  5.0    # new file with +id+type+title
+  yaml_edit:block_add:               2.0    # per top-level nested block
+  yaml_edit:list_grow:               1.0    # per net `- ` bullet (capped)
+  yaml_edit:scalar_change:           0.5    # per top-level scalar set
+  yaml_edit:lines_volume_cap:        3.0    # max bonus from line volume
+  yaml_edit:lines_volume_divisor:   30      # +30 lines = +1.0 bonus
+  yaml_edit:contributors_rebalance:  0.3    # per new person added
+  yaml_edit:revert:                 -0.5    # per net-removed block
+
+  list_grow_cap_per_commit:        10       # max bullets credited per commit
+  bulk_migration_discount:          0.1     # multiplier for bulk renames
+
+# ─────────────────────────────────────────────────────────────────────
 # RULES
 # ─────────────────────────────────────────────────────────────────────
 rules:
@@ -90,6 +119,7 @@ rules:
   - "ALL commits are delivery evidence — including governance (.edpa/, config/)"
   - "Stories at status=Done are credited; Feature/Epic/Initiative gate transitions are credited per gate_weight"
   - "Role labels (Owner/Key/Reviewer/Consulted) are derived at display time from signal types; never stored"
+  - "yaml_edit signals are STRUCTURAL — count blocks/bullets/scalars; never semantically classify content"
 
 # ─────────────────────────────────────────────────────────────────────
 # PRINCIPLE: WORK = WORK
