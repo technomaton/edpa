@@ -2,151 +2,196 @@
 name: edpa-autocalib
 user-invocable: false
 description: >
-  Auto-calibrate EDPA CW heuristics using Karpathy's autoresearch loop. One file
-  (cw_heuristics.yaml), one metric (MAD vs ground truth), one loop (modify→evaluate→keep/discard).
-  Use when: user says "calibrate CW", "auto-calibrate", "optimize heuristics", or after first PI
-  with ≥20 manually confirmed CW records. Do NOT use before first PI — insufficient ground truth.
+  Auto-calibrate EDPA CW signal weights using the Monte Carlo + coordinate-descent
+  optimizer (v1.11+). One target file (cw_heuristics.yaml.tmpl), one metric (MAD
+  on a synthetic corpus), two phases (random sample → coordinate descent). Use
+  when: user says "calibrate CW", "auto-calibrate", "optimize heuristics",
+  "recalibrate signals". Synthetic corpus — runnable any time, no ground-truth
+  file required. Re-run after a real PI close once team-confirmed CW corrections
+  are available (see "Re-run with real data" below).
 license: MIT
-compatibility: Python 3.10+, git, .edpa/config/heuristics.yaml, .edpa/data/ground_truth.yaml
+compatibility: Python 3.10+, git, plugin/edpa/scripts/calibrate_signals.py
 allowed-tools: Read Write Bash(python3 *) Bash(git *) Grep
 disable-model-invocation: false
 metadata:
   author: Jaroslav Urbánek
-  version: 1.0.0
+  version: 2.0.0
   domain: governance
   phase: auto-calibration
-  pattern: autoresearch (Karpathy)
+  pattern: Monte Carlo + coordinate descent
   standard: AgentSkills v1.0
 ---
 
-# EDPA Auto-Calibration — Karpathy Autoresearch Loop
+# EDPA Auto-Calibration — Monte Carlo signal-weight optimizer
 
 ## What this does
 
-Optimizes CW heuristic parameters by running an autonomous experiment loop against
-manually confirmed ground truth data. Inspired by Karpathy's autoresearch pattern.
+Optimizes the five **signal weights** (`assignee`, `pr_author`, `commit_author`,
+`pr_reviewer`, `issue_comment`) in `plugin/edpa/templates/cw_heuristics.yaml.tmpl`
+against a synthetic corpus generated procedurally. The engine consumes those
+weights directly — there is no `role_weights` or `role_overrides` block any
+more (both were dropped in v1.11; see `plugin/edpa/scripts/engine.py:864`).
+
+The optimizer is self-contained: it generates its own ground truth via Monte
+Carlo, evaluates candidate weight vectors against it, and writes the best
+candidate back into the template when `--apply` is passed.
 
 ## Arguments
 
-`$ARGUMENTS` = experiment budget (number, default: 50) or "auto".
+`$ARGUMENTS` = optional flags forwarded to `calibrate_signals.py`. Common forms:
 
-### Argument resolution (when $ARGUMENTS is empty)
+- empty / `help` → show current calibration metadata, propose a default run
+- `quick` → adds `--quick` (200 MC samples; ~1 s; smoke test only)
+- a positive integer → `--scenarios <N>` (e.g. `2000`); default `1000`
+- `apply` → after calibration, write best weights back to the template
+- raw flags (`--scenarios 2000 --seed 7 --apply --report report.json`) →
+  passed verbatim
 
-If `$ARGUMENTS` is empty, blank, or "help":
+## Argument resolution (when `$ARGUMENTS` is empty)
 
-1. Check if `.edpa/data/ground_truth.yaml` exists:
-   - If yes, count records and report: "Ground truth: **{count}** records (minimum 20 required)."
-   - If no, inform: "No ground truth file found. Create `.edpa/data/ground_truth.yaml` from retrospective data first."
-2. If sufficient records, check current heuristics state:
-   - Read `.edpa/config/heuristics.yaml` and show current role_weights
-   - Check if `.edpa/data/calibration_log.tsv` exists → show last calibration date and MAD
-3. Present:
+1. Read the current `calibration:` block from
+   `plugin/edpa/templates/cw_heuristics.yaml.tmpl` and print:
    ```
-   Calibration status:
-     Ground truth:    32 records (OK)
-     Current MAD:     0.12 (from last calibration 2026-03-15)
-     Suggested budget: 50 experiments
-
-   Run calibration with 50 experiments? [50]
+   Last calibration:
+     method:        MC random-sample + coordinate descent
+     scenarios:     1000   records: 31041
+     baseline MAD:  0.0861
+     calibrated:    0.0805 (+6.5%)
+     version:       1.11.0
+     timestamp:     2026-05-08T18:37:24Z
    ```
-4. **Default suggestion:** 50 experiments. User can override with any number.
+2. Suggest defaults:
+   ```
+   Suggested run:
+     python3 plugin/edpa/scripts/calibrate_signals.py \
+       --scenarios 1000 --seed 42
+
+   Apply best weights to the template? [N]
+   ```
+3. Wait for user confirmation (run / apply / change scenarios / cancel).
 
 ## Prerequisites
 
-**Hard requirement:** `.edpa/data/ground_truth.yaml` with ≥ 20 records:
-```yaml
-# .edpa/data/ground_truth.yaml — from retrospective confirmations
-records:
-  - item_id: S-200
-    person_id: turyna
-    evidence_role: owner
-    auto_cw: 1.0
-    confirmed_cw: 0.95
-    iteration: PI-2026-1.1
-```
+**None for the synthetic path.** The MC corpus is generated in-process; no
+`.edpa/data/ground_truth.yaml` is needed. The legacy `role_weights` schema and
+`evaluate_cw.py` autoresearch loop are deprecated — the engine ignores them.
 
-If fewer than 20 records exist, inform user: "Insufficient ground truth. Need ≥20 confirmed CW records from retrospectives. Current: {count}."
+If the user explicitly asks to calibrate against *real* PI data, fall through
+to "Re-run with real data" below.
 
 ## Configuration
 
 ```
-Target file:    .edpa/config/heuristics.yaml
-Metric:         mean_absolute_deviation(auto_cw, confirmed_cw)
+Target file:    plugin/edpa/templates/cw_heuristics.yaml.tmpl
+Script:         plugin/edpa/scripts/calibrate_signals.py (LOCKED)
+Metric:         mean_absolute_deviation(predicted_cw, true_cw)
+                where predicted_cw = Σ weight × signal_count, per-item normalized
 Direction:      lower
-Budget:         $0 (default 50) or user-specified experiments
-Eval script:    .claude/edpa/scripts/evaluate_cw.py (LOCKED — agent must NOT edit)
-Branch:         calibration/{timestamp}
+Phases:         (1) MC random sampling   default 2000 samples (200 if --quick)
+                (2) coordinate descent   refines top-5 candidates
+Search space:   5D, each weight ∈ [0.1, 8.0]
+Defaults:       assignee 4.0, pr_author 3.4, commit_author 2.78,
+                pr_reviewer 2.25, issue_comment 1.14
 ```
 
-## Autoresearch loop
+**CRITICAL: never edit `calibrate_signals.py`.** The synthetic corpus generator
+and the MAD cost function are inside the same script *intentionally* — the
+locked-vs-tunable separation is preserved by structure: the cost function takes
+only a candidate weight vector and pure-reads `signal_count × weight` with
+per-item normalization (no parameters live inside the cost function itself).
+If you are tempted to modify the generator to match a particular weight
+vector, STOP — that gamifies the metric. Add new scenario flavors only when
+they reflect a real-world contribution pattern the corpus does not yet model,
+and even then file a separate PR — not inside a calibration run.
 
-### Setup
+## Run
+
+### Step 1 — Execute
+
 ```bash
-git checkout -b calibration/$(date +%Y%m%d-%H%M%S)
+python3 plugin/edpa/scripts/calibrate_signals.py \
+  --scenarios "${SCENARIOS:-1000}" \
+  --seed "${SEED:-42}" \
+  ${QUICK:+--quick} \
+  ${APPLY:+--apply} \
+  ${REPORT:+--report "$REPORT"}
 ```
 
-### Loop (repeat $0 times, default 50):
-
-**Step 1: Read state**
-- Load current `.edpa/config/heuristics.yaml`
-- Load experiment history from git log on calibration branch
-- Load last MAD score
-
-**Step 2: Propose ONE change**
-Pick one parameter to mutate:
-- `role_weights.owner` ± small delta
-- `role_weights.key` ± small delta
-- `role_weights.reviewer` ± small delta
-- `role_weights.consulted` ± small delta
-- `signals.*` ± small delta
-- `evidence_threshold` ± small delta
-
-Constraints:
-- owner ≥ key ≥ reviewer ≥ consulted (ordering preserved)
-- All weights in [0.05, 1.0]
-- Threshold in [0.5, 3.0]
-
-**Step 3: Commit**
-```bash
-git add .edpa/config/heuristics.yaml
-git commit -m "experiment {n}: {parameter} {old_value} -> {new_value}"
+Expected stdout (abridged):
+```
+Generating 1000 synthetic scenarios (seed=42)...
+  → 31041 (person, item) records across 1000 scenarios
+Baseline (v1.11 shipped defaults): MAD = 0.0861
+Phase 1 — Monte Carlo random sampling (2000 samples)...
+  Top 5 candidates by MAD: ...
+Phase 2 — Coordinate descent refinement...
+  Cand 1: 0.0820 → 0.0805 after refinement
+  ...
+Best calibrated weights (MAD = 0.0805):
+  assignee: 4.00
+  pr_author: 3.40
+  ...
+MAD improvement: 0.0861 → 0.0805 (+6.5%)
 ```
 
-**Step 4: Evaluate**
-```bash
-python3 .claude/edpa/scripts/evaluate_cw.py --ground-truth .edpa/data/ground_truth.yaml --heuristics .edpa/config/heuristics.yaml
+### Step 2 — Report
+
+Summarize the run to the user:
+- baseline MAD, calibrated MAD, % improvement
+- which weights moved most (delta from defaults)
+- whether `--apply` was used (template updated or not)
+
+### Step 3 — Apply (only if requested)
+
+When the user passed `apply`, `calibrate_signals.py --apply` has already
+rewritten the template `signals:` block and refreshed the `calibration:`
+metadata. Confirm by re-reading the target file's `calibration:` block and
+echoing `mad_calibrated` and `calibrated_at`.
+
+If not applied, leave the template untouched and tell the user how to apply
+later:
+```
+Re-run with: python3 plugin/edpa/scripts/calibrate_signals.py --apply
 ```
 
-Script outputs: `MAD={value}`
+## Re-run with real data (post-first-PI)
 
-**CRITICAL: Agent must NEVER edit .claude/edpa/scripts/evaluate_cw.py. If tempted to modify the evaluator, STOP. This separation prevents gaming.**
+The MC corpus is a *prior*: it encodes plausible signal/cw mappings under
+v1.11's procedural model. To improve on it, replace synthetic
+`SyntheticContribution` records with team-confirmed corrections from a closed
+PI retrospective.
 
-**Step 5: Decide**
-- If new MAD < previous best MAD → **KEEP** (advance branch)
-- If new MAD ≥ previous best MAD → **REVERT**: `git reset --hard HEAD~1`
+Today this requires a small adapter (not yet implemented as a skill):
 
-**Step 6: Log**
-Append to `.edpa/data/calibration_log.tsv`:
-```
-{experiment_num}\t{parameter}\t{old_value}\t{new_value}\t{new_MAD}\t{best_MAD}\t{kept|reverted}
-```
+1. Export per-item engine output from a closed PI (`edpa_results.json`).
+2. Run the retrospective; capture team-corrected CW shares.
+3. Build a list of
+   `SyntheticContribution(person, role, item_id, true_cw=<confirmed_cw>,
+   signal_counts=<observed_counts_from_engine>)`.
+4. Replace `generate_corpus(...)` with the loaded real corpus and rerun the
+   optimizer.
 
-### Post-loop
+If the user asks for this flow now, refuse with: "Real-data calibration adapter
+not yet implemented. Run the synthetic MC pipeline first; track real
+corrections in retros until the adapter ships."
 
-1. Print summary: experiments run, kept count, initial MAD, final MAD, % improvement
-2. Print optimized parameters vs initial
-3. Ask user: "Apply calibrated heuristics to main branch? (git merge calibration/... into main)"
+## Strategy guidance
 
-## Strategy escalation
-
-- Experiments 1–10: role_weights only (biggest impact)
-- Experiments 11–25: signal weights
-- Experiments 26–50: threshold + combined adjustments
-- Every 10 experiments: review log for patterns, adjust mutation delta size
+- Smoke test / CI gate: `--scenarios 200 --quick` (~1 s; may not improve over
+  baseline, that's fine).
+- Honest calibration: `--scenarios 1000 --seed 42` (~10 s; 31 k records).
+- Thorough run: `--scenarios 2000 --seed 42 --apply` (~30 s).
+- Stability check: rerun with 3 different `--seed` values. If best weights
+  agree within ~±0.3, the result is stable. If they diverge, raise
+  `--scenarios`.
 
 ## Error handling
 
-- Ground truth < 20 records → refuse, explain why
-- evaluate_cw.py missing → create from template in .claude/edpa/scripts/evaluate_cw.py
-- Git conflicts → abort, report
-- MAD not improving after 20 experiments → suggest reviewing ground truth quality
+- `calibrate_signals.py` missing → check `plugin/edpa/scripts/`; do not
+  recreate from template. Tell the user the plugin install is incomplete.
+- Template file missing → same; do not synthesize. Point to plugin install
+  state.
+- `MAD improvement: +0.0%` after a full run → expected; the shipped defaults
+  are already near a local optimum on the v1.11 generator. Higher
+  `--scenarios` rarely changes this.
+- Negative improvement → corpus generator was edited; revert that change.
