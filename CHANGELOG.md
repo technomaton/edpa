@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+## 1.18.1 — 2026-05-11
+
+### Fixed — `/edpa:calibrate` skill rewired to v1.11+ MC pipeline
+
+The `edpa-autocalib` skill drove the deprecated `role_weights` autoresearch
+loop and required a hand-curated `.edpa/data/ground_truth.yaml` to even
+start. Since v1.11 the engine has not consumed `role_weights` /
+`role_overrides` at all (see `plugin/edpa/scripts/engine.py:864`), so the
+skill was effectively dead on arrival: every invocation failed with
+"Insufficient ground truth (0 < 20 records)" before doing any work.
+
+`SKILL.md` now orchestrates `plugin/edpa/scripts/calibrate_signals.py`
+(Monte Carlo random sampling + coordinate descent on the 5 git-signal
+weights). The MC corpus is self-generated, so no ground-truth file is
+required. `plugin/commands/edpa/calibrate.md` rewritten to match.
+
+No engine, scoring math, or data-format change — the fix is purely in the
+skill orchestration layer.
+
+### Added — `tools/sensitivity_check.py` (dev tool, not in plugin tarball)
+
+Stand-alone tool that perturbs each `gate_weights` entry ±20% (rebalanced
+or naked) on a synthetic PI and reports per-person cw distribution shift.
+Confirms shipped defaults are robust: all 17 weights land in LOW class at
+±20% rebalanced; only `Implementing→Validating` (Feature) and
+`Implementing→Done` (Epic) reach MED at ±50%. Useful before any future
+manual tuning of gate weights.
+
 ## 1.18.0 — 2026-05-11
 
 ### Stable promotion
