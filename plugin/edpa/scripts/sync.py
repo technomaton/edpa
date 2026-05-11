@@ -227,6 +227,48 @@ def load_sync_config(root):
     return config.get("sync", DEFAULT_SYNC_CONFIG)
 
 
+def is_project_configured(sync_config):
+    """Return True only if sync.github_org / project_number are real values.
+    Fresh installs ship `.edpa/config/edpa.yaml` with placeholder values
+    `YOUR_ORG` / `0` until `/edpa:setup` (or `project_setup.py`) writes the
+    real org and project number. Any sync call before that point must
+    no-op cleanly — actually invoking `gh project item-list --owner YOUR_ORG`
+    crashes with "unknown owner type" and surfaces as a red CI failure,
+    which scares the user into thinking their install is broken when in
+    fact they just have not configured the Project yet.
+    """
+    org = (sync_config.get("github_org") or "").strip()
+    project_num = sync_config.get("github_project_number", 0)
+    if org in ("", "YOUR_ORG"):
+        return False
+    if not project_num or project_num == 0:
+        return False
+    return True
+
+
+def warn_not_configured_and_exit():
+    """Print a clear "setup not done" message and exit 0.
+    Exit 0 (not 1) so cron-driven workflow runs stay green: a fresh
+    install with no Project yet is a no-op, not a failure. The log
+    explains what to do next.
+    """
+    print()
+    print(bold(color("  ⚠ EDPA sync skipped — GitHub Project not configured yet.", C.WARN)))
+    print()
+    print("  .edpa/config/edpa.yaml still has placeholder values for `sync.github_org`")
+    print("  and/or `sync.github_project_number`. Run the setup before the sync")
+    print("  workflows will do anything:")
+    print()
+    print(color("    python3 .claude/edpa/scripts/project_setup.py \\", C.MUTED))
+    print(color("      --org <your-github-org> --repo <your-repo> \\", C.MUTED))
+    print(color("      --project-title \"<your-project-title>\"", C.MUTED))
+    print()
+    print("  Or run the `/edpa:setup` skill from Claude Code. Once edpa.yaml")
+    print("  is written, the next cron tick / workflow_dispatch will sync normally.")
+    print()
+    sys.exit(0)
+
+
 # -- Backlog Helpers -----------------------------------------------------------
 
 TYPE_DIRS = ["initiatives", "epics", "features", "stories"]
@@ -1114,6 +1156,8 @@ def cmd_pull(root, sync_config, args):
         print(color("  [mock] Generating simulated GitHub Project data...", C.MUTED))
         gh_data = generate_mock_gh_data(root, fields_mapping)
     else:
+        if not is_project_configured(sync_config):
+            warn_not_configured_and_exit()
         org = sync_config.get("github_org", "YOUR_ORG")
         project_num = sync_config.get("github_project_number", 1)
         print(color(f"  Fetching project items from {org}/project#{project_num}...", C.SYNC))
@@ -1198,6 +1242,8 @@ def cmd_push(root, sync_config, args):
         print(color("  [mock] Generating simulated GitHub Project data...", C.MUTED))
         gh_data = generate_mock_gh_data(root, fields_mapping)
     else:
+        if not is_project_configured(sync_config):
+            warn_not_configured_and_exit()
         setup_state = load_setup_state(root)
         if setup_state is None or not setup_state.get("project_id") or not setup_state.get("field_ids"):
             print(color("  Push aborted: GitHub setup state missing or incomplete.", C.ERR))
