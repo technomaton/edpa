@@ -25,15 +25,29 @@ jobs:
 
       - run: pip install pyyaml
 
+      - name: Warn if PAT not configured
+        if: ${{ secrets.EDPA_TOKEN == '' }}
+        # pi_close.py reads org-scoped Project v2 data via GraphQL.
+        # Without EDPA_TOKEN, the default GITHUB_TOKEN silently returns
+        # zero items and the PI summary is empty. Surface the cause.
+        run: |
+          echo "::warning::EDPA_TOKEN secret not configured. Falling back to GITHUB_TOKEN, which cannot read org-scoped GitHub Projects v2. PI summary may be empty."
+
+      - name: Configure git identity
+        # MUST run before any step that auto-commits, otherwise git
+        # fails with "Please tell me who you are".
+        run: |
+          git config user.name "EDPA Bot @ TECHNOMATON"
+          git config user.email "edpa-bot@noreply.technomaton.com"
+
       - name: Aggregate PI metrics
         env:
           PI_ID: ${{ inputs.pi_id }}
+          GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
         run: python3 .claude/edpa/scripts/pi_close.py --pi "$PI_ID"
 
       - name: Commit PI report
         run: |
-          git config user.name "EDPA Bot"
-          git config user.email "edpa@github-actions"
           git add .edpa/reports/pi-${{ inputs.pi_id }}/
           if git diff --cached --quiet; then
             echo "No PI report changes"

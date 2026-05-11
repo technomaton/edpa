@@ -32,9 +32,25 @@ jobs:
           test -f .edpa/config/people.yaml || (echo "ERROR: Run /edpa setup first." && exit 1)
           test -f .edpa/config/heuristics.yaml || (echo "ERROR: Run /edpa setup first." && exit 1)
 
+      - name: Warn if PAT not configured
+        if: ${{ secrets.EDPA_TOKEN == '' }}
+        # engine.py reads org-scoped Project v2 evidence (commits, PRs,
+        # comments) via GraphQL. Without EDPA_TOKEN, the default
+        # GITHUB_TOKEN cannot reach Projects v2 and CW evidence will be
+        # incomplete. Surface the cause up-front.
+        run: |
+          echo "::warning::EDPA_TOKEN secret not configured. Falling back to GITHUB_TOKEN, which cannot read org-scoped GitHub Projects v2. Iteration close may have incomplete evidence."
+
+      - name: Configure git identity
+        # MUST run before any step that auto-commits, otherwise git
+        # fails with "Please tell me who you are".
+        run: |
+          git config user.name "EDPA Bot @ TECHNOMATON"
+          git config user.email "edpa-bot@noreply.technomaton.com"
+
       - name: Run EDPA Engine
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           python3 .claude/edpa/scripts/engine.py \
             --iteration "${{ inputs.iteration_id }}" \
@@ -54,8 +70,6 @@ jobs:
 
       - name: Commit results
         run: |
-          git config user.name "EDPA Bot"
-          git config user.email "edpa@github-actions"
           git add .edpa/reports/ .edpa/snapshots/
           git commit -m "feat(edpa): close iteration ${{ inputs.iteration_id }}" || true
           git push

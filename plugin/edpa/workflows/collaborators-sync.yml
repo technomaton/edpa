@@ -29,8 +29,9 @@ permissions:
 # only sees direct collaborators on the repo. If your team uses
 # GitHub Teams or pending invitations and this workflow misses
 # people, store a Personal Access Token (PAT with `repo` + `read:org`
-# scopes) as the `COLLAB_SYNC_TOKEN` secret on this repo. The
-# workflow falls back to GITHUB_TOKEN when the PAT is not configured.
+# scopes) as the `EDPA_TOKEN` secret on this repo (the same PAT used
+# by sync workflows for Projects v2). The workflow falls back to
+# GITHUB_TOKEN when the PAT is not configured.
 
 jobs:
   sync:
@@ -40,6 +41,22 @@ jobs:
 
       - name: Install Python deps
         run: pip install pyyaml ruamel.yaml
+
+      - name: Warn if PAT not configured
+        if: ${{ secrets.EDPA_TOKEN == '' }}
+        # GITHUB_TOKEN only sees direct repo collaborators — Teams and
+        # pending invitations are invisible. Without EDPA_TOKEN this
+        # workflow will silently miss collaborators. Surface up-front.
+        run: |
+          echo "::warning::EDPA_TOKEN secret not configured. Falling back to GITHUB_TOKEN, which only sees direct repo collaborators. Org Team members and pending invitations will be missed."
+
+      - name: Configure git identity
+        # MUST run before any step that auto-commits, otherwise git
+        # fails with "Please tell me who you are". Harmless when no
+        # commits happen (status mode).
+        run: |
+          git config user.name "EDPA Bot @ TECHNOMATON"
+          git config user.email "edpa-bot@noreply.technomaton.com"
 
       - name: Decide action
         id: decide
@@ -73,9 +90,9 @@ jobs:
       - name: Status only
         if: steps.decide.outputs.mode == 'status'
         env:
-          # Prefer COLLAB_SYNC_TOKEN PAT (read:org + repo) when set;
+          # Prefer EDPA_TOKEN PAT (read:org + repo + project) when set;
           # GITHUB_TOKEN sees only direct repo collaborators.
-          GH_TOKEN: ${{ secrets.COLLAB_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           python plugin/edpa/scripts/sync_collaborators.py status \
             --repo "$GITHUB_REPOSITORY"
@@ -83,15 +100,13 @@ jobs:
       - name: Apply removes — direct commit to main
         if: steps.decide.outputs.mode == 'apply-removes-direct'
         env:
-          # Prefer COLLAB_SYNC_TOKEN PAT (read:org + repo) when set;
+          # Prefer EDPA_TOKEN PAT (read:org + repo + project) when set;
           # GITHUB_TOKEN sees only direct repo collaborators.
-          GH_TOKEN: ${{ secrets.COLLAB_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           python plugin/edpa/scripts/sync_collaborators.py apply \
             --repo "$GITHUB_REPOSITORY"
           if [ -n "$(git status --porcelain .edpa/config/people.yaml 2>/dev/null)" ]; then
-            git config user.name  "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add .edpa/config/people.yaml
             git commit -m "chore(people): mark removed collaborator(s) unavailable
 
@@ -105,9 +120,9 @@ jobs:
       - name: Apply adds — open PR with auto-filled stubs
         if: steps.decide.outputs.mode == 'apply-adds-pr'
         env:
-          # Prefer COLLAB_SYNC_TOKEN PAT (read:org + repo) when set;
+          # Prefer EDPA_TOKEN PAT (read:org + repo + project) when set;
           # GITHUB_TOKEN sees only direct repo collaborators.
-          GH_TOKEN: ${{ secrets.COLLAB_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           python plugin/edpa/scripts/sync_collaborators.py apply \
             --repo "$GITHUB_REPOSITORY" \
@@ -116,8 +131,6 @@ jobs:
             echo "No people.yaml change — nothing to PR."
             exit 0
           fi
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           BRANCH="bot/sync-collaborators-${{ github.run_id }}"
           git checkout -b "$BRANCH"
           git add .edpa/config/people.yaml
