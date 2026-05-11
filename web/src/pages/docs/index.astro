@@ -1,0 +1,111 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+
+const docs = [
+  {
+    href: '/docs/edpa-token-setup',
+    title: 'EDPA_TOKEN — průvodce nastavením',
+    desc: 'Step-by-step vygenerování GitHub PAT a uložení jako repo nebo org secret. Bez tohoto tokenu sync workflowy mezi .edpa/backlog/ a GitHub Project tiše no-opují. ~5 minut, jednou per repo.',
+    tags: ['setup', 'github actions', 'pipeline', 'doporučeno'],
+  },
+];
+---
+
+<DocsLayout
+  title="Dokumentace"
+  description="EDPA dokumentace — průvodce nastavením, runbooky, reference."
+>
+  <h1>Dokumentace</h1>
+  <p>
+    Operativní průvodci pro nasazení a údržbu EDPA. Pro plnou specifikaci
+    metodiky a tutoriál začněte na <a href="/methodology/">Metodice</a> nebo
+    v <a href="/guide/">Průvodci</a>.
+  </p>
+
+  <ul class="docs-list">
+    {docs.map((d) => (
+      <li class="docs-item">
+        <a href={d.href} class="docs-item-link">
+          <h3 class="docs-item-title">{d.title}</h3>
+          <p class="docs-item-desc">{d.desc}</p>
+          <div class="docs-item-tags">
+            {d.tags.map((t) => <span class="docs-tag">{t}</span>)}
+          </div>
+        </a>
+      </li>
+    ))}
+  </ul>
+
+  <h2>Další zdroje</h2>
+  <ul>
+    <li>
+      <a href="https://github.com/technomaton/edpa/tree/main/docs">
+        docs/ na GitHubu
+      </a>{' '}
+      — kompletní seznam markdown souborů včetně methodology, audit-trail,
+      runbooku, calibration architecture
+    </li>
+    <li>
+      <a href="https://github.com/technomaton/edpa/blob/main/docs/kashealth-pilot/KASHEALTH-PILOT.md">
+        Kashealth Pilot Runbook
+      </a>{' '}
+      — operativní průvodce pro 1-PI pilot
+    </li>
+    <li>
+      <a href="https://github.com/technomaton/edpa/blob/main/CHANGELOG.md">
+        CHANGELOG.md
+      </a>{' '}
+      — historie všech beta releases s vysvětlením změn
+    </li>
+  </ul>
+</DocsLayout>
+
+<style>
+  .docs-list {
+    list-style: none;
+    padding: 0;
+    margin: 2rem 0 3rem;
+  }
+  .docs-item {
+    margin: 0 0 1rem;
+    padding: 0;
+  }
+  .docs-item-link {
+    display: block;
+    padding: 20px 24px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--bd, rgba(255, 255, 255, 0.08));
+    border-radius: 10px;
+    text-decoration: none !important;
+    color: inherit;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .docs-item-link:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--ac);
+  }
+  .docs-item-title {
+    margin: 0 0 0.5rem;
+    color: var(--ac);
+    font-size: 1.15rem;
+  }
+  .docs-item-desc {
+    margin: 0 0 0.75rem;
+    color: var(--fg-dim, rgba(255, 255, 255, 0.85));
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+  .docs-item-tags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .docs-tag {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--bd, rgba(255, 255, 255, 0.1));
+    border-radius: 12px;
+    color: var(--fg-dim, rgba(255, 255, 255, 0.7));
+  }
+</style>

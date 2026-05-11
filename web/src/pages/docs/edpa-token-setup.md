@@ -1,5 +1,5 @@
 ---
-layout: ../../layouts/Layout.astro
+layout: ../../layouts/DocsLayout.astro
 title: "EDPA_TOKEN — průvodce nastavením"
 description: "Step-by-step guide pro vygenerování GitHub PAT a uložení jako EDPA_TOKEN secret. Bez tohoto tokenu sync workflowy mezi .edpa/backlog/ a GitHub Project tiše no-opují."
 ---
