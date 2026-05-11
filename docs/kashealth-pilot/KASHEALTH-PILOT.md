@@ -70,6 +70,65 @@ potvrzením. Issue Types missing → nabídne `issue_types.py setup --org`.
 
 **Pokud chce CI / scripted run:** přidej `--non-interactive --auto-fix`.
 
+### 1.1 `EDPA_TOKEN` secret — povinné pro pipeline automation
+
+`install.sh` zkopíruje 8 workflow souborů do `.github/workflows/`. Z nich
+**dva** (`sync-projects-to-git.yml`, `sync-git-to-projects.yml`) potřebují
+PAT s vyššími scopes, protože default `GITHUB_TOKEN` **nemůže číst ani
+zapisovat do GitHub Projects v2** (jsou org-scoped, nikoli repo-scoped).
+
+**Bez `EDPA_TOKEN`:**
+- `sync-projects-to-git` (cron á 15 min) **tiše no-opuje** — GraphQL
+  query vrací 0 items, žádný error v logu kromě warningu. Backlog YAML
+  files v gitu se začnou rozcházet s GH Projectem.
+- `sync-git-to-projects` (on push do `.edpa/backlog/**`) **fail-fast
+  s HTTP 403** na první GraphQL mutaci. Aspoň je to viditelné.
+- **Manuální fallback:** každou středu před týdenním close běž
+  `python3 .claude/edpa/scripts/sync.py pull --commit` lokálně a po
+  každé úpravě backlog YAML files `sync.py push` před commitem.
+
+**Setup (jednou per repo):**
+
+1. Vytvoř PAT (Personal Access Token) na svém GitHub účtu —
+   *Settings → Developer settings → Personal access tokens →
+   Tokens (classic) → Generate new token (classic)*:
+   - **Note:** `EDPA sync bot — kashealth/kas-platform-v1` (per repo)
+   - **Expiration:** 1 year (nebo "No expiration" pokud máš secret
+     rotation policy)
+   - **Scopes:**
+     - `repo` (full control of private repositories)
+     - `project` (read+write GitHub Projects)
+     - `read:org` (read org membership — potřebné pro member lookup)
+     - `workflow` (update GitHub Action workflows — pokud chceš
+       i `update-template.yml`)
+
+2. Ulož PAT jako repo secret —
+   *kashealth/kas-platform-v1 → Settings → Secrets and variables →
+   Actions → New repository secret*:
+   - **Name:** `EDPA_TOKEN` (přesně, case-sensitive)
+   - **Value:** vlož PAT z kroku 1
+   - **Save**
+
+3. Ověř, že to běží — pushni libovolný commit do `.edpa/backlog/`:
+   ```bash
+   touch .edpa/backlog/initiatives/.gitkeep && git add -A && \
+     git commit -m "test: trigger sync workflow" && git push
+   ```
+   *Repo → Actions → "Sync Git -> GitHub Projects"* musí proběhnout
+   `✓ Success`. Pokud vidíš `::warning::EDPA_TOKEN secret not
+   configured...`, secret nebyl nalezen — zkontroluj jméno.
+
+**Token rotation:** Jakmile PAT expiruje, oba workflowy začnou fail-ovat.
+Doporučení: do týmového kalendáře udělej "EDPA_TOKEN rotation" připomínku
+2 týdny před expirací; rotuj přes Settings → Generate new token →
+přepsat secret value.
+
+**Sdílený PAT napříč repos:** pokud máš víc projektů s EDPA, můžeš mít
+jeden PAT pro všechny a uložit ho jako **organization secret** (kashealth
+→ Settings → Secrets → Actions → New organization secret), pak ho
+zviditelnit pro všechny repos co používají EDPA. Šetří to rotation
+overhead.
+
 ## 2. Naplnit počáteční backlog
 
 ```bash

@@ -3,11 +3,10 @@ name: Sync Git -> GitHub Projects
 on:
   push:
     paths:
-      - '.edpa/backlog/**'
+      - ".edpa/backlog/**"
 
 permissions:
   contents: read
-  projects: write
 
 jobs:
   sync:
@@ -17,15 +16,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # Need previous commit for diff
+          fetch-depth: 2 # Need previous commit for diff
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - run: pip install pyyaml
 
+      - name: Warn if PAT not configured
+        if: ${{ secrets.EDPA_TOKEN == '' }}
+        # GITHUB_TOKEN is always present in CI, so a $-empty check would
+        # never trigger. The real failure mode is "PAT missing AND
+        # GITHUB_TOKEN can't reach Projects v2" — sync.py will 403 on
+        # the first GraphQL mutation. Surface the cause up-front.
+        run: |
+          echo "::warning::EDPA_TOKEN secret not configured. Falling back to GITHUB_TOKEN, which cannot write to org-scoped GitHub Projects v2. Expect 403 errors below."
+
       - name: Sync Git to Projects
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
         run: python3 .claude/edpa/scripts/sync.py push

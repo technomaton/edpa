@@ -100,11 +100,19 @@ BULK_MIGRATION_PATTERNS = [
     re.compile(r"^refactor[:(].*\bbulk\b", re.IGNORECASE),
 ]
 
-# Bot author emails.
+# Bot author emails. Commits authored by these never produce yaml_edit
+# weight — they are tool-generated state synchronization, not human work.
+#
+# `*@noreply.technomaton.com` covers the EDPA sync bot identity used by
+# the `sync-projects-to-git.yml` / `sync-git-to-projects.yml` workflows
+# (default `edpa-bot@noreply.technomaton.com`). The whole subdomain is
+# matched so future bot accounts (e.g. `release-bot@noreply.…`,
+# `iteration-close-bot@noreply.…`) inherit the exclusion automatically.
 BOT_EMAIL_PATTERNS = [
     re.compile(r".*\[bot\]@.*"),
     re.compile(r".*github-actions@.*"),
     re.compile(r".*noreply@github\.com$"),
+    re.compile(r".*@noreply\.technomaton\.com$"),
 ]
 
 
@@ -163,6 +171,21 @@ def _is_bulk_migration(subject: str) -> bool:
 
 def _is_bot_author(email: str) -> bool:
     return any(p.search(email or "") for p in BOT_EMAIL_PATTERNS)
+
+
+# Public alias — consumed by transitions.py and other modules that need
+# to identify bot commits and skip them from CW credit. Keeping the
+# regex list in this single module ensures all evidence collectors
+# agree on which authors are "tools".
+def is_bot_author(email: str) -> bool:
+    """True if the email matches a known bot/tool-author pattern.
+
+    Used by every signal collector (yaml_edit_signals, transitions,
+    detect_contributors) to keep EDPA's own sync/setup/release bots
+    out of the CW calculation. Without this, the bot would self-credit
+    every YAML mutation it makes during scheduled syncs.
+    """
+    return _is_bot_author(email)
 
 
 # ─── Diff scoring ───────────────────────────────────────────────────────────

@@ -28,6 +28,17 @@ except ImportError:
     print("ERROR: PyYAML required. Install with: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
+# Shared bot-author check — same regex list used by yaml_edit_signals.py
+# so every signal collector agrees on which commits are tool-generated.
+# Without this, the EDPA sync bot would self-credit every status flip
+# it pushes (sync-projects-to-git auto-commits status transitions when
+# someone moves a card on the GitHub Project UI).
+sys.path.insert(0, str(Path(__file__).parent))
+try:
+    from yaml_edit_signals import is_bot_author
+finally:
+    sys.path.pop(0)
+
 
 TRACKED_DIRS = {
     "stories": "Story",
@@ -210,6 +221,15 @@ def detect_transitions(edpa_root: Path, since: datetime = None, until: datetime 
         if since and cur_ts < since:
             continue
         if until and cur_ts > until:
+            continue
+
+        # Skip bot-authored transitions. The EDPA sync bot pushes
+        # status flips when a human moves a card on the GitHub Project
+        # board; the gate-event credit must go to that human, not to
+        # the bot that mirrored the change into the YAML. detect_-
+        # contributors will pick up the human via assignee/pr_author
+        # /commit_author signals on the related Story/Defect.
+        if is_bot_author(cur_author):
             continue
 
         transitions.append({
