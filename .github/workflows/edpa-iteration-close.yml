@@ -33,7 +33,9 @@ jobs:
           test -f .edpa/config/heuristics.yaml || (echo "ERROR: Run /edpa setup first." && exit 1)
 
       - name: Warn if PAT not configured
-        if: ${{ secrets.EDPA_TOKEN == '' }}
+        env:
+          PAT: ${{ secrets.EDPA_TOKEN }}
+        if: env.PAT == ''
         # engine.py reads org-scoped Project v2 evidence (commits, PRs,
         # comments) via GraphQL. Without EDPA_TOKEN, the default
         # GITHUB_TOKEN cannot reach Projects v2 and CW evidence will be

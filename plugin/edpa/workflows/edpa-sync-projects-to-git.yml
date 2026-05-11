@@ -49,7 +49,9 @@ jobs:
       - run: pip install pyyaml
 
       - name: Warn if PAT not configured
-        if: ${{ secrets.EDPA_TOKEN == '' }}
+        env:
+          PAT: ${{ secrets.EDPA_TOKEN }}
+        if: env.PAT == ''
         # GITHUB_TOKEN is always present in CI so the fallback never
         # leaves $GH_TOKEN empty. With only GITHUB_TOKEN, sync.py pull
         # returns 0 items from the Projects v2 GraphQL query and every

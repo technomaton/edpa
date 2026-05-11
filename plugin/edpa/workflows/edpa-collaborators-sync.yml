@@ -43,7 +43,9 @@ jobs:
         run: pip install pyyaml ruamel.yaml
 
       - name: Warn if PAT not configured
-        if: ${{ secrets.EDPA_TOKEN == '' }}
+        env:
+          PAT: ${{ secrets.EDPA_TOKEN }}
+        if: env.PAT == ''
         # GITHUB_TOKEN only sees direct repo collaborators — Teams and
         # pending invitations are invisible. Without EDPA_TOKEN this
         # workflow will silently miss collaborators. Surface up-front.

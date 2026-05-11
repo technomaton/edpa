@@ -25,7 +25,9 @@ jobs:
       - run: pip install pyyaml
 
       - name: Warn if PAT not configured
-        if: ${{ secrets.EDPA_TOKEN == '' }}
+        env:
+          PAT: ${{ secrets.EDPA_TOKEN }}
+        if: env.PAT == ''
         # GITHUB_TOKEN is always present in CI, so a $-empty check would
         # never trigger. The real failure mode is "PAT missing AND
         # GITHUB_TOKEN can't reach Projects v2" — sync.py will 403 on

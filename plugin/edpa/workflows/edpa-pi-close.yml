@@ -26,7 +26,9 @@ jobs:
       - run: pip install pyyaml
 
       - name: Warn if PAT not configured
-        if: ${{ secrets.EDPA_TOKEN == '' }}
+        env:
+          PAT: ${{ secrets.EDPA_TOKEN }}
+        if: env.PAT == ''
         # pi_close.py reads org-scoped Project v2 data via GraphQL.
         # Without EDPA_TOKEN, the default GITHUB_TOKEN silently returns
         # zero items and the PI summary is empty. Surface the cause.
