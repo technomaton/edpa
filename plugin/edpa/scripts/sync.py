@@ -204,7 +204,6 @@ def load_jsonl(path):
 DEFAULT_SYNC_CONFIG = {
     "github_org": "YOUR_ORG",
     "github_project_number": 1,
-    "sync_interval": "15m",
     "auto_commit": True,
     "fields_mapping": {
         "js": "Job Size",

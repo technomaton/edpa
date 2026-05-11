@@ -33,7 +33,6 @@ sync:
   github_org: YOUR_ORG
   github_project_number: 0
   github_project_id: ""
-  sync_interval: 15m
   auto_commit: true
   fields_mapping:
     js: Job Size
