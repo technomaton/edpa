@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - ".edpa/backlog/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,8 +12,10 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # Skip if the push was from the sync bot (prevent loops)
-    if: github.actor != 'github-actions[bot]'
+    # Skip if the push was from the sync bot (prevent loops).
+    # The bot exclusion does NOT apply on workflow_dispatch — manual
+    # runs are always intentional.
+    if: github.event_name == 'workflow_dispatch' || github.actor != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v4
         with:
