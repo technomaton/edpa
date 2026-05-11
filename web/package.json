@@ -1,7 +1,7 @@
 {
   "name": "edpa-web",
   "type": "module",
-  "version": "1.18.0-beta",
+  "version": "1.18.0",
   "private": true,
   "scripts": {
     "dev": "astro dev",

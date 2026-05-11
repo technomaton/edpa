@@ -2,7 +2,20 @@
 
 ## Unreleased
 
-## 1.18.0-beta — 2026-05-11
+## 1.18.0 — 2026-05-11
+
+### Stable promotion
+
+`1.18.0-beta` shipped earlier the same day; this tag promotes the
+same code to a non-prerelease release so that GitHub's `/releases/
+latest` redirect points at it and `curl … install.sh | sh` users
+land on the workflow-prefix refactor by default. No code change
+between 1.18.0-beta and 1.18.0 — only release-flag metadata.
+
+Live install.sh patch (read overwrite prompt from /dev/tty, support
+`EDPA_FORCE_INSTALL=1` for non-interactive overwrite) ships with
+this stable tag; the v1.18.0-beta plugin tarball did not include
+it since install.sh lives outside `plugin/`.
 
 ### Breaking — `edpa-` prefix on all distributed workflows
 
