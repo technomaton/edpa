@@ -416,6 +416,7 @@ cp -r .claude/skills/* ~/.gemini/skills/
 | [Auto-Calibration](docs/auto-calibration.md) | Karpathy autoresearch loop |
 | [Cadence](docs/cadence.md) | Classic (2/10) vs AI-Native (1/5) |
 | [GitHub Setup](docs/github-setup.md) | Projects, custom fields, views |
+| [EDPA_TOKEN Setup](docs/edpa-token-setup.md) | PAT generation, repo/org secret, rotation — required for the automated GitHub Projects ↔ git sync |
 | [FAQ](docs/faq.md) | Common questions |
 
 ## Simulation & Calibration
