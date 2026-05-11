@@ -72,7 +72,14 @@ jobs:
         run: python3 .claude/edpa/scripts/sync.py pull --commit
 
       - name: Push changes
-        # sync.py pull --commit already created N commits when pulled
-        # changes existed; git push is a no-op ("Everything up-to-date")
-        # when there's nothing new — safe to always invoke.
-        run: git push
+        # Only push when sync.py pull --commit actually created local
+        # commits beyond origin/main. Skipping the push when there is
+        # nothing to send avoids surfacing transient auth failures
+        # (mis-scoped PATs, ephemeral org policy hiccups) as red CI
+        # for what is logically a no-op.
+        run: |
+          if [ -n "$(git log origin/main..HEAD --oneline 2>/dev/null)" ]; then
+            git push
+          else
+            echo "No new commits — nothing to push."
+          fi
