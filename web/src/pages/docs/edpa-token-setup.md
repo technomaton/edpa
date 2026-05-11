@@ -1,5 +1,14 @@
-<!-- Canonical source. Web mirror at web/src/pages/docs/edpa-token-setup.md
-     uses the same body — keep both in sync when editing. -->
+---
+layout: ../../layouts/Layout.astro
+title: "EDPA_TOKEN — průvodce nastavením"
+description: "Step-by-step guide pro vygenerování GitHub PAT a uložení jako EDPA_TOKEN secret. Bez tohoto tokenu sync workflowy mezi .edpa/backlog/ a GitHub Project tiše no-opují."
+---
+
+<!-- Web mirror of docs/edpa-token-setup.md.
+     Canonical source lives in the repo root docs/ folder; this file
+     keeps the same body for browser-friendly rendering at
+     https://edpa.technomaton.com/docs/edpa-token-setup.
+     Keep both files in sync when editing. -->
 
 # EDPA_TOKEN — průvodce nastavením
 
@@ -221,6 +230,7 @@ Pak rotace tokenu a re-push.
 ---
 
 **Související dokumenty:**
-- [`docs/kashealth-pilot/KASHEALTH-PILOT.md`](kashealth-pilot/KASHEALTH-PILOT.md) — pilot runbook
-- [`.github/workflows/sync-projects-to-git.yml`](../.github/workflows/sync-projects-to-git.yml) — event-driven sync (Project → Git)
-- [`.github/workflows/sync-git-to-projects.yml`](../.github/workflows/sync-git-to-projects.yml) — push-triggered sync (Git → Project)
+- [Pilot runbook](https://github.com/technomaton/edpa/blob/main/docs/kashealth-pilot/KASHEALTH-PILOT.md)
+- [`sync-projects-to-git.yml`](https://github.com/technomaton/edpa/blob/main/.github/workflows/sync-projects-to-git.yml) — event-driven sync (Project → Git)
+- [`sync-git-to-projects.yml`](https://github.com/technomaton/edpa/blob/main/.github/workflows/sync-git-to-projects.yml) — push-triggered sync (Git → Project)
+- [Step-by-step průvodce v kontextu plné instalace](/guide) — krok 5 z 11

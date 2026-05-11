@@ -91,6 +91,52 @@ python3 .claude/edpa/scripts/create_project_views.py`,
   },
   {
     num: 5,
+    title: 'Nastavit EDPA_TOKEN',
+    color: 'var(--cy)',
+    desc: 'Bez tohoto tokenu workflowy sync-projects-to-git a sync-git-to-projects tiše no-opují — default GITHUB_TOKEN nemá scope pro org-scoped Projects v2. Setup je ~5 minut a běží jen jednou per repo (nebo per org pokud sdílíš PAT). Doporučená cesta — manuální sync.py pull/push před každým commitem nešká­luje na týmový pilot.',
+    claude: `# Plný step-by-step průvodce s UI screenshoty:
+# https://edpa.technomaton.com/docs/edpa-token-setup
+#
+# Stručně:
+# 1. github.com/settings/personal-access-tokens/new
+#    → Fine-grained PAT, Resource owner = <org>
+#    → Repository access: <repo>
+#    → Repo perms:  Contents+Issues+Workflows = write
+#                   Pull requests+Metadata    = read
+#    → Org perms:   Projects                  = write
+#                   Members                   = read
+# 2. <org>/<repo> → Settings → Secrets and variables
+#    → Actions → New repository secret
+#    → Name: EDPA_TOKEN
+#    → Secret: <paste ghp_… value>
+# 3. Test: pushni libovolnou změnu do .edpa/backlog/**
+#    Actions tab → "Sync Git -> GitHub Projects" → ✓ Success`,
+    code: `# Org-wide variant (jeden PAT pro N repos):
+# github.com/organizations/<org>/settings/secrets/actions
+# → New organization secret → Name: EDPA_TOKEN
+# → Repository access: Selected repositories → vyber repos kde EDPA poběží
+
+# Verifikace bez Claude Code:
+git commit --allow-empty -m "test: trigger sync" && git push
+gh run list --workflow sync-git-to-projects.yml --limit 1
+# Musí ukázat: ✓ completed success
+
+# Manuální fallback (pokud token zatím nemáš nebo expiroval):
+python3 .claude/edpa/scripts/sync.py pull --commit
+python3 .claude/edpa/scripts/sync.py push`,
+    result: `✓ EDPA_TOKEN secret created in <org>/<repo>
+✓ Test push triggered sync-git-to-projects workflow
+✓ Workflow completed in 28s (status: success)
+✓ Latency Project → Git: ~5s (event-driven via projects_v2_item)
+✓ Latency Git → Project: ~30s (on push to .edpa/backlog/**)
+
+Rotation: PAT vyprší za 1 rok. Do kalendáře:
+  recurring event "Rotate EDPA_TOKEN" — 2 týdny před expirací.
+
+Full guide: docs/edpa-token-setup.md (9 sekcí + troubleshooting + FAQ)`,
+  },
+  {
+    num: 6,
     title: 'Naplnit backlog',
     color: 'var(--or)',
     desc: 'Vytvořte YAML soubory v .edpa/backlog/ — jeden soubor per item. Hierarchie: Initiative > Epic > Feature > Story (+ Defect na úrovni Story). WSJF se počítá automaticky.',
@@ -138,7 +184,7 @@ I-1: Medical Platform
         └── S-4: Validation (JS=3) ← pkral`,
   },
   {
-    num: 6,
+    num: 7,
     title: 'Tým začne pracovat',
     color: 'var(--pk)',
     desc: 'Tým pracuje standardním GitHub flow — branch naming konvence, commity s referencemi na items, PR a code review. EDPA vše sleduje automaticky.',
@@ -166,7 +212,7 @@ Evidence detekována (signal weights → contribution_score):
   → cw[pkral,  S-1] =  2.25 / 12.43 = 0.18`,
   },
   {
-    num: 7,
+    num: 8,
     title: 'Konec iterace',
     color: 'var(--ac)',
     desc: 'Na konci iterace EDPA engine načte evidenci z backlog YAML souborů a proporcionálně alokuje hodiny podle skutečné práce.',
@@ -194,7 +240,7 @@ Allocation:
 Invariants: ALL PASSED`,
   },
   {
-    num: 8,
+    num: 9,
     title: 'Výkazy a reporty',
     color: 'var(--cy)',
     desc: 'EDPA generuje per-person výkazy, per-item cost allocation, JSON export a frozen snapshot. Vše auditovatelné a reprodukovatelné.',
@@ -222,7 +268,7 @@ Invariants: ALL PASSED`,
 └──────────┴────────┴────────┴────────┘`,
   },
   {
-    num: 9,
+    num: 10,
     title: 'Retrospektiva + kalibrace',
     color: 'var(--gn)',
     desc: 'Porovnejte EDPA výstupy se skutečností (ground truth). evaluate_cw.py počítá MAD, korelaci a identifikuje outliers.',
@@ -246,7 +292,7 @@ Verdict: EXCELLENT
 No weight adjustment needed.`,
   },
   {
-    num: 10,
+    num: 11,
     title: 'Další PI',
     color: 'var(--yl)',
     desc: 'Opakujte pro každou iteraci. S každým cyklem se kalibrace zpřesňuje. Cíl: prediktabilita > 80 %, MAD < 0.05 do třetího PI.',
@@ -270,9 +316,9 @@ Status: Mature — framework calibrated.`,
 
 const phases = [
   { label: 'Setup', steps: [1,2,3], color: 'var(--ac)' },
-  { label: 'Config', steps: [4,5], color: 'var(--cy)' },
-  { label: 'Run', steps: [6,7,8], color: 'var(--gn)' },
-  { label: 'Report', steps: [9,10], color: 'var(--yl)' },
+  { label: 'Config', steps: [4,5,6], color: 'var(--cy)' },
+  { label: 'Run', steps: [7,8,9], color: 'var(--gn)' },
+  { label: 'Report', steps: [10,11], color: 'var(--yl)' },
 ];
 import { VERSION } from '../lib/version';
 ---
