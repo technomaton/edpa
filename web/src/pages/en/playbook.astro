@@ -66,22 +66,14 @@ gh auth refresh -s repo,project,read:project,admin:org</code></pre>
       <li>Alespoň základní backlog (1 Epic, 2-3 Features, 5-10 Stories)</li>
     </ul>
 
-    <h3>Role v EDPA</h3>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Role</th><th>Popis</th><th>Typické evidence v Gitu</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>BO</strong></td><td>Business Owner</td><td>Issue komentáře, validace</td></tr>
-          <tr><td><strong>PM</strong></td><td>Product Manager / Product Owner</td><td>Backlog management, specifikace</td></tr>
-          <tr><td><strong>Arch</strong></td><td>Architekt</td><td>Code review, design decisions</td></tr>
-          <tr><td><strong>Dev</strong></td><td>Vývojář</td><td>Commity, PR, assignee</td></tr>
-          <tr><td><strong>DevSecOps</strong></td><td>DevSecOps Engineer</td><td>CI/CD, security, infra commity</td></tr>
-          <tr><td><strong>QA</strong></td><td>Test Engineer</td><td>Testovací commity, review</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <p>
+      <code>role:</code> in <code>people.yaml</code> is a free-form
+      label used for reports (timesheet column, Excel exports) and as
+      input to the synthetic calibration corpus. Engine signal weights
+      apply uniformly regardless of a person's role &mdash;
+      <code>assignee=4.0</code>, <code>pr_author=3.4</code>,
+      <code>commit_author=2.78</code>, etc. are the same for everyone.
+    </p>
   </section>
 
   <!-- Fáze 1 -->
