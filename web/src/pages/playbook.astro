@@ -193,36 +193,29 @@ naming:
     defect: "D"</code></pre>
 
     <h3>1.4 Nakonfigurovat CW heuristiky</h3>
-    <pre><code># /edpa setup generates .edpa/config/heuristics.yaml automatically</code></pre>
-    <p>Výchozí hodnoty jsou kalibrované Monte Carlo simulací (1000 scénářů, 66 362 záznamů, p&lt;0.001). Pro začátek stačí bez úprav.</p>
+    <pre><code># /edpa setup generates .edpa/config/cw_heuristics.yaml automatically</code></pre>
+    <p>Výchozí váhy v šabloně <code>cw_heuristics.yaml.tmpl</code> jsou kalibrované Monte Carlo simulací (1000 scénářů, 31 041 záznamů, MAD = 0.0805). Pro většinu týmů stačí bez úprav.</p>
+
+    <p>Engine konzumuje pět <strong>signal weights</strong> — kolik každý druh git evidence přispívá k <code>contribution_score</code> na položce:</p>
 
     <div class="card">
       <table>
         <thead>
-          <tr><th>Evidence role</th><th>CW váha</th></tr>
+          <tr><th>Signál</th><th>Váha</th><th>Co znamená</th></tr>
         </thead>
         <tbody>
-          <tr><td>owner (assignee)</td><td>1.00</td></tr>
-          <tr><td>key (PR author)</td><td>0.60</td></tr>
-          <tr><td>reviewer (commit/PR review)</td><td>0.25</td></tr>
-          <tr><td>consulted (komentář)</td><td>0.15</td></tr>
+          <tr><td><code>assignee</code></td><td>4.00</td><td>GitHub issue assignee</td></tr>
+          <tr><td><code>pr_author</code></td><td>3.40</td><td>Autor PR odkazujícího na položku</td></tr>
+          <tr><td><code>commit_author</code></td><td>2.78</td><td>Commit s S-XXX/F-XXX v branchi, title nebo zprávě</td></tr>
+          <tr><td><code>pr_reviewer</code></td><td>2.25</td><td>PR review submitted (kromě self)</td></tr>
+          <tr><td><code>issue_comment</code></td><td>1.14</td><td>Komentář na issue/PR (kromě botů)</td></tr>
         </tbody>
       </table>
     </div>
 
-    <p>Role-specifické korekce (strategické role jsou Gitem podhodnoceny):</p>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Role</th><th>Korekce</th><th>Důvod</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>BO consulted</td><td>0.30 (+0.15)</td><td>Rozhodování neviditelné v Gitu</td></tr>
-          <tr><td>PM consulted</td><td>0.20 (+0.05)</td><td>Specifikace neviditelná v Gitu</td></tr>
-          <tr><td>Arch reviewer</td><td>0.30 (+0.05)</td><td>Design review neviditelný</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <p>Signály se sčítají additivně do <code>contribution_score</code> per (osoba, item) a normalizují per-item: <code>cw = score / &Sigma;<sub>persons</sub> score</code>. Role labely (owner/key/reviewer/consulted) se odvozují z dominantního signálu jen pro display — engine je neukládá a nepoužívá pro výpočet.</p>
+
+    <p>Kalibrace přes <code>/edpa calibrate</code> — Monte Carlo random sampling + coordinate descent přes 5D prostor signal weights proti syntetickému korpusu. Detail viz sekce <a href="#architektura">Architektura</a>.</p>
 
     <h3>1.5 Nakonfigurovat .edpa/iterations/ a .edpa/config/edpa.yaml</h3>
     <p>Od v1.5 žije PI a iterace v <code>.edpa/iterations/</code> jako samostatné soubory. <code>edpa.yaml</code> obsahuje jen stabilní governance / sync konfiguraci.</p>
