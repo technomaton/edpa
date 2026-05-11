@@ -27,7 +27,6 @@
 - **Pilot lead:** Jaroslav Urbánek (Lead Architect / Vedoucí VaV)
 - **Pilot kickoff:** 2026-05-07
 - **Pilot duration:** 1 PI (5 weeks, target close 2026-06-11)
-- **Detailed reference:** [KASHEALTH-PILOT-detailed.md](KASHEALTH-PILOT-detailed.md) — full 14-section v1.9.0 runbook archived for reference
 
 ## 0. Quick orientation
 
@@ -212,5 +211,4 @@ Pokud 5+ z 6 PASS → pilot úspěšný, pokračuj na PI-2026-2 (full prod) a zv
 - v1.9.0 capacity overrides RFC: [`docs/proposals/per-iteration-capacity-overrides.md`](../proposals/per-iteration-capacity-overrides.md)
 - E2E test plan: [`docs/E2E-TEST-PLAN.md`](../E2E-TEST-PLAN.md)
 - CHANGELOG: [`CHANGELOG.md`](../../CHANGELOG.md)
-- Detailed v1.9.0 runbook: [`KASHEALTH-PILOT-detailed.md`](KASHEALTH-PILOT-detailed.md)
 - Governance design: [`docs/examples/governance-kashealth/governance-reseni-v3.md`](../examples/governance-kashealth/governance-reseni-v3.md)
