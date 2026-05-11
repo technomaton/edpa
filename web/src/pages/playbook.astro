@@ -119,10 +119,10 @@ rm -rf /tmp/edpa</code></pre>
     sync_state.json      # Stav poslední synchronizace
     iterations/          # Plány a výsledky iterací
   .github/workflows/
-    branch-check.yml     # CI: kontrola branch naming
-    iteration-close.yml  # CI: uzavření iterace (workflow_dispatch)
-    sync-projects-to-git.yml   # Cron: Projects -&gt; Git (15 min)
-    sync-git-to-projects.yml   # Push trigger: Git -&gt; Projects
+    edpa-branch-check.yml     # CI: kontrola branch naming
+    edpa-iteration-close.yml  # CI: uzavření iterace (workflow_dispatch)
+    edpa-sync-projects-to-git.yml   # Cron: Projects -&gt; Git (15 min)
+    edpa-sync-git-to-projects.yml   # Push trigger: Git -&gt; Projects
   .claude/edpa/templates/
     people.yaml.tmpl   # Šablona kapacitního registru
     cw_heuristics.yaml.tmpl    # Šablona CW heuristik
@@ -486,7 +486,7 @@ python3 .claude/edpa/scripts/backlog.py tree --iteration PI-2026-1.1</code></pre
     </ol>
 
     <h3>2.2 Denní práce</h3>
-    <p><strong>Branch naming konvence</strong> (CI kontrola v <code>.github/workflows/branch-check.yml</code>):</p>
+    <p><strong>Branch naming konvence</strong> (CI kontrola v <code>.github/workflows/edpa-branch-check.yml</code>):</p>
     <pre><code># Formát: &#123;type&#125;/&#123;ITEM_ID&#125;-&#123;popis&#125;
 git checkout -b feature/S-200-omop-parser
 git checkout -b feature/F-102-anon-engine
@@ -519,8 +519,8 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
     <p>Bidirekční synchronizace mezi GitHub Projects (UI pro PM/BO) a item files v <code>.edpa/</code> (Git-native):</p>
     <p><strong>Automaticky přes GitHub Actions:</strong></p>
     <ul>
-      <li><code>sync-projects-to-git.yml</code> — každých 15 minut stahuje změny z Projects do Gitu</li>
-      <li><code>sync-git-to-projects.yml</code> — při push do <code>main</code> se změnou v <code>.edpa/</code> propaguje do Projects</li>
+      <li><code>edpa-sync-projects-to-git.yml</code> — každých 15 minut stahuje změny z Projects do Gitu</li>
+      <li><code>edpa-sync-git-to-projects.yml</code> — při push do <code>main</code> se změnou v <code>.edpa/</code> propaguje do Projects</li>
     </ul>
     <p><strong>Claude Code (doporučeno):</strong></p>
     <pre><code>/edpa sync pull      # GitHub Projects -> item files
@@ -710,10 +710,10 @@ TOTAL_DEVIATION=0.824000</code></pre>
           <tr><th>Workflow</th><th>Trigger</th><th>Co dělá</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>branch-check.yml</code></td><td>PR opened/sync</td><td>Kontroluje branch naming konvenci</td></tr>
-          <tr><td><code>iteration-close.yml</code></td><td>workflow_dispatch</td><td>Spustí EDPA engine, commitne výsledky</td></tr>
-          <tr><td><code>sync-projects-to-git.yml</code></td><td>cron (15min)</td><td>Pull: Projects &rarr; item files</td></tr>
-          <tr><td><code>sync-git-to-projects.yml</code></td><td>push na .edpa/</td><td>Push: item files &rarr; Projects</td></tr>
+          <tr><td><code>edpa-branch-check.yml</code></td><td>PR opened/sync</td><td>Kontroluje branch naming konvenci</td></tr>
+          <tr><td><code>edpa-iteration-close.yml</code></td><td>workflow_dispatch</td><td>Spustí EDPA engine, commitne výsledky</td></tr>
+          <tr><td><code>edpa-sync-projects-to-git.yml</code></td><td>cron (15min)</td><td>Pull: Projects &rarr; item files</td></tr>
+          <tr><td><code>edpa-sync-git-to-projects.yml</code></td><td>push na .edpa/</td><td>Push: item files &rarr; Projects</td></tr>
         </tbody>
       </table>
     </div>
@@ -1001,7 +1001,7 @@ python3 .claude/edpa/scripts/sync.py diff</code></pre>
     <pre><code>python3 .claude/edpa/scripts/sync.py push</code></pre>
 
     <h3>Sync — loop prevence</h3>
-    <p>Workflow <code>sync-git-to-projects.yml</code> obsahuje:</p>
+    <p>Workflow <code>edpa-sync-git-to-projects.yml</code> obsahuje:</p>
     <pre><code>if: github.actor != 'github-actions[bot]'</code></pre>
     <p>To zabraňuje nekonečné smyčce: push &rarr; sync &rarr; push &rarr; sync...</p>
 

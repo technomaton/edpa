@@ -139,8 +139,8 @@ Dvě Actions zajišťují automatický sync:
 
 | Workflow | Trigger | Směr |
 |----------|---------|------|
-| `sync-projects-to-git.yml` | Cron každých 15 minut | Projects → `.edpa/backlog/` |
-| `sync-git-to-projects.yml` | Push na `.edpa/backlog/` | `.edpa/backlog/` → Projects |
+| `edpa-sync-projects-to-git.yml` | Cron každých 15 minut | Projects → `.edpa/backlog/` |
+| `edpa-sync-git-to-projects.yml` | Push na `.edpa/backlog/` | `.edpa/backlog/` → Projects |
 
 Loop prevention: commity od `github-actions[bot]` netriggerují reverse sync.
 

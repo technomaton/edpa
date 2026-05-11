@@ -29,10 +29,10 @@ plugin/
 │   │   ├── cw_heuristics.yaml.tmpl # Evidence scoring weights
 │   │   └── project.yaml.tmpl     # Project metadata
 │   └── workflows/                 # GitHub Actions
-│       ├── branch-check.yml       # Branch naming enforcement
-│       ├── iteration-close.yml    # Iteration close automation
-│       ├── sync-projects-to-git.yml
-│       └── sync-git-to-projects.yml
+│       ├── edpa-branch-check.yml       # Branch naming enforcement
+│       ├── edpa-iteration-close.yml    # Iteration close automation
+│       ├── edpa-sync-projects-to-git.yml
+│       └── edpa-sync-git-to-projects.yml
 ├── commands/edpa/                 # Claude Code slash commands
 │   ├── setup.md                   # /edpa setup
 │   ├── close-iteration.md         # /edpa close-iteration

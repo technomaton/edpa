@@ -106,7 +106,7 @@ events:
 - `member.removed` → workflow commits the `availability=unavailable`
   flip directly on `main` (factual, no review needed).
 
-See `plugin/edpa/workflows/collaborators-sync.yml`. The skill is the
+See `plugin/edpa/workflows/edpa-collaborators-sync.yml`. The skill is the
 manual-trigger counterpart for back-fills, repairs, or initial sync on
 a brand-new EDPA install.
 

@@ -336,7 +336,7 @@ git checkout -b "feature/S-1-test-story"
 
 ## Fáze 4 — Branche, commity, PR
 
-**Cíl:** ověřit GitHub Action `branch-check.yml`, že odmítá PR s nestandardním
+**Cíl:** ověřit GitHub Action `edpa-branch-check.yml`, že odmítá PR s nestandardním
 názvem branche, a že commit s referencí na item ID se zaznamená v evidence.
 
 ### 4.1 Špatný branch name → PR fail
@@ -904,10 +904,10 @@ Plán je úspěšně provedený, pokud:
 | `plugin/edpa/scripts/transitions.py`            | extract status changes z git logu     |
 | `plugin/edpa/scripts/validate_syntax.py`        | YAML schema validation                |
 | `plugin/edpa/scripts/issue_types.py`            | org-level Issue Type setup            |
-| `plugin/edpa/workflows/branch-check.yml`        | GH Action — branch naming             |
-| `plugin/edpa/workflows/sync-projects-to-git.yml`| GH Action — periodický pull           |
-| `plugin/edpa/workflows/sync-git-to-projects.yml`| GH Action — periodický push           |
-| `plugin/edpa/workflows/iteration-close.yml`     | GH Action — automatický close         |
+| `plugin/edpa/workflows/edpa-branch-check.yml`        | GH Action — branch naming             |
+| `plugin/edpa/workflows/edpa-sync-projects-to-git.yml`| GH Action — periodický pull           |
+| `plugin/edpa/workflows/edpa-sync-git-to-projects.yml`| GH Action — periodický push           |
+| `plugin/edpa/workflows/edpa-iteration-close.yml`     | GH Action — automatický close         |
 | `plugin/hooks/hooks.json`                       | Claude Code hooks (validate, commit info) |
 | `plugin/edpa/scripts/hooks/validate_on_save.sh` | post-Edit/Write validátor             |
 | `plugin/edpa/scripts/hooks/edpa_post_commit.sh` | post-Bash commit info                 |

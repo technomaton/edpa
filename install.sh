@@ -166,17 +166,60 @@ if [ ! -f ".edpa/config/edpa.yaml" ] && [ -f "$TARGET/edpa/templates/project.yam
   echo "Created .edpa/config/edpa.yaml from template (run /edpa:setup to configure)"
 fi
 
-# Install GitHub Actions workflows. The plugin ships ten workflows under
-# edpa/workflows/, but GitHub only runs files in .github/workflows/. Without
-# this copy step, workflows sit unused inside the plugin directory and the
-# customer never gets branch-check, contributor-detect, sync-*, etc.
+# Install GitHub Actions workflows. The plugin ships 11 workflows under
+# edpa/workflows/ (all prefixed `edpa-*.yml` since v1.18.0-beta), but
+# GitHub only runs files in .github/workflows/. Without this copy step,
+# workflows sit unused inside the plugin directory and the customer
+# never gets branch-check, contributor-detect, sync-*, etc.
 #
 # Safe defaults: only copy files that don't already exist in the target.
 # A user who has hand-edited their workflow keeps the hand-edited version;
 # new workflows are installed without surprise overwrites. Use
 # `EDPA_FORCE_WORKFLOWS=1` to force overwrites on a deliberate update.
+#
+# Legacy migration (pre-v1.18.0-beta): the legacy filenames were
+# unprefixed (`branch-check.yml`, `sync-*.yml`, etc.). When detected,
+# install.sh either:
+#   - default: warns and prints `git mv` commands (review before
+#     applying — keeps your hand-edits visible in the rename diff)
+#   - EDPA_AUTO_MIGRATE=1: renames legacy files automatically (then
+#     the normal install path overwrites them only if
+#     EDPA_FORCE_WORKFLOWS=1; otherwise your renamed version stays)
+LEGACY_WORKFLOWS="branch-check collaborators-sync contributor-detect iteration-close pi-close sync-git-to-projects sync-projects-to-git traceability-check validate-item velocity-track wsjf-calculate"
 if [ -d "$TARGET/edpa/workflows" ]; then
   mkdir -p ".github/workflows"
+
+  # Detect legacy unprefixed installations.
+  legacy_found=""
+  for f in $LEGACY_WORKFLOWS; do
+    [ -e ".github/workflows/$f.yml" ] && legacy_found="$legacy_found $f"
+  done
+
+  if [ -n "$legacy_found" ]; then
+    if [ "$EDPA_AUTO_MIGRATE" = "1" ]; then
+      echo "EDPA legacy migration: renaming unprefixed workflows..."
+      for f in $legacy_found; do
+        if [ -e ".github/workflows/edpa-$f.yml" ]; then
+          echo "  skip $f.yml (edpa-$f.yml already exists — delete one manually)"
+        else
+          mv ".github/workflows/$f.yml" ".github/workflows/edpa-$f.yml"
+          echo "  renamed $f.yml -> edpa-$f.yml"
+        fi
+      done
+    else
+      echo ""
+      echo "EDPA legacy workflow names detected (v1.18.0-beta renamed everything to edpa-* prefix)."
+      echo "Run these commands to migrate, OR re-run install with EDPA_AUTO_MIGRATE=1:"
+      for f in $legacy_found; do
+        echo "  git mv .github/workflows/$f.yml .github/workflows/edpa-$f.yml"
+      done
+      echo ""
+      echo "Continuing install — new edpa-* files will be installed alongside legacy ones."
+      echo "After migration, you may see duplicate workflows running until the rename commits."
+      echo ""
+    fi
+  fi
+
   installed=0
   skipped=0
   for src in "$TARGET"/edpa/workflows/*.yml; do

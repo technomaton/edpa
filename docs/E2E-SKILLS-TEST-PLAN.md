@@ -284,7 +284,7 @@ returned a file; bad enum status was written.
 ## Fáze 4 — Branche, commity, PR
 
 **Goal:** Standard git workflow flows through the assistant. The
-`branch-check.yml` GitHub Action enforces naming. Commit triggers
+`edpa-branch-check.yml` GitHub Action enforces naming. Commit triggers
 `edpa_post_commit.sh` hook with structured commit info.
 
 ### 4.1 Wrong branch name

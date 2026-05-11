@@ -26,7 +26,7 @@ Aggregation:
   → Σ_persons cw[*, item] = 1.0    (per-item invariant)
 
 Modes:
-  1. CI mode (env-driven, used by contributor-detect.yml):
+  1. CI mode (env-driven, used by edpa-contributor-detect.yml):
        PR_NUMBER, PR_AUTHOR, PR_TITLE, PR_BRANCH set by workflow
   2. CLI audit:
        detect_contributors.py --pr 42
@@ -647,7 +647,7 @@ def cmd_item(edpa_root: Path, repo: str, item_id: str,
 
 
 def cmd_ci(edpa_root: Path, repo: str, dry_run: bool = False) -> int:
-    """Driven by contributor-detect.yml workflow — env vars give PR context."""
+    """Driven by edpa-contributor-detect.yml workflow — env vars give PR context."""
     pr_number = os.environ.get("PR_NUMBER", "").strip()
     if not pr_number:
         print("CI mode requires PR_NUMBER env var", file=sys.stderr)

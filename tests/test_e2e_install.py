@@ -115,10 +115,12 @@ def test_install_creates_only_dot_directories(project):
 def test_install_includes_all_workflow_templates(project):
     workflows = project / ".claude" / "edpa" / "workflows"
     expected = {
-        "branch-check.yml", "contributor-detect.yml", "iteration-close.yml",
-        "pi-close.yml", "sync-git-to-projects.yml", "sync-projects-to-git.yml",
-        "traceability-check.yml", "validate-item.yml", "velocity-track.yml",
-        "wsjf-calculate.yml",
+        "edpa-branch-check.yml", "edpa-collaborators-sync.yml",
+        "edpa-contributor-detect.yml", "edpa-iteration-close.yml",
+        "edpa-pi-close.yml", "edpa-sync-git-to-projects.yml",
+        "edpa-sync-projects-to-git.yml", "edpa-traceability-check.yml",
+        "edpa-validate-item.yml", "edpa-velocity-track.yml",
+        "edpa-wsjf-calculate.yml",
     }
     actual = {p.name for p in workflows.iterdir() if p.suffix == ".yml"}
     assert expected <= actual, f"missing workflow templates: {expected - actual}"

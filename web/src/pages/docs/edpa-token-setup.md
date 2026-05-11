@@ -25,8 +25,8 @@ description: "Step-by-step guide pro vygenerování GitHub PAT a uložení jako 
 
 ## 1. Proč to potřebuješ
 
-Dva GitHub Actions workflowy (`sync-projects-to-git.yml` a
-`sync-git-to-projects.yml`) volají Projects v2 GraphQL API. Default
+Dva GitHub Actions workflowy (`edpa-sync-projects-to-git.yml` a
+`edpa-sync-git-to-projects.yml`) volají Projects v2 GraphQL API. Default
 `GITHUB_TOKEN`, který GitHub injektuje do každého workflow runu,
 nemá scope pro Projects v2 (jsou **org-scoped**, ne repo-scoped) —
 GraphQL vrátí 403 nebo prázdné výsledky.
@@ -141,7 +141,7 @@ Alternativně posuň issue card na Project boardu a počkej na další business-
 | `::warning::EDPA_TOKEN secret not configured` v logu | Secret se jmenuje špatně | Přejmenuj na přesně `EDPA_TOKEN` |
 | `HTTP 403` na GraphQL mutaci | PAT nemá `project: read+write` | Edit token → přidej Projects org permission |
 | `HTTP 404` na GH Project | PAT nemá repo permission na ten konkrétní repo | Edit token → Repository access → zahrň repo |
-| `Please tell me who you are` při git commit | Workflow nemá git config step (legacy verze) | Updatuj `sync-projects-to-git.yml` na ≥ v1.17.1 |
+| `Please tell me who you are` při git commit | Workflow nemá git config step (legacy verze) | Updatuj `edpa-sync-projects-to-git.yml` na ≥ v1.17.1 |
 | Workflow naskočí, ale 0 změn pulluje | PAT je z personal accountu, ne z org member | Vytvoř nový s Resource owner = org |
 
 ## 6. Rotace tokenu
@@ -231,6 +231,6 @@ Pak rotace tokenu a re-push.
 
 **Související dokumenty:**
 - [Pilot runbook](https://github.com/technomaton/edpa/blob/main/docs/kashealth-pilot/KASHEALTH-PILOT.md)
-- [`sync-projects-to-git.yml`](https://github.com/technomaton/edpa/blob/main/.github/workflows/sync-projects-to-git.yml) — event-driven sync (Project → Git)
-- [`sync-git-to-projects.yml`](https://github.com/technomaton/edpa/blob/main/.github/workflows/sync-git-to-projects.yml) — push-triggered sync (Git → Project)
+- [`edpa-sync-projects-to-git.yml`](https://github.com/technomaton/edpa/blob/main/.github/workflows/edpa-sync-projects-to-git.yml) — event-driven sync (Project → Git)
+- [`edpa-sync-git-to-projects.yml`](https://github.com/technomaton/edpa/blob/main/.github/workflows/edpa-sync-git-to-projects.yml) — push-triggered sync (Git → Project)
 - [Step-by-step průvodce v kontextu plné instalace](/guide) — krok 5 z 11

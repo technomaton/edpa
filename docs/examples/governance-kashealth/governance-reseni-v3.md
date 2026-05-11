@@ -472,11 +472,11 @@ AI generuje kód i dokumentaci. Vykazuješ čas na dodání itemu, ne minuty psa
 |---|---|---|---|
 | **1. wsjf-calculator.yml** | Field change (BV/TC/RR/JS) | Auto-výpočet WSJF Score | Comment s WSJF skóre |
 | **2. contributor-detector.yml** | PR merge / review / issue | Detekce kontributorů + evidence | Contributor log JSON |
-| **3. iteration-close.yml** | Manuální dispatch | Frozen snapshot + MD/JSON/XLSX výkazy + per-item | Výkazy + snapshot |
-| **4. pi-close.yml** | Manuální dispatch | Agregace iterací do PI summary | PI summary |
+| **3. edpa-iteration-close.yml** | Manuální dispatch | Frozen snapshot + MD/JSON/XLSX výkazy + per-item | Výkazy + snapshot |
+| **4. edpa-pi-close.yml** | Manuální dispatch | Agregace iterací do PI summary | PI summary |
 | **5. velocity-tracker.yml** | Iter/PI close | Velocity JSON + dashboard | Velocity data |
 | **6. validate-work-item.yml** | issues: opened/edited | Kontrola povinných sekcí dle typu | Label governance:invalid |
-| **7. traceability-check.yml** | pull_request: opened | Ověřuje že PR referuje work item | Fail pokud chybí |
+| **7. edpa-traceability-check.yml** | pull_request: opened | Ověřuje že PR referuje work item | Fail pokud chybí |
 
 ### 11.4 governance/config.yml (centrální konfigurace)
 
@@ -722,7 +722,7 @@ Průkaznost stojí na 5 pilířích:
 | **Auditor neuzná EDPA model** | Vysoký | Formální metodika, frozen snapshoty, reprodukovatelnost, BankID podpis |
 | **CW heuristika neodpovídá realitě** | Střední | Manuální override + kalibrace po 2–3 iteracích |
 | **ČVUT IT odmítne B2B Direct Connect** | Střední | Guest přístup funguje bez spolupráce IT (horší UX) |
-| **Commit bez S-/F-/E-XXX reference** | Střední | CI check blokuje PR, traceability-check.yml |
+| **Commit bez S-/F-/E-XXX reference** | Střední | CI check blokuje PR, edpa-traceability-check.yml |
 | **PM/Arch práce bez commitů** | Střední | Issue comments + /contribute příkaz |
 | **0 relevantních items pro osobu** | Nízký | Procesní eskalace, ne matematická improvizace |
 | **Týmy nejsou disciplinované** | Střední | Governance labels + WIP alerty + soft enforcement |

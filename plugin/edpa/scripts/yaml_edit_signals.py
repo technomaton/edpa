@@ -104,8 +104,8 @@ BULK_MIGRATION_PATTERNS = [
 # weight — they are tool-generated state synchronization, not human work.
 #
 # `*@noreply.technomaton.com` covers the EDPA sync bot identity used by
-# the `sync-projects-to-git.yml` / `sync-git-to-projects.yml` workflows
-# (default `edpa-bot@noreply.technomaton.com`). The whole subdomain is
+# the `edpa-sync-projects-to-git.yml` / `edpa-sync-git-to-projects.yml`
+# workflows (default `edpa-bot@noreply.technomaton.com`). The whole subdomain is
 # matched so future bot accounts (e.g. `release-bot@noreply.…`,
 # `iteration-close-bot@noreply.…`) inherit the exclusion automatically.
 BOT_EMAIL_PATTERNS = [

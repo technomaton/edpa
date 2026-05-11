@@ -118,7 +118,7 @@ python3 .claude/edpa/scripts/create_project_views.py`,
 
 # Verifikace bez Claude Code:
 git commit --allow-empty -m "test: trigger sync" && git push
-gh run list --workflow sync-git-to-projects.yml --limit 1
+gh run list --workflow edpa-sync-git-to-projects.yml --limit 1
 # Musí ukázat: ✓ completed success
 
 # Manuální fallback (pokud token zatím nemáš nebo expiroval):

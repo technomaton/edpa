@@ -140,10 +140,10 @@ my-project/
       heuristics.yaml.tmpl    # Sablona CW heuristik
       project.yaml.tmpl       # Sablona projektove konfigurace
   .github/workflows/
-    branch-check.yml     # CI: kontrola branch naming
-    iteration-close.yml  # CI: uzavreni iterace (workflow_dispatch)
-    sync-projects-to-git.yml   # Cron: Projects -> Git (15 min)
-    sync-git-to-projects.yml   # Push trigger: Git -> Projects
+    edpa-branch-check.yml     # CI: kontrola branch naming
+    edpa-iteration-close.yml  # CI: uzavreni iterace (workflow_dispatch)
+    edpa-sync-projects-to-git.yml   # Cron: Projects -> Git (15 min)
+    edpa-sync-git-to-projects.yml   # Push trigger: Git -> Projects
   docs/                  # Dokumentace
 ```
 
@@ -545,7 +545,7 @@ python .claude/edpa/scripts/backlog.py tree --iteration PI-2026-1.1
 
 ### 2.2 Denni prace
 
-**Branch naming konvence** (CI kontrola v `.github/workflows/branch-check.yml`):
+**Branch naming konvence** (CI kontrola v `.github/workflows/edpa-branch-check.yml`):
 
 ```bash
 # Format: {type}/{ITEM_ID}-{popis}
@@ -593,8 +593,8 @@ Bidirekcni synchronizace mezi GitHub Projects (UI pro PM/BO) a item files v `.ed
 
 **Automaticky pres GitHub Actions:**
 
-- `sync-projects-to-git.yml` -- kazych 15 minut stahuje zmeny z Projects do Gitu
-- `sync-git-to-projects.yml` -- pri push do `main` s zmenou v `.edpa/` propaguje do Projects
+- `edpa-sync-projects-to-git.yml` -- kazych 15 minut stahuje zmeny z Projects do Gitu
+- `edpa-sync-git-to-projects.yml` -- pri push do `main` s zmenou v `.edpa/` propaguje do Projects
 
 **Manualne:**
 
@@ -903,10 +903,10 @@ python .claude/edpa/scripts/backlog.py status
 
 | Workflow | Trigger | Co dela |
 |----------|---------|--------|
-| `branch-check.yml` | PR opened/sync | Kontroluje branch naming konvenci |
-| `iteration-close.yml` | workflow_dispatch | Spusti EDPA engine, commity vysledky |
-| `sync-projects-to-git.yml` | cron (15min) + manual | Pull: Projects -> item files in .edpa/ |
-| `sync-git-to-projects.yml` | push na .edpa/ | Push: item files in .edpa/ -> Projects |
+| `edpa-branch-check.yml` | PR opened/sync | Kontroluje branch naming konvenci |
+| `edpa-iteration-close.yml` | workflow_dispatch | Spusti EDPA engine, commity vysledky |
+| `edpa-sync-projects-to-git.yml` | cron (15min) + manual | Pull: Projects -> item files in .edpa/ |
+| `edpa-sync-git-to-projects.yml` | push na .edpa/ | Push: item files in .edpa/ -> Projects |
 
 ---
 
@@ -1211,7 +1211,7 @@ python .claude/edpa/scripts/sync.py push
 
 ### Sync -- loop prevence
 
-Workflow `sync-git-to-projects.yml` obsahuje:
+Workflow `edpa-sync-git-to-projects.yml` obsahuje:
 
 ```yaml
 if: github.actor != 'github-actions[bot]'

@@ -73,7 +73,7 @@ potvrzením. Issue Types missing → nabídne `issue_types.py setup --org`.
 ### 1.1 `EDPA_TOKEN` secret — povinné pro pipeline automation
 
 `install.sh` zkopíruje 8 workflow souborů do `.github/workflows/`. Z nich
-**dva** (`sync-projects-to-git.yml`, `sync-git-to-projects.yml`) potřebují
+**dva** (`edpa-sync-projects-to-git.yml`, `edpa-sync-git-to-projects.yml`) potřebují
 PAT s vyššími scopes, protože default `GITHUB_TOKEN` **nemůže číst ani
 zapisovat do GitHub Projects v2** (jsou org-scoped, nikoli repo-scoped).
 

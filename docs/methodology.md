@@ -2,7 +2,7 @@
 
 *Capacity derivation from delivery evidence*
 
-**Version 1.17.1-beta — May 2026 — Jaroslav Urbanek, Lead Architect**
+**Version 1.18.0-beta — May 2026 — Jaroslav Urbanek, Lead Architect**
 
 ---
 
@@ -114,7 +114,7 @@ CW computation lives in two collectors that feed the same additive
 signal pool:
 
 - `detect_contributors.py` (v1.11) — PR/issue API surfaces. Runs at
-  PR merge via the `contributor-detect.yml` workflow.
+  PR merge via the `edpa-contributor-detect.yml` workflow.
 - `yaml_edit_signals.py` (v1.17) — git diff over `.edpa/backlog/*.yaml`.
   Runs at engine close, scoped to the iteration window.
 

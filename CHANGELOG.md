@@ -2,6 +2,84 @@
 
 ## Unreleased
 
+## 1.18.0-beta — 2026-05-11
+
+### Breaking — `edpa-` prefix on all distributed workflows
+
+All 11 plugin-shipped GitHub Actions workflows were renamed to use the
+`edpa-` prefix:
+
+  branch-check.yml         → edpa-branch-check.yml
+  collaborators-sync.yml   → edpa-collaborators-sync.yml
+  contributor-detect.yml   → edpa-contributor-detect.yml
+  iteration-close.yml      → edpa-iteration-close.yml
+  pi-close.yml             → edpa-pi-close.yml
+  sync-git-to-projects.yml → edpa-sync-git-to-projects.yml
+  sync-projects-to-git.yml → edpa-sync-projects-to-git.yml
+  traceability-check.yml   → edpa-traceability-check.yml
+  validate-item.yml        → edpa-validate-item.yml
+  velocity-track.yml       → edpa-velocity-track.yml
+  wsjf-calculate.yml       → edpa-wsjf-calculate.yml
+
+Rationale: generic names like `branch-check.yml` collided with target
+projects' own workflows; install.sh's "skip if exists" silently no-op'd
+in collision cases, leaving the user thinking EDPA was installed when
+it wasn't. Prefixed names are namespace-safe and group together in the
+Actions UI sidebar.
+
+**Migration for existing installs:** `install.sh` now detects legacy
+unprefixed files in `.github/workflows/` and either:
+- (default) prints `git mv` commands and continues with the install
+  alongside the legacy files — review and apply the rename manually,
+- (`EDPA_AUTO_MIGRATE=1`) renames legacy files automatically before
+  copying the new prefixed versions.
+
+### Fixed — `projects_v2_item` is webhook-only, not a workflow trigger
+
+The v1.17.x sync-projects-to-git workflow used `projects_v2_item` as
+a primary `on:` trigger (commit fafc77a), claiming event-driven sync.
+That was wrong: `projects_v2_item` is an *organization webhook event*
+documented in [Webhook events and payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads),
+not a [workflow trigger](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
+GitHub Actions cannot subscribe to Project v2 board changes directly.
+
+Replaced with a business-hours polling cron (`*/30 6-17 * * 1-5` UTC =
+Mon-Fri 8-18 CET/CEST) plus `workflow_dispatch` for manual on-demand
+reconciliation. ~528 CI min/month, ~26% of Free plan 2000-min limit.
+Maximum latency 30 min during business hours; weekends pause sync
+(use workflow_dispatch or wait for Monday's first tick — max ~14h
+latency Friday 18:00 → Monday 08:00 local).
+
+### Refactor — standardized workflow patterns
+
+Unified all commit-producing workflows behind a single pattern:
+
+- **Git identity** is configured in its own step *before* any action
+  that could auto-commit. Standard values across all workflows:
+    user.name  = "EDPA Bot @ TECHNOMATON"
+    user.email = "edpa-bot@noreply.technomaton.com"
+  Previously several workflows ran `git config` inside the commit step
+  or used legacy placeholders (`github-actions[bot]`,
+  `edpa-bot@users.noreply.github.com`) that produced inconsistent
+  attribution and failed when an earlier step already triggered a commit.
+
+- **Token usage** moves to the `EDPA_TOKEN || GITHUB_TOKEN` fallback
+  pattern with an explicit warning step when EDPA_TOKEN is missing.
+  `collaborators-sync.yml` drops its bespoke `COLLAB_SYNC_TOKEN` secret
+  in favor of the shared `EDPA_TOKEN` (same PAT carries `read:org`,
+  `repo`, and `project` scopes — one secret instead of two).
+
+Also fixed `contributor-detect.yml` permission denial — setting
+`contents: write` explicitly forced all other permissions to `none`,
+breaking `gh pr view` calls in the detection script. Restored
+explicit `pull-requests: read` + `issues: read`.
+
+### Notes
+
+- No CW recalibration, no schema migration.
+- Workflow drift between `plugin/edpa/workflows/` and `.github/workflows/`
+  is now reconciled: plugin is canonical for all distributed workflows.
+
 ## 1.17.1-beta — 2026-05-10
 
 ### Fixed — surfaced via 2-PI × 5-iteration end-to-end run

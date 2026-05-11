@@ -174,7 +174,7 @@ gh project create --title "$ARGUMENTS Governance" --owner @me
 
 ### 6. Create branch naming CI check
 
-Create `.github/workflows/branch-check.yml` that blocks PRs without S-XXX/F-XXX/E-XXX reference.
+Create `.github/workflows/edpa-branch-check.yml` that blocks PRs without S-XXX/F-XXX/E-XXX reference.
 
 ### 7. Hierarchy is mandatory — never produce a flat backlog
 
