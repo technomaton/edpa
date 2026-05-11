@@ -7,14 +7,6 @@ on:
         description: 'Iteration ID (e.g., PI-2026-1.3)'
         required: true
         type: string
-      mode:
-        description: 'Calculation mode'
-        required: false
-        default: 'simple'
-        type: choice
-        options:
-          - simple
-          - full
 
 jobs:
   close-iteration:
@@ -37,43 +29,27 @@ jobs:
 
       - name: Verify configuration
         run: |
-          if [ ! -f .edpa/config/people.yaml ]; then
-            echo "ERROR: .edpa/config/people.yaml not found. Run /edpa setup first."
-            exit 1
-          fi
-          if [ ! -f .edpa/config/heuristics.yaml ]; then
-            echo "ERROR: .edpa/config/heuristics.yaml not found. Run /edpa setup first."
-            exit 1
-          fi
-          echo "Configuration verified."
+          test -f .edpa/config/people.yaml || (echo "ERROR: Run /edpa setup first." && exit 1)
+          test -f .edpa/config/heuristics.yaml || (echo "ERROR: Run /edpa setup first." && exit 1)
 
       - name: Run EDPA Engine
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ITERATION_ID: ${{ inputs.iteration_id }}
-          MODE: ${{ inputs.mode }}
         run: |
           python3 .claude/edpa/scripts/engine.py \
-            --iteration "$ITERATION_ID" \
-            --mode "$MODE" \
-            --capacity .edpa/config/people.yaml \
-            --heuristics .edpa/config/heuristics.yaml
+            --iteration "${{ inputs.iteration_id }}" \
+            --edpa-root .edpa
 
       - name: Verify invariants
         run: |
           RESULTS=".edpa/reports/iteration-${{ inputs.iteration_id }}/edpa_results.json"
-          if [ ! -f "$RESULTS" ]; then
-            echo "ERROR: Engine did not produce results."
-            exit 1
-          fi
+          test -f "$RESULTS" || (echo "ERROR: No results." && exit 1)
           python3 -c "
           import json, sys
           with open('$RESULTS') as f:
               data = json.load(f)
           if not data.get('all_invariants_passed'):
-              print('INVARIANT FAILURE — check results')
               sys.exit(1)
-          print('All invariants passed.')
           "
 
       - name: Commit results
@@ -81,5 +57,5 @@ jobs:
           git config user.name "EDPA Bot"
           git config user.email "edpa@github-actions"
           git add .edpa/reports/ .edpa/snapshots/
-          git commit -m "feat(edpa): close iteration ${{ inputs.iteration_id }}" || echo "No changes to commit"
+          git commit -m "feat(edpa): close iteration ${{ inputs.iteration_id }}" || true
           git push

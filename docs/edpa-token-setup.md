@@ -118,12 +118,12 @@ Pak otevři `https://github.com/<org>/<repo>/actions` a sleduj:
 | Workflow | Očekávaný stav |
 |---|---|
 | `Sync Git -> GitHub Projects` | ✓ Success (běží na push event) |
-| `Sync GitHub Projects -> Git` | nemusí běžet (čeká na `projects_v2_item` event) |
+| `Sync GitHub Projects -> Git` | nemusí běžet (čeká na další `*/30` cron tick v business hours Po-Pá 8-18, nebo manual dispatch) |
 
-Pro otestování druhého směru posuň ručně libovolný issue card na
-Project boardu (např. změň Status na "In Progress"). Workflow
-`Sync GitHub Projects -> Git` musí naskočit do **~5 sekund** a
-přimountovat změnu zpět do `.edpa/backlog/<type>/<id>.yaml`.
+Pro otestování druhého směru otevři `Actions → Sync GitHub Projects -> Git → Run workflow`
+a sleduj, že po cca 20-40 s vznikne commit s tvojí změnou v `.edpa/backlog/<type>/<id>.yaml`.
+Alternativně posuň issue card na Project boardu a počkej na další business-hours cron tick
+(max 30 min latence v pracovní době; mimo ni se sync pozastaví).
 
 ### Co když to nefunguje
 

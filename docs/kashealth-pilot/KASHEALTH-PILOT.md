@@ -78,19 +78,25 @@ PAT s vyššími scopes, protože default `GITHUB_TOKEN` **nemůže číst ani
 zapisovat do GitHub Projects v2** (jsou org-scoped, nikoli repo-scoped).
 
 **Trigger model (v1.17.1+):**
-- `sync-projects-to-git` — primárně **event-driven** přes
-  `projects_v2_item` (created/edited/deleted/reordered), latence sync
-  ~5 s. Safety-net cron 4×/den (`0 */6 * * *`) drží konzistenci
-  i kdyby GH zahodil event. Spotřeba ~450-1100 CI min/měsíc na
-  kashealth-scale (vs. ~2880 min při starém `*/15` cronu — Free plan
-  by jel přes 2000 min limit).
-- `sync-git-to-projects` — `on: push` do `.edpa/backlog/**`, beze změny.
+- `sync-projects-to-git` — `cron: '*/30 6-17 * * 1-5'` (každých 30 min
+  v business hours Po-Pá 8-18 CET/CEST; UTC 6-17 pokrývá obě zóny) +
+  `workflow_dispatch` pro manual on-demand sync. Spotřeba ~528 CI
+  min/měsíc, ~26 % Free plan 2000 min limitu. Latence ~15 min průměrně
+  v pracovní době, max 30 min. Mimo business hours / víkendy se sync
+  pozastavuje — Project edits z noci/víkendu se zreplikují do `.edpa/`
+  až s prvním cron tickem v pondělí 8:00 (max ~14 h latence Pá 18:00 →
+  Po 8:00).
+  (`projects_v2_item` je organization webhook event, NE workflow
+  trigger — GitHub Actions ho neumí použít jako `on:` klíč.)
+- `sync-git-to-projects` — `on: push` do `.edpa/backlog/**`, beze změny
+  (push-driven, takže běží i mimo business hours, kdykoliv někdo
+  commitne backlog YAML).
 
 **Bez `EDPA_TOKEN`:**
-- `sync-projects-to-git` **tiše no-opuje** — `projects_v2_item` event
-  i safety-net cron oba zavolají sync.py pull, ale GraphQL query bez
-  PAT vrací 0 items. Žádný error v logu kromě warningu. Backlog YAML
-  files v gitu se začnou rozcházet s GH Projectem.
+- `sync-projects-to-git` **tiše no-opuje** — každý cron tick zavolá
+  sync.py pull, ale GraphQL query bez PAT vrací 0 items. Žádný error
+  v logu kromě warningu. Backlog YAML files v gitu se začnou rozcházet
+  s GH Projectem.
 - `sync-git-to-projects` (on push do `.edpa/backlog/**`) **fail-fast
   s HTTP 403** na první GraphQL mutaci. Aspoň je to viditelné.
 - **Manuální fallback:** každou středu před týdenním close běž

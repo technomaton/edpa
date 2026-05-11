@@ -1,30 +1,31 @@
 name: Sync GitHub Projects -> Git
 
-# Event-driven primary trigger + 6-hour safety-net cron.
+# Business-hours polling cron + manual dispatch.
 #
-# `projects_v2_item` fires on the org when a Project v2 item is added,
-# edited, deleted, or reordered (status / field / iteration change on
-# the board). It is the canonical "Project changed" hook and replaces
-# the polling cron. Typical kashealth-scale activity is 20-50 events/
-# day → ~450-1100 CI min/month, comfortably under the Free plan's
-# 2000 min limit; the old `*/15` cron consumed ~1400-2900 min/month.
+# Note: `projects_v2_item` is an organization webhook event, NOT a
+# workflow trigger — GitHub Actions cannot subscribe to Project v2
+# board changes directly. Sync runs on a schedule and reconciles
+# Project state against committed YAMLs.
 #
-# `cron: '0 */6 * * *'` is the safety net — GitHub occasionally drops
-# webhook events and the 4×/day reconciliation guarantees eventual
-# consistency without paying the polling tax.
+# `cron: '*/30 6-17 * * 1-5'` = every 30 min, UTC hours 6-17, Mon-Fri.
+# UTC 6-17 covers Czech business hours 8-18 in both CET (winter, UTC+1)
+# and CEST (summer, UTC+2) — minor seasonal overflow in either
+# direction, but the full 8-18 local window is always covered.
+# ~528 CI min/month, ~26% of the 2000-min Free plan limit.
 #
-# Loop safety: `sync-git-to-projects.yml` uses a PAT to write fields,
-# which *does* re-fire `projects_v2_item`. `sync.py pull` is idempotent
-# (compares Project state against committed YAMLs and produces 0
-# commits when they match), so the back-bounce runs but no-ops — ~30 s
-# of CI per round-trip. If the loop ever shows up as a billing pain,
-# add a content-marker step before sync-git-to-projects' mutations
-# and an `if: !contains(...)` guard here.
+# Outside business hours / on weekends sync pauses; use
+# `workflow_dispatch` for manual on-demand reconciliation, or wait
+# until the next business-day cron tick (max ~14h latency between
+# Friday 18:00 and Monday 08:00 local).
+#
+# Loop safety: `sync-git-to-projects.yml` writes Project fields when
+# YAMLs change. The cron-based pull is idempotent (compares Project
+# state against committed YAMLs, produces 0 commits when they match),
+# so there's no event loop to guard against — only the cost of two
+# scheduled jobs reconciling the same state.
 on:
-  projects_v2_item:
-    types: [created, edited, deleted, reordered]
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '*/30 6-17 * * 1-5'
   workflow_dispatch:
 
 permissions:
@@ -52,7 +53,7 @@ jobs:
         # GITHUB_TOKEN is always present in CI so the fallback never
         # leaves $GH_TOKEN empty. With only GITHUB_TOKEN, sync.py pull
         # returns 0 items from the Projects v2 GraphQL query and every
-        # event/cron tick silently no-ops — surface the cause.
+        # cron tick silently no-ops — surface the cause.
         run: |
           echo "::warning::EDPA_TOKEN secret not configured. Falling back to GITHUB_TOKEN, which cannot read org-scoped GitHub Projects v2. Pull will return 0 items and silently no-op."
 
