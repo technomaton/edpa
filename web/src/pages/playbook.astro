@@ -135,7 +135,7 @@ rm -rf /tmp/edpa</code></pre>
     project_setup.py      # Automatické vytvoření GitHub Projectu
     project_views.py      # Views setup
     create_project_views.py    # Playwright automatizace views (volitelné)
-    evaluate_cw.py       # CW kalibrace (MAD evaluator)
+    calibrate_signals.py # CW signal weights kalibrace (Monte Carlo + MAD)
   .edpa/data/              # Ground truth data (po PI)
   .edpa/reports/           # Generované reporty per iterace
   .edpa/snapshots/         # Zmrazené snapshoty iterací
@@ -429,7 +429,8 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
       <li>Parent issue propojen (sub-issue)</li>
       <li>Job Size odhadnut</li>
       <li>BV + TC + RR&amp;OE vyplněny</li>
-      <li>Primary Owner přiřazen</li>
+      <li>Contributors přiřazeni &mdash; <code>contributors[]</code> v YAML
+          (auto-detekce z PR/commit evidence, nebo seed s <code>person</code> + <code>cw</code> share)</li>
       <li>Iteration nebo Planning Interval přiřazen</li>
     </ul>
 
@@ -616,39 +617,52 @@ delivery:
       <li>Pro každou story porovnat: kdo byl auto-detekován, jaké CW engine přiřadil, odpovídá realitě?</li>
     </ol>
 
-    <h3>3.2 Zaznamenat ground truth</h3>
-    <p>Vytvořit <code>.edpa/data/ground_truth.yaml</code>:</p>
-    <pre><code># Ground truth pro CW kalibraci
-records:
-  - item_id: S-200
-    person_id: alice
-    evidence_role: reviewer
-    auto_cw: 0.25
-    confirmed_cw: 0.35
-    person_role: Arch
-    notes: "Alice dělala design review + arch. rozhodnutí"
+    <h3>3.2 Ground truth pro kalibraci (volitelné)</h3>
+    <p>
+      Kalibrátor běží proti Monte Carlo syntetickému korpusu (1 000
+      scenarios &times; 31 041 records) a hledá MAD-optimální signal
+      weights v <code>.edpa/config/heuristics.yaml</code>. Žádný
+      ground_truth.yaml není povinný &mdash; lze spustit kdykoli, i
+      před prvním PI close.
+    </p>
+    <p>
+      Pokud chcete kalibrovat proti reálným záznamům z PI retro,
+      zapište team-confirmed CW korekce do
+      <code>.edpa/data/ground_truth.yaml</code>:
+    </p>
+    <pre><code>records:
+  - person: alice          # id z .edpa/config/people.yaml
+    item: S-200
+    iteration: PI-2026-1.1
+    confirmed_cw: 0.35     # PM/retro-confirmed share (0..1)
+    notes: "design review + arch. rozhodnutí"
 
-  - item_id: S-200
-    person_id: bob
-    evidence_role: owner
-    auto_cw: 1.00
-    confirmed_cw: 1.00
-    person_role: Dev
-    notes: "Přesně -- Bob byl assignee a udělal všechnu práci"
+  - person: bob
+    item: S-200
+    iteration: PI-2026-1.1
+    confirmed_cw: 0.65
+    notes: "implementation + tests"
 
-  # ... alespoň 20 záznamů pro kalibraci</code></pre>
+  # ... alespoň 20 záznamů pro spolehlivou kalibraci</code></pre>
 
     <h3>3.3 Kalibrace CW heuristik</h3>
     <p><strong>Claude Code (doporučeno):</strong></p>
     <pre><code>/edpa calibrate</code></pre>
     <p><strong>Manuální CLI:</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/evaluate_cw.py \
-  --ground-truth .edpa/data/ground_truth.yaml \
-  --heuristics .edpa/config/heuristics.yaml</code></pre>
+    <pre><code># Dry-run &mdash; ukáže navrženou MAD reduction bez zápisu
+python3 .claude/edpa/scripts/calibrate_signals.py
+
+# Apply &mdash; přepíše .edpa/config/heuristics.yaml novými signal weights
+python3 .claude/edpa/scripts/calibrate_signals.py --apply</code></pre>
     <p>Výstup:</p>
-    <pre><code>MAD=0.041200
-RECORDS=20
-TOTAL_DEVIATION=0.824000</code></pre>
+    <pre><code>Phase 1 (random sample): 1000 scenarios, MAD baseline = 0.0861
+Phase 2 (coordinate descent): MAD calibrated = 0.0805 (-6.5%)
+Calibrated weights:
+  assignee:       4.00
+  pr_author:      3.40
+  commit_author:  2.78
+  pr_reviewer:    2.25
+  issue_comment:  1.14</code></pre>
 
     <p><strong>Interpretace MAD (Mean Absolute Deviation):</strong></p>
     <div class="card">
@@ -698,7 +712,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
     <ol>
       <li><strong>Retrospektiva</strong> — auto-detected CW vs realita</li>
       <li><strong>Ground truth</strong> — zaznamenat alespoň 20 nových záznamů</li>
-      <li><strong>CW kalibrace</strong> — <code>evaluate_cw.py</code>, vyhodnotit MAD</li>
+      <li><strong>CW kalibrace</strong> — <code>calibrate_signals.py</code> &mdash; Monte Carlo kalibrace signal weights, vyhodnotit MAD</li>
       <li><strong>Velocity trend</strong> — porovnat delivery across iterací</li>
       <li><strong>Predictability</strong> — (delivered_sp / planned_sp) across iterací</li>
     </ol>
@@ -767,7 +781,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
     <h3>Konec PI 1</h3>
     <ul class="checklist">
       <li>Ground truth zaznamenáno (min. 20 záznamů)</li>
-      <li>CW kalibrace provedena (<code>evaluate_cw.py</code>)</li>
+      <li>CW kalibrace provedena (<code>calibrate_signals.py --apply</code>)</li>
       <li>MAD vyhodnoceno (cíl: &lt; 0.06)</li>
       <li>Heuristiky upraveny (pokud MAD &gt; 0.06)</li>
       <li>Plánování PI 2 — nové epicy, WSJF, kapacity</li>
@@ -869,14 +883,14 @@ TOTAL_DEVIATION=0.824000</code></pre>
       </table>
     </div>
 
-    <h3>evaluate_cw.py — CW Kalibrace</h3>
+    <h3>calibrate_signals.py — CW Signal Weights Kalibrace</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>evaluate_cw.py --ground-truth .edpa/data/ground_truth.yaml --heuristics .edpa/config/heuristics.yaml</code></td><td>Spočítá MAD</td></tr>
+          <tr><td><code>calibrate_signals.py</code></td><td>Dry-run kalibrace proti syntetickému korpusu</td></tr>
         </tbody>
       </table>
     </div>
