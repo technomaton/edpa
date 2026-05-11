@@ -81,13 +81,32 @@ fi
 echo ""
 
 # --- Warn if already installed ---
+#
+# Read prompts in a `curl … | sh` flow: stdin is the pipe, not the
+# terminal, so plain `read` returns EOF immediately and the script
+# aborts before the user can type anything. The canonical fix
+# (rustup, nvm, oh-my-zsh all do this) is to redirect from /dev/tty,
+# which still points at the real terminal even when stdin is piped.
+#
+# Non-interactive environments (CI, docker build, sub-shells with no
+# tty): /dev/tty is unavailable. Skip the prompt and require the
+# `EDPA_FORCE_INSTALL=1` env var to overwrite — never silently
+# destroy an existing install just because nobody could answer.
 if [ -d "$TARGET/edpa" ]; then
-  printf "Warning: %s/edpa/ already exists. Overwrite? [y/N] " "$TARGET"
-  read -r answer
-  case "$answer" in
-    [yY]*) echo "Overwriting..." ;;
-    *) echo "Aborted."; exit 1 ;;
-  esac
+  if [ "$EDPA_FORCE_INSTALL" = "1" ]; then
+    echo "EDPA_FORCE_INSTALL=1 — overwriting existing $TARGET/edpa/ without prompt."
+  elif [ -r /dev/tty ]; then
+    printf "Warning: %s/edpa/ already exists. Overwrite? [y/N] " "$TARGET"
+    read -r answer < /dev/tty
+    case "$answer" in
+      [yY]*) echo "Overwriting..." ;;
+      *) echo "Aborted."; exit 1 ;;
+    esac
+  else
+    echo "ERROR: $TARGET/edpa/ already exists and no TTY available for prompt."
+    echo "Re-run with EDPA_FORCE_INSTALL=1 to overwrite, or remove the directory first."
+    exit 1
+  fi
 fi
 
 # Create target directory
