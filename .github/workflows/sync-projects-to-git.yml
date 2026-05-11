@@ -1,8 +1,30 @@
 name: Sync GitHub Projects -> Git
 
+# Event-driven primary trigger + 6-hour safety-net cron.
+#
+# `projects_v2_item` fires on the org when a Project v2 item is added,
+# edited, deleted, or reordered (status / field / iteration change on
+# the board). It is the canonical "Project changed" hook and replaces
+# the polling cron. Typical kashealth-scale activity is 20-50 events/
+# day → ~450-1100 CI min/month, comfortably under the Free plan's
+# 2000 min limit; the old `*/15` cron consumed ~1400-2900 min/month.
+#
+# `cron: '0 */6 * * *'` is the safety net — GitHub occasionally drops
+# webhook events and the 4×/day reconciliation guarantees eventual
+# consistency without paying the polling tax.
+#
+# Loop safety: `sync-git-to-projects.yml` uses a PAT to write fields,
+# which *does* re-fire `projects_v2_item`. `sync.py pull` is idempotent
+# (compares Project state against committed YAMLs and produces 0
+# commits when they match), so the back-bounce runs but no-ops — ~30 s
+# of CI per round-trip. If the loop ever shows up as a billing pain,
+# add a content-marker step before sync-git-to-projects' mutations
+# and an `if: !contains(...)` guard here.
 on:
+  projects_v2_item:
+    types: [created, edited, deleted, reordered]
   schedule:
-    - cron: "*/15 * * * *" # Every 15 minutes
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -29,8 +51,8 @@ jobs:
         if: ${{ secrets.EDPA_TOKEN == '' }}
         # GITHUB_TOKEN is always present in CI so the fallback never
         # leaves $GH_TOKEN empty. With only GITHUB_TOKEN, sync.py pull
-        # returns 0 items from the Projects v2 GraphQL query and the
-        # cron silently no-ops every 15 minutes — surface the cause.
+        # returns 0 items from the Projects v2 GraphQL query and every
+        # event/cron tick silently no-ops — surface the cause.
         run: |
           echo "::warning::EDPA_TOKEN secret not configured. Falling back to GITHUB_TOKEN, which cannot read org-scoped GitHub Projects v2. Pull will return 0 items and silently no-op."
 
