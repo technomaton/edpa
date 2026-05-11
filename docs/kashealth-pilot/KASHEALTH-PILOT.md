@@ -1,15 +1,29 @@
-# Kashealth Pilot Runbook (v1.17)
+# Kashealth Pilot Runbook (v1.17.1)
 
 - **Grant:** CZ.01.01.01/01/24_062/0007440 · OP TAK
 - **Org:** [`kashealth`](https://github.com/kashealth) (ČVUT FBMI + Medicalc software s.r.o.)
 - **Primary repo:** `kashealth/kas-platform-v1` (private monorepo)
-- **EDPA version:** **1.17.0-beta** — adds yaml_edit structural
-  signals (8 types) so progressive elaboration on Initiatives /
-  Epics / Features (LBC, benefit hypothesis, acceptance criteria,
-  NFRs, risks) is credited automatically. Fixes Bug A (Defects were
-  silently dropped from engine output at the level-filter). Single
-  calculation path inherited from 1.14, gates + yaml_edit + Done
-  credit converge through the same per-item normalization.
+- **EDPA version:** **1.17.1-beta** — pin pre-kickoff. Inherits the
+  v1.17.0 yaml_edit structural signals (8 types) so progressive
+  elaboration on Initiatives / Epics / Features (LBC, benefit
+  hypothesis, acceptance criteria, NFRs, risks) is credited
+  automatically, plus three read-path bug fixes surfaced by the
+  2-PI × 5-iteration E2E rerun on 2026-05-10:
+  - **IP-iter gate events** — `load_gate_events` now credits the
+    transition's commit author when the parent has no
+    `contributors[]` yet (typical for strategic work on Initiatives
+    /Epics being progressively elaborated). Without the fix, PI-x.5
+    closes derived 0h despite real IP work; sandbox went 0h → 120h.
+  - **Defect filter** — Defects (and Tasks) now exact-match the
+    `iteration:` field like Stories. Before, a Defect with
+    `iteration: PI-2026-2.4` was credited in BOTH iter 4 and iter 5,
+    doubling its hours in the PI rollup.
+  - **`backlog.py tree`/`status`** read project metadata from
+    `edpa.yaml` instead of `people.yaml` and tolerate missing keys —
+    no more `KeyError: 'project'` on the canonical pilot template.
+  No CW recalibration, no schema migration. Single calculation path
+  inherited from 1.14; gates + yaml_edit + Done credit converge
+  through the same per-item normalization.
 - **Pilot lead:** Jaroslav Urbánek (Lead Architect / Vedoucí VaV)
 - **Pilot kickoff:** 2026-05-07
 - **Pilot duration:** 1 PI (5 weeks, target close 2026-06-11)
@@ -191,7 +205,8 @@ Pokud 5+ z 6 PASS → pilot úspěšný, pokračuj na PI-2026-2 (full prod) a zv
 
 ## 8. Reference
 
-- Methodology: [`docs/methodology.md`](../methodology.md) (EDPA 1.17.0-beta spec)
+- Methodology: [`docs/methodology.md`](../methodology.md) (EDPA 1.17.1-beta spec)
+- v1.17.1 E2E validation: `CHANGELOG.md` § 1.17.1-beta — three bugs found by 2-PI × 5-iter rerun, all fixed pre-kickoff
 - v1.17 yaml_edit calibration corpus: [`docs/proposals/v1.17-yaml-edit-calibration-corpus.md`](../proposals/v1.17-yaml-edit-calibration-corpus.md) — pre-Monte Carlo edge case memo
 - v1.10 RFC: [`docs/proposals/v1.10-skill-first-gaps-and-excel-consolidation.md`](../proposals/v1.10-skill-first-gaps-and-excel-consolidation.md)
 - v1.9.0 capacity overrides RFC: [`docs/proposals/per-iteration-capacity-overrides.md`](../proposals/per-iteration-capacity-overrides.md)
