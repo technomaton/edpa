@@ -9,6 +9,11 @@ on:
 
 permissions:
   contents: write
+  # When ANY permission is set explicitly, all unspecified ones default
+  # to `none`. The script calls `gh pr view` and reads issue assignee /
+  # comment data, so we must restore read access for both.
+  pull-requests: read
+  issues: read
 
 jobs:
   detect-contributors:
@@ -22,7 +27,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - run: pip install pyyaml
 
@@ -35,10 +40,13 @@ jobs:
           PR_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: python3 .claude/edpa/scripts/detect_contributors.py
 
+      - name: Configure git identity
+        run: |
+          git config user.name "EDPA Bot @ TECHNOMATON"
+          git config user.email "edpa-bot@noreply.technomaton.com"
+
       - name: Commit updated backlog
         run: |
-          git config user.name "edpa-bot"
-          git config user.email "edpa-bot@users.noreply.github.com"
           git add .edpa/backlog/
           if git diff --cached --quiet; then
             echo "No contributor changes detected"
