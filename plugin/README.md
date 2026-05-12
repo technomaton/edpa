@@ -14,10 +14,19 @@ This directory contains the installable EDPA plugin for Claude Code and compatib
 
 The hub registers `tm-edpa` with `source: {github, repo: technomaton/edpa, path: plugin}`, so the marketplace fetches the plugin payload directly from this directory in the upstream repo — no vendored mirror, no drift.
 
+Or directly from this repo (without going through the hub):
+
+```bash
+/plugin marketplace add technomaton/edpa
+/plugin install edpa@edpa
+```
+
+The repo-root `.claude-plugin/marketplace.json` lists the `edpa` plugin with `source: "./plugin"`, so Claude Code fetches just the `plugin/` subtree into `~/.claude/plugins/cache/edpa/` — the rest of the repo (`web/`, `tools/`, `tests/`, `docs/`) stays in the marketplace clone and never enters the plugin runtime.
+
 For maintainer dogfooding against a local clone:
 
 ```bash
-/plugin marketplace add /path/to/edpa/plugin
+/plugin marketplace add /Users/<you>/projects/edpa
 /plugin install edpa@edpa
 ```
 
