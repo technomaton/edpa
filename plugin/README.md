@@ -18,7 +18,7 @@ Or directly from this repo (without going through the hub):
 
 ```bash
 /plugin marketplace add technomaton/edpa
-/plugin install edpa@edpa
+/plugin install edpa@technomaton-edpa
 ```
 
 The repo-root `.claude-plugin/marketplace.json` lists the `edpa` plugin with `source: "./plugin"`, so Claude Code fetches just the `plugin/` subtree into `~/.claude/plugins/cache/edpa/` — the rest of the repo (`web/`, `tools/`, `tests/`, `docs/`) stays in the marketplace clone and never enters the plugin runtime.
@@ -27,7 +27,7 @@ For maintainer dogfooding against a local clone:
 
 ```bash
 /plugin marketplace add /Users/<you>/projects/edpa
-/plugin install edpa@edpa
+/plugin install edpa@technomaton-edpa
 ```
 
 The SessionStart hook in `hooks/hooks.json` calls `edpa/scripts/hooks/install_deps.sh` on first launch, which `pip install`s `requirements.txt` once per plugin install (content-hashed marker in `${CLAUDE_PLUGIN_DATA}`). No manual setup needed.

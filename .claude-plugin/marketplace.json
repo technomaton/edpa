@@ -1,11 +1,11 @@
 {
-  "name": "edpa",
+  "name": "technomaton-edpa",
   "owner": {
     "name": "TECHNOMATON",
     "url": "https://technomaton.com"
   },
   "metadata": {
-    "description": "Standalone marketplace for the EDPA plugin. Lets users do `/plugin marketplace add technomaton/edpa` and install the plugin without going through the technomaton-hub indirection. The hub also distributes the same plugin as `tm-edpa` — both paths land on identical payload (technomaton/edpa@plugin)."
+    "description": "Standalone marketplace for the EDPA plugin. Lets users do `/plugin marketplace add technomaton/edpa` and install the plugin without going through the technomaton-hub indirection. Marketplace name matches Claude Code's auto-derived cache dirname (`~/.claude/plugins/marketplaces/technomaton-edpa/`) so the registered name is consistent across the install surface. The hub also distributes the same plugin as `tm-edpa@technomaton-hub` — both paths land on identical payload (technomaton/edpa@plugin)."
   },
   "plugins": [
     {

@@ -1,6 +1,6 @@
 {
   "extraKnownMarketplaces": {
-    "edpa": {
+    "technomaton-edpa": {
       "source": {
         "source": "path",
         "path": "./.claude-plugin/marketplace.json"
@@ -8,6 +8,6 @@
     }
   },
   "enabledPlugins": {
-    "edpa@edpa": "enabled"
+    "edpa@technomaton-edpa": "enabled"
   }
 }
