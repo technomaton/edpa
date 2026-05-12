@@ -1,5 +1,5 @@
 ---
-name: edpa-reports
+name: reports
 user-invocable: false
 description: >
   Generate EDPA timesheets, reports, and exports. Produces per-person MD/JSON reports,

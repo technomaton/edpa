@@ -1,5 +1,5 @@
 ---
-name: edpa-setup
+name: setup
 user-invocable: false
 description: >
   Initialize EDPA governance for a project. Creates GitHub Projects with custom fields,

@@ -1,5 +1,5 @@
 ---
-name: edpa-autocalib
+name: autocalib
 user-invocable: false
 description: >
   Auto-calibrate EDPA CW signal weights using the Monte Carlo + coordinate-descent

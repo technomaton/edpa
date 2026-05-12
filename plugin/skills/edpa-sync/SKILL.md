@@ -1,5 +1,5 @@
 ---
-name: edpa-sync
+name: sync
 user-invocable: false
 description: >
   Bidirectional sync between GitHub Projects and .edpa/backlog/ YAML files.

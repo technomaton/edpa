@@ -20,11 +20,12 @@
     "./skills/edpa-sync-people/SKILL.md"
   ],
   "commands": [
-    "./commands/edpa/setup.md",
-    "./commands/edpa/close-iteration.md",
-    "./commands/edpa/reports.md",
-    "./commands/edpa/calibrate.md",
-    "./commands/edpa/sync.md"
+    "./commands/setup.md",
+    "./commands/close-iteration.md",
+    "./commands/reports.md",
+    "./commands/calibrate.md",
+    "./commands/sync.md",
+    "./commands/board.md"
   ],
   "agents": [],
   "hooks": "./hooks/hooks.json"

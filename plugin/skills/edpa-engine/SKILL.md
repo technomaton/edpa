@@ -1,5 +1,5 @@
 ---
-name: edpa-engine
+name: engine
 user-invocable: false
 description: >
   Run EDPA evidence-driven calculation for an iteration. Gathers GitHub delivery evidence
