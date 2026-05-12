@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "edpa": {
+      "source": {
+        "source": "path",
+        "path": "./.claude-plugin/marketplace.json"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "edpa@edpa": "enabled"
+  }
+}
