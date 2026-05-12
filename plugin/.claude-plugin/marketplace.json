@@ -1,0 +1,19 @@
+{
+  "name": "edpa",
+  "owner": {
+    "name": "TECHNOMATON",
+    "url": "https://technomaton.com"
+  },
+  "metadata": {
+    "description": "Standalone marketplace for the EDPA plugin. Lets maintainers run `/plugin marketplace add /path/to/edpa/plugin` for local dogfooding without going through the technomaton-hub indirection."
+  },
+  "plugins": [
+    {
+      "name": "edpa",
+      "source": ".",
+      "description": "EDPA — Evidence-Driven Proportional Allocation. Derive hours from Git delivery evidence. Zero timesheets, Monte Carlo calibrated CW weights, bidirectional sync with GitHub Projects.",
+      "license": "MIT",
+      "tags": ["governance", "edpa", "capacity", "community"]
+    }
+  ]
+}
