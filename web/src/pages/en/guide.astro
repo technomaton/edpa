@@ -6,20 +6,28 @@ const steps = [
     num: 1,
     title: 'Prerequisites',
     color: 'var(--ac)',
-    desc: 'Install GitHub CLI, Python 3.10+, and PyYAML. Verify your GitHub login with project scope.',
+    desc: 'Install GitHub CLI and Python 3.10+. Claude Code users: Python deps are installed automatically by the SessionStart hook. Other environments: pip install manually.',
+    claude: `# GitHub CLI — authenticate with project scope
+gh auth login
+gh auth refresh -s project,read:project
+
+# Python 3.10+ must be in PATH
+python3 --version   # >= 3.10
+
+# Python dependencies install automatically
+# on first Claude Code session in the project (SessionStart hook)`,
     code: `# GitHub CLI — authenticate with project scope
 gh auth login
 gh auth refresh -s project,read:project
 
-# Python dependencies
-pip install pyyaml
+# Python dependencies (Cursor, Codex CLI, raw)
+pip install pyyaml ruamel.yaml openpyxl requests
 
 # Verify
 python3 --version   # >= 3.10
 gh --version        # >= 2.40`,
     result: `✓ Logged in to github.com as your-user
 ✓ Token scopes: repo, project, read:project
-✓ pyyaml installed
 Python 3.12.1
 gh version 2.44.1`,
   },
@@ -41,7 +49,7 @@ cd project-name`,
     title: 'Install EDPA',
     color: 'var(--gn)',
     desc: 'In Claude Code: install via the marketplace. Other environments (Cursor, Codex CLI): curl|sh. Both options vendor the engine to .edpa/engine/ and scaffold the .edpa/ structure.',
-    claude: `/plugin install tm-edpa@technomaton-hub
+    claude: `/plugin install edpa@technomaton-edpa
 # Claude Code downloads the plugin from the marketplace`,
     code: `# Outside Claude Code (Cursor, Codex CLI, raw):
 curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
