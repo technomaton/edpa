@@ -59,6 +59,20 @@ def test_no_hardcoded_org_in_scripts():
     scripts_dir = ROOT / "plugin" / "edpa" / "scripts"
     violations = []
 
+    # Legitimate occurrences of "technomaton" / "kashealth" in code that
+    # are NOT hardcoded org assumptions but bot-commit / domain filters,
+    # log-message namespacing, or other domain-of-this-project references
+    # that legitimately ship with the engine.
+    allowlist = {
+        # yaml_edit_signals.py filters out bot commits from @noreply.<github-app>.com
+        # patterns; the @noreply\.technomaton\.com regex is the bot for THIS repo's
+        # own GH App, not a customer assumption. Adding/removing it would change
+        # bot-commit handling, which is engine behaviour we want covered, but the
+        # consistency rule doesn't apply to it. Match by "noreply" substring so
+        # the regex's backslash-escaped dots don't disrupt the lookup.
+        ("yaml_edit_signals.py", "noreply"),
+    }
+
     for py_file in sorted(scripts_dir.glob("*.py")):
         in_docstring = False
         docstring_delim_count = 0
@@ -80,6 +94,10 @@ def test_no_hardcoded_org_in_scripts():
 
             # Strip inline comments starting with #
             code_part = raw_line.split("#")[0] if "#" in raw_line else raw_line
+
+            # Allowlist match — line legitimately contains a forbidden token
+            if any(token in raw_line for fname, token in allowlist if fname == py_file.name):
+                continue
 
             for word in forbidden:
                 if word.lower() in code_part.lower():
