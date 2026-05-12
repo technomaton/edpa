@@ -794,27 +794,26 @@ import { VERSION } from '../lib/version';
     <h3>Smyčka</h3>
     <div class="card" style="margin-top:12px">
       <ol class="loop-steps">
-        <li><code>git checkout -b calibration/{`{timestamp}`}</code></li>
-        <li>Pro každý experiment (1..budget):
+        <li>Spustit <code>python calibrate_signals.py --scenarios 1000 --seed 42</code></li>
+        <li>Skript provede:
           <ol class="loop-substeps">
-            <li>Načti aktuální heuristiku + historii experimentů</li>
-            <li>Navrhni JEDNU změnu parametru (threshold, weight, signal score)</li>
-            <li><code>git commit -m "exp {`{n}`}: {`{param}`} {`{old}`} -&gt; {`{new}`}"</code></li>
-            <li>Spusť: <code>python evaluate_cw.py --ground-truth ... --heuristics ...</code></li>
-            <li>Parsuj MAD z výstupu</li>
-            <li>Pokud MAD &lt; předchozí_best: <span style="color:var(--gn)">KEEP</span> | Jinak: <span style="color:var(--rd)">REVERT</span></li>
-            <li>Loguj do <code>calibration_log.tsv</code></li>
+            <li>Vygeneruje synthetic Monte Carlo korpus (1 000 scénářů × ~31 k záznamů) procedurálně z modelu, kde signal counts pravděpodobnostně reflektují true cw share</li>
+            <li>Spočítá MAD baseline proti shipped defaults (assignee=4.00, pr_author=3.40, …)</li>
+            <li><strong>Fáze 1 — random sampling:</strong> 2000 náhodných weight vektorů v 5D prostoru [0.1, 8.0], seřadí podle MAD</li>
+            <li><strong>Fáze 2 — coordinate descent:</strong> refinuje top-5 kandidátů, pro každý signal zkusí ±step, halves step na no-improvement</li>
+            <li>Vrátí best calibrated weights + MAD improvement %</li>
+            <li>S <code>--apply</code> přepíše <code>cw_heuristics.yaml.tmpl</code> + obnoví <code>calibration:</code> metadata</li>
           </ol>
         </li>
-        <li>Vytiskni souhrn: initial MAD, final MAD, % zlepšení</li>
-        <li>Zeptej se uživatele: merge kalibrační větev do main?</li>
+        <li>Vytiskne souhrn: baseline MAD, calibrated MAD, % zlepšení, top weights</li>
+        <li>(Optional) <code>--report report.json</code> dump celého běhu pro audit</li>
       </ol>
     </div>
 
     <h3>Bezpečnostní omezení</h3>
     <div class="grid grid-2" style="margin-top:12px">
-      <div class="note"><strong>Evaluator je LOCKED</strong> — agent nesmí editovat <code>evaluate_cw.py</code>. Oddělení optimalizéru od objektivní funkce.</div>
-      <div class="note"><strong>Jedna změna per experiment</strong> — pokud změníš 5 věcí, nevíš co fungovalo.</div>
+      <div class="note"><strong>Kalibrátor je LOCKED</strong> — agent nesmí editovat <code>calibrate_signals.py</code>. Synthetic corpus generator + MAD cost function jsou v jednom souboru by design; separation by structure brání gaming.</div>
+      <div class="note"><strong>Žádné parametry uvnitř cost function</strong> — <code>evaluate_mad()</code> bere jen weight vektor a pure-reads <code>signal_count × weight</code> s per-item normalizací.</div>
     </div>
 
     <h3>Strategie eskalace</h3>

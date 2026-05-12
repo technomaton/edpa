@@ -783,27 +783,26 @@ import { VERSION } from '../../lib/version';
     <h3>Loop</h3>
     <div class="card" style="margin-top:12px">
       <ol class="loop-steps">
-        <li><code>git checkout -b calibration/{`{timestamp}`}</code></li>
-        <li>For each experiment (1..budget):
+        <li>Run <code>python calibrate_signals.py --scenarios 1000 --seed 42</code></li>
+        <li>The script will:
           <ol class="loop-substeps">
-            <li>Load current heuristic + experiment history</li>
-            <li>Propose ONE parameter change (threshold, weight, signal score)</li>
-            <li><code>git commit -m "exp {`{n}`}: {`{param}`} {`{old}`} -&gt; {`{new}`}"</code></li>
-            <li>Run: <code>python evaluate_cw.py --ground-truth ... --heuristics ...</code></li>
-            <li>Parse MAD from output</li>
-            <li>If MAD &lt; previous_best: <span style="color:var(--gn)">KEEP</span> | Otherwise: <span style="color:var(--rd)">REVERT</span></li>
-            <li>Log to <code>calibration_log.tsv</code></li>
+            <li>Generate a synthetic Monte Carlo corpus (1,000 scenarios × ~31k records) procedurally from a model where signal counts probabilistically reflect each person's true cw share</li>
+            <li>Compute baseline MAD against shipped defaults (assignee=4.00, pr_author=3.40, …)</li>
+            <li><strong>Phase 1 — random sampling:</strong> 2000 random weight vectors in the 5D space [0.1, 8.0], sorted by MAD</li>
+            <li><strong>Phase 2 — coordinate descent:</strong> refines the top-5 candidates, tries ±step per signal, halves step on no-improvement</li>
+            <li>Return best calibrated weights + MAD improvement %</li>
+            <li>With <code>--apply</code>, rewrite <code>cw_heuristics.yaml.tmpl</code> + refresh the <code>calibration:</code> metadata</li>
           </ol>
         </li>
-        <li>Print summary: initial MAD, final MAD, % improvement</li>
-        <li>Ask user: merge calibration branch into main?</li>
+        <li>Print summary: baseline MAD, calibrated MAD, % improvement, top weights</li>
+        <li>(Optional) <code>--report report.json</code> dumps the full run for audit</li>
       </ol>
     </div>
 
     <h3>Safety constraints</h3>
     <div class="grid grid-2" style="margin-top:12px">
-      <div class="note"><strong>Evaluator is LOCKED</strong> — the agent must not edit <code>evaluate_cw.py</code>. Separation of optimizer from objective function.</div>
-      <div class="note"><strong>One change per experiment</strong> — if you change 5 things, you don't know what worked.</div>
+      <div class="note"><strong>The calibrator is LOCKED</strong> — the agent must not edit <code>calibrate_signals.py</code>. The synthetic corpus generator + MAD cost function live in one file by design; separation by structure prevents gaming.</div>
+      <div class="note"><strong>No parameters inside the cost function</strong> — <code>evaluate_mad()</code> takes only a weight vector and pure-reads <code>signal_count × weight</code> with per-item normalization.</div>
     </div>
 
     <h3>Escalation strategy</h3>
