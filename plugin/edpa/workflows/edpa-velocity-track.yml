@@ -24,11 +24,6 @@ jobs:
 
       - run: pip install pyyaml
 
-      - name: Install EDPA plugin (ephemeral, no project vendoring)
-        env:
-          EDPA_FORCE_INSTALL: "1"
-        run: curl -fsSL https://edpa.technomaton.com/install.sh | sh
-
       - name: Configure git identity
         # MUST run before any step that auto-commits, otherwise git
         # fails with "Please tell me who you are".
@@ -37,7 +32,7 @@ jobs:
           git config user.email "edpa-bot@noreply.technomaton.com"
 
       - name: Compute velocity report
-        run: python3 .claude/edpa/scripts/velocity.py
+        run: python3 .edpa/engine/scripts/velocity.py
 
       - name: Commit velocity report
         run: |

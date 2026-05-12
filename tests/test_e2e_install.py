@@ -34,15 +34,18 @@ ALLOWED_ROOT_ENTRIES = {".claude", ".edpa", ".git", "README.md"}
 
 
 def _install_plugin(target: Path):
-    """Replicate install.sh behaviour using local source — no network."""
-    claude = target / ".claude"
-    claude.mkdir()
-    for item in PLUGIN_SRC.iterdir():
-        dest = claude / item.name
-        if item.is_dir():
-            shutil.copytree(item, dest)
-        else:
-            shutil.copy2(item, dest)
+    """Replicate install.sh behaviour using local source — no network.
+
+    v1.18.4+: engine vendors to `.edpa/engine/` (not `.claude/edpa/`).
+    `.github/workflows/` install is delegated to /edpa:setup; install.sh
+    itself only handles the engine + `.edpa/` data tree.
+    """
+    engine = target / ".edpa" / "engine"
+    engine.mkdir(parents=True)
+    for sub in ("scripts", "schemas", "templates"):
+        shutil.copytree(PLUGIN_SRC / "edpa" / sub, engine / sub)
+    plugin_version = json.loads((PLUGIN_SRC / ".claude-plugin" / "plugin.json").read_text())["version"]
+    (engine / "VERSION").write_text(plugin_version + "\n")
 
     edpa = target / ".edpa"
     for sub in [
@@ -51,8 +54,11 @@ def _install_plugin(target: Path):
     ]:
         (edpa / sub).mkdir(parents=True, exist_ok=True)
 
-    shutil.copy(TEMPLATE_DIR / "cw_heuristics.yaml.tmpl", edpa / "config" / "heuristics.yaml")
+    # Seed templates: people.yaml + edpa.yaml. Engine reads canonical CW
+    # heuristics from .edpa/engine/templates/cw_heuristics.yaml.tmpl
+    # directly — no .edpa/config/heuristics.yaml is needed.
     shutil.copy(TEMPLATE_DIR / "people.yaml.tmpl", edpa / "config" / "people.yaml")
+    shutil.copy(TEMPLATE_DIR / "edpa.yaml.tmpl", edpa / "config" / "edpa.yaml")
 
 
 def _plant_minimal_backlog(target: Path):
@@ -90,7 +96,7 @@ def _plant_minimal_backlog(target: Path):
 
 def _run(target: Path, *args):
     return subprocess.run(
-        [sys.executable, str(target / ".claude" / "edpa" / "scripts" / args[0]), *args[1:]],
+        [sys.executable, str(target / ".edpa" / "engine" / "scripts" / args[0]), *args[1:]],
         cwd=target, capture_output=True, text=True,
     )
 
@@ -112,22 +118,17 @@ def test_install_creates_only_dot_directories(project):
     assert not extras, f"unexpected root entries after install: {extras}"
 
 
-def test_install_includes_all_workflow_templates(project):
-    workflows = project / ".claude" / "edpa" / "workflows"
-    expected = {
-        "edpa-branch-check.yml", "edpa-collaborators-sync.yml",
-        "edpa-contributor-detect.yml", "edpa-iteration-close.yml",
-        "edpa-pi-close.yml", "edpa-sync-git-to-projects.yml",
-        "edpa-sync-projects-to-git.yml", "edpa-traceability-check.yml",
-        "edpa-validate-item.yml", "edpa-velocity-track.yml",
-        "edpa-wsjf-calculate.yml",
-    }
-    actual = {p.name for p in workflows.iterdir() if p.suffix == ".yml"}
-    assert expected <= actual, f"missing workflow templates: {expected - actual}"
+def test_install_vendors_engine_under_edpa(project):
+    """Engine (scripts + schemas + templates) lives in .edpa/engine/."""
+    engine = project / ".edpa" / "engine"
+    assert engine.is_dir()
+    assert (engine / "VERSION").is_file()
+    for sub in ("scripts", "schemas", "templates"):
+        assert (engine / sub).is_dir(), f"missing .edpa/engine/{sub}/"
 
 
 def test_install_includes_new_action_scripts(project):
-    scripts = project / ".claude" / "edpa" / "scripts"
+    scripts = project / ".edpa" / "engine" / "scripts"
     for name in ("traceability.py", "pi_close.py", "velocity.py"):
         assert (scripts / name).is_file(), f"missing script: {name}"
 
@@ -174,7 +175,7 @@ def test_velocity_writes_report(project):
 def test_engine_runs_with_template_people(project):
     _plant_minimal_backlog(project)
     r = subprocess.run(
-        [sys.executable, str(project / ".claude" / "edpa" / "scripts" / "engine.py"),
+        [sys.executable, str(project / ".edpa" / "engine" / "scripts" / "engine.py"),
          "--edpa-root", str(project / ".edpa"),
          "--iteration", "PI-2026-1.1"],
         cwd=project, capture_output=True, text=True,

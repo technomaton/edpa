@@ -31,11 +31,6 @@ jobs:
 
       - run: pip install pyyaml
 
-      - name: Install EDPA plugin (ephemeral, no project vendoring)
-        env:
-          EDPA_FORCE_INSTALL: "1"
-        run: curl -fsSL https://edpa.technomaton.com/install.sh | sh
-
       - name: Configure git identity
         # MUST run before any step that auto-commits, otherwise git
         # fails with "Please tell me who you are".
@@ -50,7 +45,7 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: python3 .claude/edpa/scripts/detect_contributors.py
+        run: python3 .edpa/engine/scripts/detect_contributors.py
 
       - name: Commit updated backlog
         run: |

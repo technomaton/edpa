@@ -25,11 +25,6 @@ jobs:
 
       - run: pip install pyyaml
 
-      - name: Install EDPA plugin (ephemeral, no project vendoring)
-        env:
-          EDPA_FORCE_INSTALL: "1"
-        run: curl -fsSL https://edpa.technomaton.com/install.sh | sh
-
       - name: Warn if PAT not configured
         env:
           PAT: ${{ secrets.EDPA_TOKEN }}
@@ -51,7 +46,7 @@ jobs:
         env:
           PI_ID: ${{ inputs.pi_id }}
           GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
-        run: python3 .claude/edpa/scripts/pi_close.py --pi "$PI_ID"
+        run: python3 .edpa/engine/scripts/pi_close.py --pi "$PI_ID"
 
       - name: Commit PI report
         run: |

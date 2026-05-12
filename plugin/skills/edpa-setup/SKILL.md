@@ -2,13 +2,13 @@
 name: setup
 user-invocable: false
 description: >
-  Initialize EDPA governance for a project. Creates GitHub Projects with custom fields,
-  work item hierarchy (Initiative→Epic→Feature→Story), capacity registry, project
-  configuration, and copies CI workflows into .github/. Use when starting a new project
-  or onboarding EDPA.
+  Initialize EDPA governance for a project. Vendors the engine (scripts + schemas +
+  templates) into `.edpa/engine/`, creates `.edpa/config/{edpa.yaml,people.yaml}`,
+  copies CI workflows to `.github/workflows/`, provisions GitHub Project + custom
+  fields. Use when starting a new project or onboarding EDPA.
 license: MIT
 compatibility: GitHub CLI (gh), Python 3.10+
-allowed-tools: Read Write Bash(gh *) Bash(git *) Bash(mkdir *) Bash(python3 *) Bash(cp *) Bash(touch *)
+allowed-tools: Read Write Bash(gh *) Bash(git *) Bash(mkdir *) Bash(python3 *) Bash(cp *) Bash(touch *) Bash(rm *)
 metadata:
   author: Jaroslav Urbánek
   version: 1.0.0
@@ -21,25 +21,32 @@ metadata:
 
 ## What this does
 
-Initializes EDPA governance for a GitHub-based project. Produces a **clean** target project that consumes the plugin from `${CLAUDE_PLUGIN_ROOT}` (Claude Code's plugin cache) — does NOT vendor plugin scripts/templates/workflows into the project's `.claude/` directory. CI workflows install the plugin ephemerally on the runner via `install.sh`, so the project repo stays free of plugin payload.
+Initializes EDPA governance for a GitHub-based project with a **clean** layout that puts everything EDPA-related under `.edpa/`. The engine (scripts + schemas + templates) is vendored from `${CLAUDE_PLUGIN_ROOT}/edpa/` into `.edpa/engine/`, so:
 
-After running, the project layout is:
+- CI workflows reference `python3 .edpa/engine/scripts/X.py` — no curl|sh install step per CI run, zero overhead
+- Non-Claude-Code tools (Cursor, Codex) can run engine scripts directly from `.edpa/engine/`
+- `.claude/` in the project stays clean (typically empty or just `settings.json`)
+- Plugin payload is duplicated 1.6 MB into the project (committed), but pinned to a specific plugin version for reproducibility
+
+Resulting layout:
 
 ```
 <project>/
 ├── .edpa/
+│   ├── engine/                       ← vendored from ${CLAUDE_PLUGIN_ROOT}/edpa/
+│   │   ├── scripts/   (30 .py)
+│   │   ├── schemas/   (1 .json)
+│   │   ├── templates/ (3 .tmpl)
+│   │   └── VERSION    ← plugin version pinned in this project
 │   ├── config/
-│   │   ├── edpa.yaml         # project metadata, governance, naming, issue types
-│   │   └── people.yaml       # cadence + teams + people
+│   │   ├── edpa.yaml                 ← project metadata (from edpa.yaml.tmpl)
+│   │   └── people.yaml               ← capacity registry (from people.yaml.tmpl)
 │   ├── backlog/{initiatives,epics,features,stories}/
 │   ├── iterations/, reports/, snapshots/, data/
 │   ├── changelog.jsonl
 │   └── sync_state.json
-└── .github/workflows/
-    └── edpa-*.yml            # 11 CI workflows (lazy-install plugin on runner)
+└── .github/workflows/edpa-*.yml      ← 11 CI workflows (call .edpa/engine/scripts/X.py)
 ```
-
-No `.claude/edpa/`. Scripts/templates/workflows live in `${CLAUDE_PLUGIN_ROOT}` for Claude Code, and are installed ephemerally on CI runners by the workflows themselves.
 
 ## Arguments
 
@@ -61,45 +68,16 @@ If `$ARGUMENTS` is empty, blank, or "help":
 
 ### 0. Stage 0 — Preflight readiness check
 
-Run the preflight script. It verifies:
-
-- `python3`, `git`, `gh` on PATH; Python ≥ 3.10
-- Required modules: `yaml`, `openpyxl`
-- `gh auth status` + scopes: `admin:org`, `project`, `repo`, `workflow`
-- Org access (members visible to your token)
-- Target repo accessible
-- Org-level Issue Types: Initiative, Epic, Feature, Story, Defect, Task
-- `git config user.name` + `user.email` set (auto-commit needs them)
-- (If `.edpa/config/people.yaml` exists) declared github logins are org members
-
-Stage 0 runs as part of `project_setup.py` automatically. The script is in the plugin cache:
+Run the preflight script directly from the plugin cache (engine isn't vendored yet at this point):
 
 ```bash
-# Standalone preflight (no provisioning) — for "is this repo ready?":
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py" --org <org> --repo <repo> --check-only
-
-# Full setup (runs Stage 0 first, blocks on ERROR, then provisions):
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py" --org <org> --repo <repo> \
-  --project-title "<title>"
-
-# CI / scripted: never prompt, never auto-fix:
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py" ... --non-interactive
-
-# Auto-apply offered fixes (e.g. create missing Issue Types):
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py" ... --auto-fix
+python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py" \
+  --org <org> --repo <repo> --check-only
 ```
 
-`${CLAUDE_PLUGIN_ROOT}` is set by Claude Code when running plugin skills; it points at `~/.claude/plugins/cache/<plugin-id>/<version>/`. **Always reference plugin scripts via this variable, never via `.claude/edpa/scripts/`** — the target project does NOT vendor those files.
+This verifies: Python ≥ 3.10, `pyyaml + openpyxl`, `gh auth status`, scopes (`admin:org`, `project`, `repo`, `workflow`), org access, target repo, org-level Issue Types, `git config user.name + user.email`, and (if `.edpa/config/people.yaml` exists) that declared github logins are org members. Blocks on error.
 
-Stage 0 is idempotent and re-runnable. Skip via `--skip-preflight` only for repeat runs in the same session where preflight already passed.
-
-### 1. Verify Python toolchain (covered by Stage 0)
-
-Stage 0 already checked this. The plugin's SessionStart hook (`install_deps.sh`) auto-installs `pyyaml + ruamel.yaml + mcp + openpyxl` on the maintainer's machine the first time Claude Code loads the plugin, so a re-check here is usually a no-op.
-
-If imports still fail: `pip3 install -r "${CLAUDE_PLUGIN_ROOT}/requirements.txt" --break-system-packages`
-
-### 2. Create .edpa/ directory structure
+### 1. Create .edpa/ directory tree
 
 ```bash
 mkdir -p .edpa/config \
@@ -114,6 +92,27 @@ mkdir -p .edpa/config \
 touch .edpa/changelog.jsonl .edpa/sync_state.json
 ```
 
+### 2. Vendor engine into `.edpa/engine/`
+
+```bash
+mkdir -p .edpa/engine
+cp -R "${CLAUDE_PLUGIN_ROOT}/edpa/scripts"   .edpa/engine/
+cp -R "${CLAUDE_PLUGIN_ROOT}/edpa/schemas"   .edpa/engine/
+cp -R "${CLAUDE_PLUGIN_ROOT}/edpa/templates" .edpa/engine/
+
+# Pin the vendored plugin version so /edpa:setup --update-engine knows what to
+# diff against and CI workflows can sanity-check their script tree.
+python3 -c "import json; print(json.load(open('${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json'))['version'])" > .edpa/engine/VERSION
+```
+
+**Why .edpa/engine/ (not .claude/edpa/):**
+
+- `.edpa/` is the EDPA namespace owned by the project — engine code belongs inside it.
+- `.claude/` is reserved for Claude Code's per-project config (e.g., `settings.json`); putting plugin payload there conflates two ownership boundaries.
+- CI runners and non-Claude-Code tools have no `${CLAUDE_PLUGIN_ROOT}` and no plugin cache, so the engine must live in the project repo somewhere — `.edpa/engine/` is that somewhere.
+
+**What gets vendored:** `scripts/` (30 .py), `schemas/` (1 .json), `templates/` (3 .tmpl). Skills/commands/hooks/.mcp.json from `${CLAUDE_PLUGIN_ROOT}` are NOT vendored — those are for Claude Code's plugin runtime exclusively, which loads them from its cache, not from the project.
+
 ### 3. Install CI workflows into `.github/workflows/`
 
 ```bash
@@ -121,37 +120,53 @@ mkdir -p .github/workflows
 cp "${CLAUDE_PLUGIN_ROOT}"/edpa/workflows/*.yml .github/workflows/
 ```
 
-The 11 workflows are self-bootstrapping: each one's first job step runs `curl -fsSL https://edpa.technomaton.com/install.sh | sh` on the CI runner, so scripts get installed ephemerally per run and the project repo never has to commit `.claude/edpa/scripts/`. See `${CLAUDE_PLUGIN_ROOT}/edpa/workflows/` for the source.
+The 11 workflows call `python3 .edpa/engine/scripts/X.py` directly — no install step needed per run because the engine is already vendored in the project repo from step 2.
 
-### 4. Initialize project metadata — `edpa.yaml`
+### 4. Initialize project metadata — `.edpa/config/edpa.yaml`
 
-Read `${CLAUDE_PLUGIN_ROOT}/edpa/templates/project.yaml.tmpl` as the starting point. Write to `.edpa/config/edpa.yaml`, populating at minimum `project.name` from `$ARGUMENTS`. Leave optional fields (funding, organizations, addresses) empty for the user to fill in later if relevant.
+```bash
+cp "${CLAUDE_PLUGIN_ROOT}/edpa/templates/edpa.yaml.tmpl" .edpa/config/edpa.yaml
+```
 
-The template has rich content: project description, funding instrument (program/registration/period), organizations (legal name, tax/VAT IDs, addresses), governance methodology version, naming patterns for PI/iteration/branch, item type prefixes, native GitHub Issue Types, label classifications. Most of these can stay at defaults.
+Then update `project.name` in the new file to `$ARGUMENTS`. Leave optional fields (funding instrument, organizations, addresses) empty for the user to fill in later if relevant.
 
-**Do NOT merge project metadata into `people.yaml`** — these are two separate files in the v1.11+ architecture: `edpa.yaml` for project-level config, `people.yaml` for capacity registry only.
+The template carries:
+- `project.{name, description, domain}` (basic identity)
+- `project.funding.{program, registration, period_*}` (grants / contracts; remove block if N/A)
+- `project.organizations[]` (legal name, tax/VAT IDs, addresses; for audit + invoicing)
+- `governance.methodology` (engine version pin)
+- `naming.{pi_pattern, iteration_pattern, branch_pattern, item_prefixes}`
+- `issue_types.{Initiative, Epic, Feature, Story, Defect, Task}`
+- `labels.Enabler`
 
-### 5. Initialize capacity registry — `people.yaml`
+Most of these can stay at defaults.
 
-Read `${CLAUDE_PLUGIN_ROOT}/edpa/templates/people.yaml.tmpl` as the starting point. Write to `.edpa/config/people.yaml`, replacing the example `people:` entries with the real team. Keep the `cadence:` and `teams:` blocks (default cadence is AI-native: 1-week iterations, 5-week PI, 4 delivery + 1 IP).
+**Don't merge project metadata into `people.yaml`** — these are two separate files in the v1.11+ architecture: `edpa.yaml` for project-level config, `people.yaml` for capacity registry only.
 
-For each team member, ask the user explicitly for: name, role, team, FTE, email, **and GitHub username**. Calculate `capacity_per_iteration = fte × hours_per_week × iteration_weeks` (e.g. `1.0 × 40 × 1 = 40` for 1-week iter).
+### 5. Initialize capacity registry — `.edpa/config/people.yaml`
 
-**Roles** — use one of these exact values: `Arch`, `Dev`, `DevSecOps`, `PM`, `QA`. **Never default to "Dev"** — ask the user explicitly. If the user/memory profile indicates a specific role (e.g. "Lead Architect" → `Arch`), use that; otherwise the canonical phrasing is:
+```bash
+cp "${CLAUDE_PLUGIN_ROOT}/edpa/templates/people.yaml.tmpl" .edpa/config/people.yaml
+```
+
+Then replace the `people[]` example entries with the real team. Keep the `cadence:` and `teams:` blocks (default cadence is AI-native: 1-week iterations, 5-week PI, 4 delivery + 1 IP).
+
+For each team member, ask the user explicitly for: **name, role, team, FTE, email, and GitHub username**. Calculate `capacity_per_iteration = fte × hours_per_week × iteration_weeks` (e.g. `1.0 × 40 × 1 = 40` for 1-week iter).
+
+**Roles** — use one of these exact values: `Arch`, `Dev`, `DevSecOps`, `PM`, `QA`. **Never default to "Dev"** — ask the user explicitly. If a memory profile indicates a specific role (e.g. "Lead Architect" → `Arch`), use that; otherwise:
 
 > "What is {name}'s role? (Arch / Dev / DevSecOps / PM / QA)"
 
-**CRITICAL — never invent the `github` field** from email patterns (e.g. `jaroslav@company.com` → `jaroslav`) or from the user's name. GitHub usernames are not derivable. If the user does not know someone's login, leave `github: ""` and tell them they can fill it in later — `sync push --assignee` simply skips people without a login. Inventing a login risks routing issue assignments to a stranger with the same handle.
+**CRITICAL — never invent the `github` field** from email patterns or names. GitHub usernames are not derivable. If the user doesn't know someone's login, leave `github: ""` and tell them they can fill it in later — `sync push --assignee` skips people without a login. Inventing risks routing issue assignments to a stranger with the same handle.
 
-Canonical phrasing per person:
-> "GitHub username for {name}? (leave blank if you don't know it right now — you can fill it in later in `.edpa/config/people.yaml`)"
+> "GitHub username for {name}? (leave blank if you don't know — fill in later via PR to people.yaml)"
 
 ### 6. Provision GitHub Project + custom fields
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py" \
+python3 .edpa/engine/scripts/project_setup.py \
   --org <org> --repo <repo> --project-title "<project-name> Governance" \
-  --skip-preflight   # only if Stage 0 already ran this session
+  --skip-preflight   # already ran in step 0
 ```
 
 The script:
@@ -160,7 +175,7 @@ The script:
 - Maps Issue Types (Initiative/Epic/Feature/Story/Defect/Task) to the project
 - Creates the `Enabler` label and other classifications
 - Writes `.edpa/config/issue_map.yaml` mapping local IDs ↔ GitHub Issue numbers
-- Offers to call `create_project_views.py` to seed Initiative / Epic / Feature / Story / Status kanban views
+- Offers to call `create_project_views.py` to seed kanban views
 
 ### 7. Hierarchy is mandatory — never produce a flat backlog
 
@@ -168,13 +183,13 @@ The script:
 
 ```bash
 # Correct — backlog.py enforces parent + assigns the next ID
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/backlog.py" add --type Initiative --title "Platform"
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/backlog.py" add --type Epic        --parent I-1 --title "Auth"
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/backlog.py" add --type Feature     --parent E-1 --title "OAuth"
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/backlog.py" add --type Story       --parent F-1 --title "Login UI" --js 5
+python3 .edpa/engine/scripts/backlog.py add --type Initiative --title "Platform"
+python3 .edpa/engine/scripts/backlog.py add --type Epic        --parent I-1 --title "Auth"
+python3 .edpa/engine/scripts/backlog.py add --type Feature     --parent E-1 --title "OAuth"
+python3 .edpa/engine/scripts/backlog.py add --type Story       --parent F-1 --title "Login UI" --js 5
 
 # After items exist, sync push wires parent-child to GitHub sub-issues:
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/sync.py" push
+python3 .edpa/engine/scripts/sync.py push
 ```
 
 **Forbidden** — these bypass hierarchy enforcement:
@@ -182,28 +197,27 @@ python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/sync.py" push
 - Writing `.edpa/backlog/**/*.yaml` files via the editor without a `parent:` field on every non-Initiative entry
 - Skipping `sync push` after adding items locally — without it, GitHub Issues never get linked as sub-issues
 
-If the user asks "create issues for the backlog", ALWAYS use `backlog.py add` per item, then a single `sync push` at the end.
+### 8. Commit + output confirmation
 
-### 8. Output confirmation
+Commit `.edpa/`, `.edpa/engine/`, `.github/workflows/edpa-*.yml`. Print summary: project name, team count, total FTE, capacity/iteration, cadence, GH Project URL.
 
-Print summary: project name, team count, total FTE, capacity/iteration, cadence, GH Project URL.
-
-The `project_setup.py` wizard automatically prompts for optional `create_project_views.py` invocation (Initiative / Epic / Feature / Story / Status views in the GitHub Project UI). Default is yes. Failure to create views is non-fatal — the maintainer can re-run later:
+The `project_setup.py` wizard automatically prompts for optional `create_project_views.py` invocation. Default is yes. Failure is non-fatal — the maintainer can re-run later:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/create_project_views.py" --url <project-url>
+python3 .edpa/engine/scripts/create_project_views.py --url <project-url>
 ```
 
 ## What NOT to do
 
-- **Don't copy plugin files into `.claude/edpa/`.** The cleanly-installed project has `.claude/settings.json` and nothing else under `.claude/`. Plugin scripts live in `${CLAUDE_PLUGIN_ROOT}` for the maintainer (Claude Code's cache) and are installed ephemerally on CI runners by the workflows themselves. Vendoring them into the project's `.claude/` is legacy v1.0 behaviour that confuses end-users and duplicates content.
-- **Don't create `.edpa/config/heuristics.yaml`.** The engine reads canonical CW weights from `${CLAUDE_PLUGIN_ROOT}/edpa/templates/cw_heuristics.yaml.tmpl` (LOCKED, calibrated). The `.edpa/config/heuristics.yaml` file from pre-v1.11 was a copy that the engine ignored — seeding it is dead legacy.
+- **Don't copy plugin files into `.claude/edpa/`.** Engine vendors to `.edpa/engine/`. The project's `.claude/` stays clean (typically just `settings.json`). Vendoring to `.claude/edpa/` was the v1.0-era pattern; v1.18.4+ uses `.edpa/engine/`.
+- **Don't create `.edpa/config/heuristics.yaml`.** The engine reads canonical CW weights from `.edpa/engine/templates/cw_heuristics.yaml.tmpl` (LOCKED, calibrated). The user-editable `.edpa/config/heuristics.yaml` from pre-v1.11 was a copy the engine ignored.
 - **Don't merge project metadata into `people.yaml`.** v1.11+ has `edpa.yaml` (project) and `people.yaml` (capacity) as separate files. Mixing them was a pre-v1.11 footgun.
 - **Don't default `role: Dev`.** Roles are `Arch / Dev / DevSecOps / PM / QA`; ask the user.
 
 ## Error handling
 
 - `gh` not authenticated → print `gh auth login` instructions
-- Missing Python packages → install via SessionStart hook, or manually with `pip install -r "${CLAUDE_PLUGIN_ROOT}/requirements.txt"`
+- Missing Python packages → SessionStart hook installs them; manual fallback: `pip3 install -r "${CLAUDE_PLUGIN_ROOT}/requirements.txt" --break-system-packages`
 - GitHub API rate limit → wait and retry
-- `${CLAUDE_PLUGIN_ROOT}` not set → skill was invoked outside Claude Code's plugin runtime; fall back to manual install via `curl | sh https://edpa.technomaton.com/install.sh` and rerun setup from a Claude Code session
+- `${CLAUDE_PLUGIN_ROOT}` not set → skill was invoked outside Claude Code's plugin runtime; fall back to `curl -fsSL https://edpa.technomaton.com/install.sh | sh` (which vendors to `.edpa/engine/` directly) and rerun setup
+- `.edpa/engine/VERSION` mismatches `${CLAUDE_PLUGIN_ROOT}` plugin version → engine drift; offer `/edpa:setup --update-engine` to refresh

@@ -24,10 +24,5 @@ jobs:
 
       - run: pip install pyyaml
 
-      - name: Install EDPA plugin (ephemeral, no project vendoring)
-        env:
-          EDPA_FORCE_INSTALL: "1"
-        run: curl -fsSL https://edpa.technomaton.com/install.sh | sh
-
       - name: Check backlog traceability
-        run: python3 .claude/edpa/scripts/traceability.py
+        run: python3 .edpa/engine/scripts/traceability.py

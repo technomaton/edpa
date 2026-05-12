@@ -42,11 +42,6 @@ jobs:
       - name: Install Python deps
         run: pip install pyyaml ruamel.yaml
 
-      - name: Install EDPA plugin (ephemeral, no project vendoring)
-        env:
-          EDPA_FORCE_INSTALL: "1"
-        run: curl -fsSL https://edpa.technomaton.com/install.sh | sh
-
       - name: Warn if PAT not configured
         env:
           PAT: ${{ secrets.EDPA_TOKEN }}
@@ -101,7 +96,7 @@ jobs:
           # GITHUB_TOKEN sees only direct repo collaborators.
           GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          python3 .claude/edpa/scripts/sync_collaborators.py status \
+          python3 .edpa/engine/scripts/sync_collaborators.py status \
             --repo "$GITHUB_REPOSITORY"
 
       - name: Apply removes — direct commit to main
@@ -111,7 +106,7 @@ jobs:
           # GITHUB_TOKEN sees only direct repo collaborators.
           GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          python3 .claude/edpa/scripts/sync_collaborators.py apply \
+          python3 .edpa/engine/scripts/sync_collaborators.py apply \
             --repo "$GITHUB_REPOSITORY"
           if [ -n "$(git status --porcelain .edpa/config/people.yaml 2>/dev/null)" ]; then
             git add .edpa/config/people.yaml
@@ -131,7 +126,7 @@ jobs:
           # GITHUB_TOKEN sees only direct repo collaborators.
           GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          python3 .claude/edpa/scripts/sync_collaborators.py apply \
+          python3 .edpa/engine/scripts/sync_collaborators.py apply \
             --repo "$GITHUB_REPOSITORY" \
             --auto-add
           if [ -z "$(git status --porcelain .edpa/config/people.yaml 2>/dev/null)" ]; then

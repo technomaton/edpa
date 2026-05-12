@@ -1,33 +1,36 @@
 #!/bin/sh
-# EDPA Installer — installs the EDPA plugin into .claude/
+# EDPA Installer — installs the EDPA plugin into the current project.
 # Usage: curl -fsSL https://edpa.technomaton.com/install.sh | sh
 #
 # Two install paths exist for EDPA:
 #
 #   1. Claude Code marketplace  → `/plugin install tm-edpa@technomaton-hub`
-#      Pulls plugin payload from technomaton/edpa@plugin directly.
-#      Python deps install automatically via the plugin's SessionStart hook.
-#      .github/workflows/ get copied by /edpa:setup on first invocation.
+#      or `/plugin install edpa@technomaton-edpa`. Pulls plugin payload from
+#      technomaton/edpa@plugin into Claude Code's plugin cache. Then the
+#      user runs `/edpa:setup` which vendors the engine to `.edpa/engine/`
+#      and provisions the project.
 #
 #   2. This script (curl|sh)    → for Cursor, Codex CLI, or any environment
 #      that doesn't speak the Claude Code plugin protocol. Downloads the
-#      same plugin payload from a GitHub Release tarball, places it under
-#      .claude/, and bootstraps .edpa/. After install, the user must:
-#        - install Python deps:   pip3 install -r .claude/requirements.txt
-#        - copy CI workflows:     run /edpa:setup or python3 .claude/edpa/scripts/preflight.py
+#      same plugin payload from a GitHub Release tarball, vendors the
+#      engine to `.edpa/engine/`, bootstraps `.edpa/`, and prints
+#      next-step instructions for project provisioning.
 #
-# This script is intentionally minimal: it does NOT install pip packages
-# or copy CI workflows. Both belong to /edpa:setup, which is the single
-# source of truth across both install paths.
+# This script is intentionally minimal: it vendors `plugin/edpa/{scripts,
+# schemas,templates}/` into `.edpa/engine/` so CI workflows and non-CC tools
+# can find the engine. It does NOT install pip packages, does NOT copy CI
+# workflows (that's project_setup.py / /edpa:setup), and does NOT touch
+# `.claude/`. The result is a project root that has `.edpa/` and nothing
+# else added.
 set -e
 
 REPO="technomaton/edpa"
-TARGET=".claude"
+TARGET=".edpa/engine"
 
 echo "EDPA Installer"
 echo "=============="
 
-# --- Prereq existence checks (no pip installs — see header) ---
+# --- Prereq existence checks ---
 echo ""
 echo "Checking prerequisites..."
 
@@ -58,8 +61,7 @@ fi
 if command -v pip3 >/dev/null 2>&1; then
   echo "  pip3 ✓"
 else
-  echo "  pip3 not found — install Python deps manually after this script:"
-  echo "       pip3 install -r .claude/requirements.txt"
+  echo "  pip3 not found — install Python deps manually after this script."
 fi
 
 echo ""
@@ -67,56 +69,51 @@ echo ""
 # --- Idempotency guard ---
 #
 # Read prompts in a `curl … | sh` flow: stdin is the pipe, not the
-# terminal, so plain `read` returns EOF immediately and the script
-# aborts before the user can type anything. The canonical fix
+# terminal, so plain `read` returns EOF immediately. The canonical fix
 # (rustup, nvm, oh-my-zsh all do this) is to redirect from /dev/tty,
 # which still points at the real terminal even when stdin is piped.
 #
 # Non-interactive environments (CI, docker build, sub-shells with no
 # tty): /dev/tty is unavailable. Skip the prompt and require the
-# `EDPA_FORCE_INSTALL=1` env var to overwrite — never silently
-# destroy an existing install just because nobody could answer.
-if [ -d "$TARGET/edpa" ]; then
+# `EDPA_FORCE_INSTALL=1` env var to overwrite.
+if [ -d "$TARGET" ]; then
   if [ "$EDPA_FORCE_INSTALL" = "1" ]; then
-    echo "EDPA_FORCE_INSTALL=1 — overwriting existing $TARGET/edpa/ without prompt."
+    echo "EDPA_FORCE_INSTALL=1 — overwriting existing $TARGET/ without prompt."
   elif [ -r /dev/tty ]; then
-    printf "Warning: %s/edpa/ already exists. Overwrite? [y/N] " "$TARGET"
+    printf "Warning: %s already exists. Overwrite? [y/N] " "$TARGET"
     read -r answer < /dev/tty
     case "$answer" in
       [yY]*) echo "Overwriting..." ;;
       *) echo "Aborted."; exit 1 ;;
     esac
   else
-    echo "ERROR: $TARGET/edpa/ already exists and no TTY available for prompt."
+    echo "ERROR: $TARGET/ already exists and no TTY available for prompt."
     echo "Re-run with EDPA_FORCE_INSTALL=1 to overwrite, or remove the directory first."
     exit 1
   fi
 fi
-
-mkdir -p "$TARGET"
 
 # --- Download plugin payload ---
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 echo "Downloading EDPA plugin..."
-# Pick the most recent release tag (including prereleases — GitHub's
-# "/releases/latest" API and `gh release download` without a tag both
-# skip prereleases, which would silently fall back to a main-branch
-# clone whenever every published release is marked `-beta`).
+# Prefer the most recent release tag (including prereleases — GitHub's
+# /releases/latest API skips prereleases, which would silently fall back
+# to a main-branch clone whenever every published release is marked beta).
 if command -v gh >/dev/null 2>&1; then
   LATEST_TAG=$(gh release list --repo "$REPO" --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
   if [ -n "$LATEST_TAG" ] && gh release download "$LATEST_TAG" --repo "$REPO" --pattern "edpa-plugin.tar.gz" --dir "$TMPDIR" 2>/dev/null; then
     echo "Downloaded from release $LATEST_TAG."
     mkdir -p "$TMPDIR/edpa"
     tar -xzf "$TMPDIR/edpa-plugin.tar.gz" -C "$TMPDIR/edpa"
+    PLUGIN_VERSION="$LATEST_TAG"
   else
     echo "No release asset found, cloning main branch..."
     gh repo clone "$REPO" "$TMPDIR/edpa" -- --depth 1 -q
+    PLUGIN_VERSION="main"
   fi
 else
-  # /releases (plural) returns ALL releases including prereleases,
-  # most recent first. Take the first matching asset URL.
   RELEASE_URL=$(curl -fsSL "https://api.github.com/repos/$REPO/releases" 2>/dev/null \
     | grep '"browser_download_url".*edpa-plugin.tar.gz' \
     | head -1 | cut -d'"' -f4) || true
@@ -126,70 +123,93 @@ else
     curl -fsSL "$RELEASE_URL" | tar -xz -C "$TMPDIR"
     mkdir -p "$TMPDIR/edpa/plugin"
     mv "$TMPDIR"/* "$TMPDIR/edpa/plugin/" 2>/dev/null || true
+    PLUGIN_VERSION="latest-release"
   else
     echo "No release found, downloading main branch..."
     curl -fsSL "https://github.com/$REPO/archive/refs/heads/main.tar.gz" \
       | tar -xz -C "$TMPDIR"
     mv "$TMPDIR"/edpa-* "$TMPDIR/edpa"
+    PLUGIN_VERSION="main"
   fi
 fi
 
-# Copy plugin contents into .claude/ (including hidden files like .mcp.json, .claude-plugin/)
 PLUGIN_SRC="$TMPDIR/edpa/plugin"
 if [ ! -d "$PLUGIN_SRC" ]; then
   PLUGIN_SRC="$TMPDIR/edpa"
 fi
-# Copy visible files
-cp -R "$PLUGIN_SRC/"* "$TARGET/" 2>/dev/null || true
-# Copy hidden files (but not . and ..)
-for f in "$PLUGIN_SRC"/.[!.]* "$PLUGIN_SRC"/..?*; do
-  [ -e "$f" ] && cp -R "$f" "$TARGET/" 2>/dev/null || true
-done
 
-# Make hook scripts executable
-chmod +x "$TARGET/edpa/scripts/hooks/"* 2>/dev/null || true
+# --- Vendor engine into .edpa/engine/ ---
+echo ""
+echo "Vendoring engine into $TARGET/..."
+mkdir -p "$TARGET"
+cp -R "$PLUGIN_SRC/edpa/scripts"   "$TARGET/"
+cp -R "$PLUGIN_SRC/edpa/schemas"   "$TARGET/"
+cp -R "$PLUGIN_SRC/edpa/templates" "$TARGET/"
 
-# --- Bootstrap .edpa/ data directory + seed templates ---
+# Pin the vendored plugin version so /edpa:setup --update-engine and CI
+# workflows can sanity-check the engine tree.
+if [ -f "$PLUGIN_SRC/.claude-plugin/plugin.json" ]; then
+  PINNED=$(python3 -c "import json; print(json.load(open('$PLUGIN_SRC/.claude-plugin/plugin.json'))['version'])" 2>/dev/null || echo "$PLUGIN_VERSION")
+else
+  PINNED="$PLUGIN_VERSION"
+fi
+echo "$PINNED" > "$TARGET/VERSION"
+
+# Make hook shell scripts executable (used by EDPA plugin hooks if user
+# also runs this in a Claude Code project — harmless otherwise).
+chmod +x "$TARGET/scripts/hooks/"* 2>/dev/null || true
+
+echo "  scripts:   $(find $TARGET/scripts -maxdepth 1 -name '*.py' | wc -l | tr -d ' ') Python modules"
+echo "  schemas:   $(find $TARGET/schemas -maxdepth 1 -name '*.json' | wc -l | tr -d ' ') JSON schemas"
+echo "  templates: $(find $TARGET/templates -maxdepth 1 -name '*.tmpl' | wc -l | tr -d ' ') YAML templates"
+echo "  pinned:    $PINNED"
+
+# --- Bootstrap .edpa/ data tree + seed configs from templates ---
+echo ""
+echo "Bootstrapping .edpa/ data tree..."
 for dir in config backlog/initiatives backlog/epics backlog/features backlog/stories iterations reports snapshots data; do
   mkdir -p ".edpa/$dir"
 done
 
-# Engine reads canonical CW weights from
-# $TARGET/edpa/templates/cw_heuristics.yaml.tmpl (LOCKED, calibrated) —
-# no .edpa/config/heuristics.yaml is needed. Pre-v1.11 install.sh seeded
-# one and the engine ignored it; that legacy line was removed in v1.18.4.
-if [ ! -f ".edpa/config/people.yaml" ] && [ -f "$TARGET/edpa/templates/people.yaml.tmpl" ]; then
-  cp "$TARGET/edpa/templates/people.yaml.tmpl" ".edpa/config/people.yaml"
-  echo "Created .edpa/config/people.yaml from template (edit with your team)"
+# Seed people.yaml + edpa.yaml from canonical templates. Engine reads
+# canonical CW heuristics from .edpa/engine/templates/cw_heuristics.yaml.tmpl
+# directly — no .edpa/config/heuristics.yaml is needed and would be ignored.
+if [ ! -f ".edpa/config/people.yaml" ] && [ -f "$TARGET/templates/people.yaml.tmpl" ]; then
+  cp "$TARGET/templates/people.yaml.tmpl" ".edpa/config/people.yaml"
+  echo "  Created .edpa/config/people.yaml (edit with your team)"
 fi
-if [ ! -f ".edpa/config/edpa.yaml" ] && [ -f "$TARGET/edpa/templates/project.yaml.tmpl" ]; then
-  cp "$TARGET/edpa/templates/project.yaml.tmpl" ".edpa/config/edpa.yaml"
-  echo "Created .edpa/config/edpa.yaml from template (run /edpa:setup to configure)"
-fi
-
-# Show installed version
-if [ -f "$TARGET/.claude-plugin/plugin.json" ]; then
-  VERSION=$(python3 -c "import json; print(json.load(open('$TARGET/.claude-plugin/plugin.json'))['version'])" 2>/dev/null || echo "unknown")
-  echo ""
-  echo "EDPA $VERSION installed successfully!"
-else
-  echo ""
-  echo "EDPA installed successfully!"
+if [ ! -f ".edpa/config/edpa.yaml" ] && [ -f "$TARGET/templates/edpa.yaml.tmpl" ]; then
+  cp "$TARGET/templates/edpa.yaml.tmpl" ".edpa/config/edpa.yaml"
+  echo "  Created .edpa/config/edpa.yaml (edit project.name + governance metadata)"
 fi
 
+touch ".edpa/changelog.jsonl" ".edpa/sync_state.json"
+
+echo ""
+echo "EDPA $PINNED installed."
 echo ""
 echo "Next steps:"
 echo ""
 echo "  Claude Code users:"
-echo "    1. Restart Claude Code (SessionStart hook will auto-install Python deps)"
-echo "    2. Run  /edpa:setup \"Project Name\"  to provision GitHub Projects + workflows"
+echo "    Re-run setup via /edpa:setup to provision GitHub Project + CI workflows."
+echo "    /edpa:setup will overlay the same .edpa/engine/ tree and prompt for"
+echo "    team details, then push to GitHub Projects."
 echo ""
 echo "  Other tools (Cursor, Codex CLI, raw):"
 echo "    1. Install Python deps:"
-echo "         pip3 install -r .claude/requirements.txt"
-echo "    2. Run preflight + setup wizard:"
-echo "         python3 .claude/edpa/scripts/preflight.py --org <your-org>"
-echo "         python3 .claude/edpa/scripts/project_setup.py --org <org> --repo <repo>"
+echo "         pip3 install pyyaml ruamel.yaml openpyxl"
+echo "         (mcp package only needed if you want the MCP server)"
+echo "    2. Edit team and project metadata:"
+echo "         .edpa/config/people.yaml"
+echo "         .edpa/config/edpa.yaml"
+echo "    3. Run project provisioning manually:"
+echo "         python3 .edpa/engine/scripts/project_setup.py --org <org> --repo <repo> \\"
+echo "           --project-title \"<your-project-name> Governance\""
+echo "    4. Copy CI workflows:"
+echo "         mkdir -p .github/workflows"
+echo "         cp .edpa/engine/templates/../workflows/*.yml .github/workflows/  # if present"
+echo "         # (release tarball doesn't ship workflows separately; pull them"
+echo "         # from the plugin source tree at github.com/$REPO/tree/main/plugin/edpa/workflows)"
 echo ""
 echo "  CI sync (optional, ~5 min):"
 echo "    Configure the EDPA_TOKEN secret so GH Actions workflows can run."
