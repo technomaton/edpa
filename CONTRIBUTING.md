@@ -50,6 +50,37 @@ python3 -m pytest tests/
 python3 plugin/edpa/scripts/engine.py --demo
 ```
 
+### Claude Code dogfooding (optional but recommended)
+
+The repo dogfoods its own EDPA plugin so any changes to `plugin/` are
+testable in this same Claude Code session. After cloning, run **once
+per clone** in Claude Code:
+
+```
+/plugin marketplace add .
+```
+
+This registers the local marketplace from `.claude-plugin/marketplace.json`.
+Then:
+
+```
+/plugin install edpa@technomaton-edpa
+```
+
+`.claude/settings.json` has `"enabledPlugins": {"edpa@technomaton-edpa": "enabled"}`
+so the plugin stays active across `/reload-plugins` and session restarts —
+you only need the install command once.
+
+**Iteration loop** for plugin development:
+
+1. Edit `plugin/skills/<X>/SKILL.md` (or any other plugin file)
+2. `/plugin marketplace update technomaton-edpa` — re-copies working tree into cache
+3. `/reload-plugins` — re-loads skills/commands/hooks/MCP from cache
+
+`${CLAUDE_PLUGIN_ROOT}` resolves to `~/.claude/plugins/cache/edpa/`, so
+the engine and MCP server run from the cache copy — not directly from
+the working tree. This matches what end-users experience.
+
 ## Project Structure
 
 - `plugin/` — EDPA plugin source (skills, commands, scripts, templates)

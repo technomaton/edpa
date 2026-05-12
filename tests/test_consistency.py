@@ -22,8 +22,13 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def test_version_consistent():
     """All version references must match the source of truth in plugin.json."""
-    # Source of truth
-    plugin = json.loads((ROOT / ".claude/.claude-plugin/plugin.json").read_text())
+    # Source of truth — `plugin/.claude-plugin/plugin.json` in the repo.
+    # Pre-v1.18.3 the `.claude/` symlink farm exposed this at
+    # `.claude/.claude-plugin/plugin.json`; that symlink is gone now, and
+    # the runtime copy after `/plugin install` lives in
+    # `~/.claude/plugins/cache/edpa/.claude-plugin/plugin.json` (out of
+    # repo). Read directly from the source-of-truth location.
+    plugin = json.loads((ROOT / "plugin/.claude-plugin/plugin.json").read_text())
     version = plugin["version"]
 
     errors = []
@@ -142,13 +147,17 @@ def test_skills_exist():
     # Code plugin spec's auto-discovery (commands at plugin root, not in
     # a self-named sub-namespace) works under /plugin install via the
     # marketplace flow.
+    # v1.18.3 dropped the .claude/ symlink farm — the canonical command
+    # files live in plugin/commands/ now. Runtime copies after
+    # `/plugin install` end up in ~/.claude/plugins/cache/edpa/commands/
+    # (out of repo). Check the source-of-truth location.
     required_commands = [
-        ".claude/commands/setup.md",
-        ".claude/commands/close-iteration.md",
-        ".claude/commands/reports.md",
-        ".claude/commands/calibrate.md",
-        ".claude/commands/sync.md",
-        ".claude/commands/board.md",
+        "plugin/commands/setup.md",
+        "plugin/commands/close-iteration.md",
+        "plugin/commands/reports.md",
+        "plugin/commands/calibrate.md",
+        "plugin/commands/sync.md",
+        "plugin/commands/board.md",
     ]
 
     missing = []
@@ -160,7 +169,7 @@ def test_skills_exist():
     assert not missing, "Missing command files:\n  " + "\n  ".join(missing)
 
     # plugin.json must reference these commands
-    plugin = json.loads((ROOT / ".claude/.claude-plugin/plugin.json").read_text())
+    plugin = json.loads((ROOT / "plugin/.claude-plugin/plugin.json").read_text())
     commands = plugin.get("commands", [])
     command_basenames = {Path(c).name for c in commands}
 
