@@ -119,12 +119,18 @@ def test_no_hardcoded_org_in_config():
 
 def test_skills_exist():
     """Every /edpa command must have a corresponding skill file."""
+    # Layout changed in v1.18.3: commands flattened from
+    # .claude/commands/edpa/X.md → .claude/commands/X.md so the Claude
+    # Code plugin spec's auto-discovery (commands at plugin root, not in
+    # a self-named sub-namespace) works under /plugin install via the
+    # marketplace flow.
     required_commands = [
-        ".claude/commands/edpa/setup.md",
-        ".claude/commands/edpa/close-iteration.md",
-        ".claude/commands/edpa/reports.md",
-        ".claude/commands/edpa/calibrate.md",
-        ".claude/commands/edpa/sync.md",
+        ".claude/commands/setup.md",
+        ".claude/commands/close-iteration.md",
+        ".claude/commands/reports.md",
+        ".claude/commands/calibrate.md",
+        ".claude/commands/sync.md",
+        ".claude/commands/board.md",
     ]
 
     missing = []
@@ -140,7 +146,7 @@ def test_skills_exist():
     commands = plugin.get("commands", [])
     command_basenames = {Path(c).name for c in commands}
 
-    expected_basenames = {"setup.md", "close-iteration.md", "reports.md", "calibrate.md", "sync.md"}
+    expected_basenames = {"setup.md", "close-iteration.md", "reports.md", "calibrate.md", "sync.md", "board.md"}
     missing_refs = expected_basenames - command_basenames
     assert not missing_refs, (
         f"plugin.json missing command references: {missing_refs}"
