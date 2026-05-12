@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.18.5 — 2026-05-12
+
+### Bug fixes
+
+- **plugin.json**: removed `hooks` field — Claude Code v2.1.139+ auto-loads `hooks/hooks.json`
+  and errors with "Duplicate hooks file detected" when it is also referenced in the manifest.
+- **plugin/.mcp.json**: removed explicit `env.GITHUB_PERSONAL_ACCESS_TOKEN` declaration —
+  CC v2.1.139+ validates env var references at load time; `npx` inherits the variable from
+  the shell automatically so the explicit declaration was unnecessary.
+- **test_consistency.py**: updated `test_plugin_json_hooks_reference` to assert that
+  `hooks/hooks.json` is NOT referenced in plugin.json (inverted guard for new CC behaviour).
+
 ## 1.18.4 — 2026-05-12
 
 ### Bug fixes

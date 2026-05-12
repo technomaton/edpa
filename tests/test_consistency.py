@@ -386,12 +386,18 @@ def test_plugin_hooks_paths():
 # ---------------------------------------------------------------------------
 
 def test_plugin_json_hooks_reference():
-    """plugin.json hooks field points to existing file."""
+    """Claude Code auto-loads hooks/hooks.json — plugin.json must NOT reference it
+    (causes duplicate-hooks error in CC v2.1.139+). If hooks field is present it
+    must point to a *different* file."""
     pj = json.loads((ROOT / "plugin/.claude-plugin/plugin.json").read_text())
     hooks_ref = pj.get("hooks")
-    assert hooks_ref, "plugin.json missing hooks field"
-    hooks_path = ROOT / "plugin" / hooks_ref.lstrip("./")
-    assert hooks_path.exists(), f"hooks.json not found at {hooks_path}"
+    standard = "./hooks/hooks.json"
+    assert hooks_ref != standard, (
+        "plugin.json must not reference hooks/hooks.json — CC loads it automatically"
+    )
+    if hooks_ref:
+        hooks_path = ROOT / "plugin" / hooks_ref.lstrip("./")
+        assert hooks_path.exists(), f"hooks file not found at {hooks_path}"
 
 
 # ---------------------------------------------------------------------------
