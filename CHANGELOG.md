@@ -2,6 +2,87 @@
 
 ## Unreleased
 
+## 1.18.3 — 2026-05-12
+
+### Canonical Claude Code plugin layout
+
+The plugin tree now matches Claude Code's auto-discovery spec end-to-end,
+so `/plugin install` via the marketplace works without any manual steps.
+Previously the layout relied on explicit listings in `plugin.json` to
+bridge the gap between what the spec expected and what the repo shipped;
+post-`/plugin install` to a clean machine surfaced the divergence.
+
+- `plugin/commands/edpa/*.md` → `plugin/commands/*.md` (flat). Slash
+  command names are unchanged (`/edpa:setup`, `/edpa:board`, …) — they
+  derive from the plugin name plus file basename.
+- Skill slugs canonicalised via `name:` frontmatter override
+  (`edpa-setup` → `setup`, etc.) so the auto-discovered slug becomes
+  `/edpa:setup` instead of `/edpa:edpa-setup`. Directory names kept as
+  `skills/edpa-*/` for backward-compat with any external path refs.
+- New `plugin/.claude-plugin/marketplace.json` lets maintainers
+  `/plugin marketplace add /path/to/edpa/plugin` against a local clone
+  for native dogfooding (no more `.claude/` symlink farm).
+
+### SessionStart hook + `requirements.txt`
+
+Python deps install moves out of `install.sh` and into the plugin so
+the marketplace install path provisions them automatically.
+
+- New `plugin/requirements.txt` — single source of truth for runtime
+  deps (PyYAML, ruamel.yaml, mcp, openpyxl).
+- New `plugin/edpa/scripts/hooks/install_deps.sh` — SessionStart hook
+  with cheap import probe + content-hashed marker in
+  `${CLAUDE_PLUGIN_DATA}`. Cold ~700ms, warm ~15ms. Falls back to
+  `pip install --break-system-packages` for PEP 668 environments,
+  exits 0 on failure (never blocks session start).
+- `plugin/hooks/hooks.json` registers the new SessionStart event
+  alongside the existing PostToolUse hooks.
+
+### `install.sh` slimmed (281 → 197 lines)
+
+`curl|sh` installer now does download + extract + `.edpa/` bootstrap
+only. Responsibilities that don't belong to the installer move into
+the plugin:
+
+- `pip install …` blocks (PyYAML, ruamel.yaml, mcp, openpyxl) removed —
+  the SessionStart hook handles them for Claude Code users; non-CC
+  users get the explicit `pip3 install -r .claude/requirements.txt`
+  command at the end-of-install banner.
+- `.github/workflows/edpa-*.yml` copy removed — `/edpa:setup` already
+  has it in its step 2b, so both install paths converge on the skill
+  for that step. Eliminates the divergence where marketplace installs
+  never got workflows.
+- Mirror update applied to `web/public/install.sh` so the Astro static
+  hosting serves the slim version too.
+
+### Hub `tm-edpa` switches to upstream pointer model
+
+`technomaton/technomaton-hub` packs/tm-edpa/ no longer holds a
+vendored copy of the plugin. The hub's `.claude-plugin/marketplace.json`
+registers `tm-edpa` with `source: {github, repo: technomaton/edpa,
+path: plugin}`, so `/plugin install tm-edpa@technomaton-hub` fetches
+the plugin payload directly from this repo. The previous vendor-then-
+mirror flow (`scripts/sync-edpa.sh` + `.github/workflows/sync-edpa.yml`)
+chronically lagged upstream and shipped a docs-only stub without the
+Python engine — pointer model removes the vendor step entirely.
+
+`packs/tm-edpa/_vendor.json` keeps the upstream pin metadata
+(`tag: v1.18.3`, SHA recorded at release time).
+
+### CI
+
+`.github/workflows/release.yml` (already in place since the v1.18.0
+line) keeps building `edpa-plugin.tar.gz` on `v*` tag push. Confirmed
+end-to-end via simulated marketplace install + planted iteration:
+1.6 MB cache, no monorepo siblings (web/, tools/, tests/, docs/) leak,
+all six skills + six commands resolve correctly, MCP server boots, full
+engine → reports → pi_close → velocity chain runs without error.
+
+### Tests
+
+`tests/test_consistency.py::test_skills_exist` updated for the flat
+`commands/` layout — was previously asserting the pre-flatten paths.
+
 ## 1.18.2 — 2026-05-12
 
 ### Removed — dead v1.10 calibration code
