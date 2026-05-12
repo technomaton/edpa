@@ -17,7 +17,7 @@ plugin/
 ├── edpa/
 │   ├── scripts/                   # Python engine + utilities
 │   │   ├── engine.py              # Core EDPA engine (Score, DerivedHours, invariants)
-│   │   ├── evaluate_cw.py         # CW evaluator for auto-calibration (LOCKED)
+│   │   ├── calibrate_signals.py   # CW signal-weights calibrator (Monte Carlo + coordinate descent, LOCKED)
 │   │   ├── backlog.py             # Git-native backlog CLI (tree, wsjf, validate)
 │   │   ├── sync.py                # GitHub Projects <-> Git bidirectional sync
 │   │   ├── issue_types.py         # GitHub Issue Types management

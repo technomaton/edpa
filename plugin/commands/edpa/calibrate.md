@@ -16,5 +16,6 @@ Pass arguments to forward to the script: `quick`, `apply`, an integer for
 `--scenarios`, or raw flags. Empty argument shows the last calibration
 metadata and proposes a default run.
 
-Legacy note: the v1.10 `role_weights`/`role_overrides` schema and
-`evaluate_cw.py` autoresearch loop are deprecated — the engine ignores them.
+Legacy note: the v1.10 `role_weights`/`role_overrides` schema is gone —
+the engine ignores both. The autoresearch loop that drove them was
+removed in v1.18.2.

@@ -73,8 +73,9 @@ candidate back into the template when `--apply` is passed.
 ## Prerequisites
 
 **None for the synthetic path.** The MC corpus is generated in-process; no
-`.edpa/data/ground_truth.yaml` is needed. The legacy `role_weights` schema and
-`evaluate_cw.py` autoresearch loop are deprecated — the engine ignores them.
+`.edpa/data/ground_truth.yaml` is needed. The legacy `role_weights` /
+`role_overrides` schema and the `evaluate_cw.py` autoresearch evaluator
+were removed in v1.18.2.
 
 If the user explicitly asks to calibrate against *real* PI data, fall through
 to "Re-run with real data" below.

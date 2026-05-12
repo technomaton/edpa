@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+## 1.18.2 — 2026-05-12
+
+### Removed — dead v1.10 calibration code
+
+`plugin/edpa/scripts/evaluate_cw.py` deleted. The script was the
+evaluator for the v1.10 `role_weights` / `role_overrides` Karpathy
+autoresearch loop, both of which the engine has ignored since v1.11.
+With the `/edpa:calibrate` skill rewired to `calibrate_signals.py`
+(1.18.1), the evaluator had no remaining callers.
+
+### Fixed — stale documentation across web + plugin
+
+- 8 web pages (`guide.astro`, `evaluation.astro`, `presentation/index.astro`,
+  `presentation/kashealth.astro` — CZ + EN) had `evaluate_cw.py` /
+  `role_weights` references. Rewritten to point at `calibrate_signals.py`
+  with the live MC + coordinate-descent flow.
+- `evaluation.astro` "Loop" + "Safety constraints" sections rewritten
+  end-to-end to the MC pipeline (was describing the deleted Karpathy
+  loop).
+- `plugin/README.md` tree map now lists `calibrate_signals.py` instead
+  of the deleted evaluator.
+- `plugin/skills/edpa-autocalib/SKILL.md` + `plugin/commands/edpa/calibrate.md`
+  legacy note updated to "v1.18.2 removed" instead of "deprecated".
+
+No engine, scoring math, or data-format change. The
+`test_no_role_overrides_in_heuristics` assertions stay — they correctly
+test that `role_overrides` is absent from heuristics (v1.11+ engine
+behavior).
+
 ## 1.18.1 — 2026-05-11
 
 ### Fixed — `/edpa:calibrate` skill rewired to v1.11+ MC pipeline
