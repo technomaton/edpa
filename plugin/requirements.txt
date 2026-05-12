@@ -1,0 +1,14 @@
+# EDPA plugin runtime Python dependencies.
+#
+# When installed via Claude Code's marketplace, the SessionStart hook
+# (edpa/scripts/hooks/install_deps.sh) installs these on first launch and
+# skips on subsequent sessions via a marker file in ${CLAUDE_PLUGIN_DATA}.
+#
+# When installed via curl|sh (install.sh), run manually after install:
+#   pip3 install -r .claude/requirements.txt
+# or invoke `/edpa:setup` (Claude Code) which delegates to project_setup.py.
+
+PyYAML>=6.0
+ruamel.yaml>=0.18
+mcp>=1.0
+openpyxl>=3.1
