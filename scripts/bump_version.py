@@ -13,7 +13,7 @@ Files that import from the sources of truth (no edit needed, automatic):
 
 Files that contain the version literally and need manual update (this
 script handles them):
-  - plugin/edpa/templates/project.yaml.tmpl   (`methodology: "EDPA X.Y.Z-tag"`)
+  - plugin/edpa/templates/edpa.yaml.tmpl       (`methodology: "EDPA X.Y.Z-tag"`)
   - plugin/skills/edpa-reports/SKILL.md       (example output blocks)
   - plugin/skills/edpa-setup/SKILL.md         (example output blocks)
   - docs/methodology.md                       (header line "Version X.Y.Z-tag — Month Year")
@@ -131,7 +131,7 @@ def main():
 
     # 2. Literal references
     targets = [
-        REPO_ROOT / "plugin/edpa/templates/project.yaml.tmpl",
+        REPO_ROOT / "plugin/edpa/templates/edpa.yaml.tmpl",
         REPO_ROOT / "plugin/skills/edpa-reports/SKILL.md",
         REPO_ROOT / "plugin/skills/edpa-setup/SKILL.md",
     ]

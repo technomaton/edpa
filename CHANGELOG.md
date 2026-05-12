@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## 1.18.4 — 2026-05-12
+
+### Bug fixes
+
+- **plugin.json skills**: entries now point to directories (`./skills/edpa-setup`) instead
+  of SKILL.md files — Claude Code v2.1.139 changed the loader to expect directories and
+  errors with "path is a file; expected a directory" on the old format.
+- **project_setup.py step 9**: `edpa.yaml` is now seeded from `edpa.yaml.tmpl` if missing;
+  previously step 9 silently skipped persisting GitHub state when the file didn't exist.
+- **project_setup.py**: corrected `create_project_views.py` hint path from `.claude/edpa/scripts/`
+  to `.edpa/engine/scripts/` (3 occurrences).
+- **settings.json**: `enabledPlugins` value changed from string `"enabled"` to boolean `true`
+  (schema validation fix).
+- **bump_version.py**: updated template reference from `project.yaml.tmpl` to `edpa.yaml.tmpl`.
+
+### Docs
+
+- All web guides (`guide.astro`, `en/guide.astro`, `playbook.astro`, `edpa-token-setup.md`,
+  `docs/playbook.md`) updated: `.claude/edpa/scripts/` → `.edpa/engine/scripts/`,
+  `.claude/edpa/templates/` → `.edpa/engine/templates/`.
+- Step 3 (Install) in both guide pages rewritten for new architecture: marketplace install
+  (`/plugin install tm-edpa@technomaton-hub`) as primary path, `curl|sh` as secondary.
+
 ## 1.18.3 — 2026-05-12
 
 ### Canonical Claude Code plugin layout
