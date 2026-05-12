@@ -493,7 +493,7 @@ Pokud chcete plne automaticke vytvoreni views:
 
 ```bash
 pip install playwright && playwright install chromium
-python .claude/edpa/scripts/create_project_views.py
+python .edpa/engine/scripts/create_project_views.py
 ```
 
 Prvni spusteni: otevre prohlizec -> prihlasit se -> views se vytvori automaticky.

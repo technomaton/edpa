@@ -169,10 +169,10 @@ sync můžeš dělat ručně:
 
 ```bash
 # Před každým týdenním close:
-python3 .claude/edpa/scripts/sync.py pull --commit
+python3 .edpa/engine/scripts/sync.py pull --commit
 
 # Po každé úpravě .edpa/backlog/*.yaml:
-python3 .claude/edpa/scripts/sync.py push
+python3 .edpa/engine/scripts/sync.py push
 ```
 
 Tahle cesta nevyžaduje secret — používá tvůj lokální `gh auth login`

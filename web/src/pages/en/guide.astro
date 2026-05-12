@@ -40,19 +40,24 @@ cd project-name`,
     num: 3,
     title: 'Install EDPA',
     color: 'var(--gn)',
-    desc: 'One command installs the EDPA plugin into .claude/edpa/ and creates the .edpa/ directory structure. No manual copying needed.',
-    code: `curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
+    desc: 'In Claude Code: install via the marketplace. Other environments (Cursor, Codex CLI): curl|sh. Both options vendor the engine to .edpa/engine/ and scaffold the .edpa/ structure.',
+    claude: `/plugin install tm-edpa@technomaton-hub
+# Claude Code downloads the plugin from the marketplace`,
+    code: `# Outside Claude Code (Cursor, Codex CLI, raw):
+curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
     result: `EDPA Installer
 ==============
 Downloading EDPA plugin...
-✓ Plugin installed to .claude/edpa/
+✓ Engine vendored to .edpa/engine/
 ✓ Created .edpa/ structure:
-  .claude/edpa/    ← scripts, skills, hooks
-  .edpa/config/    ← team and iteration config
+  .edpa/engine/    ← scripts, templates, schemas
+  .edpa/config/    ← team and project config
   .edpa/backlog/   ← work items (per-item YAML)
   .edpa/reports/   ← generated reports
+✓ Created .edpa/config/people.yaml (edit your team)
+✓ Created .edpa/config/edpa.yaml (edit project name)
 
-Next: open Claude Code and run /edpa setup`,
+Next: /edpa setup "Project Name"`,
   },
   {
     num: 4,
@@ -64,11 +69,11 @@ Next: open Claude Code and run /edpa setup`,
     code: `# Manual alternative (if not using Claude Code):
 # 1. Edit .edpa/config/people.yaml (team, roles, FTE, capacity)
 # 2. Issue Types:
-python3 .claude/edpa/scripts/issue_types.py setup --org ORG
+python3 .edpa/engine/scripts/issue_types.py setup --org ORG
 # 3. GitHub Project:
-python3 .claude/edpa/scripts/project_setup.py --org ORG --repo project-name
+python3 .edpa/engine/scripts/project_setup.py --org ORG --repo project-name
 # 4. Views:
-python3 .claude/edpa/scripts/create_project_views.py`,
+python3 .edpa/engine/scripts/create_project_views.py`,
     result: `✓ Team: 3 members configured (2.8 FTE)
 ✓ Issue Types: Initiative, Epic, Feature, Story, Defect, Task
 ✓ GitHub Project created (#4)
@@ -103,8 +108,8 @@ assignee: jnovak
 iteration: PI-2026-1.1
 
 # Validate backlog
-python3 .claude/edpa/scripts/backlog.py validate
-python3 .claude/edpa/scripts/backlog.py tree`,
+python3 .edpa/engine/scripts/backlog.py validate
+python3 .edpa/engine/scripts/backlog.py tree`,
     result: `✓ Backlog valid (12 items, 0 errors)
 
 I-1: Medical Platform
@@ -149,7 +154,7 @@ Evidence detected:
     desc: 'At iteration end, the EDPA engine reads evidence from backlog YAML files and proportionally allocates hours based on actual work.',
     claude: `/edpa close-iteration PI-2026-1.1
 # Claude Code fetches evidence and computes allocation`,
-    code: `python3 .claude/edpa/scripts/engine.py \\
+    code: `python3 .edpa/engine/scripts/engine.py \\
   --edpa-root .edpa \\
   --iteration PI-2026-1.1
 
@@ -206,7 +211,7 @@ Invariants: ALL PASSED`,
     claude: `/edpa calibrate
 # Claude Code runs MC calibration and shows MAD results`,
     code: `# Monte Carlo signal-weight calibration
-python3 .claude/edpa/scripts/calibrate_signals.py \\
+python3 .edpa/engine/scripts/calibrate_signals.py \\
   --scenarios 1000 --seed 42
 
 # MAD < 0.06 → excellent calibration
@@ -228,7 +233,7 @@ Verdict: GOOD (defaults are already near optimum)`,
     claude: `/edpa close-iteration PI-2026-1.2
 # Next iteration — same workflow`,
     code: `# New iteration
-python3 .claude/edpa/scripts/engine.py \\
+python3 .edpa/engine/scripts/engine.py \\
   --edpa-root .edpa \\
   --iteration PI-2026-1.2
 

@@ -800,6 +800,15 @@ def main():
     # ═══════════════════════════════════════════════════════════
     step(9, "Persisting GitHub state (.edpa/config/edpa.yaml + issue_map.yaml)")
     config_path = Path(".edpa/config/edpa.yaml")
+    if not config_path.exists():
+        tmpl = Path(__file__).resolve().parent.parent / "templates" / "edpa.yaml.tmpl"
+        if tmpl.exists():
+            import shutil
+            shutil.copy(tmpl, config_path)
+            ok("Created .edpa/config/edpa.yaml from template")
+        else:
+            warn("edpa.yaml template not found — creating minimal config")
+            config_path.write_text("project:\n  name: 'My Project'\nsync: {}\n")
     if config_path.exists():
         with open(config_path) as f:
             config = yaml.safe_load(f) or {}
@@ -954,9 +963,9 @@ def main():
         print(f"  Views:   created automatically (Initiative / Epic / Feature / Story / Status)")
     elif views_created is False:
         print(f"  Views:   creation failed — see warnings above; run "
-              f"`python .claude/edpa/scripts/create_project_views.py` to retry")
+              f"`python .edpa/engine/scripts/create_project_views.py` to retry")
     else:
-        print(f"  Views:   skipped — run `python .claude/edpa/scripts/create_project_views.py` "
+        print(f"  Views:   skipped — run `python .edpa/engine/scripts/create_project_views.py` "
               f"when you want them")
     print(f"\n  {C.YELLOW}{C.BOLD}Next steps:{C.RESET}")
     print(f"  1. Enable automations in GitHub UI (Settings → Workflows):")
@@ -987,7 +996,7 @@ def _maybe_create_project_views(args, project_num, non_interactive=False):
         warn("non-interactive mode — skipping views (Playwright requires "
              "an interactive GH login on first run)")
         hint = (f"      Run later with an interactive shell: "
-                f"python3 .claude/edpa/scripts/create_project_views.py "
+                f"python3 .edpa/engine/scripts/create_project_views.py "
                 f"--url https://github.com/orgs/{args.org}/projects/{project_num}")
         print(hint)
         return None

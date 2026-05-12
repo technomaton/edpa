@@ -12,12 +12,12 @@
   "tier": "community",
   "mcpServers": "./.mcp.json",
   "skills": [
-    "./skills/edpa-setup/SKILL.md",
-    "./skills/edpa-engine/SKILL.md",
-    "./skills/edpa-reports/SKILL.md",
-    "./skills/edpa-autocalib/SKILL.md",
-    "./skills/edpa-sync/SKILL.md",
-    "./skills/edpa-sync-people/SKILL.md"
+    "./skills/edpa-setup",
+    "./skills/edpa-engine",
+    "./skills/edpa-reports",
+    "./skills/edpa-autocalib",
+    "./skills/edpa-sync",
+    "./skills/edpa-sync-people"
   ],
   "commands": [
     "./commands/setup.md",

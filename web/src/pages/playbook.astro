@@ -115,11 +115,11 @@ rm -rf /tmp/edpa</code></pre>
     edpa-iteration-close.yml  # CI: uzavření iterace (workflow_dispatch)
     edpa-sync-projects-to-git.yml   # Cron: Projects -&gt; Git (15 min)
     edpa-sync-git-to-projects.yml   # Push trigger: Git -&gt; Projects
-  .claude/edpa/templates/
+  .edpa/engine/templates/
     people.yaml.tmpl   # Šablona kapacitního registru
     cw_heuristics.yaml.tmpl    # Šablona CW heuristik
-    project.yaml.tmpl    # Šablona projektové konfigurace
-  .claude/edpa/scripts/
+    edpa.yaml.tmpl    # Šablona projektové konfigurace
+  .edpa/engine/scripts/
     engine.py       # EDPA výpočetní jádro
     backlog.py      # Správa backlogu (tree, show, wsjf, validate)
     sync.py         # Bidirekční sync GitHub Projects &lt;-&gt; Git
@@ -249,13 +249,13 @@ sync:
     <pre><code>/edpa setup</code></pre>
     <p><strong>Manuální CLI:</strong></p>
     <pre><code># Zobrazit aktuální typy
-python3 .claude/edpa/scripts/issue_types.py list --org my-org
+python3 .edpa/engine/scripts/issue_types.py list --org my-org
 
 # Vytvořit EDPA sadu Issue Types
-python3 .claude/edpa/scripts/issue_types.py setup --org my-org
+python3 .edpa/engine/scripts/issue_types.py setup --org my-org
 
 # Dry-run (jen ukáže co by se stalo)
-python3 .claude/edpa/scripts/issue_types.py setup --org my-org --dry-run</code></pre>
+python3 .edpa/engine/scripts/issue_types.py setup --org my-org --dry-run</code></pre>
 
     <p>EDPA vytvoří tyto Issue Types:</p>
     <div class="card">
@@ -306,23 +306,23 @@ iteration: PI-2026-1.1</code></pre>
 /edpa setup    # interaktivně přidá items
 
 # CLI:
-python3 .claude/edpa/scripts/backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee dev1
-python3 .claude/edpa/scripts/backlog.py add --type Epic --title "..." --js 13 --bv 13 --tc 8 --rr 5</code></pre>
+python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee dev1
+python3 .edpa/engine/scripts/backlog.py add --type Epic --title "..." --js 13 --bv 13 --tc 8 --rr 5</code></pre>
 
     <p>Ověřit integritu:</p>
-    <pre><code>python3 .claude/edpa/scripts/backlog.py validate</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/backlog.py validate</code></pre>
     <p>Zobrazit hierarchii:</p>
-    <pre><code>python3 .claude/edpa/scripts/backlog.py tree
-python3 .claude/edpa/scripts/backlog.py tree --level epic</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/backlog.py tree
+python3 .edpa/engine/scripts/backlog.py tree --level epic</code></pre>
     <p>Zobrazit WSJF prioritizaci:</p>
-    <pre><code>python3 .claude/edpa/scripts/backlog.py wsjf
-python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/backlog.py wsjf
+python3 .edpa/engine/scripts/backlog.py wsjf --level feature</code></pre>
 
     <h3>1.8 Vytvořit GitHub Project</h3>
     <p><strong>Claude Code (doporučeno):</strong></p>
     <pre><code>/edpa setup</code></pre>
     <p><strong>Manuální CLI:</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/project_setup.py \
+    <pre><code>python3 .edpa/engine/scripts/project_setup.py \
   --org my-org \
   --repo my-project \
   --project-title "EDPA -- Muj Projekt"</code></pre>
@@ -344,7 +344,7 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     <pre><code>/edpa setup</code></pre>
     <p><strong>Manuální CLI:</strong></p>
     <p><strong>Cesta A: Manuální setup s instrukcemi</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/project_views.py instructions --org my-org --project 1</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/project_views.py instructions --org my-org --project 1</code></pre>
     <div class="card">
       <table>
         <thead>
@@ -364,12 +364,12 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
     </div>
 
     <p><strong>Cesta B: Označit jako šablonu</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/project_views.py template --org my-org --project 1</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/project_views.py template --org my-org --project 1</code></pre>
     <p><strong>Cesta C: Vytvořit z šablony</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/project_views.py create-from-template \
+    <pre><code>python3 .edpa/engine/scripts/project_views.py create-from-template \
   --org my-org --template 1 --title "Novy Projekt"</code></pre>
     <p><strong>Ověření:</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/project_views.py verify --org my-org --project 1</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/project_views.py verify --org my-org --project 1</code></pre>
 
     <h3>1.10 Nastavit automatizace a Status fields</h3>
     <p><strong>Status fields (4 typované):</strong></p>
@@ -434,16 +434,16 @@ python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
 /edpa sync status        # ověření sync</code></pre>
     <p><strong>Manuální CLI:</strong></p>
     <pre><code># Demo EDPA engine (bez reálných dat)
-python3 .claude/edpa/scripts/engine.py --demo
+python3 .edpa/engine/scripts/engine.py --demo
 
 # Validace backlogu
-python3 .claude/edpa/scripts/backlog.py validate
+python3 .edpa/engine/scripts/backlog.py validate
 
 # Status projektu
-python3 .claude/edpa/scripts/backlog.py status
+python3 .edpa/engine/scripts/backlog.py status
 
 # Sync status
-python3 .claude/edpa/scripts/sync.py status</code></pre>
+python3 .edpa/engine/scripts/sync.py status</code></pre>
 
     <h3>1.12 Commitnout základní konfiguraci</h3>
     <pre><code>git add .edpa/config/people.yaml .edpa/config/project.yaml .edpa/config/heuristics.yaml
@@ -462,10 +462,10 @@ git push origin main</code></pre>
       <li><strong>Výběr stories</strong> — z backlogu dle WSJF pořadí, na 80% kapacity</li>
     </ol>
     <pre><code># WSJF ranking features
-python3 .claude/edpa/scripts/backlog.py wsjf --level feature
+python3 .edpa/engine/scripts/backlog.py wsjf --level feature
 
 # Tree pro konkrétní iteraci
-python3 .claude/edpa/scripts/backlog.py tree --iteration PI-2026-1.1</code></pre>
+python3 .edpa/engine/scripts/backlog.py tree --iteration PI-2026-1.1</code></pre>
     <ol start="3">
       <li><strong>Přiřazení assignees</strong> — každá story musí mít assignee</li>
       <li><strong>Aktualizace backlogu</strong> — <code>iteration: PI-2026-1.1</code> na vybraných stories</li>
@@ -515,23 +515,23 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
 /edpa sync status    # stav synchronizace</code></pre>
     <p><strong>Manuální CLI:</strong></p>
     <pre><code># Pull: GitHub Projects -&gt; item files in .edpa/
-python3 .claude/edpa/scripts/sync.py pull
+python3 .edpa/engine/scripts/sync.py pull
 
 # Push: item files in .edpa/ -&gt; GitHub Projects
-python3 .claude/edpa/scripts/sync.py push
+python3 .edpa/engine/scripts/sync.py push
 
 # Diff: zobrazit co by se změnilo
-python3 .claude/edpa/scripts/sync.py diff
+python3 .edpa/engine/scripts/sync.py diff
 
 # Status
-python3 .claude/edpa/scripts/sync.py status</code></pre>
+python3 .edpa/engine/scripts/sync.py status</code></pre>
 
     <h3>2.4 Iteration Close</h3>
     <p>Na konci každé iterace (po 2 týdnech):</p>
     <p><strong>Claude Code (doporučeno):</strong></p>
     <pre><code>/edpa close-iteration PI-2026-1.1</code></pre>
     <p><strong>Manuální CLI:</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1</code></pre>
 
     <p><strong>Výstupy:</strong></p>
     <pre><code>.edpa/reports/iteration-PI-2026-1.1/
@@ -635,10 +635,10 @@ delivery:
     <pre><code>/edpa calibrate</code></pre>
     <p><strong>Manuální CLI:</strong></p>
     <pre><code># Dry-run &mdash; ukáže navrženou MAD reduction bez zápisu
-python3 .claude/edpa/scripts/calibrate_signals.py
+python3 .edpa/engine/scripts/calibrate_signals.py
 
 # Apply &mdash; přepíše .edpa/config/heuristics.yaml novými signal weights
-python3 .claude/edpa/scripts/calibrate_signals.py --apply</code></pre>
+python3 .edpa/engine/scripts/calibrate_signals.py --apply</code></pre>
     <p>Výstup:</p>
     <pre><code>Phase 1 (random sample): 1000 scenarios, MAD baseline = 0.0861
 Phase 2 (coordinate descent): MAD calibrated = 0.0805 (-6.5%)
@@ -667,7 +667,7 @@ Calibrated weights:
     <h3>3.4 Plánování dalšího PI</h3>
     <ol>
       <li><strong>Nové epicy/features</strong> — přidat jako soubory do <code>.edpa/backlog/epics/</code> a <code>.edpa/backlog/features/</code></li>
-      <li><strong>WSJF prioritizace:</strong> <code>python3 .claude/edpa/scripts/backlog.py wsjf</code></li>
+      <li><strong>WSJF prioritizace:</strong> <code>python3 .edpa/engine/scripts/backlog.py wsjf</code></li>
       <li><strong>Kapacitní plánování</strong> — aktualizovat <code>.edpa/config/people.yaml</code></li>
       <li><strong>Aktualizovat <code>.edpa/config/edpa.yaml</code></strong> — nový PI, iterace, datumy</li>
     </ol>
@@ -992,12 +992,12 @@ All invariants passed: NO</code></pre>
 /edpa sync push       # po vyřešení push</code></pre>
     <p><strong>Manuální CLI:</strong></p>
     <pre><code># Zobrazit konflikty
-python3 .claude/edpa/scripts/sync.py conflicts
+python3 .edpa/engine/scripts/sync.py conflicts
 
 # Diff
-python3 .claude/edpa/scripts/sync.py diff</code></pre>
+python3 .edpa/engine/scripts/sync.py diff</code></pre>
     <p>Ručně vyřešit v příslušném item souboru v <code>.edpa/</code>, pak:</p>
-    <pre><code>python3 .claude/edpa/scripts/sync.py push</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/sync.py push</code></pre>
 
     <h3>Sync — loop prevence</h3>
     <p>Workflow <code>edpa-sync-git-to-projects.yml</code> obsahuje:</p>
@@ -1019,7 +1019,7 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
       <li>Analyzovat záznamy s největším <code>abs(predicted_cw - confirmed_cw)</code> per (osoba, item)</li>
       <li>Seskupit dle dominant signal type (assignee / pr_author / commit_author / pr_reviewer / issue_comment)</li>
       <li>Pokud strategická role (PM / BO / Arch) je systematicky podhodnocena, kalibrátor zvedne <code>signals.issue_comment</code> nebo <code>signals.pr_reviewer</code></li>
-      <li>Spustit <code>python3 .claude/edpa/scripts/calibrate_signals.py --apply</code> pro re-baseline proti aktuální ground truth</li>
+      <li>Spustit <code>python3 .edpa/engine/scripts/calibrate_signals.py --apply</code> pro re-baseline proti aktuální ground truth</li>
       <li>Re-run engine, ověřit invariants + nový MAD</li>
     </ol>
 
