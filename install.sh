@@ -1,6 +1,24 @@
 #!/bin/sh
-# EDPA Installer — installs the EDPA plugin into .claude/edpa/
+# EDPA Installer — installs the EDPA plugin into .claude/
 # Usage: curl -fsSL https://edpa.technomaton.com/install.sh | sh
+#
+# Two install paths exist for EDPA:
+#
+#   1. Claude Code marketplace  → `/plugin install tm-edpa@technomaton-hub`
+#      Pulls plugin payload from technomaton/edpa@plugin directly.
+#      Python deps install automatically via the plugin's SessionStart hook.
+#      .github/workflows/ get copied by /edpa:setup on first invocation.
+#
+#   2. This script (curl|sh)    → for Cursor, Codex CLI, or any environment
+#      that doesn't speak the Claude Code plugin protocol. Downloads the
+#      same plugin payload from a GitHub Release tarball, places it under
+#      .claude/, and bootstraps .edpa/. After install, the user must:
+#        - install Python deps:   pip3 install -r .claude/requirements.txt
+#        - copy CI workflows:     run /edpa:setup or python3 .claude/edpa/scripts/preflight.py
+#
+# This script is intentionally minimal: it does NOT install pip packages
+# or copy CI workflows. Both belong to /edpa:setup, which is the single
+# source of truth across both install paths.
 set -e
 
 REPO="technomaton/edpa"
@@ -9,11 +27,10 @@ TARGET=".claude"
 echo "EDPA Installer"
 echo "=============="
 
-# --- Dependency checks ---
+# --- Prereq existence checks (no pip installs — see header) ---
 echo ""
 echo "Checking prerequisites..."
 
-# Python 3.10+
 if ! command -v python3 >/dev/null 2>&1; then
   echo "ERROR: Python 3 not found. Install Python 3.10+ first."
   exit 1
@@ -26,61 +43,28 @@ if [ "$PY_OK" = "no" ]; then
 fi
 echo "  Python $PY_VERSION ✓"
 
-# PyYAML — required for every EDPA script
-if python3 -c 'import yaml' 2>/dev/null; then
-  echo "  PyYAML ✓"
-else
-  echo "  PyYAML not found — installing..."
-  pip3 install pyyaml --quiet --break-system-packages 2>/dev/null || pip3 install pyyaml --quiet
-fi
-
-# ruamel.yaml — comment-preserving YAML round-trip for the
-# collaborator-sync workflow. Without it sync_collaborators.py rejects
-# at startup and any people.yaml edit by the bot would lose comments.
-if python3 -c 'from ruamel.yaml import YAML' 2>/dev/null; then
-  echo "  ruamel.yaml ✓"
-else
-  echo "  ruamel.yaml not found — installing..."
-  pip3 install ruamel.yaml --quiet --break-system-packages 2>/dev/null || pip3 install ruamel.yaml --quiet
-fi
-
-# mcp — required for MCP server (.claude/edpa/scripts/mcp_server.py)
-# Without this the MCP tools (edpa_status, edpa_backlog, ...) silently fail
-# to start and Claude Code falls back to Bash + grep for everything.
-if python3 -c 'from mcp.server import Server' 2>/dev/null; then
-  echo "  mcp (MCP SDK) ✓"
-else
-  echo "  mcp not found — installing..."
-  pip3 install mcp --quiet --break-system-packages 2>/dev/null || pip3 install mcp --quiet
-fi
-
-# openpyxl — required for Excel exports in /edpa:reports
-# Without this the engine prints "Excel export skipped" and the reports
-# skill produces only Markdown timesheets, no edpa-results.xlsx.
-if python3 -c 'import openpyxl' 2>/dev/null; then
-  echo "  openpyxl ✓"
-else
-  echo "  openpyxl not found — installing..."
-  pip3 install openpyxl --quiet --break-system-packages 2>/dev/null || pip3 install openpyxl --quiet
-fi
-
-# git
 if command -v git >/dev/null 2>&1; then
   echo "  git ✓"
 else
   echo "WARNING: git not found. EDPA requires git for evidence detection."
 fi
 
-# gh (optional but recommended)
 if command -v gh >/dev/null 2>&1; then
   echo "  GitHub CLI ✓"
 else
   echo "  GitHub CLI not found (optional — needed for /edpa setup and sync)"
 fi
 
+if command -v pip3 >/dev/null 2>&1; then
+  echo "  pip3 ✓"
+else
+  echo "  pip3 not found — install Python deps manually after this script:"
+  echo "       pip3 install -r .claude/requirements.txt"
+fi
+
 echo ""
 
-# --- Warn if already installed ---
+# --- Idempotency guard ---
 #
 # Read prompts in a `curl … | sh` flow: stdin is the pipe, not the
 # terminal, so plain `read` returns EOF immediately and the script
@@ -109,10 +93,9 @@ if [ -d "$TARGET/edpa" ]; then
   fi
 fi
 
-# Create target directory
 mkdir -p "$TARGET"
 
-# Download plugin contents
+# --- Download plugin payload ---
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
@@ -166,12 +149,11 @@ done
 # Make hook scripts executable
 chmod +x "$TARGET/edpa/scripts/hooks/"* 2>/dev/null || true
 
-# Create .edpa structure if it doesn't exist
+# --- Bootstrap .edpa/ data directory + seed templates ---
 for dir in config backlog/initiatives backlog/epics backlog/features backlog/stories iterations reports snapshots data; do
   mkdir -p ".edpa/$dir"
 done
 
-# Copy default config templates (if not already present)
 if [ ! -f ".edpa/config/heuristics.yaml" ] && [ -f "$TARGET/edpa/templates/cw_heuristics.yaml.tmpl" ]; then
   cp "$TARGET/edpa/templates/cw_heuristics.yaml.tmpl" ".edpa/config/heuristics.yaml"
   echo "Created .edpa/config/heuristics.yaml from template"
@@ -183,81 +165,6 @@ fi
 if [ ! -f ".edpa/config/edpa.yaml" ] && [ -f "$TARGET/edpa/templates/project.yaml.tmpl" ]; then
   cp "$TARGET/edpa/templates/project.yaml.tmpl" ".edpa/config/edpa.yaml"
   echo "Created .edpa/config/edpa.yaml from template (run /edpa:setup to configure)"
-fi
-
-# Install GitHub Actions workflows. The plugin ships 11 workflows under
-# edpa/workflows/ (all prefixed `edpa-*.yml` since v1.18.0-beta), but
-# GitHub only runs files in .github/workflows/. Without this copy step,
-# workflows sit unused inside the plugin directory and the customer
-# never gets branch-check, contributor-detect, sync-*, etc.
-#
-# Safe defaults: only copy files that don't already exist in the target.
-# A user who has hand-edited their workflow keeps the hand-edited version;
-# new workflows are installed without surprise overwrites. Use
-# `EDPA_FORCE_WORKFLOWS=1` to force overwrites on a deliberate update.
-#
-# Legacy migration (pre-v1.18.0-beta): the legacy filenames were
-# unprefixed (`branch-check.yml`, `sync-*.yml`, etc.). When detected,
-# install.sh either:
-#   - default: warns and prints `git mv` commands (review before
-#     applying — keeps your hand-edits visible in the rename diff)
-#   - EDPA_AUTO_MIGRATE=1: renames legacy files automatically (then
-#     the normal install path overwrites them only if
-#     EDPA_FORCE_WORKFLOWS=1; otherwise your renamed version stays)
-LEGACY_WORKFLOWS="branch-check collaborators-sync contributor-detect iteration-close pi-close sync-git-to-projects sync-projects-to-git traceability-check validate-item velocity-track wsjf-calculate"
-if [ -d "$TARGET/edpa/workflows" ]; then
-  mkdir -p ".github/workflows"
-
-  # Detect legacy unprefixed installations.
-  legacy_found=""
-  for f in $LEGACY_WORKFLOWS; do
-    [ -e ".github/workflows/$f.yml" ] && legacy_found="$legacy_found $f"
-  done
-
-  if [ -n "$legacy_found" ]; then
-    if [ "$EDPA_AUTO_MIGRATE" = "1" ]; then
-      echo "EDPA legacy migration: renaming unprefixed workflows..."
-      for f in $legacy_found; do
-        if [ -e ".github/workflows/edpa-$f.yml" ]; then
-          echo "  skip $f.yml (edpa-$f.yml already exists — delete one manually)"
-        else
-          mv ".github/workflows/$f.yml" ".github/workflows/edpa-$f.yml"
-          echo "  renamed $f.yml -> edpa-$f.yml"
-        fi
-      done
-    else
-      echo ""
-      echo "EDPA legacy workflow names detected (v1.18.0-beta renamed everything to edpa-* prefix)."
-      echo "Run these commands to migrate, OR re-run install with EDPA_AUTO_MIGRATE=1:"
-      for f in $legacy_found; do
-        echo "  git mv .github/workflows/$f.yml .github/workflows/edpa-$f.yml"
-      done
-      echo ""
-      echo "Continuing install — new edpa-* files will be installed alongside legacy ones."
-      echo "After migration, you may see duplicate workflows running until the rename commits."
-      echo ""
-    fi
-  fi
-
-  installed=0
-  skipped=0
-  for src in "$TARGET"/edpa/workflows/*.yml; do
-    [ -e "$src" ] || continue
-    name=$(basename "$src")
-    dest=".github/workflows/$name"
-    if [ -e "$dest" ] && [ "$EDPA_FORCE_WORKFLOWS" != "1" ]; then
-      skipped=$((skipped + 1))
-    else
-      cp "$src" "$dest"
-      installed=$((installed + 1))
-    fi
-  done
-  if [ $installed -gt 0 ] || [ $skipped -gt 0 ]; then
-    echo "GitHub Actions: $installed workflow(s) installed in .github/workflows/, $skipped already present (skipped)"
-    if [ $skipped -gt 0 ] && [ "$EDPA_FORCE_WORKFLOWS" != "1" ]; then
-      echo "  (set EDPA_FORCE_WORKFLOWS=1 and re-run to overwrite skipped files)"
-    fi
-  fi
 fi
 
 # Show installed version
@@ -272,9 +179,19 @@ fi
 
 echo ""
 echo "Next steps:"
-echo "  1. Edit .edpa/config/people.yaml with your team"
-echo "  2. Open Claude Code and run:  /edpa setup \"Project Name\""
-echo "  3. Configure EDPA_TOKEN secret for automated GH Projects sync:"
-echo "     https://edpa.technomaton.com/docs/edpa-token-setup"
-echo "     (~5 min, optional — without it, run sync.py pull/push manually)"
+echo ""
+echo "  Claude Code users:"
+echo "    1. Restart Claude Code (SessionStart hook will auto-install Python deps)"
+echo "    2. Run  /edpa:setup \"Project Name\"  to provision GitHub Projects + workflows"
+echo ""
+echo "  Other tools (Cursor, Codex CLI, raw):"
+echo "    1. Install Python deps:"
+echo "         pip3 install -r .claude/requirements.txt"
+echo "    2. Run preflight + setup wizard:"
+echo "         python3 .claude/edpa/scripts/preflight.py --org <your-org>"
+echo "         python3 .claude/edpa/scripts/project_setup.py --org <org> --repo <repo>"
+echo ""
+echo "  CI sync (optional, ~5 min):"
+echo "    Configure the EDPA_TOKEN secret so GH Actions workflows can run."
+echo "    https://edpa.technomaton.com/docs/edpa-token-setup"
 echo ""
