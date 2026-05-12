@@ -27,6 +27,11 @@ jobs:
 
       - run: pip install pyyaml
 
+      - name: Install EDPA plugin (ephemeral, no project vendoring)
+        env:
+          EDPA_FORCE_INSTALL: "1"
+        run: curl -fsSL https://edpa.technomaton.com/install.sh | sh
+
       - name: Warn if PAT not configured
         env:
           PAT: ${{ secrets.EDPA_TOKEN }}

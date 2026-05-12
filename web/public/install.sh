@@ -154,10 +154,10 @@ for dir in config backlog/initiatives backlog/epics backlog/features backlog/sto
   mkdir -p ".edpa/$dir"
 done
 
-if [ ! -f ".edpa/config/heuristics.yaml" ] && [ -f "$TARGET/edpa/templates/cw_heuristics.yaml.tmpl" ]; then
-  cp "$TARGET/edpa/templates/cw_heuristics.yaml.tmpl" ".edpa/config/heuristics.yaml"
-  echo "Created .edpa/config/heuristics.yaml from template"
-fi
+# Engine reads canonical CW weights from
+# $TARGET/edpa/templates/cw_heuristics.yaml.tmpl (LOCKED, calibrated) —
+# no .edpa/config/heuristics.yaml is needed. Pre-v1.11 install.sh seeded
+# one and the engine ignored it; that legacy line was removed in v1.18.4.
 if [ ! -f ".edpa/config/people.yaml" ] && [ -f "$TARGET/edpa/templates/people.yaml.tmpl" ]; then
   cp "$TARGET/edpa/templates/people.yaml.tmpl" ".edpa/config/people.yaml"
   echo "Created .edpa/config/people.yaml from template (edit with your team)"

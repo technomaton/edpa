@@ -27,6 +27,11 @@ jobs:
       - name: Install dependencies
         run: pip install pyyaml openpyxl
 
+      - name: Install EDPA plugin (ephemeral, no project vendoring)
+        env:
+          EDPA_FORCE_INSTALL: "1"
+        run: curl -fsSL https://edpa.technomaton.com/install.sh | sh
+
       - name: Verify configuration
         run: |
           test -f .edpa/config/people.yaml || (echo "ERROR: Run /edpa setup first." && exit 1)
