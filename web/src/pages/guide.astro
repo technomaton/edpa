@@ -271,25 +271,23 @@ Invariants: ALL PASSED`,
     num: 10,
     title: 'Retrospektiva + kalibrace',
     color: 'var(--gn)',
-    desc: 'Porovnejte EDPA výstupy se skutečností (ground truth). evaluate_cw.py počítá MAD, korelaci a identifikuje outliers.',
+    desc: 'Kalibrujte signal weights proti syntetickému Monte Carlo korpusu. calibrate_signals.py spustí MC random sampling + coordinate descent a hlásí MAD baseline vs. calibrated.',
     claude: `/edpa calibrate
-# Claude Code spustí kalibraci a zobrazí MAD výsledky`,
-    code: `# Ground truth srovnání
-python3 .claude/edpa/scripts/evaluate_cw.py \\
-  --iteration PI-2026-1.1 \\
-  --ground-truth .edpa/data/ground_truth.csv
+# Claude Code spustí MC kalibraci a zobrazí MAD výsledky`,
+    code: `# Monte Carlo kalibrace signal weights
+python3 .claude/edpa/scripts/calibrate_signals.py \\
+  --scenarios 1000 --seed 42
 
-# MAD < 0.05 → výborná kalibrace
-# MAD 0.05-0.10 → dobrá kalibrace
+# MAD < 0.06 → výborná kalibrace
+# MAD 0.06-0.10 → dobrá kalibrace
 # MAD > 0.10 → vyžaduje úpravu vah`,
-    result: `Evaluation: PI-2026-1.1
-━━━━━━━━━━━━━━━━━━━━━━━
-Pearson r:     0.94
-MAD:           0.032  ← výborná kalibrace
-Max deviation: 0.061 (pkral)
+    result: `Calibration: 1000 scenarios, seed=42
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Phase 1 (random sample):  MAD baseline   = 0.0861
+Phase 2 (coord descent):  MAD calibrated = 0.0805
+Improvement: +6.5%
 
-Verdict: EXCELLENT
-No weight adjustment needed.`,
+Verdict: GOOD (defaults are already near optimum)`,
   },
   {
     num: 11,

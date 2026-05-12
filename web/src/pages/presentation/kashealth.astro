@@ -298,10 +298,10 @@ Loop:
 4. Opakuj 50x</div>
 </div>
 <div class="col">
-<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Přínos</div><div class="sc-l">MAD redukce: <b>7.9%</b>. Přesnější výkazy bez manuální diskuse na retro.</div></div>
-<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Monte Carlo validace</div><div class="sc-l">1 000 scénářů, 68 156 záznamů. Systematické biasy: BO +0.15, PM +0.05, Arch +0.05</div></div>
-<div class="sc o" style="margin-bottom:8px"><div class="sc-t">Bezpečnost</div><div class="sc-l">Agent <b>nesmí editovat evaluátor</b></b> (evaluate_cw.py). Oddělení optimalizátoru od cílové funkce.</div></div>
-<div class="sc a"><div class="sc-t">Budoucí fáze</div><div class="sc-l">Aktivace nejdříve po 1. PI. Předtím: nedostatek ground truth dat.</div></div>
+<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Přínos</div><div class="sc-l">MAD redukce: <b>6.5%</b>. Přesnější výkazy bez manuální diskuse na retro.</div></div>
+<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Monte Carlo validace</div><div class="sc-l">1 000 scénářů, 31 041 záznamů. Kalibrují se 4 signal weights (assignee, pr_author, commit_author, pr_reviewer, issue_comment).</div></div>
+<div class="sc o" style="margin-bottom:8px"><div class="sc-t">Bezpečnost</div><div class="sc-l">Agent <b>nesmí editovat kalibrátor</b> (calibrate_signals.py). Synthetic korpus + MAD cost function jsou v jednom souboru — separation by structure.</div></div>
+<div class="sc a"><div class="sc-t">Real-data fáze</div><div class="sc-l">Synthetic MC běží kdykoli. Real-data adapter (z PI retro) až po 1. uzavřeném PI.</div></div>
 </div></div>`,
 
 // 14: CADENCE

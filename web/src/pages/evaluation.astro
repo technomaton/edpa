@@ -426,9 +426,9 @@ const categories = [
         expected: 'direction: lower is better',
       },
       {
-        name: 'test_evaluator_locked',
-        description: 'Evaluator (evaluate_cw.py) je zamčený — nesmí být modifikován optimalizátorem.',
-        expected: 'evaluate_cw.py: LOCKED, read-only',
+        name: 'test_calibrator_locked',
+        description: 'Kalibrátor (calibrate_signals.py) je zamčený — synthetic korpus + MAD cost function jsou v jednom souboru. Agent ho nesmí modifikovat (gaming).',
+        expected: 'calibrate_signals.py: LOCKED, read-only',
       },
       {
         name: 'test_single_change_per_iteration',
@@ -770,12 +770,12 @@ import { VERSION } from '../lib/version';
         <div class="tag" style="color:var(--ac3)">Konfigurace</div>
         <table>
           <tbody>
-            <tr><td><strong>Target</strong></td><td><code>cw_heuristics.yaml</code></td></tr>
-            <tr><td><strong>Metric</strong></td><td>MAD (Mean Absolute Deviation)</td></tr>
+            <tr><td><strong>Target</strong></td><td><code>cw_heuristics.yaml.tmpl</code> (signals: blok)</td></tr>
+            <tr><td><strong>Metric</strong></td><td>MAD (Mean Absolute Deviation) na MC korpusu</td></tr>
             <tr><td><strong>Direction</strong></td><td>lower is better</td></tr>
-            <tr><td><strong>Budget</strong></td><td>50 experimentů (~2h)</td></tr>
-            <tr><td><strong>Memory</strong></td><td><code>git log</code> na kalibrační větvi</td></tr>
-            <tr><td><strong>Evaluator</strong></td><td><code>evaluate_cw.py</code> (LOCKED)</td></tr>
+            <tr><td><strong>Budget</strong></td><td>2000 MC samples + coordinate descent top-5 (~10s)</td></tr>
+            <tr><td><strong>Search space</strong></td><td>5D signal weights, každá v [0.1, 8.0]</td></tr>
+            <tr><td><strong>Kalibrátor</strong></td><td><code>calibrate_signals.py</code> (LOCKED)</td></tr>
           </tbody>
         </table>
       </div>

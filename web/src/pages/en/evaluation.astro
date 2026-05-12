@@ -426,9 +426,9 @@ const categories = [
         expected: 'direction: lower is better',
       },
       {
-        name: 'test_evaluator_locked',
-        description: 'Evaluator (evaluate_cw.py) is locked — must not be modified by the optimizer.',
-        expected: 'evaluate_cw.py: LOCKED, read-only',
+        name: 'test_calibrator_locked',
+        description: 'Calibrator (calibrate_signals.py) is locked — synthetic corpus + MAD cost function live in one file. The agent must not modify it (gaming).',
+        expected: 'calibrate_signals.py: LOCKED, read-only',
       },
       {
         name: 'test_single_change_per_iteration',
@@ -759,12 +759,12 @@ import { VERSION } from '../../lib/version';
         <div class="tag" style="color:var(--ac3)">Configuration</div>
         <table>
           <tbody>
-            <tr><td><strong>Target</strong></td><td><code>cw_heuristics.yaml</code></td></tr>
-            <tr><td><strong>Metric</strong></td><td>MAD (Mean Absolute Deviation)</td></tr>
+            <tr><td><strong>Target</strong></td><td><code>cw_heuristics.yaml.tmpl</code> (signals: block)</td></tr>
+            <tr><td><strong>Metric</strong></td><td>MAD (Mean Absolute Deviation) on the MC corpus</td></tr>
             <tr><td><strong>Direction</strong></td><td>lower is better</td></tr>
-            <tr><td><strong>Budget</strong></td><td>50 experiments (~2h)</td></tr>
-            <tr><td><strong>Memory</strong></td><td><code>git log</code> on calibration branch</td></tr>
-            <tr><td><strong>Evaluator</strong></td><td><code>evaluate_cw.py</code> (LOCKED)</td></tr>
+            <tr><td><strong>Budget</strong></td><td>2000 MC samples + coordinate descent on top-5 (~10s)</td></tr>
+            <tr><td><strong>Search space</strong></td><td>5D signal weights, each in [0.1, 8.0]</td></tr>
+            <tr><td><strong>Calibrator</strong></td><td><code>calibrate_signals.py</code> (LOCKED)</td></tr>
           </tbody>
         </table>
       </div>

@@ -202,25 +202,23 @@ Invariants: ALL PASSED`,
     num: 9,
     title: 'Retrospective + Calibration',
     color: 'var(--gn)',
-    desc: 'Compare EDPA outputs against ground truth. evaluate_cw.py computes MAD, correlation, and identifies outliers.',
+    desc: 'Calibrate signal weights against a synthetic Monte Carlo corpus. calibrate_signals.py runs MC random sampling + coordinate descent and reports MAD baseline vs. calibrated.',
     claude: `/edpa calibrate
-# Claude Code runs calibration and shows MAD results`,
-    code: `# Ground truth comparison
-python3 .claude/edpa/scripts/evaluate_cw.py \\
-  --iteration PI-2026-1.1 \\
-  --ground-truth .edpa/data/ground_truth.csv
+# Claude Code runs MC calibration and shows MAD results`,
+    code: `# Monte Carlo signal-weight calibration
+python3 .claude/edpa/scripts/calibrate_signals.py \\
+  --scenarios 1000 --seed 42
 
-# MAD < 0.05 → excellent calibration
-# MAD 0.05-0.10 → good calibration
+# MAD < 0.06 → excellent calibration
+# MAD 0.06-0.10 → good calibration
 # MAD > 0.10 → weight adjustment needed`,
-    result: `Evaluation: PI-2026-1.1
-━━━━━━━━━━━━━━━━━━━━━━━
-Pearson r:     0.94
-MAD:           0.032  ← excellent calibration
-Max deviation: 0.061 (pkral)
+    result: `Calibration: 1000 scenarios, seed=42
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Phase 1 (random sample):  MAD baseline   = 0.0861
+Phase 2 (coord descent):  MAD calibrated = 0.0805
+Improvement: +6.5%
 
-Verdict: EXCELLENT
-No weight adjustment needed.`,
+Verdict: GOOD (defaults are already near optimum)`,
   },
   {
     num: 10,

@@ -297,9 +297,10 @@ Loop:
 4. Repeat 50x</div>
 </div>
 <div class="col">
-<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Benefit</div><div class="sc-l">15-30% CW deviation reduction. More accurate reports without manual discussion at retro.</div></div>
-<div class="sc o" style="margin-bottom:8px"><div class="sc-t">Safety</div><div class="sc-l">Agent <b>must not edit evaluator</b> (evaluate_cw.py). Separation of optimizer from objective function.</div></div>
-<div class="sc a"><div class="sc-t">Future phase</div><div class="sc-l">Activation earliest after 1st PI. Before that: insufficient ground truth data.</div></div>
+<div class="sc g" style="margin-bottom:8px"><div class="sc-t">Benefit</div><div class="sc-l">MAD reduction: <b>6.5%</b>. More accurate reports without manual discussion at retro.</div></div>
+<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Monte Carlo validation</div><div class="sc-l">1,000 scenarios, 31,041 records. Calibrates 5 signal weights (assignee, pr_author, commit_author, pr_reviewer, issue_comment).</div></div>
+<div class="sc o" style="margin-bottom:8px"><div class="sc-t">Safety</div><div class="sc-l">Agent <b>must not edit the calibrator</b> (calibrate_signals.py). Synthetic corpus + MAD cost function live in one file — separation by structure.</div></div>
+<div class="sc a"><div class="sc-t">Real-data phase</div><div class="sc-l">Synthetic MC runs anytime. Real-data adapter (from PI retro) only after the 1st closed PI.</div></div>
 </div></div>`,
 
 // 14: CADENCE
