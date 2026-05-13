@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.19.1 — 2026-05-13
+### Fix: Issue Type assignment in GH-first `backlog.py add`
+`gh issue create` was passing the item type (`Epic`, `Initiative`, …) as `--label`,
+which always fails unless that exact label exists in the target repo. GitHub Issue Types
+are org-level GraphQL objects, not repository labels.
+
+**Changes in `plugin/edpa/scripts/backlog.py`:**
+- `_gh_create_issue` — removed `--label <type>` from the `gh issue create` call
+- `_gh_set_issue_type` (new) — sets the Issue Type via GraphQL after issue creation,
+  importing `get_org_issue_types` / `get_issue_node_id` / `assign_issue_type` from
+  `issue_types.py`; non-fatal (prints a warning if org Issue Types are not configured)
+- `cmd_add` — calls `_gh_set_issue_type` immediately after a successful GH issue create
+
 ## 1.19.0 — 2026-05-13
 
 ### GH-first backlog item creation (`/edpa:add`)

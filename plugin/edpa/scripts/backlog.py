@@ -956,14 +956,34 @@ def _gh_create_issue(org, repo, item_type, title, parent_id=None):
         ["gh", "issue", "create",
          "--repo", f"{org}/{repo}",
          "--title", title,
-         "--body", "\n".join(body_parts),
-         "--label", item_type],
+         "--body", "\n".join(body_parts)],
         capture_output=True, text=True,
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip())
     url = result.stdout.strip()
     return int(url.rstrip("/").split("/")[-1]), url
+
+
+def _gh_set_issue_type(org, repo, issue_number, item_type):
+    """Set the GitHub Issue Type via GraphQL. Returns True on success."""
+    import sys, os
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        from issue_types import get_org_issue_types, get_issue_node_id, assign_issue_type
+    except ImportError:
+        return False
+    issue_data = get_issue_node_id(org, repo, issue_number)
+    if not issue_data:
+        return False
+    types = get_org_issue_types(org)
+    type_map = {t["name"]: t["id"] for t in types}
+    type_id = type_map.get(item_type)
+    if not type_id:
+        return False
+    return assign_issue_type(issue_data["id"], type_id) is not None
 
 
 def _gh_add_to_project(org, project_num, issue_url):
@@ -1084,6 +1104,10 @@ def cmd_add(root, backlog, args):
             gh_issue_num, issue_url = _gh_create_issue(org, repo, item_type, title, parent_id)
             new_id = f"{prefix}-{gh_issue_num}"
             print(color(f"  Issue #{gh_issue_num} → {new_id}", C.OK))
+            if _gh_set_issue_type(org, repo, gh_issue_num, item_type):
+                print(color(f"  Issue Type: {item_type}", C.OK))
+            else:
+                print(color(f"  Warning: Issue Type '{item_type}' not set (run /edpa:setup to configure Issue Types for org {org})", C.WARN))
             try:
                 project_item_id = _gh_add_to_project(org, project_num, issue_url)
                 print(color(f"  Added to Project #{project_num}", C.OK))
