@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+## 1.18.6 — 2026-05-13
+
+### New feature — GH-first backlog item creation (`/edpa:add`)
+
+New skill `edpa-add` and command `add.md` providing `/edpa:add` for creating backlog items
+with collision-free IDs via GitHub-first flow.
+
+**Problem solved:** Multiple team members (especially with AI assistance) running
+`backlog.py add` simultaneously produce the same sequential ID (e.g. both get `S-5`),
+causing merge conflicts on push. GitHub issue numbers are an atomic server-side counter —
+no collision possible.
+
+**Flow:**
+1. `gh issue create` → GitHub assigns atomic issue number (#42)
+2. EDPA ID = type prefix + issue number → `S-42`, `E-15`, `F-8`, `I-3`
+3. `gh project item-add` → adds to GitHub Project immediately
+4. Writes `.edpa/backlog/<type>/S-42.yaml`
+5. Updates `issue_map.yaml` entry
+6. `git commit -m "feat(S-42): <title>"`
+
+**Offline / pre-setup fallback:** `--local` flag forces sequential local scan (old behaviour).
+Auto-falls back to local-first if `edpa.yaml` has no sync config.
+
+- `plugin/skills/edpa-add/SKILL.md` — new skill with full instructions
+- `plugin/commands/add.md` — new command wrapper
+- `plugin/edpa/scripts/backlog.py`: added `_read_sync_config`, `_gh_create_issue`,
+  `_gh_add_to_project`, `_update_issue_map` helpers; `cmd_add` rewritten for GH-first;
+  `--local` flag added to `add` subparser
+
 ## 1.18.5 — 2026-05-12
 
 ### Bug fixes

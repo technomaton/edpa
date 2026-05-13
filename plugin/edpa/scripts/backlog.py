@@ -927,8 +927,83 @@ def cmd_validate(backlog, args):
     return len(errors)
 
 
+# -- GH-first helpers for cmd_add ---------------------------------------------
+
+def _read_sync_config(root):
+    """Return sync section from edpa.yaml if fully configured, else None."""
+    config_path = root / ".edpa" / "config" / "edpa.yaml"
+    if not config_path.exists():
+        return None
+    try:
+        with open(config_path) as f:
+            data = yaml.safe_load(f) or {}
+        sync = data.get("sync") or {}
+        if sync.get("github_org") and sync.get("github_repo") and sync.get("github_project_number"):
+            return sync
+    except Exception:
+        pass
+    return None
+
+
+def _gh_create_issue(org, repo, item_type, title, parent_id=None):
+    """Create a GitHub issue. Returns (issue_number: int, issue_url: str)."""
+    import subprocess
+    body_parts = [f"**Type:** {item_type}"]
+    if parent_id:
+        body_parts.append(f"**Parent:** {parent_id}")
+    body_parts.append("\n_Created via EDPA — update fields in `.edpa/backlog/`._")
+    result = subprocess.run(
+        ["gh", "issue", "create",
+         "--repo", f"{org}/{repo}",
+         "--title", title,
+         "--body", "\n".join(body_parts),
+         "--label", item_type],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip())
+    url = result.stdout.strip()
+    return int(url.rstrip("/").split("/")[-1]), url
+
+
+def _gh_add_to_project(org, project_num, issue_url):
+    """Add issue to GitHub Project. Returns project item ID string."""
+    import subprocess, json
+    result = subprocess.run(
+        ["gh", "project", "item-add", str(project_num),
+         "--owner", org, "--url", issue_url, "--format", "json"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip())
+    return json.loads(result.stdout).get("id", "")
+
+
+def _update_issue_map(root, edpa_id, issue_number, project_item_id, org, repo, project_num):
+    """Upsert one entry in .edpa/config/issue_map.yaml."""
+    issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
+    data = {}
+    if issue_map_path.exists():
+        with open(issue_map_path) as f:
+            data = yaml.safe_load(f) or {}
+    data["github_repo"] = f"{org}/{repo}"
+    data["github_project_number"] = project_num
+    items = data.get("items") or {}
+    items[edpa_id] = {"issue_number": issue_number, "project_item_id": project_item_id}
+    data["items"] = items
+    with open(issue_map_path, "w") as f:
+        yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+
+# ------------------------------------------------------------------------------
+
 def cmd_add(root, backlog, args):
-    """Add a new work item, creating a YAML file in the appropriate directory."""
+    """Add a new work item.
+
+    GH-first by default when sync config is present in edpa.yaml:
+      gh issue create → server-assigned number → ID suffix → local YAML → commit.
+    Falls back to local-first (sequential scan) when --local or no sync config.
+    """
     item_type = args.type
     parent_id = args.parent
     title = args.title
@@ -940,6 +1015,7 @@ def cmd_add(root, backlog, args):
     tc = getattr(args, "tc", None)
     rr_oe = getattr(args, "rr_oe", None)
     raw_contributors = getattr(args, "contributor", None) or []
+    local_only = getattr(args, "local", False)
 
     # Parse --contributor PERSON:ROLE:CW triplets up front so a typo on
     # one entry rejects the whole add (item not yet created).
@@ -989,8 +1065,39 @@ def cmd_add(root, backlog, args):
             print(color(f"  Error: Parent '{parent_id}' not found.", C.ERR))
             sys.exit(1)
 
-    # Generate next ID
-    new_id = next_id_for_type(root, item_type)
+    # --- ID assignment ---
+    prefix_map = {"Initiative": "I", "Epic": "E", "Feature": "F", "Story": "S"}
+    prefix = prefix_map[item_type]
+
+    sync = None if local_only else _read_sync_config(root)
+    gh_issue_num = None
+    project_item_id = ""
+    issue_url = ""
+
+    print()
+    if sync:
+        org = sync["github_org"]
+        repo = sync["github_repo"]
+        project_num = int(sync["github_project_number"])
+        print(color(f"  Creating GH issue in {org}/{repo}...", C.MUTED))
+        try:
+            gh_issue_num, issue_url = _gh_create_issue(org, repo, item_type, title, parent_id)
+            new_id = f"{prefix}-{gh_issue_num}"
+            print(color(f"  Issue #{gh_issue_num} → {new_id}", C.OK))
+            try:
+                project_item_id = _gh_add_to_project(org, project_num, issue_url)
+                print(color(f"  Added to Project #{project_num}", C.OK))
+            except RuntimeError as e:
+                print(color(f"  Warning: project item-add failed: {e}", C.WARN))
+        except RuntimeError as e:
+            print(color(f"  GH issue creation failed: {e}", C.ERR))
+            print(color(f"  Falling back to local-first.", C.WARN))
+            new_id = next_id_for_type(root, item_type)
+            sync = None
+    else:
+        if not local_only:
+            print(color("  No sync config — creating locally (run sync push after /edpa:setup).", C.MUTED))
+        new_id = next_id_for_type(root, item_type)
 
     # Build item data
     item_data = {
@@ -1000,7 +1107,6 @@ def cmd_add(root, backlog, args):
         "status": status,
         "parent": parent_id,
     }
-
     if js is not None:
         item_data["js"] = js
     if bv is not None:
@@ -1024,18 +1130,29 @@ def cmd_add(root, backlog, args):
         if _bv or _tc or _rr:
             item_data["wsjf"] = round((_bv + _tc + _rr) / js, 2)
 
-    # Ensure directory exists
+    # Write YAML
     type_dir = TYPE_DIRS[item_type]
     dir_path = root / ".edpa" / "backlog" / type_dir
     dir_path.mkdir(parents=True, exist_ok=True)
-
-    # Write YAML file
     file_path = dir_path / f"{new_id}.yaml"
     with open(file_path, "w", encoding="utf-8") as f:
         yaml.dump(item_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
+    if sync and gh_issue_num:
+        _update_issue_map(root, new_id, gh_issue_num, project_item_id,
+                          org, repo, project_num)
+        import subprocess
+        issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
+        subprocess.run(["git", "add", str(file_path), str(issue_map_path)],
+                       capture_output=True, cwd=str(root))
+        subprocess.run(["git", "commit", "-m", f"feat({new_id}): {title}"],
+                       capture_output=True, cwd=str(root))
+        print(color(f"  Committed: feat({new_id}): {title}", C.OK))
+
     print()
     print(f"  {color('Created:', C.OK)} {color(bold(new_id), level_color(item_type))} {title}")
+    if issue_url:
+        print(f"  {color('Issue:', C.MUTED)}   {issue_url}")
     print(f"  {color('File:', C.MUTED)}    {file_path}")
     print()
 
@@ -1090,6 +1207,9 @@ def main():
                             "PERSON:ROLE:CW where ROLE ∈ "
                             "{owner,key,reviewer,consulted} and CW ∈ "
                             "[0,1]. Example: --contributor turyna:owner:0.7")
+    p_add.add_argument("--local", action="store_true",
+                       help="Force local-first creation (skip GH issue create, "
+                            "use sequential ID scan). Use when offline or before setup.")
 
     args = parser.parse_args()
 
