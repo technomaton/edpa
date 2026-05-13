@@ -98,3 +98,4 @@ python3 .edpa/engine/scripts/backlog.py tree
 - **Never call `gh issue create` manually** — `backlog.py add` does it with correct labels and body format.
 - **Never invent IDs** — IDs come from GH issue numbers (GH-first) or sequential scan (local-first). Inventing them causes conflicts.
 - **Never skip `--parent`** for non-Initiative items — flat backlogs break WSJF calculation and engine allocation.
+- **Do not add `.github/ISSUE_TEMPLATE/` files** — EDPA uses org-level Issue Types (stronger than templates) and the skill covers all creation paths. GH UI templates would be a third source of truth with no consumer. If a team wants GH UI forms, they add them manually outside EDPA core.
