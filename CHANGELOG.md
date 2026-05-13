@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 1.19.0 — 2026-05-13
+
+### GH-first backlog item creation (`/edpa:add`)
+
+New minor version consolidating the GH-first item creation feature introduced in
+v1.18.6 and removing obsolete GitHub issue templates.
+
+**`/edpa:add`** — new skill and command for creating backlog items with collision-free IDs:
+
+- `gh issue create` → GitHub assigns atomic issue number (#42)
+- EDPA ID = type prefix + issue number (`S-42`, `E-15`, `F-8`, `I-3`)
+- No more sequential local ID scan → no multi-user race condition
+- `gh project item-add` → item visible in GitHub Project immediately
+- `issue_map.yaml` updated automatically
+- Auto `git commit -m "feat(S-42): <title>"`
+- `--local` flag for offline / pre-setup fallback
+
+**Removed: `.github/ISSUE_TEMPLATE/`** — `epic.md`, `feature.md`, `story.md` deleted.
+EDPA uses org-level Issue Types (stronger than templates) and the `/edpa:add` skill
+covers all creation paths. Templates were stale (old `S-XXX` ID scheme, label-based
+instead of Issue Types) and duplicated logic with no consumer in skill-first teams.
+
 ## 1.18.6 — 2026-05-13
 
 ### New feature — GH-first backlog item creation (`/edpa:add`)
