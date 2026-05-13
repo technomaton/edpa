@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.19.2 — 2026-05-13
+### Fix: engine version detection + correct invocation path in docstring
+Two issues surfaced during `/edpa:close-iteration` testing:
+
+1. **"EDPA unknown" in reports** — `get_version()` searched only for `plugin.json`
+   (works in the EDPA dev repo) but not in installed target projects where only
+   `.edpa/engine/VERSION` exists. Added `VERSION` file as a fallback candidate
+   (`Path(__file__).parent.parent / "VERSION"`).
+2. **Stale docstring path** — `engine.py` usage block still showed the old
+   `.claude/edpa/scripts/engine.py` path, causing Claude to get confused about
+   `--edpa-root` when invoking the engine. Updated to the canonical installed path
+   `python3 .edpa/engine/scripts/engine.py --edpa-root .edpa`.
+
 ## 1.19.1 — 2026-05-13
 ### Fix: Issue Type assignment in GH-first `backlog.py add`
 `gh issue create` was passing the item type (`Epic`, `Initiative`, …) as `--label`,

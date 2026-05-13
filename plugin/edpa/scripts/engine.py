@@ -6,12 +6,11 @@ Standalone Python implementation of the EDPA calculation engine.
 Computes derived hours from delivery evidence stored in .edpa/backlog/.
 
 Usage:
-    python .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
-    python .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
-    python .claude/edpa/scripts/engine.py --demo  # Run with built-in sample data
+    python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
+    python3 .edpa/engine/scripts/engine.py --demo  # Run with built-in sample data
 
     # Legacy mode (requires external item gathering):
-    python .claude/edpa/scripts/engine.py --capacity cap.yaml --heuristics h.yaml --iteration PI-2026-1.3
+    python3 .edpa/engine/scripts/engine.py --capacity cap.yaml --heuristics h.yaml --iteration PI-2026-1.3
 """
 
 import argparse
@@ -31,7 +30,8 @@ except ImportError:
 
 
 def get_version():
-    """Read version from plugin.json (single source of truth)."""
+    """Read version from plugin.json or the vendored VERSION file."""
+    # plugin.json candidates (EDPA repo: plugin/.claude-plugin/plugin.json)
     for candidate in [
         Path(__file__).parent.parent.parent / ".claude-plugin" / "plugin.json",
         Path(__file__).parent.parent.parent.parent / ".claude" / ".claude-plugin" / "plugin.json",
@@ -42,6 +42,13 @@ def get_version():
                     return json.load(f).get("version", "unknown")
         except (json.JSONDecodeError, OSError):
             continue
+    # Installed project: .edpa/engine/VERSION written by install.sh
+    version_file = Path(__file__).parent.parent / "VERSION"
+    try:
+        if version_file.exists():
+            return version_file.read_text().strip()
+    except OSError:
+        pass
     return "unknown"
 
 
