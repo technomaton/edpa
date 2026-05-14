@@ -1,6 +1,6 @@
 {
   "name": "edpa",
-  "version": "1.19.4",
+  "version": "1.19.5",
   "description": "EDPA — Evidence-Driven Proportional Allocation. Derive hours from Git delivery evidence. Zero timesheets, mathematical guarantee, Monte Carlo calibrated CW weights. Gated calculation credits each status transition; bidirectional sync with GitHub Projects.",
   "author": {
     "name": "TECHNOMATON",
@@ -21,12 +21,7 @@
     "./skills/edpa-sync-people"
   ],
   "commands": [
-    "./commands/setup.md",
-    "./commands/add.md",
     "./commands/close-iteration.md",
-    "./commands/reports.md",
-    "./commands/calibrate.md",
-    "./commands/sync.md",
     "./commands/board.md"
   ],
   "agents": []

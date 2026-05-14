@@ -12,7 +12,7 @@ Generate a self-contained HTML Kanban snapshot from the local backlog.
 
 1. Run the board generator:
 ```bash
-python plugin/edpa/scripts/board.py --open
+python3 .edpa/engine/scripts/board.py --open
 ```
 
 2. Pass any arguments the user specified:

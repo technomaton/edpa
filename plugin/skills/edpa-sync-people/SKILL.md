@@ -1,5 +1,5 @@
 ---
-name: sync-people
+name: edpa:sync-people
 user-invocable: true
 description: >
   Reconcile .edpa/config/people.yaml against the repository's GitHub

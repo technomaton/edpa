@@ -34,7 +34,7 @@ capacity this iteration (PTO, sick leave, overtime, onboarding ramp).
 
 1. List current overrides for transparency:
    ```bash
-   python3 .claude/edpa/scripts/capacity_override.py <iteration-id> --list
+   python3 .edpa/engine/scripts/capacity_override.py <iteration-id> --list
    ```
 
 2. Ask the user:
@@ -44,7 +44,7 @@ capacity this iteration (PTO, sick leave, overtime, onboarding ramp).
 
 3. If `add`, drive the interactive flow once per override:
    ```bash
-   python3 .claude/edpa/scripts/capacity_override.py <iteration-id> --add
+   python3 .edpa/engine/scripts/capacity_override.py <iteration-id> --add
    ```
    The script auto-commits each override with an audit message
    (`<iteration-id>: capacity override <person> -> <hours>h (<note>)`).

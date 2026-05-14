@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 1.19.5 — 2026-05-14
+### fix(plugin): remove duplicate commands, fix /sync-people namespace
+- Removed 5 commands that duplicated skills (add, sync, setup, reports, calibrate)
+  — they caused `/add`, `/sync` etc. to appear alongside `/edpa:add`, `/edpa:sync`
+- `plugin.json commands[]` now contains only `close-iteration` and `board`
+  (skills without a skill counterpart)
+- Fixed stale paths in `close-iteration.md` and `board.md`:
+  `.claude/edpa/scripts/` → `.edpa/engine/scripts/`
+- `edpa-sync-people/SKILL.md`: changed `name: sync-people` → `name: edpa:sync-people`
+  so it registers as `/edpa:sync-people` instead of bare `/sync-people`
+
 ## 1.19.4 — 2026-05-14
 ### fix: keep governance.methodology in sync with engine version
 - `edpa.yaml.tmpl` — updated hardcoded `1.17.0` to current version; `bump_version.py`
