@@ -306,6 +306,10 @@ def collect_items_flat(root):
                 "rr_oe": item.get("rr_oe", 0),
                 "wsjf": item.get("wsjf", 0),
                 "type": item.get("epic_type", ""),
+                "description": item.get("description"),
+                "acceptance_criteria": item.get("acceptance_criteria"),
+                "refinement_notes": item.get("refinement_notes"),
+                "notes": item.get("notes"),
             }
             items[item_id] = entry
     return items
@@ -572,6 +576,64 @@ def gh_set_field_value(state, project_item_id, edpa_field, value, item_level):
     return False, f"unsupported field {edpa_field!r}"
 
 
+BODY_CONTENT_FIELDS = ("description", "acceptance_criteria", "refinement_notes", "notes")
+
+
+def _format_issue_body(item):
+    """Build a Markdown issue body from YAML content fields."""
+    parts = []
+    meta = []
+    for k in ("js", "bv", "tc", "rr_oe", "wsjf"):
+        v = item.get(k)
+        if v:
+            meta.append(f"{k.upper()}={v}")
+    if item.get("assignee"):
+        meta.append(f"owner={item['assignee']}")
+    if item.get("iteration"):
+        meta.append(f"iteration={item['iteration']}")
+    level = item.get("level") or item.get("type") or ""
+    meta_line = level + (" · " + ", ".join(meta) if meta else "")
+    parts.append(meta_line)
+
+    if item.get("description"):
+        parts.append(f"\n## Description\n\n{str(item['description']).strip()}")
+
+    ac = item.get("acceptance_criteria")
+    if ac:
+        if isinstance(ac, list):
+            ac_md = "\n".join(f"- [ ] {c}" for c in ac)
+        else:
+            ac_md = str(ac).strip()
+        parts.append(f"\n## Acceptance Criteria\n\n{ac_md}")
+
+    if item.get("refinement_notes"):
+        parts.append(f"\n## Refinement Notes\n\n{str(item['refinement_notes']).strip()}")
+
+    if item.get("notes"):
+        parts.append(f"\n## Notes\n\n{str(item['notes']).strip()}")
+
+    parts.append("\n---\n_Managed by EDPA — edit fields in `.edpa/backlog/`._")
+    return "\n".join(parts)
+
+
+def _body_hash(body: str) -> str:
+    import hashlib
+    return hashlib.sha256(body.encode()).hexdigest()[:16]
+
+
+def gh_update_issue_body(state, issue_number, body):
+    """Update issue body via gh issue edit --body. Returns (ok, msg)."""
+    if not (state.get("org") and state.get("repo") and issue_number):
+        return False, "missing org/repo/issue_number"
+    cmd = [
+        "gh", "issue", "edit", str(issue_number),
+        "--repo", f"{state['org']}/{state['repo']}",
+        "--body", body,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+    return (result.returncode == 0, result.stderr.strip()[:120] or "ok")
+
+
 def gh_edit_issue_title(state, issue_number, new_title):
     """Edit issue title via gh issue edit."""
     if not (state.get("org") and state.get("repo") and issue_number):
@@ -655,16 +717,7 @@ def gh_create_issue(state, item, item_level, people_handles=None):
     title = item.get("title", "")
     full_title = f"{item_id}: {title}" if item_id else title
 
-    body_parts = [item_level]
-    for k in ("js", "bv", "tc", "rr_oe", "wsjf"):
-        v = item.get(k)
-        if v:
-            body_parts.append(f"{k.upper()}={v}")
-    if item.get("assignee"):
-        body_parts.append(f"owner={item['assignee']}")
-    if item.get("iteration"):
-        body_parts.append(f"iteration={item['iteration']}")
-    body = ", ".join(body_parts)
+    body = _format_issue_body({**item, "level": item_level})
 
     cmd = [
         "gh", "issue", "create",
@@ -1296,6 +1349,7 @@ def cmd_push(root, sync_config, args):
                 print(f"  {color('[failed]', C.ERR)}")
                 failed += 1
                 continue
+            result["body_hash"] = _body_hash(_format_issue_body({**payload, "level": level}))
             setup_state["issue_map"][item_id] = result
             issue_label = "#" + str(result["issue_number"])
             print(f"  {color(issue_label, C.OK)}")
@@ -1412,7 +1466,39 @@ def cmd_push(root, sync_config, args):
                 failed += 1
         print()
 
-    if not field_changes and not create_changes:
+    # ── Body sync: push description/acceptance_criteria/notes when hash changed
+    body_updates = []
+    if not args.mock and setup_state:
+        for item_id, local in local_items.items():
+            if not any(local.get(f) for f in BODY_CONTENT_FIELDS):
+                continue
+            mapping = setup_state.get("issue_map", {}).get(item_id) or {}
+            issue_num = mapping.get("issue_number")
+            if not issue_num:
+                continue
+            level = local.get("level", "Story")
+            body = _format_issue_body({**local, "level": level})
+            new_hash = _body_hash(body)
+            if mapping.get("body_hash") == new_hash:
+                continue
+            body_updates.append((item_id, issue_num, body, new_hash))
+
+        if body_updates:
+            print(bold(color(f"  Updating {len(body_updates)} issue bodies:", C.DIFF_MOD)))
+            for item_id, issue_num, body, new_hash in body_updates:
+                print(f"    {color(item_id, C.SYNC):18s}  body", end="")
+                ok_, msg = gh_update_issue_body(setup_state, issue_num, body)
+                if ok_:
+                    setup_state["issue_map"][item_id]["body_hash"] = new_hash
+                    print(f"  {color('[ok]', C.OK)}")
+                    pushed += 1
+                else:
+                    print(f"  {color(f'[failed: {msg}]', C.ERR)}")
+                    failed += 1
+            save_issue_map(root, setup_state)
+            print()
+
+    if not field_changes and not create_changes and not body_updates:
         print(color(f"  {CHECK} No changes to push. GitHub Project is up to date.", C.OK))
         update_sync_state(root, "push", len(local_items), compute_backlog_checksum(root))
         print()

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 1.19.3 — 2026-05-14
+### feat(sync): push description/acceptance_criteria/notes to GH issue body
+`sync push` now syncs YAML content fields to GitHub issue bodies.
+
+**New in `sync.py`:**
+- `_format_issue_body(item)` — renders `description`, `acceptance_criteria`
+  (list → `- [ ] …` checkboxes), `refinement_notes`, `notes` as structured Markdown
+- `_body_hash(body)` — SHA-256[:16] for change detection
+- `gh_update_issue_body(state, issue_number, body)` — `gh issue edit --body`
+- `collect_items_flat` — now includes all 4 content fields in the entry dict
+- `gh_create_issue` — uses `_format_issue_body` instead of minimal one-liner body
+- `cmd_push` — body sync pass after field changes: computes hash, compares with
+  `body_hash` stored in `issue_map.yaml`, calls `gh_update_issue_body` only when changed.
+  Hash is persisted so re-running `sync push` is idempotent.
+
 ## 1.19.2 — 2026-05-13
 ### Fix: engine version detection + correct invocation path in docstring
 Two issues surfaced during `/edpa:close-iteration` testing:
