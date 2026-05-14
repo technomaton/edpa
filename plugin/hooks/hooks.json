@@ -8,6 +8,12 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/hooks/install_deps.sh",
             "timeout": 30,
             "statusMessage": "EDPA — checking Python deps"
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/edpa/scripts/hooks/update_engine.sh",
+            "timeout": 20,
+            "statusMessage": "EDPA — checking engine version"
           }
         ]
       }

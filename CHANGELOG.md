@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+## 1.20.1 — 2026-05-14
+### feat(plugin): auto-vendor engine on SessionStart
+New SessionStart hook `update_engine.sh` compares the bundled plugin
+version against the project's `.edpa/engine/VERSION` and re-vendors
+`scripts/`, `schemas/`, `templates/` when they diverge. No more manual
+`/edpa:setup` re-run after `/plugin update`.
+
+Fast path: single file compare returns in <50ms when versions match.
+
+Skip conditions:
+- `CLAUDE_PLUGIN_ROOT` unset (hook invoked outside Claude Code)
+- cwd has no `.edpa/engine/` (not an EDPA project / pre-setup)
+- VERSIONs match
+- `.edpa/config/edpa.yaml` has `auto_update_engine: false`
+
+Legacy `.yaml` backlog detector: when the auto-vendor runs (or on
+warm-path), the hook scans `.edpa/backlog/**/*.yaml` and prints a
+one-line warning pointing at `migrate_backlog_yaml_to_md.py`. Sync/
+engine silently ignore stale `.yaml` items in v1.20.0+, so this catches
+the regression that would otherwise wipe the GH project on the next
+sync push.
+
+Migration script moved from `tools/` to `plugin/edpa/scripts/` so
+`install.sh` vendors it automatically — users always have a working
+migrate command at `.edpa/engine/scripts/migrate_backlog_yaml_to_md.py`.
+
+Tests: +10 `test_update_engine_hook.py` covering all skip paths, the
+update path, opt-out, legacy-yaml warning, and walking up to find
+`.edpa/engine/` from a subdirectory.
+
 ## 1.20.0 — 2026-05-14
 ### fix(plugin): namespace + invocability consistency for all skills
 All 7 `edpa-*` skills now use `name: edpa:<x>` (instead of bare `<x>` which

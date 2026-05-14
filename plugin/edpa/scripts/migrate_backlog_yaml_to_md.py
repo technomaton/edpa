@@ -20,8 +20,11 @@ import argparse
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "plugin/edpa/scripts"))
+# The script lives alongside the engine — both as the source-of-truth
+# under plugin/edpa/scripts/ (this repo) and as the vendored copy under
+# <project>/.edpa/engine/scripts/ (downstream installs). Either way,
+# `_md_frontmatter` sits in the same directory.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import yaml  # noqa: E402
 

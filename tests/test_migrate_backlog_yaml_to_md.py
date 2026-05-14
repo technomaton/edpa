@@ -16,13 +16,13 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "plugin/edpa/scripts"))
-sys.path.insert(0, str(ROOT / "tools"))
 
-# Load the migration script as a module — its filename has underscores so
-# import works without tricks.
+# Load the migration script as a module — it lives next to the engine
+# (plugin/edpa/scripts/) so install.sh vendors it into .edpa/engine/scripts/
+# and the SessionStart auto-update hook can point users at it.
 spec = importlib.util.spec_from_file_location(
     "migrate_backlog_yaml_to_md",
-    ROOT / "tools" / "migrate_backlog_yaml_to_md.py",
+    ROOT / "plugin" / "edpa" / "scripts" / "migrate_backlog_yaml_to_md.py",
 )
 mig = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
