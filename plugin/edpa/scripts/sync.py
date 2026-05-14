@@ -158,6 +158,34 @@ def save_yaml(path, data):
                   sort_keys=False, width=120)
 
 
+def update_yaml_field(path, field, value):
+    """Update one field in an existing YAML file, preserving all other content and formatting.
+
+    Uses ruamel.yaml round-trip so block scalars (> folded), lists, and quotes are
+    kept intact. Falls back to load_yaml+save_yaml if ruamel is unavailable.
+    Returns True on success.
+    """
+    try:
+        from ruamel.yaml import YAML
+        ryaml = YAML()
+        ryaml.preserve_quotes = True
+        ryaml.width = 120
+        with open(path, "r", encoding="utf-8") as f:
+            doc = ryaml.load(f)
+        if doc is None:
+            return False
+        doc[field] = value
+        with open(path, "w", encoding="utf-8") as f:
+            ryaml.dump(doc, f)
+        return True
+    except Exception as exc:
+        print(f"WARNING: update_yaml_field({path}, {field!r}) failed: {exc}", file=sys.stderr)
+        data = load_yaml(path) or {}
+        data[field] = value
+        save_yaml(path, data)
+        return False
+
+
 def load_json(path):
     """Load a JSON file. Returns parsed content, or None if missing/unparseable."""
     try:
@@ -1121,8 +1149,7 @@ def apply_remote_changes(root, changes):
             continue
 
         if field in item or field in updatable_fields:
-            item[field] = new_value
-            save_yaml(item_path, item)
+            update_yaml_field(item_path, field, new_value)
             applied += 1
 
     return applied
@@ -2223,9 +2250,7 @@ def cmd_conflicts(root, sync_config, args):
                 print(f"    {color(item_id, C.WARN)}: YAML missing")
                 failed += 1
                 continue
-            doc = load_yaml(item_path) or {}
-            doc[field] = _coerce_typed(field, value)
-            save_yaml(item_path, doc)
+            update_yaml_field(item_path, field, _coerce_typed(field, value))
             log_change(root, "auto-resolve", "field_change", item_id,
                        field=field, new=str(value), actor=p["reason"])
             applied += 1

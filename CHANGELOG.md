@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 1.19.6 — 2026-05-14
+### fix(sync): preserve YAML block scalars on pull (ruamel round-trip)
+`sync pull` and conflict resolution were corrupting backlog YAML files with
+multiline fields (`description`, `acceptance_criteria`, `refinement_notes`,
+`notes`): `yaml.dump()` rewrote `>` folded block scalars into single-quoted
+flow scalars, mangled indentation of lists, and added spurious trailing newlines.
+
+Root cause: `load_yaml` (PyYAML `safe_load`) discards formatting metadata;
+`save_yaml` (`yaml.dump`) emits whatever PyYAML thinks looks right.
+
+Fix: new `update_yaml_field(path, field, value)` uses `ruamel.yaml` round-trip
+(preserves block scalars, quotes, list style) to update a single field in-place.
+Both write-back sites switched to it (pull at line ~1125, conflict-resolve at
+~2228). Falls back to `load_yaml`+`save_yaml` if ruamel is unavailable.
+`ruamel.yaml>=0.18` was already in `requirements.txt`.
+
 ## 1.19.5 — 2026-05-14
 ### fix(plugin): remove duplicate commands, fix /sync-people namespace
 - Removed 5 commands that duplicated skills (add, sync, setup, reports, calibrate)
