@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.20.2 — 2026-05-14
+### docs: surface auto_update_engine opt-out
+- `plugin/edpa/templates/edpa.yaml.tmpl` — commented-out
+  `auto_update_engine: false` block right after `governance:` with
+  rationale (local engine patches / strict-mutation environments).
+  Visible to every user the moment they open their `.edpa/config/edpa.yaml`.
+- `plugin/skills/edpa-setup/SKILL.md` — new paragraph after the
+  "Vendor engine" step describing the v1.20.1+ SessionStart auto-vendor
+  and the opt-out flag.
+- Fix stale `/edpa:edpa-setup` reference in setup SKILL.md → `/edpa:setup`
+  (slash paths now match the post-1.19.5 namespace).
+
 ## 1.20.1 — 2026-05-14
 ### feat(plugin): auto-vendor engine on SessionStart
 New SessionStart hook `update_engine.sh` compares the bundled plugin
