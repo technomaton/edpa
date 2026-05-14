@@ -209,7 +209,7 @@ python3 .edpa/engine/scripts/create_project_views.py --url <project-url>
 
 ## What NOT to do
 
-- **Don't copy plugin files into `.claude/edpa/`.** Engine vendors to `.edpa/engine/`. The project's `.claude/` stays clean (typically just `settings.json`). Vendoring to `.claude/edpa/` was the v1.0-era pattern; v1.19.6+ uses `.edpa/engine/`.
+- **Don't copy plugin files into `.claude/edpa/`.** Engine vendors to `.edpa/engine/`. The project's `.claude/` stays clean (typically just `settings.json`). Vendoring to `.claude/edpa/` was the v1.0-era pattern; v1.20.1+ uses `.edpa/engine/`.
 - **Don't create `.edpa/config/heuristics.yaml`.** The engine reads canonical CW weights from `.edpa/engine/templates/cw_heuristics.yaml.tmpl` (LOCKED, calibrated). The user-editable `.edpa/config/heuristics.yaml` from pre-v1.11 was a copy the engine ignored.
 - **Don't merge project metadata into `people.yaml`.** v1.11+ has `edpa.yaml` (project) and `people.yaml` (capacity) as separate files. Mixing them was a pre-v1.11 footgun.
 - **Don't default `role: Dev`.** Roles are `Arch / Dev / DevSecOps / PM / QA`; ask the user.
