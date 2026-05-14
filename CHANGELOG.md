@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.19.4 — 2026-05-14
+### fix: keep governance.methodology in sync with engine version
+- `edpa.yaml.tmpl` — updated hardcoded `1.17.0` to current version; `bump_version.py`
+  now includes it in literal replacements (`✓ 1 replacement(s)`)
+- `install.sh` — on engine update (when `.edpa/config/edpa.yaml` already exists),
+  rewrites `governance.methodology` to the newly installed version via inline Python;
+  handles both quoted and unquoted YAML values
+
 ## 1.19.3 — 2026-05-14
 ### feat(sync): push description/acceptance_criteria/notes to GH issue body
 `sync push` now syncs YAML content fields to GitHub issue bodies.

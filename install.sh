@@ -181,6 +181,16 @@ fi
 if [ ! -f ".edpa/config/edpa.yaml" ] && [ -f "$TARGET/templates/edpa.yaml.tmpl" ]; then
   cp "$TARGET/templates/edpa.yaml.tmpl" ".edpa/config/edpa.yaml"
   echo "  Created .edpa/config/edpa.yaml (edit project.name + governance metadata)"
+elif [ -f ".edpa/config/edpa.yaml" ]; then
+  python3 - "$PINNED" ".edpa/config/edpa.yaml" <<'PYEOF'
+import sys, re
+version, path = sys.argv[1], sys.argv[2]
+text = open(path).read()
+new_text = re.sub(r'(methodology:\s*"?EDPA )[^"\n]+("?)', rf'\g<1>{version}\2', text)
+if new_text != text:
+    open(path, "w").write(new_text)
+    print(f"  Updated edpa.yaml governance.methodology → EDPA {version}")
+PYEOF
 fi
 
 touch ".edpa/changelog.jsonl" ".edpa/sync_state.json"
