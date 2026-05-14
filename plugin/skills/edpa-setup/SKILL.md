@@ -113,6 +113,15 @@ python3 -c "import json; print(json.load(open('${CLAUDE_PLUGIN_ROOT}/.claude-plu
 
 **What gets vendored:** `scripts/` (30 .py), `schemas/` (1 .json), `templates/` (3 .tmpl). Skills/commands/hooks/.mcp.json from `${CLAUDE_PLUGIN_ROOT}` are NOT vendored — those are for Claude Code's plugin runtime exclusively, which loads them from its cache, not from the project.
 
+**Auto-vendor on plugin update (v1.20.1+):** the SessionStart hook `update_engine.sh` compares the plugin's bundled VERSION against `.edpa/engine/VERSION` and re-vendors when they diverge. After `/plugin update edpa`, the next Claude Code session in the project auto-refreshes the engine — no manual `/edpa:setup` re-run needed.
+
+To opt out, add to `.edpa/config/edpa.yaml`:
+```yaml
+auto_update_engine: false
+```
+
+Then you must run `/edpa:edpa-setup` manually after each plugin update. Use this when you have local patches on `.edpa/engine/` or strict environments that forbid silent file mutation.
+
 ### 3. Install CI workflows into `.github/workflows/`
 
 ```bash

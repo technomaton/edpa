@@ -65,7 +65,7 @@ project:
 governance:
   methodology: "EDPA 1.20.1"
   # v1.14: single calculation path. v1.17: extended with yaml_edit
-  # signals — every commit on .edpa/backlog/<typ>/<id>.yaml in the
+  # signals — every commit on .edpa/backlog/<typ>/<id>.md in the
   # iteration window contributes structural credit (create / block_add
   # / list_grow / scalar_change / lines_volume / contributors_rebalance
   # / revert). v1.17 also fixes Bug A (Defects were silently dropped
@@ -73,6 +73,22 @@ governance:
   # selector remains dropped — gates was a strict superset of simple
   # (degenerated to Done-only when no transitions). audit_mode field
   # also dropped — snapshots always carry the full signals[] audit trail.
+
+# Plugin upgrade behavior (v1.20.1+)
+#
+# When the EDPA plugin updates (`/plugin update edpa`), Claude Code's
+# SessionStart hook compares the bundled plugin VERSION against the
+# project's `.edpa/engine/VERSION` and re-vendors scripts/schemas/
+# templates when they diverge. No manual `/edpa:setup` re-run needed.
+#
+# Set `auto_update_engine: false` to disable this. You then must run
+# `/edpa:setup` manually after each `/plugin update` to refresh
+# `.edpa/engine/`. Useful when you have local patches on the vendored
+# engine you don't want overwritten, or strict environments that
+# forbid silent file mutation.
+#
+# Default behavior (flag absent or `true`): auto-update on session start.
+# auto_update_engine: false
 
 naming:
   pi_pattern: "PI-{year}-{pi_num}"            # e.g., PI-2026-1
