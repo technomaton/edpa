@@ -9,12 +9,6 @@ description: >
 license: MIT
 compatibility: Python 3.10+ (openpyxl for XLSX), .edpa/config/people.yaml
 allowed-tools: Read Write Bash(python3 *) Bash(cp *) Bash(mkdir *)
-metadata:
-  author: Jaroslav Urbánek
-  version: 1.0.0
-  domain: governance
-  phase: reports
-  standard: AgentSkills v1.0
 ---
 
 # EDPA Reports — Timesheet & Export Generation
@@ -69,7 +63,7 @@ Projekt: {project_name}
 Registrace: {registration}
 Období: {iteration} ({dates})
 Kapacita: {capacity}h ({fte} FTE)
-Metodika: EDPA 1.20.2
+Metodika: EDPA 1.20.3
 
 | Item | Typ | JS | CW | Score | Podíl | Hodiny |
 |------|-----|----|----|-------|-------|--------|
@@ -100,11 +94,11 @@ two tabs: **Team Summary** and **Item Costs**.
 Write to `.edpa/snapshots/iteration-{ID}.json`:
 ```json
 {
-  "snapshot_version": "1.20.2",
+  "snapshot_version": "1.20.3",
   "iteration": "{id}",
   "generated_at": "ISO-8601",
   "frozen": true,
-  "methodology": "EDPA 1.20.2",
+  "methodology": "EDPA 1.20.3",
   "capacity_registry": { "...from config..." },
   "edpa_results": { "...from engine..." },
   "signature_status": "pending"

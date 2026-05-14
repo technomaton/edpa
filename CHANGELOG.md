@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 1.20.3 — 2026-05-14
+### chore: drop SKILL.md metadata block (plugin.json is single source of truth)
+- All 7 `plugin/skills/*/SKILL.md` files lost the `metadata:` block
+  (`author`, `version`, `domain`, `phase`, `standard`, `pattern`). None
+  of these fields were consumed by EDPA scripts or by the Claude Code
+  Agent Skill loader; `plugin.json` holds canonical author/version/license.
+  Removes drift risk (per-skill `version: 1.0.0` was stale against
+  plugin `1.20.x`) and cleans up the false `standard: AgentSkills v1.0`
+  label.
+- `plugin/README.md` — softened "AgentSkills v1.0 frontmatter" claim to
+  "Claude Code Agent Skill frontmatter — portable Markdown + YAML".
+- `web/src/pages/{,en/}presentation/{index,kashealth}.astro` — risk
+  table cell rewritten from "AgentSkills standard: 26+ platforms,
+  convert.sh" to a more accurate "Markdown + YAML frontmatter —
+  portable beyond Claude Code".
+- No functional change. Top-level frontmatter retained: `name`,
+  `user-invocable`, `description`, `license`, `compatibility`,
+  `allowed-tools` (and `disable-model-invocation` on autocalib).
+
 ## 1.20.2 — 2026-05-14
 ### docs: surface auto_update_engine opt-out
 - `plugin/edpa/templates/edpa.yaml.tmpl` — commented-out

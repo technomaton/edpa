@@ -9,12 +9,6 @@ description: >
 license: MIT
 compatibility: GitHub CLI (gh), Python 3.10+
 allowed-tools: Read Bash(python3 *) Bash(gh *) Bash(git *)
-metadata:
-  author: Jaroslav Urbánek
-  version: 1.0.0
-  domain: governance
-  phase: maintenance
-  standard: AgentSkills v1.0
 ---
 
 # EDPA Sync People — Reconcile collaborators with people.yaml

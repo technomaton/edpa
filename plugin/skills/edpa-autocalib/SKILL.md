@@ -13,13 +13,6 @@ license: MIT
 compatibility: Python 3.10+, git, plugin/edpa/scripts/calibrate_signals.py
 allowed-tools: Read Write Bash(python3 *) Bash(git *) Grep
 disable-model-invocation: false
-metadata:
-  author: Jaroslav Urbánek
-  version: 2.0.0
-  domain: governance
-  phase: auto-calibration
-  pattern: Monte Carlo + coordinate descent
-  standard: AgentSkills v1.0
 ---
 
 # EDPA Auto-Calibration — Monte Carlo signal-weight optimizer

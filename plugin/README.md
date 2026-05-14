@@ -125,7 +125,7 @@ plugin/
 
 ## Cross-tool compatibility
 
-The plugin ships standard `SKILL.md` files (AgentSkills v1.0 frontmatter), so the markdown payload is consumable beyond Claude Code:
+The plugin ships standard `SKILL.md` files (Claude Code Agent Skill frontmatter — portable Markdown + YAML), so the markdown payload is consumable beyond Claude Code:
 
 ```bash
 # Claude Code   — auto-detected from .claude/ (native plugin install)

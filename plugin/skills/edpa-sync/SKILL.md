@@ -9,12 +9,6 @@ description: >
 license: MIT
 compatibility: GitHub CLI (gh), Python 3.10+, .edpa/config/edpa.yaml
 allowed-tools: Read Write Bash(python3 *) Bash(gh *) Bash(git *) Grep
-metadata:
-  author: Jaroslav Urbánek
-  version: 1.0.0
-  domain: governance
-  phase: sync
-  standard: AgentSkills v1.0
 ---
 
 # EDPA Sync — GitHub Projects ↔ .edpa/backlog/

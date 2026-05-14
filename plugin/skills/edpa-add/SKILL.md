@@ -8,12 +8,6 @@ description: >
 license: MIT
 compatibility: GitHub CLI (gh), Python 3.10+, edpa.yaml sync config
 allowed-tools: Read Bash(python3 *) Bash(git *)
-metadata:
-  author: Jaroslav Urbánek
-  version: 1.0.0
-  domain: governance
-  phase: planning
-  standard: AgentSkills v1.0
 ---
 
 # EDPA Add — Create Backlog Item
