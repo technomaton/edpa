@@ -32,6 +32,21 @@ except ImportError:
     print("Error: PyYAML is required. Install with: pip install pyyaml")
     sys.exit(1)
 
+# Backlog items live as `.md` files with YAML frontmatter + Markdown body
+# (see plugin/edpa/scripts/_md_frontmatter.py). Config files in
+# .edpa/config/*.yaml stay plain YAML and continue to use load_yaml.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _md_frontmatter import (  # noqa: E402
+        format_issue_body as _md_format_issue_body,
+        load_md,
+        save_md,
+        strip_issue_body_chrome,
+        update_frontmatter_field,
+    )
+finally:
+    sys.path.pop(0)
+
 
 # -- ANSI Colors (EDPA palette) -----------------------------------------------
 
@@ -304,8 +319,10 @@ TYPE_DIRS = ["initiatives", "epics", "features", "stories"]
 def collect_items_flat(root):
     """Collect all items from per-file .edpa/backlog/ directories into a flat dict keyed by ID.
 
-    Reads individual YAML files from .edpa/backlog/initiatives/, .edpa/backlog/epics/,
-    .edpa/backlog/features/, and .edpa/backlog/stories/.
+    Reads individual .md files (YAML frontmatter + Markdown body) from
+    .edpa/backlog/initiatives/, .edpa/backlog/epics/, .edpa/backlog/features/,
+    and .edpa/backlog/stories/. The body is included verbatim so the
+    backlog checksum is sensitive to prose changes.
     """
     items = {}
     backlog = root / ".edpa" / "backlog"
@@ -313,8 +330,8 @@ def collect_items_flat(root):
         dir_path = backlog / type_dir
         if not dir_path.exists():
             continue
-        for f in sorted(dir_path.glob("*.yaml")):
-            item = load_yaml(f)
+        for f in sorted(dir_path.glob("*.md")):
+            item = load_md(f)
             if not item:
                 continue
             item_id = item.get("id")
@@ -334,10 +351,7 @@ def collect_items_flat(root):
                 "rr_oe": item.get("rr_oe", 0),
                 "wsjf": item.get("wsjf", 0),
                 "type": item.get("epic_type", ""),
-                "description": item.get("description"),
-                "acceptance_criteria": item.get("acceptance_criteria"),
-                "refinement_notes": item.get("refinement_notes"),
-                "notes": item.get("notes"),
+                "body": item.get("body", "") or "",
             }
             items[item_id] = entry
     return items
@@ -604,44 +618,15 @@ def gh_set_field_value(state, project_item_id, edpa_field, value, item_level):
     return False, f"unsupported field {edpa_field!r}"
 
 
-BODY_CONTENT_FIELDS = ("description", "acceptance_criteria", "refinement_notes", "notes")
-
-
 def _format_issue_body(item):
-    """Build a Markdown issue body from YAML content fields."""
-    parts = []
-    meta = []
-    for k in ("js", "bv", "tc", "rr_oe", "wsjf"):
-        v = item.get(k)
-        if v:
-            meta.append(f"{k.upper()}={v}")
-    if item.get("assignee"):
-        meta.append(f"owner={item['assignee']}")
-    if item.get("iteration"):
-        meta.append(f"iteration={item['iteration']}")
-    level = item.get("level") or item.get("type") or ""
-    meta_line = level + (" · " + ", ".join(meta) if meta else "")
-    parts.append(meta_line)
+    """Build a Markdown issue body for a backlog item.
 
-    if item.get("description"):
-        parts.append(f"\n## Description\n\n{str(item['description']).strip()}")
-
-    ac = item.get("acceptance_criteria")
-    if ac:
-        if isinstance(ac, list):
-            ac_md = "\n".join(f"- [ ] {c}" for c in ac)
-        else:
-            ac_md = str(ac).strip()
-        parts.append(f"\n## Acceptance Criteria\n\n{ac_md}")
-
-    if item.get("refinement_notes"):
-        parts.append(f"\n## Refinement Notes\n\n{str(item['refinement_notes']).strip()}")
-
-    if item.get("notes"):
-        parts.append(f"\n## Notes\n\n{str(item['notes']).strip()}")
-
-    parts.append("\n---\n_Managed by EDPA — edit fields in `.edpa/backlog/`._")
-    return "\n".join(parts)
+    The body is the item's raw Markdown body verbatim, wrapped with a
+    one-line meta summary (level + WSJF inputs + owner + iteration) and
+    the EDPA trailer. Delegates to ``_md_frontmatter.format_issue_body``
+    so on-disk and on-GitHub representations stay 1:1.
+    """
+    return _md_format_issue_body(item)
 
 
 def _body_hash(body: str) -> str:
@@ -1113,11 +1098,11 @@ ID_PREFIX_TO_DIR = {
 
 
 def _item_file_path(root, item_id):
-    """Resolve the .edpa/backlog/ file path for a given item ID (e.g., S-200 -> .edpa/backlog/stories/S-200.yaml)."""
+    """Resolve the .edpa/backlog/ file path for a given item ID (e.g., S-200 -> .edpa/backlog/stories/S-200.md)."""
     prefix = item_id.split("-")[0] if "-" in item_id else ""
     type_dir = ID_PREFIX_TO_DIR.get(prefix)
     if type_dir:
-        return root / ".edpa" / "backlog" / type_dir / f"{item_id}.yaml"
+        return root / ".edpa" / "backlog" / type_dir / f"{item_id}.md"
     return None
 
 
@@ -1144,12 +1129,12 @@ def apply_remote_changes(root, changes):
         if not item_path or not item_path.exists():
             continue
 
-        item = load_yaml(item_path)
+        item = load_md(item_path)
         if not item:
             continue
 
         if field in item or field in updatable_fields:
-            update_yaml_field(item_path, field, new_value)
+            update_frontmatter_field(item_path, field, new_value)
             applied += 1
 
     return applied
@@ -1411,7 +1396,7 @@ def cmd_push(root, sync_config, args):
                 local_item_path = _item_file_path(root, item_id)
                 if not local_item_path or not local_item_path.exists():
                     continue
-                local_full = load_yaml(local_item_path) or {}
+                local_full = load_md(local_item_path) or {}
                 parent_id = local_full.get("parent")
                 if not parent_id:
                     continue
@@ -1493,11 +1478,13 @@ def cmd_push(root, sync_config, args):
                 failed += 1
         print()
 
-    # ── Body sync: push description/acceptance_criteria/notes when hash changed
+    # ── Body sync: push the file body (Markdown) when its hash changed.
+    # The body is the source of truth for prose; we don't need to inspect
+    # individual prose fields any more — any body content triggers push.
     body_updates = []
     if not args.mock and setup_state:
         for item_id, local in local_items.items():
-            if not any(local.get(f) for f in BODY_CONTENT_FIELDS):
+            if not (local.get("body") or "").strip():
                 continue
             mapping = setup_state.get("issue_map", {}).get(item_id) or {}
             issue_num = mapping.get("issue_number")
@@ -2235,7 +2222,7 @@ def cmd_conflicts(root, sync_config, args):
         print()
         return
 
-    # Apply: 'remote' winners write YAML; 'local' winners push to GH.
+    # Apply: 'remote' winners write the backlog file; 'local' winners push to GH.
     setup_state = load_setup_state(root)
     applied = 0
     failed = 0
@@ -2247,10 +2234,10 @@ def cmd_conflicts(root, sync_config, args):
         if p["winner"] == "remote":
             item_path = _item_file_path(root, item_id)
             if not item_path or not item_path.exists():
-                print(f"    {color(item_id, C.WARN)}: YAML missing")
+                print(f"    {color(item_id, C.WARN)}: backlog file missing")
                 failed += 1
                 continue
-            update_yaml_field(item_path, field, _coerce_typed(field, value))
+            update_frontmatter_field(item_path, field, _coerce_typed(field, value))
             log_change(root, "auto-resolve", "field_change", item_id,
                        field=field, new=str(value), actor=p["reason"])
             applied += 1

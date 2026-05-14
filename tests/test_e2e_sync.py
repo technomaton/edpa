@@ -34,6 +34,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PROJECT_SETUP = REPO_ROOT / "plugin/edpa/scripts/project_setup.py"
 SYNC_SCRIPT = REPO_ROOT / "plugin/edpa/scripts/sync.py"
 
+sys.path.insert(0, str(REPO_ROOT / "plugin" / "edpa" / "scripts"))
+from _md_frontmatter import load_md as _load_md, save_md as _save_md  # noqa: E402
+
 pytestmark = pytest.mark.e2e
 
 
@@ -152,8 +155,8 @@ def make_workspace(tmp_path: Path, org: str, repo: str, items: list[dict]) -> Pa
     }
     for item in items:
         type_dir = type_to_dir[item["type"]]
-        path = edpa / "backlog" / type_dir / f"{item['id']}.yaml"
-        path.write_text(yaml.dump(item, sort_keys=False, allow_unicode=True))
+        path = edpa / "backlog" / type_dir / f"{item['id']}.md"
+        _save_md(path, item, body="")
 
     return tmp_path
 
@@ -337,9 +340,7 @@ def test_push_creates_new_issue_for_local_only_item(fresh_workspace):
         "parent": "E-200",
         "js": 8,
     }
-    (ws / ".edpa/backlog/stories/S-999.yaml").write_text(
-        yaml.dump(new_story, sort_keys=False, allow_unicode=True)
-    )
+    _save_md(ws / ".edpa/backlog/stories/S-999.md", new_story, body="")
 
     push = run_sync(ws, "push")
     assert push.returncode == 0, f"push failed:\n{push.stderr}\n{push.stdout}"
@@ -388,9 +389,9 @@ def test_pull_picks_up_remote_status_change(fresh_workspace):
     pull = run_sync(ws, "pull")
     assert pull.returncode == 0, f"pull failed:\n{pull.stderr}\n{pull.stdout}"
 
-    s300_yaml = yaml.safe_load((ws / ".edpa/backlog/stories/S-300.yaml").read_text())
+    s300_yaml = _load_md(ws / ".edpa/backlog/stories/S-300.md")
     assert s300_yaml.get("status") == "Done", \
-        f"S-300 status not updated; got: {s300_yaml.get('status')}\nFull YAML: {s300_yaml}"
+        f"S-300 status not updated; got: {s300_yaml.get('status')}\nFull frontmatter: {s300_yaml}"
 
     # Changelog should record the change
     changelog = (ws / ".edpa/changelog.jsonl").read_text().splitlines()
@@ -436,7 +437,7 @@ def test_iteration_field_roundtrips(fresh_workspace):
     pull = run_sync(ws, "pull")
     assert pull.returncode == 0, f"pull failed:\n{pull.stderr}\n{pull.stdout}"
 
-    s300_yaml = yaml.safe_load((ws / ".edpa/backlog/stories/S-300.yaml").read_text())
+    s300_yaml = _load_md(ws / ".edpa/backlog/stories/S-300.md")
     assert s300_yaml.get("iteration") == "PI-2026-1.2", \
         f"iteration not updated; got: {s300_yaml.get('iteration')}"
 
@@ -477,7 +478,7 @@ def test_engine_sees_status_transition_after_sync(fresh_workspace):
     pull = run_sync(ws, "pull", "--commit")
     assert pull.returncode == 0
 
-    e200_yaml = yaml.safe_load((ws / ".edpa/backlog/epics/E-200.yaml").read_text())
+    e200_yaml = _load_md(ws / ".edpa/backlog/epics/E-200.md")
     assert e200_yaml.get("status") == "Implementing", \
         f"E-200 status not synced; got: {e200_yaml.get('status')}"
 

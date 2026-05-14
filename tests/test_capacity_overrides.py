@@ -27,6 +27,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "plugin" / "edpa" / "scripts"))
 import engine  # noqa: E402
+from _md_frontmatter import save_md  # noqa: E402
 from validate_syntax import validate_iteration_people_overrides  # noqa: E402
 
 
@@ -77,18 +78,18 @@ def _seed_minimal_edpa(tmp_path: Path, *, iteration_id="PI-2026-1.1",
     (edpa / "iterations" / f"{iteration_id}.yaml").write_text(
         yaml.safe_dump(iteration_doc))
 
-    (edpa / "backlog" / "stories" / "S-1.yaml").write_text(yaml.safe_dump({
+    save_md(edpa / "backlog" / "stories" / "S-1.md", {
         "id": "S-1", "type": "Story", "title": "test",
         "parent": "F-1", "js": 5, "status": "Done",
         "iteration": iteration_id,
         "contributors": [{"person": "bob-dev", "as": "owner", "cw": cw}],
-    }))
-    (edpa / "backlog" / "stories" / "S-2.yaml").write_text(yaml.safe_dump({
+    })
+    save_md(edpa / "backlog" / "stories" / "S-2.md", {
         "id": "S-2", "type": "Story", "title": "test 2",
         "parent": "F-1", "js": 3, "status": "Done",
         "iteration": iteration_id,
         "contributors": [{"person": "alice-arch", "as": "owner", "cw": cw}],
-    }))
+    })
     return edpa
 
 

@@ -63,19 +63,20 @@ def _install_plugin(target: Path):
 
 def _plant_minimal_backlog(target: Path):
     backlog = target / ".edpa" / "backlog"
-    (backlog / "initiatives" / "I-1.yaml").write_text(
-        "id: I-1\ntype: Initiative\ntitle: T\nparent: null\n"
+    (backlog / "initiatives" / "I-1.md").write_text(
+        "---\nid: I-1\ntype: Initiative\ntitle: T\nparent: null\n---\n"
     )
-    (backlog / "epics" / "E-1.yaml").write_text(
-        "id: E-1\ntype: Epic\ntitle: T\nparent: I-1\n"
+    (backlog / "epics" / "E-1.md").write_text(
+        "---\nid: E-1\ntype: Epic\ntitle: T\nparent: I-1\n---\n"
     )
-    (backlog / "features" / "F-1.yaml").write_text(
-        "id: F-1\ntype: Feature\ntitle: T\nparent: E-1\njs: 5\n"
+    (backlog / "features" / "F-1.md").write_text(
+        "---\nid: F-1\ntype: Feature\ntitle: T\nparent: E-1\njs: 5\n---\n"
     )
-    (backlog / "stories" / "S-1.yaml").write_text(
-        "id: S-1\ntype: Story\ntitle: T\nparent: F-1\njs: 5\n"
+    (backlog / "stories" / "S-1.md").write_text(
+        "---\nid: S-1\ntype: Story\ntitle: T\nparent: F-1\njs: 5\n"
         "status: Done\niteration: PI-2026-1.1\n"
         "contributors:\n  - person: example-arch\n    as: owner\n    cw: 1\n"
+        "---\n"
     )
     (target / ".edpa" / "iterations" / "PI-2026-1.1.yaml").write_text(
         "iteration:\n"
@@ -142,8 +143,8 @@ def test_traceability_passes_on_valid_backlog(project):
 
 def test_traceability_fails_on_orphan(project):
     _plant_minimal_backlog(project)
-    (project / ".edpa" / "backlog" / "stories" / "S-ORPHAN.yaml").write_text(
-        "id: S-ORPHAN\ntype: Story\ntitle: bad\n"
+    (project / ".edpa" / "backlog" / "stories" / "S-ORPHAN.md").write_text(
+        "---\nid: S-ORPHAN\ntype: Story\ntitle: bad\n---\n"
     )
     r = _run(project, "traceability.py")
     assert r.returncode == 1

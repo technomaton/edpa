@@ -231,13 +231,17 @@ class TestCollectIntegration(unittest.TestCase):
                           email: str, ts_iso: str):
         f = self.repo / rel_path
         f.parent.mkdir(parents=True, exist_ok=True)
-        f.write_text(yaml.safe_dump(body, sort_keys=False))
+        if rel_path.endswith(".md"):
+            from _md_frontmatter import save_md
+            save_md(f, body, "")
+        else:
+            f.write_text(yaml.safe_dump(body, sort_keys=False))
         self._run(f"git add {rel_path}", cwd=self.repo)
         self._commit(msg, email, ts_iso)
 
     def test_create_signal_lands_for_alice(self):
         self._write_and_commit(
-            ".edpa/backlog/initiatives/I-1.yaml",
+            ".edpa/backlog/initiatives/I-1.md",
             {"id": "I-1", "type": "Initiative",
              "title": "test init", "status": "Funnel"},
             "EDPA: I-1 created", "alice@example.com",
@@ -253,7 +257,7 @@ class TestCollectIntegration(unittest.TestCase):
     def test_defect_in_tracked_dirs(self):
         # Bug A regression test: defects must produce signals.
         self._write_and_commit(
-            ".edpa/backlog/defects/D-1.yaml",
+            ".edpa/backlog/defects/D-1.md",
             {"id": "D-1", "type": "Defect", "title": "bug", "status": "Done"},
             "EDPA: D-1 fixed", "bob@example.com",
             "2026-05-14T11:00:00+00:00",
@@ -264,7 +268,7 @@ class TestCollectIntegration(unittest.TestCase):
     def test_outside_window_filtered(self):
         # Iter is 2026-05-11..17; commit at 2026-06-01 must be excluded.
         self._write_and_commit(
-            ".edpa/backlog/initiatives/I-2.yaml",
+            ".edpa/backlog/initiatives/I-2.md",
             {"id": "I-2", "type": "Initiative", "title": "later",
              "status": "Funnel"},
             "EDPA: I-2 created", "alice@example.com",
@@ -275,7 +279,7 @@ class TestCollectIntegration(unittest.TestCase):
 
     def test_bot_author_zero_weight(self):
         self._write_and_commit(
-            ".edpa/backlog/features/F-1.yaml",
+            ".edpa/backlog/features/F-1.md",
             {"id": "F-1", "type": "Feature", "title": "auto", "status": "Funnel"},
             "EDPA: F-1 created", "github-actions[bot]@noreply.example.com",
             "2026-05-13T12:00:00+00:00",
@@ -285,7 +289,7 @@ class TestCollectIntegration(unittest.TestCase):
 
     def test_tool_commit_message_zero_weight(self):
         self._write_and_commit(
-            ".edpa/backlog/features/F-2.yaml",
+            ".edpa/backlog/features/F-2.md",
             {"id": "F-2", "type": "Feature", "title": "sync",
              "status": "Funnel"},
             "EDPA sync push: 1 created, 0 updated", "alice@example.com",
@@ -297,7 +301,7 @@ class TestCollectIntegration(unittest.TestCase):
     def test_bulk_migration_discount(self):
         # Bulk rename commit produces credit reduced to 10% of normal.
         self._write_and_commit(
-            ".edpa/backlog/stories/S-1.yaml",
+            ".edpa/backlog/stories/S-1.md",
             {"id": "S-1", "type": "Story", "title": "rename",
              "status": "Funnel"},
             "chore(rename): rr → rr_oe across all stories",

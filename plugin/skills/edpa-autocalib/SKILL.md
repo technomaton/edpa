@@ -1,6 +1,6 @@
 ---
-name: autocalib
-user-invocable: false
+name: edpa:autocalib
+user-invocable: true
 description: >
   Auto-calibrate EDPA CW signal weights using the Monte Carlo + coordinate-descent
   optimizer (v1.11+). One target file (cw_heuristics.yaml.tmpl), one metric (MAD

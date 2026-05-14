@@ -44,6 +44,8 @@ export interface WorkItem {
   roam_status?: RoamStatus;
   severity?: Severity;
   description?: string;
+  /** Raw Markdown body — source of truth for prose (description / AC / notes). */
+  body?: string;
 }
 
 export interface Person {

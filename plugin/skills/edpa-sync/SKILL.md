@@ -1,11 +1,11 @@
 ---
-name: sync
-user-invocable: false
+name: edpa:sync
+user-invocable: true
 description: >
   Bidirectional sync between GitHub Projects and .edpa/backlog/ YAML files.
-  Pull updates from GitHub Projects into local YAML, push local changes to GitHub,
-  show diff, or check sync status. Use when user says "sync", "pull from GitHub",
-  "push to GitHub", or "check sync status".
+  Default (no args) runs pull --commit then push for full bidirectional sync.
+  Subcommands: pull, push, diff, status, conflicts, setup-refresh, add-iteration.
+  Use when user says "sync", "pull from GitHub", "push to GitHub", or "check sync status".
 license: MIT
 compatibility: GitHub CLI (gh), Python 3.10+, .edpa/config/edpa.yaml
 allowed-tools: Read Write Bash(python3 *) Bash(gh *) Bash(git *) Grep
@@ -26,23 +26,33 @@ Supports pull (GitHub → local), push (local → GitHub), diff, and status comm
 
 ## Arguments
 
-`$ARGUMENTS` = command: "pull", "push", "diff", "status", or "pull --commit" (auto-commit after pull).
+`$ARGUMENTS` = optional subcommand: "pull", "push", "diff", "status", "conflicts",
+"setup-refresh", "add-iteration <ID>", or "pull --commit".
 
 ### Argument resolution (when $ARGUMENTS is empty)
 
-If `$ARGUMENTS` is empty, blank, or "help":
+If `$ARGUMENTS` is empty or blank, run the **full bidirectional sync**:
 
-1. Present available sync commands:
-   ```
-   Available commands:
-     status          Show last sync time, local/remote changes, conflicts
-     diff            Show what would change (dry-run, no modifications)
-     pull            GitHub Projects -> .edpa/backlog/ YAML files
-     pull --commit   Pull + auto-commit changes
-     push            .edpa/backlog/ YAML files -> GitHub Projects
-   ```
-2. **Default suggestion:** "status" (safe, read-only overview).
-3. Ask user: "Which sync command? [status]"
+1. `python3 .claude/edpa/scripts/sync.py pull --commit` (GitHub → local YAML, auto-commit)
+2. If step 1 exits non-zero (network/auth error, unresolved conflicts), **stop** — do not push.
+   Surface the error and let the user decide (e.g., `/edpa:sync conflicts`).
+3. `python3 .claude/edpa/scripts/sync.py push` (local YAML → GitHub)
+4. Report a one-line summary: items pulled, items pushed, any failures.
+
+If `$ARGUMENTS` is `"help"`, print the subcommand list instead:
+
+```
+Subcommands:
+  (empty)         Full sync: pull --commit, then push   ← default
+  pull            GitHub Projects -> .edpa/backlog/
+  pull --commit   Pull + auto-commit changes
+  push            .edpa/backlog/ -> GitHub Projects
+  diff            Show what would change (dry-run)
+  status          Show last sync time, local/remote changes, conflicts
+  conflicts       List/resolve cross-side conflicts
+  setup-refresh   Rebuild field_ids/option_ids/issue_map
+  add-iteration <ID>  Add an iteration option to the GH Iteration field
+```
 
 ## Prerequisites
 
@@ -58,7 +68,7 @@ If `$ARGUMENTS` is empty, blank, or "help":
 python3 .claude/edpa/scripts/sync.py pull
 ```
 
-Fetches all items from GitHub Project, updates `.edpa/backlog/{type}/{ID}.yaml` files.
+Fetches all items from GitHub Project, updates `.edpa/backlog/{type}/{ID}.md` files (YAML frontmatter + Markdown body).
 With `--commit`: auto-commits changes after pull.
 
 ### Push (Local → GitHub)

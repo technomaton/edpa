@@ -1,6 +1,6 @@
 ---
-name: engine
-user-invocable: false
+name: edpa:engine
+user-invocable: true
 description: >
   Run EDPA evidence-driven calculation for an iteration. Gathers GitHub delivery evidence
   (commits, PRs, reviews, comments), computes CW from heuristics, calculates Score and
@@ -122,8 +122,8 @@ Score[P, yaml_edit]    = signal_weight    × CW[P, item]       # v1.17 (in-memor
 - **Parent gate transitions** for every Feature / Epic / Initiative
   status transition captured in git history (via `sync pull --commit`
   auto-commits) within the iteration date window.
-- **YAML-edit structural signals (v1.17)** — every commit on
-  `.edpa/backlog/<typ>/<id>.yaml` in the iteration window contributes
+- **Backlog-edit structural signals (v1.17)** — every commit on
+  `.edpa/backlog/<typ>/<id>.md` in the iteration window contributes
   structural signals (`yaml_edit:create`, `yaml_edit:block_add`,
   `yaml_edit:list_grow`, `yaml_edit:scalar_change`,
   `yaml_edit:lines_volume`, `yaml_edit:contributors_rebalance`,

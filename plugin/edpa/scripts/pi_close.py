@@ -31,10 +31,20 @@ except ImportError:
 
 
 def load_yaml(path: Path):
-    """Returns parsed dict, empty dict for empty file, None if missing/unparseable."""
+    """Returns parsed dict for `.yaml`, or frontmatter+body dict for `.md`.
+
+    Empty file → {}, missing/unparseable → None.
+    """
     if not path.is_file():
         return None
     try:
+        if path.suffix == ".md":
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            try:
+                from _md_frontmatter import load_md
+            finally:
+                sys.path.pop(0)
+            return load_md(path) or {}
         return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except (yaml.YAMLError, OSError) as exc:
         print(f"WARNING: load_yaml({path}) failed: {exc}", file=sys.stderr)
@@ -155,7 +165,7 @@ def features_completed(edpa_root: Path, pi_id: str):
     if not feat_dir.is_dir():
         return []
     done = []
-    for f in sorted(feat_dir.glob("*.yaml")):
+    for f in sorted(feat_dir.glob("*.md")):
         data = load_yaml(f)
         if not data:
             continue

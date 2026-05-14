@@ -2,6 +2,72 @@
 
 ## Unreleased
 
+## 1.20.0 — 2026-05-14
+### fix(plugin): namespace + invocability consistency for all skills
+All 7 `edpa-*` skills now use `name: edpa:<x>` (instead of bare `<x>` which
+polluted the global slash palette as `/setup`, `/engine`, etc.) and set
+`user-invocable: true` (previously: `setup`, `engine`, `reports`, `autocalib`
+were `false`, blocking `/edpa:setup` etc.). Same rationale as v1.19.5 which
+removed wrapper commands — now the skill itself serves as both the auto-
+trigger surface AND the explicit slash entry point. No more duplicate
+palette entries, no more "use Y skill" indirection.
+
+Also fixed `tests/test_consistency.py:test_skills_exist` — its hardcoded
+required-commands list was stale since v1.19.5 (still expected the 5
+removed wrapper commands).
+
+### BREAKING: backlog items move from `*.yaml` to `*.md` + YAML frontmatter
+Backlog items in `.edpa/backlog/{initiatives,epics,features,stories,defects,risks,milestones}/`
+are now stored as `.md` files: a YAML frontmatter block (structured metadata —
+id, status, js/bv/tc/rr_oe, parent, contributors[], etc.) followed by a Markdown
+body (prose — description, acceptance criteria, refinement notes, notes).
+
+**Why**: the body becomes 1:1 with the GitHub issue body. `sync push` sends the
+body verbatim, no per-field re-composition. The recent v1.19.6 ruamel
+block-scalar preservation fix becomes obsolete for prose — Markdown is the
+native carrier for prose, not YAML block scalars.
+
+**Format** (`stories/S-200.md`):
+```markdown
+---
+id: S-200
+type: Story
+title: …
+status: Done
+contributors:
+  - person: alice
+    cw: 1
+    as: owner
+---
+
+## Description
+
+Prose, links, code blocks, anything Markdown.
+
+## Acceptance Criteria
+
+- [ ] criterion 1
+- [ ] criterion 2
+```
+
+**Migration**: run `python tools/migrate_backlog_yaml_to_md.py` — idempotent,
+preserves all frontmatter fields, moves `description`/`acceptance_criteria`/
+`refinement_notes`/`notes` into the body as `##`-headed sections, deletes the
+original `.yaml`.
+
+**Impact**:
+- New helper `plugin/edpa/scripts/_md_frontmatter.py` is the single source of
+  truth for load/save. Used by sync, engine, mcp_server, board, traceability,
+  validate_syntax, detect_contributors, backlog CLI, edpa_commit_info,
+  pi_close, _people_loader.
+- pi-planning frontend: `WorkItem` gains optional `body?: string`;
+  `yaml-store.ts` parses/serializes frontmatter inline (no new TS dep).
+- Pre-commit hook (`validate_on_save.sh`) now accepts `.md` paths and routes
+  them through the new `validate_markdown()` schema check, which also rejects
+  prose fields in frontmatter (must live in body).
+- Validator: prose fields in frontmatter are now an error — they belong in the
+  Markdown body.
+
 ## 1.19.6 — 2026-05-14
 ### fix(sync): preserve YAML block scalars on pull (ruamel round-trip)
 `sync pull` and conflict resolution were corrupting backlog YAML files with

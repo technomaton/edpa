@@ -1,7 +1,0 @@
-id: R-4
-type: Risk
-title: OMOP CDM v6 schema breaking changes
-description: Upcoming OMOP release may require parser rewrite
-severity: medium
-owner: urbanek
-iteration: PI-2026-1

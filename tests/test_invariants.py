@@ -19,6 +19,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent.parent / "plugin" / "edpa" / "scripts"))
 
 from engine import run_edpa, generate_demo_data, load_backlog_items, extract_contributors
+from _md_frontmatter import save_md as _save_md_helper
 
 
 def test_sum_equals_capacity():
@@ -334,7 +335,7 @@ class TestLoadBacklogItems:
             data["assignee"] = assignee
         if contributors:
             data["contributors"] = contributors
-        (type_dir / f"{item_id}.yaml").write_text(yaml.dump(data))
+        _save_md_helper(type_dir / f"{item_id}.md", data, "")
 
     def test_load_stories_by_iteration(self, tmp_path):
         """Stories filtered by exact iteration match."""

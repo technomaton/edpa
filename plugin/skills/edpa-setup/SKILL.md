@@ -1,6 +1,6 @@
 ---
-name: setup
-user-invocable: false
+name: edpa:setup
+user-invocable: true
 description: >
   Initialize EDPA governance for a project. Vendors the engine (scripts + schemas +
   templates) into `.edpa/engine/`, creates `.edpa/config/{edpa.yaml,people.yaml}`,
@@ -194,7 +194,7 @@ python3 .edpa/engine/scripts/sync.py push
 
 **Forbidden** — these bypass hierarchy enforcement:
 - `gh issue create ...` directly (skips `backlog.py add` validation)
-- Writing `.edpa/backlog/**/*.yaml` files via the editor without a `parent:` field on every non-Initiative entry
+- Writing `.edpa/backlog/**/*.md` files via the editor without a `parent:` field on every non-Initiative entry
 - Skipping `sync push` after adding items locally — without it, GitHub Issues never get linked as sub-issues
 
 ### 8. Commit + output confirmation

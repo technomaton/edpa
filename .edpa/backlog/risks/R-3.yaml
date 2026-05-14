@@ -1,7 +1,0 @@
-id: R-3
-type: Risk
-title: Team capacity drop during summer holidays
-description: Multiple team members on vacation in July, risk of missing PI-2026-2 commitments
-severity: high
-owner: pm
-iteration: PI-2026-1

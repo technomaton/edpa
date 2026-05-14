@@ -1,6 +1,6 @@
 ---
-name: reports
-user-invocable: false
+name: edpa:reports
+user-invocable: true
 description: >
   Generate EDPA timesheets, reports, and exports. Produces per-person MD/JSON reports,
   per-item cost allocation, PI summaries, Excel exports, and frozen snapshots. Use when

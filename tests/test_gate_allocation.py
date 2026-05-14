@@ -68,23 +68,23 @@ def _make_repo(tmp_path):
         "planning: {capacity: 140, planned_sp: 8}\n"
         "delivery: {delivered_sp: 8, velocity: 8}\n"
     )
-    (edpa / "backlog" / "initiatives" / "I-1.yaml").write_text(
-        "id: I-1\ntype: Initiative\ntitle: T\nparent: null\njs: 21\nstatus: Implementing\n"
+    (edpa / "backlog" / "initiatives" / "I-1.md").write_text(
+        "---\nid: I-1\ntype: Initiative\ntitle: T\nparent: null\njs: 21\nstatus: Implementing\n---\n"
     )
-    (edpa / "backlog" / "epics" / "E-1.yaml").write_text(
-        "id: E-1\ntype: Epic\ntitle: T\nparent: I-1\njs: 13\nstatus: Funnel\n"
-        "contributors:\n  - person: alice\n    as: owner\n    cw: 1\n"
+    (edpa / "backlog" / "epics" / "E-1.md").write_text(
+        "---\nid: E-1\ntype: Epic\ntitle: T\nparent: I-1\njs: 13\nstatus: Funnel\n"
+        "contributors:\n  - person: alice\n    as: owner\n    cw: 1\n---\n"
     )
-    (edpa / "backlog" / "features" / "F-1.yaml").write_text(
-        "id: F-1\ntype: Feature\ntitle: T\nparent: E-1\njs: 8\nstatus: Funnel\n"
+    (edpa / "backlog" / "features" / "F-1.md").write_text(
+        "---\nid: F-1\ntype: Feature\ntitle: T\nparent: E-1\njs: 8\nstatus: Funnel\n"
         "iteration: PI-2026-1\n"
         "contributors:\n  - person: alice\n    as: reviewer\n    cw: 0.3\n"
-        "  - person: bob\n    as: owner\n    cw: 1\n"
+        "  - person: bob\n    as: owner\n    cw: 1\n---\n"
     )
-    (edpa / "backlog" / "stories" / "S-1.yaml").write_text(
-        "id: S-1\ntype: Story\ntitle: T\nparent: F-1\njs: 5\nstatus: Done\n"
+    (edpa / "backlog" / "stories" / "S-1.md").write_text(
+        "---\nid: S-1\ntype: Story\ntitle: T\nparent: F-1\njs: 5\nstatus: Done\n"
         "iteration: PI-2026-1.1\n"
-        "contributors:\n  - person: bob\n    as: owner\n    cw: 1\n"
+        "contributors:\n  - person: bob\n    as: owner\n    cw: 1\n---\n"
     )
 
     _git(repo, "init", "-q")
@@ -135,7 +135,7 @@ def test_detects_initial_status_creation(tmp_path):
 
 def test_detects_subsequent_transition(tmp_path):
     repo, edpa = _make_repo(tmp_path)
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "Analyzing",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Analyzing",
                    "2026-04-08T12:00:00")
     ts = transitions.detect_transitions(edpa)
     moves = [t for t in ts if t["from_status"] is not None and t["item_id"] == "F-1"]
@@ -146,9 +146,9 @@ def test_detects_subsequent_transition(tmp_path):
 
 def test_iteration_window_filter(tmp_path):
     repo, edpa = _make_repo(tmp_path)
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "Analyzing",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Analyzing",
                    "2026-04-08T12:00:00")  # in window
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "Backlog",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Backlog",
                    "2026-04-20T12:00:00")  # outside window
     iter_file = edpa / "iterations" / "PI-2026-1.1.yaml"
     start, end = transitions.parse_iteration_dates(iter_file)
@@ -160,7 +160,7 @@ def test_iteration_window_filter(tmp_path):
 
 def test_no_change_diff_ignored(tmp_path):
     repo, edpa = _make_repo(tmp_path)
-    f = edpa / "backlog" / "features" / "F-1.yaml"
+    f = edpa / "backlog" / "features" / "F-1.md"
     text = f.read_text() + "\n# trailing\n"
     f.write_text(text)
     _git(repo, "add", ".")
@@ -211,9 +211,9 @@ def _run_engine(repo, edpa, iteration="PI-2026-1.1"):
 
 def test_engine_produces_gate_events(tmp_path):
     repo, edpa = _make_repo(tmp_path)
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "Analyzing",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Analyzing",
                    "2026-04-08T12:00:00")
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "Backlog",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Backlog",
                    "2026-04-10T12:00:00")
     result = _run_engine(repo, edpa)
     assert "gate_events" in result
@@ -228,9 +228,9 @@ def test_engine_produces_gate_events(tmp_path):
 
 def test_engine_capacity_invariant(tmp_path):
     repo, edpa = _make_repo(tmp_path)
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "Analyzing",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Analyzing",
                    "2026-04-08T12:00:00")
-    _change_status(repo, edpa, "backlog/epics/E-1.yaml", "Reviewing",
+    _change_status(repo, edpa, "backlog/epics/E-1.md", "Reviewing",
                    "2026-04-09T12:00:00")
     result = _run_engine(repo, edpa)
     assert result["all_invariants_passed"]
@@ -248,7 +248,7 @@ def test_no_transitions_degenerates_to_done_credit(tmp_path):
     gate_events is empty and engine credits only Done items
     (functionally identical to pre-v1.14 'simple' mode)."""
     repo, edpa = _make_repo(tmp_path)
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "Done",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Done",
                    "2026-04-08T12:00:00")
     result = _run_engine(repo, edpa)
     items_seen = set()
@@ -262,11 +262,11 @@ def test_no_transitions_degenerates_to_done_credit(tmp_path):
 
 def test_status_revert_does_not_subtract(tmp_path):
     repo, edpa = _make_repo(tmp_path)
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "Analyzing",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Analyzing",
                    "2026-04-08T12:00:00")
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "Funnel",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Funnel",
                    "2026-04-09T12:00:00")
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "Analyzing",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Analyzing",
                    "2026-04-10T12:00:00")
     result = _run_engine(repo, edpa)
     forward = [e for e in result["gate_events"]
@@ -287,7 +287,7 @@ def test_demo_runs_without_mode_arg(tmp_path):
 
 def test_unknown_gate_uses_equal_split_fallback(tmp_path):
     repo, edpa = _make_repo(tmp_path)
-    _change_status(repo, edpa, "backlog/features/F-1.yaml", "WeirdStatus",
+    _change_status(repo, edpa, "backlog/features/F-1.md", "WeirdStatus",
                    "2026-04-08T12:00:00")
     result = _run_engine(repo, edpa)
     weird = [e for e in result["gate_events"]

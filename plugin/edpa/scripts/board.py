@@ -25,6 +25,12 @@ except ImportError:
     print("Error: PyYAML is required. Install with: pip install pyyaml")
     sys.exit(1)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _md_frontmatter import load_md as _load_md  # noqa: E402
+finally:
+    sys.path.pop(0)
+
 
 # -- Repo discovery ------------------------------------------------------------
 
@@ -54,8 +60,8 @@ def load_items(root):
     for type_dir in ["initiatives", "epics", "features", "stories", "defects"]:
         dir_path = root / ".edpa" / "backlog" / type_dir
         if dir_path.exists():
-            for f in sorted(dir_path.glob("*.yaml")):
-                item = yaml.safe_load(open(f, encoding="utf-8"))
+            for f in sorted(dir_path.glob("*.md")):
+                item = _load_md(f)
                 if item:
                     items.append(item)
     return items

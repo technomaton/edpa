@@ -168,13 +168,15 @@ def edpa_workspace(tmp_path: Path) -> Path:
         "  owner: 1.0\n"
         "  reviewer: 0.30\n"
     )
-    (edpa / "backlog" / "stories" / "S-1.yaml").write_text(
+    (edpa / "backlog" / "stories" / "S-1.md").write_text(
+        "---\n"
         "id: S-1\n"
         "type: Story\n"
         "title: 'Integration test story'\n"
         "status: Done\n"
         "js: 3\n"
         "iteration: PI-2026-1.1\n"
+        "---\n"
     )
     return edpa
 

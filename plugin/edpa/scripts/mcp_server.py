@@ -147,16 +147,14 @@ def _load_yaml_cache_clear() -> None:
 
 
 def load_yaml(path: Path) -> dict | None:
-    """Load a YAML file, return None on failure.
+    """Load a YAML file (or Markdown-with-frontmatter), return None on failure.
 
-    Caches parsed contents keyed by (path, st_mtime_ns). On the next
-    call against the same path:
-      - if the file's mtime hasn't changed, returns the cached dict
-      - if it has, re-reads, replaces the cache entry
-      - if the file disappeared, returns None
+    Caches parsed contents keyed by (path, st_mtime_ns). Backlog items
+    (`.md` files under .edpa/backlog/) are parsed via
+    ``_md_frontmatter.load_md`` — frontmatter fields plus a ``body`` key.
+    Config / iteration files (`.yaml`) are parsed via PyYAML.
     Cache is bounded; the least-recently-used entry is evicted when
-    the cap is reached. Specific exceptions only — KeyboardInterrupt
-    / SystemExit propagate.
+    the cap is reached.
     """
     try:
         st = path.stat()
@@ -173,8 +171,17 @@ def load_yaml(path: Path) -> dict | None:
         return cached[1]
 
     try:
-        with open(path, encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+        if path.suffix == ".md":
+            import sys as _sys
+            _sys.path.insert(0, str(Path(__file__).resolve().parent))
+            try:
+                from _md_frontmatter import load_md as _load_md  # noqa: E402
+            finally:
+                _sys.path.pop(0)
+            data = _load_md(path) or {}
+        else:
+            with open(path, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
     except (yaml.YAMLError, OSError) as exc:
         logger.warning("load_yaml(%s) failed: %s", path, exc)
         # Drop a stale cached version; next caller should re-attempt.
@@ -517,8 +524,8 @@ def _handle_backlog(edpa_root: Path, iteration: str | None, type_filter: str | N
         if type_filter and level != type_filter:
             continue
 
-        for yaml_file in sorted(type_dir.glob("*.yaml")):
-            data = load_yaml(yaml_file)
+        for md_file in sorted(type_dir.glob("*.md")):
+            data = load_yaml(md_file)
             if not data or not isinstance(data, dict):
                 continue
 
@@ -528,7 +535,7 @@ def _handle_backlog(edpa_root: Path, iteration: str | None, type_filter: str | N
                 continue
 
             items.append({
-                "id": data.get("id", yaml_file.stem),
+                "id": data.get("id", md_file.stem),
                 "type": data.get("type", level),
                 "title": data.get("title", ""),
                 "status": data.get("status", ""),
@@ -557,7 +564,7 @@ def _handle_item(edpa_root: Path, item_id: str) -> list[TextContent]:
     for d in search_dirs:
         if not d.is_dir():
             continue
-        candidate = d / f"{item_id}.yaml"
+        candidate = d / f"{item_id}.md"
         if candidate.exists():
             data = load_yaml(candidate)
             if data:

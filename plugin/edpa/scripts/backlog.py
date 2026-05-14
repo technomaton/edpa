@@ -26,6 +26,13 @@ except ImportError:
     print("Error: PyYAML is required. Install with: pip install pyyaml")
     sys.exit(1)
 
+# Backlog items are stored as `.md` files with YAML frontmatter + body.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _md_frontmatter import load_md as _load_md  # noqa: E402
+finally:
+    sys.path.pop(0)
+
 
 def _people_index(root: Path) -> dict:
     """Cache: people-by-id index loaded from .edpa/config/people.yaml.
@@ -162,13 +169,14 @@ def load_backlog(root):
         if "project" in edpa_cfg and "project" not in backlog:
             backlog["project"] = edpa_cfg["project"]
 
-    # Load all items from type directories
+    # Load all items from type directories. Items are stored as `.md`
+    # files with YAML frontmatter + Markdown body (see _md_frontmatter).
     items = []
     for type_dir in ["initiatives", "epics", "features", "stories", "defects"]:
         dir_path = edpa / "backlog" / type_dir
         if dir_path.exists():
-            for f in sorted(dir_path.glob("*.yaml")):
-                item = yaml.safe_load(open(f, encoding="utf-8"))
+            for f in sorted(dir_path.glob("*.md")):
+                item = _load_md(f)
                 if item:
                     items.append(item)
 
@@ -181,9 +189,9 @@ def load_item_direct(root, item_id):
     prefix = item_id.split("-")[0] if "-" in item_id else ""
     type_dir = PREFIX_TO_DIR.get(prefix)
     if type_dir:
-        path = root / ".edpa" / "backlog" / type_dir / f"{item_id}.yaml"
+        path = root / ".edpa" / "backlog" / type_dir / f"{item_id}.md"
         if path.exists():
-            item = yaml.safe_load(open(path, encoding="utf-8"))
+            item = _load_md(path)
             if item:
                 item["level"] = TYPE_TO_LEVEL.get(item.get("type", ""), item.get("type", ""))
                 return item
@@ -327,7 +335,7 @@ def next_id_for_type(root, item_type):
 
     max_num = 0
     if dir_path.exists():
-        for f in dir_path.glob("*.yaml"):
+        for f in dir_path.glob("*.md"):
             stem = f.stem  # e.g. "S-226"
             parts = stem.split("-")
             if len(parts) == 2:
@@ -1154,13 +1162,17 @@ def cmd_add(root, backlog, args):
         if _bv or _tc or _rr:
             item_data["wsjf"] = round((_bv + _tc + _rr) / js, 2)
 
-    # Write YAML
+    # Write `.md` (YAML frontmatter + empty body for a fresh item).
     type_dir = TYPE_DIRS[item_type]
     dir_path = root / ".edpa" / "backlog" / type_dir
     dir_path.mkdir(parents=True, exist_ok=True)
-    file_path = dir_path / f"{new_id}.yaml"
-    with open(file_path, "w", encoding="utf-8") as f:
-        yaml.dump(item_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    file_path = dir_path / f"{new_id}.md"
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from _md_frontmatter import save_md as _save_md  # noqa: E402
+    finally:
+        sys.path.pop(0)
+    _save_md(file_path, item_data, body="")
 
     if sync and gh_issue_num:
         _update_issue_map(root, new_id, gh_issue_num, project_item_id,

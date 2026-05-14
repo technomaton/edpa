@@ -64,13 +64,21 @@ EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
 
 
 def load_yaml(path):
-    """Load a YAML file. Returns parsed content or None on failure.
+    """Load a backlog file. Returns parsed content or None on failure.
 
-    Engine callers expect None-on-error and continue past unparseable
-    files rather than crash mid-iteration. Errors go to stderr so the
-    normal stdout output (which downstream tools may parse) stays clean.
+    Backlog items (`.md`) are parsed via ``_md_frontmatter.load_md`` so the
+    engine sees frontmatter fields plus a ``body`` key. Other files
+    (`.yaml`, e.g. iterations and config) are parsed via PyYAML.
     """
     try:
+        path_obj = Path(path) if not isinstance(path, Path) else path
+        if path_obj.suffix == ".md":
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            try:
+                from _md_frontmatter import load_md as _load_md
+            finally:
+                sys.path.pop(0)
+            return _load_md(path_obj)
         with open(path, encoding="utf-8") as f:
             return yaml.safe_load(f)
     except FileNotFoundError:
@@ -521,15 +529,15 @@ def load_backlog_items(edpa_root, iteration_id=None):
         if not type_dir.exists():
             continue
 
-        for yaml_file in sorted(type_dir.glob("*.yaml")):
-            data = load_yaml(yaml_file)
+        for md_file in sorted(type_dir.glob("*.md")):
+            data = load_yaml(md_file)
             if data is None:
                 continue
 
             if not data or not isinstance(data, dict):
                 continue
 
-            item_id = data.get("id", yaml_file.stem)
+            item_id = data.get("id", md_file.stem)
             status = data.get("status", "")
 
             # Filter: only Done items
@@ -783,10 +791,10 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
         sub = GATE_TYPE_DIRS.get(item_type)
         if not sub:
             continue
-        parent_file = edpa_root / "backlog" / sub / f"{t['item_id']}.yaml"
+        parent_file = edpa_root / "backlog" / sub / f"{t['item_id']}.md"
         if not parent_file.is_file():
             continue
-        parent = yaml.safe_load(parent_file.read_text(encoding="utf-8")) or {}
+        parent = load_yaml(parent_file) or {}
         parent_js = parent.get("js") or parent.get("job_size") or 0
         if parent_js <= 0:
             continue
@@ -1050,8 +1058,8 @@ def show_status(edpa_root):
     # Backlog
     backlog_dir = edpa_root / "backlog"
     if backlog_dir.exists():
-        story_count = len(list((backlog_dir / "stories").glob("*.yaml"))) if (backlog_dir / "stories").exists() else 0
-        feature_count = len(list((backlog_dir / "features").glob("*.yaml"))) if (backlog_dir / "features").exists() else 0
+        story_count = len(list((backlog_dir / "stories").glob("*.md"))) if (backlog_dir / "stories").exists() else 0
+        feature_count = len(list((backlog_dir / "features").glob("*.md"))) if (backlog_dir / "features").exists() else 0
         print(f"✓ backlog — {feature_count} features, {story_count} stories")
     else:
         print("✗ backlog/ not found")

@@ -1,5 +1,5 @@
 ---
-name: add
+name: edpa:add
 user-invocable: true
 description: >
   Create a new backlog item (Initiative / Epic / Feature / Story) using GH-first flow:
@@ -25,7 +25,7 @@ Creates a new work item in the EDPA backlog using **GH-first flow**:
 1. `gh issue create` → GitHub assigns an atomic issue number (#42)
 2. EDPA ID = type prefix + issue number → `S-42`, `E-15`, `F-8`, `I-3`
 3. `gh project item-add` → adds to GitHub Project
-4. Writes `.edpa/backlog/<type>/S-42.yaml`
+4. Writes `.edpa/backlog/<type>/S-42.md` (YAML frontmatter + empty Markdown body for prose)
 5. Updates `.edpa/config/issue_map.yaml`
 6. `git commit -m "feat(S-42): <title>"`
 

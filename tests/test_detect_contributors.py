@@ -273,11 +273,11 @@ def test_load_people_map(tmp_path):
 def test_find_backlog_file(tmp_path):
     edpa_root = tmp_path / ".edpa"
     (edpa_root / "backlog" / "stories").mkdir(parents=True)
-    (edpa_root / "backlog" / "stories" / "S-1.yaml").touch()
+    (edpa_root / "backlog" / "stories" / "S-1.md").touch()
     (edpa_root / "backlog" / "features").mkdir(parents=True)
-    (edpa_root / "backlog" / "features" / "F-1.yaml").touch()
-    assert dc.find_backlog_file(edpa_root, "S-1").name == "S-1.yaml"
-    assert dc.find_backlog_file(edpa_root, "F-1").name == "F-1.yaml"
+    (edpa_root / "backlog" / "features" / "F-1.md").touch()
+    assert dc.find_backlog_file(edpa_root, "S-1").name == "S-1.md"
+    assert dc.find_backlog_file(edpa_root, "F-1").name == "F-1.md"
     assert dc.find_backlog_file(edpa_root, "S-99") is None
 
 

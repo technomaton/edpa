@@ -20,7 +20,7 @@ except Exception:
 
 # Skip if no file path or not a supported file type
 case "$FILE_PATH" in
-    *.yaml|*.yml|*.json|*.py) ;;
+    *.yaml|*.yml|*.md|*.json|*.py) ;;
     *) exit 0 ;;
 esac
 

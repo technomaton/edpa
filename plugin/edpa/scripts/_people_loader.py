@@ -25,8 +25,17 @@ logger = logging.getLogger(__name__)
 
 
 def _default_loader(path: Path) -> "dict | None":
+    """Route by extension: `.md` → frontmatter helper, `.yaml` → PyYAML."""
     import yaml
     try:
+        if Path(path).suffix == ".md":
+            import sys
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            try:
+                from _md_frontmatter import load_md
+            finally:
+                sys.path.pop(0)
+            return load_md(path) or {}
         with open(path, encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     except (yaml.YAMLError, OSError) as exc:
@@ -84,7 +93,7 @@ def _collect_assignees_from_iterations(edpa_root: Path,
 
 def _collect_assignees_from_backlog(edpa_root: Path,
                                     loader=None) -> "set[str]":
-    """Walk backlog/{stories,features,epics,initiatives}/*.yaml — return
+    """Walk backlog/{stories,features,epics,initiatives}/*.md — return
     the set of internal person IDs referenced as ``assignee``."""
     backlog = edpa_root / "backlog"
     if not backlog.is_dir():
@@ -95,7 +104,7 @@ def _collect_assignees_from_backlog(edpa_root: Path,
         d = backlog / sub
         if not d.is_dir():
             continue
-        for f in sorted(d.glob("*.yaml")):
+        for f in sorted(d.glob("*.md")):
             doc = load(f) or {}
             assignee = doc.get("assignee")
             if isinstance(assignee, str) and assignee:

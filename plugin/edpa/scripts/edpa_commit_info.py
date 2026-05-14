@@ -169,8 +169,8 @@ def find_backlog_item(edpa_root, branch=None, diff=None):
 
     # Collect all known item IDs from backlog files
     known_ids = set()
-    for yaml_file in backlog_dir.rglob("*.yaml"):
-        known_ids.add(yaml_file.stem)
+    for md_file in backlog_dir.rglob("*.md"):
+        known_ids.add(md_file.stem)
 
     # Extract references from branch and diff
     text = ""

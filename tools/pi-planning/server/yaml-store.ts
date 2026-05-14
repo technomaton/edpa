@@ -25,6 +25,53 @@ const PREFIX_TO_DIR: Record<string, string> = {
   R: 'risks',
 };
 
+// ─── Markdown + YAML frontmatter helpers ────────────────────────────────
+// Backlog items live as `.md` files: `---\n<yaml>\n---\n<markdown body>`.
+// Structured metadata is in the frontmatter; prose (description, AC, notes)
+// lives in the body. Mirrors plugin/edpa/scripts/_md_frontmatter.py.
+
+const FRONTMATTER_DELIM = '---';
+
+function splitFrontmatter(text: string): { yamlText: string; body: string } {
+  if (!text) return { yamlText: '', body: '' };
+  if (!text.startsWith(FRONTMATTER_DELIM)) return { yamlText: '', body: text };
+  let rest = text.slice(FRONTMATTER_DELIM.length);
+  if (rest.startsWith('\r\n')) rest = rest.slice(2);
+  else if (rest.startsWith('\n')) rest = rest.slice(1);
+  const endMatch = rest.match(/^---\s*$/m);
+  if (!endMatch || endMatch.index === undefined) return { yamlText: '', body: text };
+  const yamlText = rest.slice(0, endMatch.index);
+  let body = rest.slice(endMatch.index + endMatch[0].length);
+  if (body.startsWith('\r\n')) body = body.slice(2);
+  else if (body.startsWith('\n')) body = body.slice(1);
+  return { yamlText, body };
+}
+
+function parseMd(filePath: string): WorkItem | null {
+  if (!fs.existsSync(filePath)) return null;
+  const text = fs.readFileSync(filePath, 'utf-8');
+  const { yamlText, body } = splitFrontmatter(text);
+  const data = (yamlText.trim() ? (yaml.load(yamlText) as Record<string, unknown>) : {}) || {};
+  return { ...data, body } as unknown as WorkItem;
+}
+
+function dumpMd(filePath: string, item: WorkItem): void {
+  const { body, ...frontmatter } = item as WorkItem & { body?: string };
+  const yamlText = Object.keys(frontmatter).length
+    ? yaml.dump(frontmatter, { lineWidth: 120, noRefs: true, sortKeys: false })
+    : '';
+  const parts = [`${FRONTMATTER_DELIM}\n`, yamlText];
+  if (!yamlText.endsWith('\n')) parts.push('\n');
+  parts.push(`${FRONTMATTER_DELIM}\n`);
+  const bodyText = body ?? '';
+  if (bodyText) {
+    if (!bodyText.startsWith('\n')) parts.push('\n');
+    parts.push(bodyText);
+    if (!bodyText.endsWith('\n')) parts.push('\n');
+  }
+  fs.writeFileSync(filePath, parts.join(''), 'utf-8');
+}
+
 export function findEdpaRoot(startDir: string): string | null {
   let dir = path.resolve(startDir);
   while (dir !== path.dirname(dir)) {
@@ -44,10 +91,9 @@ export function loadAllItems(edpaRoot: string): WorkItem[] {
     const dir = path.join(backlogDir, typeDir);
     if (!fs.existsSync(dir)) continue;
 
-    const files = fs.readdirSync(dir).filter(f => f.endsWith('.yaml')).sort();
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.md')).sort();
     for (const file of files) {
-      const content = fs.readFileSync(path.join(dir, file), 'utf-8');
-      const item = yaml.load(content) as WorkItem;
+      const item = parseMd(path.join(dir, file));
       if (item?.id) items.push(item);
     }
   }
@@ -59,10 +105,8 @@ export function loadItem(edpaRoot: string, id: string): WorkItem | null {
   const typeDir = PREFIX_TO_DIR[prefix];
   if (!typeDir) return null;
 
-  const filePath = path.join(edpaRoot, '.edpa', 'backlog', typeDir, `${id}.yaml`);
-  if (!fs.existsSync(filePath)) return null;
-
-  return yaml.load(fs.readFileSync(filePath, 'utf-8')) as WorkItem;
+  const filePath = path.join(edpaRoot, '.edpa', 'backlog', typeDir, `${id}.md`);
+  return parseMd(filePath);
 }
 
 export function saveItem(edpaRoot: string, item: WorkItem): void {
@@ -72,9 +116,8 @@ export function saveItem(edpaRoot: string, item: WorkItem): void {
   const dir = path.join(edpaRoot, '.edpa', 'backlog', typeDir);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  const filePath = path.join(dir, `${item.id}.yaml`);
-  const content = yaml.dump(item, { lineWidth: 120, noRefs: true, sortKeys: false });
-  fs.writeFileSync(filePath, content, 'utf-8');
+  const filePath = path.join(dir, `${item.id}.md`);
+  dumpMd(filePath, item);
 }
 
 export function loadPeopleConfig(edpaRoot: string): { people: Person[]; teams: Team[]; project: ProjectConfig } {
@@ -126,7 +169,7 @@ export function nextId(edpaRoot: string, type: string): string {
   if (!fs.existsSync(dir)) return `${type[0]}-1`;
 
   const prefix = type[0];
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.yaml'));
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
   let maxNum = 0;
   for (const f of files) {
     const match = f.match(/\d+/);

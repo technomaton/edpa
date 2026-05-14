@@ -147,16 +147,12 @@ def test_skills_exist():
     # Code plugin spec's auto-discovery (commands at plugin root, not in
     # a self-named sub-namespace) works under /plugin install via the
     # marketplace flow.
-    # v1.18.3 dropped the .claude/ symlink farm — the canonical command
-    # files live in plugin/commands/ now. Runtime copies after
-    # `/plugin install` end up in ~/.claude/plugins/cache/edpa/commands/
-    # (out of repo). Check the source-of-truth location.
+    # v1.19.5 dropped 5 wrapper commands (add/sync/setup/reports/
+    # calibrate) that just invoked the same-named skill — they caused
+    # duplicate /add + /edpa:add entries in the palette. Only commands
+    # without a corresponding skill remain: close-iteration and board.
     required_commands = [
-        "plugin/commands/setup.md",
         "plugin/commands/close-iteration.md",
-        "plugin/commands/reports.md",
-        "plugin/commands/calibrate.md",
-        "plugin/commands/sync.md",
         "plugin/commands/board.md",
     ]
 
@@ -173,7 +169,7 @@ def test_skills_exist():
     commands = plugin.get("commands", [])
     command_basenames = {Path(c).name for c in commands}
 
-    expected_basenames = {"setup.md", "close-iteration.md", "reports.md", "calibrate.md", "sync.md", "board.md"}
+    expected_basenames = {"close-iteration.md", "board.md"}
     missing_refs = expected_basenames - command_basenames
     assert not missing_refs, (
         f"plugin.json missing command references: {missing_refs}"
@@ -248,9 +244,17 @@ def test_backlog_file_count():
         if not path.is_dir():
             errors.append(f"{name}/ directory missing")
             continue
-        count = len(list(path.glob("*.yaml")))
+        # v1.20.0+: items are .md (YAML frontmatter + Markdown body).
+        # Reject stale .yaml files — they signal an incomplete migration.
+        stale_yaml = list(path.glob("*.yaml"))
+        if stale_yaml:
+            errors.append(
+                f"{name}/ still has {len(stale_yaml)} legacy .yaml file(s) — "
+                f"run tools/migrate_backlog_yaml_to_md.py"
+            )
+        count = len(list(path.glob("*.md")))
         if count < 1:
-            errors.append(f"{name}/ has no YAML files (need >= 1)")
+            errors.append(f"{name}/ has no .md files (need >= 1)")
         total += count
 
     assert not errors, "Backlog structure issues:\n  " + "\n  ".join(errors)

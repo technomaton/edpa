@@ -148,8 +148,10 @@ def test_validate_assignee_in_backlog_counts(tmp_path):
     """Assignees that appear only in backlog/ (not iteration) still count."""
     write_yaml(tmp_path / "config" / "people.yaml",
                make_people_yaml({"id": "alice"}))   # no github
-    write_yaml(tmp_path / "backlog" / "stories" / "S-1.yaml",
-               {"id": "S-1", "type": "Story", "assignee": "alice"})
+    from _md_frontmatter import save_md
+    (tmp_path / "backlog" / "stories").mkdir(parents=True, exist_ok=True)
+    save_md(tmp_path / "backlog" / "stories" / "S-1.md",
+            {"id": "S-1", "type": "Story", "assignee": "alice"}, "")
     diags = validate_people(tmp_path)
     _, warnings = split_diagnostics(diags)
     assert any(d["code"] == "person_no_github" for d in warnings)

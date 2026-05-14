@@ -142,14 +142,14 @@ def parse_contribute_directives(text: str) -> dict[str, float]:
 
 
 def find_backlog_file(edpa_root: Path, item_id: str) -> Path | None:
-    """Locate .edpa/backlog/<dir>/<item_id>.yaml; None if missing."""
+    """Locate .edpa/backlog/<dir>/<item_id>.md; None if missing."""
     prefix = item_id.split("-")[0]
     type_dir = PREFIX_TO_DIR.get(prefix, "stories")
-    candidate = edpa_root / "backlog" / type_dir / f"{item_id}.yaml"
+    candidate = edpa_root / "backlog" / type_dir / f"{item_id}.md"
     if candidate.exists():
         return candidate
     for d in PREFIX_TO_DIR.values():
-        p = edpa_root / "backlog" / d / f"{item_id}.yaml"
+        p = edpa_root / "backlog" / d / f"{item_id}.md"
         if p.exists():
             return p
     return None
@@ -493,33 +493,29 @@ def aggregate_signals(signals: list[dict],
     return contributors
 
 
-def write_contributors(yaml_path: Path,
+def write_contributors(item_path: Path,
                        new_contributors: list[dict],
                        *, dry_run: bool = False) -> bool:
-    """Replace `contributors[]` block in yaml_path with new_contributors.
+    """Replace `contributors[]` block in a backlog `.md` file.
 
     v1.11 semantics: full rewrite, no merge-with-existing. Re-running
     detect_contributors is idempotent — same signals → same output.
     Returns True when the file changed.
     """
-    data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
-    old = data.get("contributors", []) or []
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from _md_frontmatter import load_md, update_frontmatter_field
+    finally:
+        _sys.path.pop(0)
 
-    # Drop legacy `as:` field from any pre-v1.11 entries before comparing.
-    if old != new_contributors:
-        data["contributors"] = new_contributors
-        if not dry_run:
-            yaml_path.write_text(
-                yaml.safe_dump(
-                    data,
-                    default_flow_style=False,
-                    allow_unicode=True,
-                    sort_keys=False,
-                ),
-                encoding="utf-8",
-            )
-        return True
-    return False
+    data = load_md(item_path) or {}
+    old = data.get("contributors", []) or []
+    if old == new_contributors:
+        return False
+    if not dry_run:
+        update_frontmatter_field(item_path, "contributors", new_contributors)
+    return True
 
 
 # ─── Per-item processing ────────────────────────────────────────────────────
@@ -552,9 +548,9 @@ def process_item(edpa_root: Path, repo: str, item_id: str,
 
     Returns (changed: bool, n_signals: int).
     """
-    yaml_path = find_backlog_file(edpa_root, item_id)
-    if not yaml_path:
-        print(f"  {item_id}: no YAML file — skipping", file=sys.stderr)
+    item_path = find_backlog_file(edpa_root, item_id)
+    if not item_path:
+        print(f"  {item_id}: no backlog file — skipping", file=sys.stderr)
         return False, 0
 
     issue_num = issue_map.get(item_id)
@@ -582,7 +578,7 @@ def process_item(edpa_root: Path, repo: str, item_id: str,
         print(f"  {item_id}: aggregation produced 0 contributors — skipping")
         return False, n
 
-    changed = write_contributors(yaml_path, contributors, dry_run=dry_run)
+    changed = write_contributors(item_path, contributors, dry_run=dry_run)
     verb = "would update" if dry_run else ("updated" if changed else "unchanged")
     print(f"  {item_id}: {len(contributors)} contributors, {n} signals → {verb}")
     return changed, n

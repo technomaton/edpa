@@ -28,9 +28,20 @@ except ImportError:
     print("ERROR: PyYAML required. Install with: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _md_frontmatter import load_md as _load_md  # noqa: E402
+finally:
+    sys.path.pop(0)
+
 YAML_EXTENSIONS = {".yaml", ".yml", ".tmpl"}
+MARKDOWN_EXTENSIONS = {".md"}
 JSON_EXTENSIONS = {".json"}
 PYTHON_EXTENSIONS = {".py"}
+
+# Prose fields that belong in the Markdown body, NOT in frontmatter.
+BACKLOG_BODY_FIELDS = {"description", "acceptance_criteria",
+                       "refinement_notes", "notes"}
 
 # ─────────────────────────────────────────────────────────────────────
 # Backlog schema (kept in sync with templates/cw_heuristics.yaml.tmpl,
@@ -509,13 +520,6 @@ def validate_yaml(path, *, content=None, strict=False):
         errors.append(f"{path}: {e}")
         return errors, warnings
 
-    # Backlog schema check applies only to files we recognize as backlog items.
-    if data is not None and _is_backlog_path(path):
-        item_errors, item_warnings = validate_backlog_schema(
-            path, data, strict=strict)
-        errors.extend(item_errors)
-        warnings.extend(item_warnings)
-
     # Iteration YAMLs may carry top-level `people:` overrides (v1.9+).
     if data is not None and _is_iteration_path(path):
         iter_errors, iter_warnings = validate_iteration_people_overrides(
@@ -523,6 +527,54 @@ def validate_yaml(path, *, content=None, strict=False):
         errors.extend(iter_errors)
         warnings.extend(iter_warnings)
 
+    return errors, warnings
+
+
+def validate_markdown(path, *, content=None, strict=False):
+    """Validate a single backlog `.md` file (frontmatter + body).
+
+    Only files under ``.edpa/backlog/<type>/`` are subject to schema
+    checks; other `.md` files (docs, READMEs, …) are accepted as-is.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    path = Path(path)
+
+    # Schema checks apply only to backlog `.md` files.
+    if not _is_backlog_path(path):
+        return errors, warnings
+
+    if content is not None:
+        # stdin mode — parse via the same helper. We round-trip through
+        # a temp string by hand-splitting.
+        from _md_frontmatter import _split_frontmatter  # type: ignore
+        yaml_text, body_text = _split_frontmatter(content)
+        try:
+            data = yaml.safe_load(yaml_text) if yaml_text.strip() else {}
+        except yaml.YAMLError as e:
+            return [f"{path}: frontmatter YAML error: {e}"], warnings
+        if not isinstance(data, dict):
+            data = {}
+        data["body"] = body_text
+    else:
+        data = _load_md(path)
+        if data is None:
+            return [f"{path}: file not found"], warnings
+
+    # Prose must live in body, not in frontmatter.
+    fm_only = {k: v for k, v in data.items() if k != "body"}
+    leaked = sorted(BACKLOG_BODY_FIELDS & fm_only.keys())
+    if leaked:
+        errors.append(
+            f"{path}: prose field(s) {leaked!r} must live in the Markdown "
+            f"body, not in YAML frontmatter (move them under "
+            f"`## Description` etc.)"
+        )
+
+    item_errors, item_warnings = validate_backlog_schema(
+        path, fm_only, strict=strict)
+    errors.extend(item_errors)
+    warnings.extend(item_warnings)
     return errors, warnings
 
 
@@ -572,6 +624,8 @@ def validate_file(path, *, content=None, kind=None, strict=False):
         ext = path.suffix.lower()
         if ext in YAML_EXTENSIONS:
             kind = "yaml"
+        elif ext in MARKDOWN_EXTENSIONS:
+            kind = "markdown"
         elif ext in JSON_EXTENSIONS:
             kind = "json"
         elif ext in PYTHON_EXTENSIONS:
@@ -581,6 +635,8 @@ def validate_file(path, *, content=None, kind=None, strict=False):
 
     if kind == "yaml":
         return validate_yaml(path, content=content, strict=strict)
+    if kind == "markdown":
+        return validate_markdown(path, content=content, strict=strict)
     if kind == "json":
         return validate_json(path, content=content)
     if kind == "python":
@@ -598,7 +654,8 @@ def validate_directory(directory, *, strict=False):
     all_warnings = []
     seen = set()
 
-    for ext_set in [YAML_EXTENSIONS, JSON_EXTENSIONS, PYTHON_EXTENSIONS]:
+    for ext_set in [YAML_EXTENSIONS, MARKDOWN_EXTENSIONS,
+                    JSON_EXTENSIONS, PYTHON_EXTENSIONS]:
         for ext in ext_set:
             for path in directory.glob(f"**/*{ext}"):
                 if path in seen:

@@ -27,6 +27,12 @@ except ImportError:
     print("ERROR: PyYAML required. Install with: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _md_frontmatter import load_md as _load_md  # noqa: E402
+finally:
+    sys.path.pop(0)
+
 
 PARENT_RULES = {
     "Initiative": None,
@@ -50,11 +56,10 @@ def load_backlog(edpa_root: Path):
         dir_path = edpa_root / "backlog" / dirname
         if not dir_path.is_dir():
             continue
-        for f in sorted(dir_path.glob("*.yaml")):
-            try:
-                data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
-            except yaml.YAMLError as e:
-                load_errors.append(f"{f}: YAML parse error: {e}")
+        for f in sorted(dir_path.glob("*.md")):
+            data = _load_md(f) or {}
+            if not data:
+                load_errors.append(f"{f}: failed to parse frontmatter")
                 continue
             item_id = data.get("id") or f.stem
             declared_type = data.get("type")
