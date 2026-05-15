@@ -1,5 +1,5 @@
 ---
-id: V-2
+id: EV-2
 type: Event
 event_kind: release
 title: Release v1.0-beta

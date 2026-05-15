@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## 1.21.2 — 2026-05-15
+### fix(PI planning): loadEdpaConfig scans .edpa/iterations/, Event prefix EV-
+
+Two issues caught during runtime smoke test of the PI Planning UI.
+
+**1. `/api/config` returned `pis: []` after v1.20.0.**
+`loadEdpaConfig` only looked for `pis:` array or legacy `pi:` object inside `edpa.yaml`. Since v1.20.0 moved PI/iteration timeline data into per-file YAML under `.edpa/iterations/` (`PI-{id}.yaml` for PI metadata, `PI-{id}.{n}.yaml` per iteration), `edpa.yaml` no longer carries either field, so the UI saw zero PIs → zero iterations → no items rendered on the board.
+
+`loadEdpaConfig` now scans `.edpa/iterations/`:
+- Files containing `pi:` at root → PI metadata blocks (id, status, iteration_weeks, pi_iterations, shared_services, events).
+- Files containing `iteration:` at root → per-iteration metadata; grouped by their `pi:` field; sorted numerically by id (so `PI-2026-1.10` comes after `.9`).
+- PIs that have iterations but no PI metadata file get synthesised (status derived from iteration statuses).
+- Falls back to legacy `pis:` array and `pi:` object in `edpa.yaml` for older projects.
+- Dates: `start_date` / `end_date` are parsed by js-yaml as `Date` instances (YAML timestamp schema). New `formatIterationDates` handles both Date and string, renders as `D.M.–D.M.` (Czech short format).
+
+**2. Event ID prefix `V-` → `EV-`.**
+Single-letter `V` was unfamiliar; `EV` mirrors what the UI now calls the row ("Events") and reads more naturally next to `S-`, `F-`, `R-` etc.
+- `TYPE_PREFIX.Event` flipped to `'EV'`; `PREFIX_TO_DIR.EV` replaces `PREFIX_TO_DIR.V` (the existing `loadItem` `id.split('-')[0]` happens to work for both single- and multi-char prefixes).
+- Renamed files in this repo: `V-1.md` → `EV-1.md`, `V-2.md` → `EV-2.md`; `id:` fields updated to match.
+- Smoke-tested: POST `events` → `EV-3` (auto-cleaned).
+
+Strict tsc clean. PI Planning UI runtime-verified: 5 iterations of PI-2026-1 render with proper dates (6.4.–17.4. etc.), Events row shows EV-1 / EV-2, ROAM shows R-1/R-2/R-3.
+
 ## 1.21.1 — 2026-05-15
 ### fix(PI planning): nextId for Event uses prefix V, not E
 

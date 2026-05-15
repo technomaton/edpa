@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
-import type { WorkItem, Person, Team, PIConfig, ProjectConfig } from '../src/types/edpa.js';
+import type { WorkItem, Person, Team, PIConfig, ProjectConfig, Iteration } from '../src/types/edpa.js';
 
 const TYPE_DIRS: Record<string, string> = {
   Initiative: 'initiatives',
@@ -19,7 +19,7 @@ const PREFIX_TO_DIR: Record<string, string> = {
   F: 'features',
   S: 'stories',
   D: 'defects',
-  V: 'events',
+  EV: 'events',
   R: 'risks',
 };
 
@@ -29,7 +29,7 @@ const TYPE_PREFIX: Record<string, string> = {
   Feature: 'F',
   Story: 'S',
   Defect: 'D',
-  Event: 'V',
+  Event: 'EV',
   Risk: 'R',
 };
 
@@ -141,14 +141,22 @@ export function loadPeopleConfig(edpaRoot: string): { people: Person[]; teams: T
 
 export function loadEdpaConfig(edpaRoot: string): { pis: PIConfig[] } {
   const configPath = path.join(edpaRoot, '.edpa', 'config', 'edpa.yaml');
-  const data = yaml.load(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+  const data = (fs.existsSync(configPath)
+    ? (yaml.load(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>)
+    : {}) || {};
 
-  // Support new `pis:` array format
+  // Format 1 (current, v1.20+): per-PI + per-iteration files under .edpa/iterations/
+  const piFromIterationsDir = loadPisFromIterationsDir(edpaRoot);
+  if (piFromIterationsDir.length > 0) {
+    return { pis: piFromIterationsDir };
+  }
+
+  // Format 2: explicit `pis:` array in edpa.yaml
   if (data.pis) {
     return { pis: data.pis as PIConfig[] };
   }
 
-  // Legacy: convert old `pi:` single object to array
+  // Format 3 (legacy): single `pi:` object in edpa.yaml
   const legacyPi = data.pi as Record<string, unknown> | undefined;
   if (legacyPi) {
     const piId = (legacyPi.current as string) || 'PI-unknown';
@@ -167,6 +175,95 @@ export function loadEdpaConfig(edpaRoot: string): { pis: PIConfig[] } {
   }
 
   return { pis: [] };
+}
+
+function loadPisFromIterationsDir(edpaRoot: string): PIConfig[] {
+  const iterDir = path.join(edpaRoot, '.edpa', 'iterations');
+  if (!fs.existsSync(iterDir)) return [];
+
+  const files = fs.readdirSync(iterDir).filter(f => f.endsWith('.yaml'));
+  // PI files: pi: { id, ... } at root. Iteration files: iteration: { id, pi, ... }
+  const piBlocks: Record<string, Record<string, unknown>> = {};
+  const iterBlocks: Record<string, unknown>[] = [];
+
+  for (const f of files) {
+    const text = fs.readFileSync(path.join(iterDir, f), 'utf-8');
+    const data = yaml.load(text) as Record<string, unknown> | null;
+    if (!data) continue;
+    if (data.pi && typeof data.pi === 'object') {
+      const piData = data.pi as Record<string, unknown>;
+      const id = piData.id as string | undefined;
+      if (id) piBlocks[id] = piData;
+    } else if (data.iteration && typeof data.iteration === 'object') {
+      iterBlocks.push(data.iteration as Record<string, unknown>);
+    }
+  }
+
+  // Group iterations by their pi field
+  const iterByPi: Record<string, Iteration[]> = {};
+  for (const it of iterBlocks) {
+    const piId = it.pi as string | undefined;
+    if (!piId) continue;
+    iterByPi[piId] ||= [];
+    iterByPi[piId].push({
+      id: it.id as string,
+      dates: formatIterationDates(it.start_date, it.end_date),
+      status: (it.status as Iteration['status']) || 'planned',
+      type: (it.type as string | undefined),
+    });
+  }
+  // Sort iterations within each PI by id (lexicographic — `PI-2026-1.1` < `PI-2026-1.10`)
+  for (const ids of Object.values(iterByPi)) {
+    ids.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  }
+
+  // Compose PIConfig per known PI
+  const pis: PIConfig[] = [];
+  for (const [piId, piData] of Object.entries(piBlocks)) {
+    const iters = iterByPi[piId] || [];
+    pis.push({
+      id: piId,
+      status: (piData.status as PIConfig['status']) || 'planning',
+      pi_iterations: (piData.pi_iterations as number) || iters.length,
+      iteration_weeks: (piData.iteration_weeks as number) || 2,
+      iterations: iters,
+      shared_services: piData.shared_services as string[] | undefined,
+      events: piData.events as PIConfig['events'],
+    });
+  }
+
+  // Also surface PIs that only have iteration files (no PI metadata file)
+  for (const piId of Object.keys(iterByPi)) {
+    if (piBlocks[piId]) continue;
+    const iters = iterByPi[piId];
+    const allClosed = iters.every(i => i.status === 'closed');
+    const hasActive = iters.some(i => i.status === 'active');
+    pis.push({
+      id: piId,
+      status: allClosed ? 'closed' : hasActive ? 'active' : 'planning',
+      pi_iterations: iters.length,
+      iteration_weeks: 2,
+      iterations: iters,
+    });
+  }
+
+  pis.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  return pis;
+}
+
+function formatIterationDates(start: unknown, end: unknown): string {
+  if (!start || !end) return '';
+  // js-yaml parses `YYYY-MM-DD` as a Date; raw YAML strings stay strings.
+  const fmt = (v: unknown) => {
+    if (v instanceof Date) return `${v.getUTCDate()}.${v.getUTCMonth() + 1}.`;
+    if (typeof v === 'string') {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+      if (m) return `${parseInt(m[3])}.${parseInt(m[2])}.`;
+      return v;
+    }
+    return String(v);
+  };
+  return `${fmt(start)}–${fmt(end)}`;
 }
 
 export function nextId(edpaRoot: string, type: string): string {
