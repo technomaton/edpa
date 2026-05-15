@@ -23,6 +23,16 @@ const PREFIX_TO_DIR: Record<string, string> = {
   R: 'risks',
 };
 
+const TYPE_PREFIX: Record<string, string> = {
+  Initiative: 'I',
+  Epic: 'E',
+  Feature: 'F',
+  Story: 'S',
+  Defect: 'D',
+  Event: 'V',
+  Risk: 'R',
+};
+
 // ─── Markdown + YAML frontmatter helpers ────────────────────────────────
 // Backlog items live as `.md` files: `---\n<yaml>\n---\n<markdown body>`.
 // Structured metadata is in the frontmatter; prose (description, AC, notes)
@@ -161,12 +171,12 @@ export function loadEdpaConfig(edpaRoot: string): { pis: PIConfig[] } {
 
 export function nextId(edpaRoot: string, type: string): string {
   const typeDir = TYPE_DIRS[type];
-  if (!typeDir) throw new Error(`Unknown type: ${type}`);
+  const prefix = TYPE_PREFIX[type];
+  if (!typeDir || !prefix) throw new Error(`Unknown type: ${type}`);
 
   const dir = path.join(edpaRoot, '.edpa', 'backlog', typeDir);
-  if (!fs.existsSync(dir)) return `${type[0]}-1`;
+  if (!fs.existsSync(dir)) return `${prefix}-1`;
 
-  const prefix = type[0];
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
   let maxNum = 0;
   for (const f of files) {

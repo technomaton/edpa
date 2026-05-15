@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 1.21.1 — 2026-05-15
+### fix(PI planning): nextId for Event uses prefix V, not E
+
+The 1.21.0 unification exposed a latent bug in `yaml-store.ts:nextId`:
+prefix was derived as `type[0]`, which mapped `Event` → `E` and
+collided with Epic IDs. The first probe POST to `/api/backlog/events`
+after release returned `E-3` and wrote `.edpa/backlog/events/E-3.md`,
+contaminating both namespaces. Verified during runtime smoke test of
+the PI Planning server; no real user data affected (only test probe
+artefacts).
+
+- Added explicit `TYPE_PREFIX` map next to `PREFIX_TO_DIR` in
+  `tools/pi-planning/server/yaml-store.ts`; `nextId` now reads
+  `TYPE_PREFIX[type]` instead of `type[0]`. Same map is the inverse
+  of `PREFIX_TO_DIR` so the two stay in sync.
+- Smoke-tested: POST `events` → `V-3`, POST `risks` → `R-4`.
+- Strict tsc + Vite build still clean.
+
 ## 1.21.0 — 2026-05-15
 ### feat(PI planning)!: unify Milestone+Event → Event; expand setup scaffolding
 **Breaking** for any code carrying `type: Milestone`. The PI Planning tool's `ItemType` no longer accepts `'Milestone'`; the YAML store has dropped the `milestones/` directory and the `M:` ID prefix; the plugin's `_md_frontmatter.LEVELS` set no longer recognises "Milestone". Migrate by renaming files to `events/V-N.md`, setting `type: Event` and (optionally) `event_kind: review|release|demo|deadline`.

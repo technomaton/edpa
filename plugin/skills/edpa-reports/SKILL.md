@@ -63,7 +63,7 @@ Projekt: {project_name}
 Registrace: {registration}
 Období: {iteration} ({dates})
 Kapacita: {capacity}h ({fte} FTE)
-Metodika: EDPA 1.21.0
+Metodika: EDPA 1.21.1
 
 | Item | Typ | JS | CW | Score | Podíl | Hodiny |
 |------|-----|----|----|-------|-------|--------|
@@ -94,11 +94,11 @@ two tabs: **Team Summary** and **Item Costs**.
 Write to `.edpa/snapshots/iteration-{ID}.json`:
 ```json
 {
-  "snapshot_version": "1.21.0",
+  "snapshot_version": "1.21.1",
   "iteration": "{id}",
   "generated_at": "ISO-8601",
   "frozen": true,
-  "methodology": "EDPA 1.21.0",
+  "methodology": "EDPA 1.21.1",
   "capacity_registry": { "...from config..." },
   "edpa_results": { "...from engine..." },
   "signature_status": "pending"
