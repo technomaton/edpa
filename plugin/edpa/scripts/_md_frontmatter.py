@@ -352,7 +352,7 @@ def strip_issue_body_chrome(issue_body: str) -> str:
     # if the first non-empty line matches the known shape.
     lines = text.split("\n")
     LEVELS = {"Story", "Feature", "Epic", "Initiative", "Defect", "Task",
-              "Risk", "Milestone"}
+              "Risk", "Event"}
     for i, ln in enumerate(lines):
         if not ln.strip():
             continue

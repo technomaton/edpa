@@ -5,7 +5,7 @@ export interface Contributor {
   rs?: number;
 }
 
-export type ItemType = 'Initiative' | 'Epic' | 'Feature' | 'Story' | 'Defect' | 'Milestone' | 'Event' | 'Risk';
+export type ItemType = 'Initiative' | 'Epic' | 'Feature' | 'Story' | 'Defect' | 'Event' | 'Risk';
 export type PortfolioStatus = 'Funnel' | 'Reviewing' | 'Analyzing' | 'Ready' | 'Implementing' | 'Done';
 export type DeliveryStatus = 'Funnel' | 'Analyzing' | 'Backlog' | 'Implementing' | 'Validating' | 'Deploying' | 'Releasing' | 'Done';
 export type ItemStatus = PortfolioStatus | DeliveryStatus | 'Planned' | 'In Progress' | 'Active';

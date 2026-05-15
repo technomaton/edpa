@@ -32,6 +32,7 @@ export function backlogRoutes(edpaRoot: string): Router {
       features: 'Feature',
       stories: 'Story',
       defects: 'Defect',
+      events: 'Event',
       risks: 'Risk',
     };
     const itemType = typeMap[type];

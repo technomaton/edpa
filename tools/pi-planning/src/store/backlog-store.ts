@@ -18,6 +18,7 @@ const TYPE_DIRS: Record<string, string> = {
   Feature: 'features',
   Story: 'stories',
   Defect: 'defects',
+  Event: 'events',
   Risk: 'risks',
 };
 

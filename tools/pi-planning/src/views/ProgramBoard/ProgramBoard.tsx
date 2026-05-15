@@ -67,8 +67,8 @@ function buildBoard(
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  // All team IDs in order: milestones row + internal + external
-  const allRowIds = ['__milestones__', ...internalTeamIds, ...externalTeamIds];
+  // All team IDs in order: events row + internal + external
+  const allRowIds = ['__events__', ...internalTeamIds, ...externalTeamIds];
 
   // Filter items for this PI
   const iterationIds = new Set(iterations.map(it => it.id));
@@ -77,13 +77,13 @@ function buildBoard(
     return iterationIds.has(i.iteration) || iterations.some(it => i.iteration!.startsWith(it.id));
   });
 
-  // Milestones & Events from backlog
-  const backlogMilestones = piItems.filter(i => i.type === 'Milestone' || i.type === 'Event');
-  // Synthetic milestones from PI events config
+  // Events from backlog
+  const backlogEvents = piItems.filter(i => i.type === 'Event');
+  // Synthetic events from PI events config
   // Only show events that have an iteration within this PI.
   // Events without iteration (e.g. PI Planning) happen in the *previous* PI's
   // IP iteration, so they don't belong on this PI's board.
-  const syntheticMilestones: WorkItem[] = piEvents
+  const syntheticEvents: WorkItem[] = piEvents
     .filter(evt => evt.iteration && iterationIds.has(evt.iteration))
     .map((evt, i) => ({
       id: `EVT-${i + 1}`,
@@ -95,14 +95,14 @@ function buildBoard(
       iteration: evt.iteration,
       contributors: [],
     }));
-  const milestones = [...backlogMilestones, ...syntheticMilestones];
+  const events = [...backlogEvents, ...syntheticEvents];
   // Features/Stories for the board
   const features = piItems.filter(i => i.type === 'Feature' || i.type === 'Story');
 
   // Build dependency lookup for color coding
   const hasIncomingDep = new Set<string>();
   const hasOutgoingDep = new Set<string>();
-  [...features, ...milestones].forEach(item => {
+  [...features, ...events].forEach(item => {
     if (item.depends_on) {
       item.depends_on.forEach(depId => {
         hasOutgoingDep.add(depId);
@@ -113,13 +113,13 @@ function buildBoard(
 
   // Pre-compute items per half-cell to determine dynamic row heights
   const halfCellCounts: Record<string, number> = {};
-  const allBoardItems = [...features, ...milestones];
+  const allBoardItems = [...features, ...events];
   const teamIds = [...internalTeamIds, ...externalTeamIds];
 
   allBoardItems.forEach(item => {
     const iterId = iterationForItem(item, iterations);
-    const rowId = (item.type === 'Milestone' || item.type === 'Event')
-      ? '__milestones__'
+    const rowId = item.type === 'Event'
+      ? '__events__'
       : getTeamForItem(item, personTeam);
     if (iterId && allRowIds.includes(rowId)) {
       const half = item.iteration_half || 1;
@@ -128,8 +128,8 @@ function buildBoard(
     }
   });
 
-  // Dynamic row heights for all rows (milestones + internal + external)
-  const MILESTONE_MIN_H = 120;
+  // Dynamic row heights for all rows (events + internal + external)
+  const EVENTS_ROW_MIN_H = 120;
   const rowHeights: Record<string, number> = {};
   const rowYOffsets: Record<string, number> = {};
   let yAccum = HEADER_H;
@@ -142,7 +142,7 @@ function buildBoard(
       const maxInCell = Math.max(w1, w2);
       if (maxInCell > maxInRow) maxInRow = maxInCell;
     });
-    const minH = rowId === '__milestones__' ? MILESTONE_MIN_H : ROW_H;
+    const minH = rowId === '__events__' ? EVENTS_ROW_MIN_H : ROW_H;
     const h = Math.max(minH, CARD_PAD * 2 + 24 + maxInRow * (CARD_H + CARD_GAP));
     rowHeights[rowId] = h;
     rowYOffsets[rowId] = yAccum;
@@ -181,13 +181,13 @@ function buildBoard(
 
   // Row headers + cells for all rows
   allRowIds.forEach((rowId) => {
-    const isMilestoneRow = rowId === '__milestones__';
+    const isEventsRow = rowId === '__events__';
     const isExternal = externalTeamIds.includes(rowId);
-    const memberCount = isMilestoneRow ? 0 : people.filter(p => p.team === rowId).length;
+    const memberCount = isEventsRow ? 0 : people.filter(p => p.team === rowId).length;
     const rowH = rowHeights[rowId];
     const rowY = rowYOffsets[rowId];
-    const rowLabel = isMilestoneRow ? 'Milestones & Events' : rowId;
-    const rowSub = isMilestoneRow ? '' : isExternal ? `${memberCount} ext` : `${memberCount} members`;
+    const rowLabel = isEventsRow ? 'Events' : rowId;
+    const rowSub = isEventsRow ? '' : isExternal ? `${memberCount} ext` : `${memberCount} members`;
     nodes.push({
       id: `row-${rowId}`,
       type: 'headerNode',
@@ -195,7 +195,7 @@ function buildBoard(
       data: {
         label: rowLabel,
         sublabel: rowSub,
-        variant: isMilestoneRow ? 'milestone-row' : isExternal ? 'external-row' : 'row',
+        variant: isEventsRow ? 'events-row' : isExternal ? 'external-row' : 'row',
       },
       draggable: false,
       selectable: false,
@@ -203,11 +203,11 @@ function buildBoard(
     });
 
     iterations.forEach((iter, colIdx) => {
-      // Capacity calc (skip for milestone row)
-      const teamPeople = isMilestoneRow ? [] : people.filter(p => p.team === rowId);
-      const available = isMilestoneRow ? 0 : teamPeople.reduce((s, p) => s + p.capacity, 0) * (planningFactors[rowId] || 0.8);
-      const cellItems = isMilestoneRow
-        ? milestones.filter(m => iterationForItem(m, iterations) === iter.id)
+      // Capacity calc (skip for events row)
+      const teamPeople = isEventsRow ? [] : people.filter(p => p.team === rowId);
+      const available = isEventsRow ? 0 : teamPeople.reduce((s, p) => s + p.capacity, 0) * (planningFactors[rowId] || 0.8);
+      const cellItems = isEventsRow
+        ? events.filter(m => iterationForItem(m, iterations) === iter.id)
         : features.filter(f => getTeamForItem(f, personTeam) === rowId && iterationForItem(f, iterations) === iter.id);
       const used = cellItems.reduce((s, f) => s + (f.js || 0), 0);
 
@@ -234,14 +234,14 @@ function buildBoard(
     });
   });
 
-  // All board cards — features + milestones
+  // All board cards — features + events
   const halfCount: Record<string, number> = {};
 
-  [...features, ...milestones].forEach(item => {
+  [...features, ...events].forEach(item => {
     const iterId = iterationForItem(item, iterations);
     const colIdx = iterId ? iterations.findIndex(it => it.id === iterId) : -1;
-    const isMilestone = item.type === 'Milestone' || item.type === 'Event';
-    const rowId = isMilestone ? '__milestones__' : getTeamForItem(item, personTeam);
+    const isEvent = item.type === 'Event';
+    const rowId = isEvent ? '__events__' : getTeamForItem(item, personTeam);
     const rowIdx = allRowIds.indexOf(rowId);
     const half = item.iteration_half || 1;
 
@@ -266,8 +266,8 @@ function buildBoard(
       y = totalGridHeight + 60 + uRow * (CARD_H + CARD_GAP);
     }
 
-    // Color: yellow = milestone/event, red = has dependency, blue = independent
-    const depColor = isMilestone ? 'milestone'
+    // Color: yellow = event, red = has dependency, blue = independent
+    const depColor = isEvent ? 'event'
       : hasIncomingDep.has(item.id) ? 'dependent'
       : 'independent';
 
@@ -417,7 +417,7 @@ export function ProgramBoard() {
         Math.floor((centerX - ROW_HEADER_W) / COL_W),
       ));
       const { rowYOffsets: ryo, rowHeights: rh } = layoutRef.current;
-      const allRowIds = ['__milestones__', ...internalTeamIds, ...externalTeamIds];
+      const allRowIds = ['__events__', ...internalTeamIds, ...externalTeamIds];
       let matchedTeam = allRowIds[0];
       for (const tid of allRowIds) {
         const rowTop = ryo[tid] || 0;
@@ -441,9 +441,9 @@ export function ProgramBoard() {
       if (node.type !== 'featureCard') return;
       const item = node.data.item as WorkItem;
       const { team, iteration, half, isIP } = detectCellHalf(node.position.x, node.position.y);
-      const isMilestone = item.type === 'Milestone' || item.type === 'Event';
-      // Show blocked indicator for IP iterations (except milestones)
-      const suffix = isIP && !isMilestone ? '-BLOCKED' : `-W${half}`;
+      const isEvent = item.type === 'Event';
+      // Show blocked indicator for IP iterations (except events)
+      const suffix = isIP && !isEvent ? '-BLOCKED' : `-W${half}`;
       const targetId = `cell-${team}-${iteration}${suffix}`;
       setDropTarget(prev => prev === targetId ? prev : targetId);
     },
@@ -459,7 +459,7 @@ export function ProgramBoard() {
       const { iteration, half, isIP } = detectCellHalf(node.position.x, node.position.y);
 
       // Block drop into IP iteration (Innovation & Planning — no work planned)
-      if (isIP && item.type !== 'Milestone' && item.type !== 'Event') {
+      if (isIP && item.type !== 'Event') {
         setWarning(`IP iteration (${iteration}) is reserved for Innovation & Planning — no work items`);
         setTimeout(() => setWarning(null), 3000);
         return;

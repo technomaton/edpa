@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 1.21.0 — 2026-05-15
+### feat(PI planning)!: unify Milestone+Event → Event; expand setup scaffolding
+**Breaking** for any code carrying `type: Milestone`. The PI Planning tool's `ItemType` no longer accepts `'Milestone'`; the YAML store has dropped the `milestones/` directory and the `M:` ID prefix; the plugin's `_md_frontmatter.LEVELS` set no longer recognises "Milestone". Migrate by renaming files to `events/V-N.md`, setting `type: Event` and (optionally) `event_kind: review|release|demo|deadline`.
+
+- **PI Planning UI** (`tools/pi-planning/`):
+  - `src/types/edpa.ts` — `ItemType` drops `'Milestone'`.
+  - `server/yaml-store.ts` — drop Milestone from `TYPE_DIRS`, `PREFIX_TO_DIR`, and the directory scan list. The `events/` directory remains and is fed by the new `events: 'Event'` entry in `server/routes/backlog.ts`'s POST type map (was missing, so Events couldn't be created via the API).
+  - `src/store/backlog-store.ts` — add missing `Event: 'events'` to TYPE_DIRS.
+  - ProgramBoard + ProgramBoardSection + FeatureCard — collapsed every `type === 'Milestone' || type === 'Event'` branch to plain `type === 'Event'`. Row id renamed `__milestones__` → `__events__`, label renamed "Milestones & Events" → "Events", CSS class `pb-section__row--milestones` → `--events`, `pb-section__card--milestone` → `--event`, `rf-header--milestone-row` → `--events-row`. Variable renames throughout (`isMilestone*` → `isEvent*`, `backlogMilestones`/`syntheticMilestones`/`milestones` → `backlogEvents`/`syntheticEvents`/`events`, `MILESTONE_MIN_H` → `EVENTS_ROW_MIN_H`). `HeaderNode.tsx` variant type widened to include `events-row` + `external-row` (was lying via `as` cast).
+  - Vite build + strict tsc both clean (210 modules, 785 ms).
+- **Plugin** (`plugin/edpa/scripts/_md_frontmatter.py`) — LEVELS set now `{Story, Feature, Epic, Initiative, Defect, Task, Risk, Event}`. Used only by the meta-line stripper; nothing else in the plugin engine reads it.
+- **Setup scaffolding** (`plugin/skills/edpa-setup/SKILL.md`) — Step 1 mkdir now also creates `defects/`, `tasks/`, `events/`, `risks/` under `.edpa/backlog/`, plus `.edpa/pi-objectives/`. Added prose explaining that PI Planning artefacts (events, risks, objectives) carry their own lifecycle and are surfaced in the local PI Planning UI rather than synced to GitHub Projects or credited by the engine.
+- **Data migration in this repo:**
+  - `.edpa/backlog/milestones/M-1.md` → `.edpa/backlog/events/V-1.md` (`type: Event, event_kind: review`).
+  - `.edpa/backlog/milestones/M-2.md` → `.edpa/backlog/events/V-2.md` (`type: Event, event_kind: release`, was already Event-typed but misfiled).
+  - `.edpa/backlog/risks/R-4.md` deleted (duplicate of R-1 — same OMOP CDM v6 schema risk).
+  - `.edpa/backlog/risks/R-3.md` — added missing `roam_status: accepted`.
+
+Rationale: PI Planning artefacts now follow the same model as core delivery items — global backlog with per-type sequential IDs, `iteration:` field as the PI binding, no per-team prefix on the ID itself. `pi-objectives/PI-{id}.yaml` stays as the only genuinely PI-scoped artefact (per-team committed/stretch agreement). The Milestone type was redundant with Event in SAFe usage and was already drifting (M-2 carried `type: Event`).
+
 ## 1.20.3 — 2026-05-14
 ### chore: drop SKILL.md metadata block (plugin.json is single source of truth)
 - All 7 `plugin/skills/*/SKILL.md` files lost the `metadata:` block

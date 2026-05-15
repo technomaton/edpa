@@ -6,7 +6,7 @@ function HeaderNodeInner({ data }: NodeProps) {
     label: string;
     sublabel?: string;
     badge?: string;
-    variant: 'column' | 'row' | 'corner';
+    variant: 'column' | 'row' | 'corner' | 'events-row' | 'external-row';
     status?: string;
   };
 

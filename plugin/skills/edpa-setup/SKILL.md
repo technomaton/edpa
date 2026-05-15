@@ -35,8 +35,8 @@ Resulting layout:
 │   ├── config/
 │   │   ├── edpa.yaml                 ← project metadata (from edpa.yaml.tmpl)
 │   │   └── people.yaml               ← capacity registry (from people.yaml.tmpl)
-│   ├── backlog/{initiatives,epics,features,stories}/
-│   ├── iterations/, reports/, snapshots/, data/
+│   ├── backlog/{initiatives,epics,features,stories,defects,tasks,events,risks}/
+│   ├── pi-objectives/, iterations/, reports/, snapshots/, data/
 │   ├── changelog.jsonl
 │   └── sync_state.json
 └── .github/workflows/edpa-*.yml      ← 11 CI workflows (call .edpa/engine/scripts/X.py)
@@ -79,12 +79,23 @@ mkdir -p .edpa/config \
          .edpa/backlog/epics \
          .edpa/backlog/features \
          .edpa/backlog/stories \
+         .edpa/backlog/defects \
+         .edpa/backlog/tasks \
+         .edpa/backlog/events \
+         .edpa/backlog/risks \
+         .edpa/pi-objectives \
          .edpa/iterations \
          .edpa/reports \
          .edpa/snapshots \
          .edpa/data
 touch .edpa/changelog.jsonl .edpa/sync_state.json
 ```
+
+The full layout reflects every backlog type EDPA recognises:
+
+- `initiatives/`, `epics/`, `features/`, `stories/`, `defects/`, `tasks/` — core delivery hierarchy. Engine credits derived hours for Story/Defect/Task Done events + gate transitions on Feature/Epic/Initiative.
+- `events/`, `risks/` — PI Planning artefacts. Surfaced in `tools/pi-planning/` UI (ProgramBoard events row, ROAM board). Engine does **not** credit hours for these; they are kalendářní / management items with their own lifecycle and reference an iteration via the `iteration:` field.
+- `pi-objectives/PI-{id}.yaml` — per-PI committed/stretch agreement (per team). Filled by the PI Planning UI; not synced to GitHub Projects.
 
 ### 2. Vendor engine into `.edpa/engine/`
 
@@ -107,7 +118,7 @@ python3 -c "import json; print(json.load(open('${CLAUDE_PLUGIN_ROOT}/.claude-plu
 
 **What gets vendored:** `scripts/` (30 .py), `schemas/` (1 .json), `templates/` (3 .tmpl). Skills/commands/hooks/.mcp.json from `${CLAUDE_PLUGIN_ROOT}` are NOT vendored — those are for Claude Code's plugin runtime exclusively, which loads them from its cache, not from the project.
 
-**Auto-vendor on plugin update (v1.20.3+):** the SessionStart hook `update_engine.sh` compares the plugin's bundled VERSION against `.edpa/engine/VERSION` and re-vendors when they diverge. After `/plugin update edpa`, the next Claude Code session in the project auto-refreshes the engine — no manual `/edpa:setup` re-run needed.
+**Auto-vendor on plugin update (v1.21.0+):** the SessionStart hook `update_engine.sh` compares the plugin's bundled VERSION against `.edpa/engine/VERSION` and re-vendors when they diverge. After `/plugin update edpa`, the next Claude Code session in the project auto-refreshes the engine — no manual `/edpa:setup` re-run needed.
 
 To opt out, add to `.edpa/config/edpa.yaml`:
 ```yaml
@@ -212,7 +223,7 @@ python3 .edpa/engine/scripts/create_project_views.py --url <project-url>
 
 ## What NOT to do
 
-- **Don't copy plugin files into `.claude/edpa/`.** Engine vendors to `.edpa/engine/`. The project's `.claude/` stays clean (typically just `settings.json`). Vendoring to `.claude/edpa/` was the v1.0-era pattern; v1.20.3+ uses `.edpa/engine/`.
+- **Don't copy plugin files into `.claude/edpa/`.** Engine vendors to `.edpa/engine/`. The project's `.claude/` stays clean (typically just `settings.json`). Vendoring to `.claude/edpa/` was the v1.0-era pattern; v1.21.0+ uses `.edpa/engine/`.
 - **Don't create `.edpa/config/heuristics.yaml`.** The engine reads canonical CW weights from `.edpa/engine/templates/cw_heuristics.yaml.tmpl` (LOCKED, calibrated). The user-editable `.edpa/config/heuristics.yaml` from pre-v1.11 was a copy the engine ignored.
 - **Don't merge project metadata into `people.yaml`.** v1.11+ has `edpa.yaml` (project) and `people.yaml` (capacity) as separate files. Mixing them was a pre-v1.11 footgun.
 - **Don't default `role: Dev`.** Roles are `Arch / Dev / DevSecOps / PM / QA`; ask the user.

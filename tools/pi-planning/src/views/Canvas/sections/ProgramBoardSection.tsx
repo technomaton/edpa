@@ -15,18 +15,18 @@ interface Props {
 // SAFe color coding:
 // Red = has incoming dependency (significant dependency)
 // Blue = independent / final delivery (no incoming deps)
-// Yellow/Orange = milestone or event
+// Yellow/Orange = event (release, demo, deadline, etc.)
 const DEP_STYLES: Record<string, { border: string; bg: string; idColor: string }> = {
   dependent:   { border: '#dc2626', bg: 'rgba(220,38,38,0.06)',  idColor: '#dc2626' },
   independent: { border: '#2563eb', bg: 'rgba(37,99,235,0.06)',  idColor: '#2563eb' },
-  milestone:   { border: '#f59e0b', bg: 'rgba(245,158,11,0.08)', idColor: '#d97706' },
+  event:       { border: '#f59e0b', bg: 'rgba(245,158,11,0.08)', idColor: '#d97706' },
 };
 
 function getTeamForItem(item: WorkItem, personTeam: Record<string, string>): string {
   return personTeam[item.owner || ''] || personTeam[item.assignee || ''] || 'Unassigned';
 }
 
-type DepCategory = 'dependent' | 'independent' | 'milestone';
+type DepCategory = 'dependent' | 'independent' | 'event';
 
 function PBCard({ item, isReadonly, depCategory }: { item: WorkItem; isReadonly: boolean; depCategory: DepCategory }) {
   const style = DEP_STYLES[depCategory];
@@ -79,14 +79,14 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
   const allTeamIds = [...new Set(people.map(p => p.team))];
   const internalTeams = allTeamIds.filter(t => !sharedServiceIds.has(t) && !allTeams.find(tm => tm.id === t && tm.type === 'external'));
   const externalTeams = allTeamIds.filter(t => sharedServiceIds.has(t) || !!allTeams.find(tm => tm.id === t && tm.type === 'external'));
-  const allRows = ['Milestones', ...internalTeams, ...externalTeams];
+  const allRows = ['Events', ...internalTeams, ...externalTeams];
 
   const iterationIds = new Set(iterations.map(it => it.id));
 
   // All board items + synthetic events
   const boardItems = useMemo(() => {
     const filtered = items.filter(i =>
-      (i.type === 'Feature' || i.type === 'Story' || i.type === 'Milestone' || i.type === 'Event') &&
+      (i.type === 'Feature' || i.type === 'Story' || i.type === 'Event') &&
       (i.iteration ? iterationIds.has(i.iteration) || iterations.some(it => i.iteration!.startsWith(it.id)) : true)
     );
     const syntheticEvents: WorkItem[] = (pi?.events || [])
@@ -109,8 +109,8 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
     });
     const map: Record<string, DepCategory> = {};
     boardItems.forEach(item => {
-      if (item.type === 'Milestone' || item.type === 'Event') {
-        map[item.id] = 'milestone';
+      if (item.type === 'Event') {
+        map[item.id] = 'event';
       } else if (hasIncoming.has(item.id)) {
         map[item.id] = 'dependent';
       } else {
@@ -124,8 +124,8 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
   const cellItems = useMemo(() => {
     const map: Record<string, WorkItem[]> = {};
     boardItems.forEach(item => {
-      const isMilestone = item.type === 'Milestone' || item.type === 'Event';
-      const row = isMilestone ? 'Milestones' : getTeamForItem(item, personTeam);
+      const isEvent = item.type === 'Event';
+      const row = isEvent ? 'Events' : getTeamForItem(item, personTeam);
       const iter = iterations.find(it => item.iteration?.startsWith(it.id));
       if (iter) {
         const key = `${row}::${iter.id}`;
@@ -158,7 +158,7 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
     if (!item) return;
     // Block IP iterations
     const iter = iterations.find(it => it.id === iterationId);
-    if (iter?.type === 'IP' && item.type !== 'Milestone' && item.type !== 'Event') return;
+    if (iter?.type === 'IP' && item.type !== 'Event') return;
     if (item.iteration !== iterationId) {
       updateItem(itemId, { iteration: iterationId });
       saveItem(itemId);
@@ -186,13 +186,13 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
         <tbody>
           {allRows.map(row => {
             const isExternal = externalTeams.includes(row);
-            const isMilestones = row === 'Milestones';
-            const teamPeople = isMilestones ? [] : people.filter(p => p.team === row);
+            const isEventsRow = row === 'Events';
+            const teamPeople = isEventsRow ? [] : people.filter(p => p.team === row);
             return (
-              <tr key={row} className={isMilestones ? 'pb-section__row--milestones' : isExternal ? 'pb-section__row--external' : ''}>
+              <tr key={row} className={isEventsRow ? 'pb-section__row--events' : isExternal ? 'pb-section__row--external' : ''}>
                 <td className="pb-section__row-header">
                   <span className="pb-section__row-name">{row}</span>
-                  {!isMilestones && (
+                  {!isEventsRow && (
                     <span className="pb-section__row-count">{teamPeople.length} members</span>
                   )}
                 </td>
@@ -202,7 +202,7 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
                   const isIP = iter.type === 'IP';
                   const isDrop = dropTarget === cellKey;
                   // Capacity
-                  const available = isMilestones ? 0 :
+                  const available = isEventsRow ? 0 :
                     teamPeople.reduce((s, p) => s + p.capacity, 0) * (planningFactors[row] || 0.8);
                   const used = cellCardItems.reduce((s, i) => s + (i.js || 0), 0);
 
@@ -218,7 +218,7 @@ export function ProgramBoardSection({ items: rawItems, pi: rawPi, people: rawPeo
                     if (!itemId) return;
                     const item = items.find(i => i.id === itemId);
                     if (!item) return;
-                    if (iter.type === 'IP' && item.type !== 'Milestone' && item.type !== 'Event') return;
+                    if (iter.type === 'IP' && item.type !== 'Event') return;
                     const changes: Partial<WorkItem> = { iteration: iter.id };
                     if (!isSingleWeek) changes.iteration_half = half;
                     if (item.iteration !== iter.id || item.iteration_half !== half) {
