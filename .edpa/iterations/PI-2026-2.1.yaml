@@ -1,12 +1,12 @@
-# Iteration PI-2026-1.4 -- Active
+# Iteration PI-2026-2.1 -- Plan & Results
 
 iteration:
-  id: PI-2026-1.4
-  pi: PI-2026-1
-  start_date: 2026-04-27
-  end_date: 2026-05-01
+  id: PI-2026-2.1
+  pi: PI-2026-2
+  start_date: 2026-05-11
+  end_date: 2026-05-15
   weeks: 1
-  status: active
+  status: closed
 
 planning:
   capacity: 380

@@ -1,0 +1,10 @@
+# PI-2026-2 metadata. One PI yaml per Program Increment; per-iteration
+# files (PI-2026-2.{1..5}.yaml) hold planning + delivery detail.
+
+pi:
+  id: PI-2026-2
+  status: active
+  iteration_weeks: 1
+  pi_iterations: 5
+  start_date: 2026-05-11
+  end_date: 2026-06-12

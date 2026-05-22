@@ -1,10 +1,10 @@
-# Iteration PI-2026-1.5 -- Innovation & Planning iteration (last in PI)
+# Iteration PI-2026-2.5 -- Innovation & Planning iteration (last in PI)
 
 iteration:
-  id: PI-2026-1.5
-  pi: PI-2026-1
-  start_date: 2026-05-04
-  end_date: 2026-05-08
+  id: PI-2026-2.5
+  pi: PI-2026-2
+  start_date: 2026-06-08
+  end_date: 2026-06-12
   weeks: 1
   status: planned
   type: IP
