@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### refactor: extract `_gh_issue_factory` shared by backlog.py / sync.py / project_setup.py
+
+The three call sites that create GH issues (`backlog.py cmd_add`, `sync.py gh_create_issue`, `project_setup.py` STEP 6) had drifted copies of the same six-step pipeline (create → resolve node_id → rewrite title → assign Issue Type → add to project → link sub-issue). PR1 fixed the symptoms in `backlog.py` but left the duplication; this PR collapses all three into one `create_gh_issue` helper in `_gh_issue_factory.py`.
+
+The factory exposes two creation modes:
+- **known-id** (sync.py push, project_setup.py): caller passes `edpa_id`, factory does a single `gh issue create` with the final `"{ID}: {title}"` — saves one API round-trip per item.
+- **new-id** (backlog.py add): caller omits `edpa_id`, factory creates with the raw title, derives `"{prefix}-{num}"` from the server-assigned number, then `gh issue edit --title` to the canonical form.
+
+Hard failures (create, title rewrite) raise `RuntimeError`. Soft failures (Issue Type assign, project add, sub-issue link) populate a `warnings` list so each caller surfaces them in its own UX (`cmd_add` colored line, `sync.py push` inline `[failed]`, `project_setup.py` `info()` banner).
+
+Idempotency stays at the call site (`project_setup.py`'s `existing_issue_lookup` per-title cache is unchanged) because the three callers have incompatible idempotency models.
+
+Net diff: `backlog.py` −85 lines, `sync.py` −60 lines, `project_setup.py` −35 lines, factory +250 lines. Single source of truth for title format, node_id resolution, and Issue Type assignment — a future change to the pipeline now lands in one file.
+
 ### feat(backlog)!: strict GH-first `backlog.py add` with mirrored title and sub-issue linking
 
 Three pilot-user findings about `backlog.py add`, all rooted in `cmd_add` having drifted from the `sync.py push` implementation:

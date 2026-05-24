@@ -719,95 +719,52 @@ def gh_get_issue_type_ids(org):
 
 
 def gh_create_issue(state, item, item_level, people_handles=None):
-    """Create a GH issue for a local-only EDPA item, add to project, set issue type.
+    """Create a GH issue for a local-only EDPA item via the shared factory.
 
-    If `people_handles` maps the item's assignee to a GitHub login, the issue is
-    created with `--assignee <login>`. Otherwise the assignee is recorded in the
-    body only. Returns dict with issue_number, project_item_id, node_id on success.
+    Push runs in two passes (create-all, then link-all) because parent
+    items may themselves be in the create batch — so this function does
+    not link to a parent. The push loop calls `gh_link_subissue` after
+    all `issue_map` entries exist.
+
+    Returns dict with issue_number, project_item_id, node_id on success;
+    None on hard failure so the caller can mark the item as failed.
     """
-    repo = f"{state['org']}/{state['repo']}"
     item_id = item.get("id") or item.get("_id") or ""
     title = item.get("title", "")
-    full_title = f"{item_id}: {title}" if item_id else title
-
     body = _format_issue_body({**item, "level": item_level})
 
-    cmd = [
-        "gh", "issue", "create",
-        "--repo", repo,
-        "--title", full_title,
-        "--body", body,
-    ]
-    if item.get("epic_type") == "Enabler":
-        cmd += ["--label", "Enabler"]
-
-    # Resolve internal assignee ID -> GitHub login if a mapping was supplied
     handles = people_handles or {}
     assignee_internal = item.get("assignee") or item.get("owner")
     gh_login = handles.get(assignee_internal) if assignee_internal else None
-    if gh_login:
-        cmd += ["--assignee", gh_login]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-    if result.returncode != 0:
-        return None
+    extra_labels = ["Enabler"] if item.get("epic_type") == "Enabler" else None
 
-    issue_url = result.stdout.strip()
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
-        issue_num = int(issue_url.rstrip("/").split("/")[-1])
-    except (ValueError, IndexError):
+        from _gh_issue_factory import create_gh_issue  # noqa: E402
+    finally:
+        sys.path.pop(0)
+
+    try:
+        result = create_gh_issue(
+            state["org"], state["repo"],
+            item_type=item_level,
+            raw_title=title,
+            body=body,
+            edpa_id=item_id or None,
+            project_num=int(state["project_number"]),
+            type_ids=gh_get_issue_type_ids(state["org"]),
+            parent_node_id=None,
+            assignee_login=gh_login,
+            extra_labels=extra_labels,
+        )
+    except RuntimeError:
         return None
-
-    # Resolve issue node_id
-    node_q = (
-        f'{{ repository(owner: "{state["org"]}", name: "{state["repo"]}") '
-        f'{{ issue(number: {issue_num}) {{ id }} }} }}'
-    )
-    node_result = subprocess.run(
-        ["gh", "api", "graphql", "-f", f"query={node_q}"],
-        capture_output=True, text=True, timeout=20,
-    )
-    node_id = ""
-    if node_result.returncode == 0:
-        try:
-            d = json.loads(node_result.stdout)
-            node_id = (((d.get("data") or {}).get("repository") or {}).get("issue") or {}).get("id", "") or ""
-        except json.JSONDecodeError:
-            pass
-
-    # Assign issue type via GraphQL
-    type_ids = gh_get_issue_type_ids(state["org"])
-    type_id = type_ids.get(item_level)
-    if type_id and node_id:
-        mutation = (
-            f'mutation {{ updateIssueIssueType(input: '
-            f'{{ issueId: "{node_id}", issueTypeId: "{type_id}" }}) '
-            f'{{ issue {{ id }} }} }}'
-        )
-        subprocess.run(
-            ["gh", "api", "graphql", "-f", f"query={mutation}"],
-            capture_output=True, text=True, timeout=20,
-        )
-
-    # Add to project
-    add_cmd = [
-        "gh", "project", "item-add", str(state["project_number"]),
-        "--owner", state["org"],
-        "--url", issue_url,
-        "--format", "json",
-    ]
-    add_result = subprocess.run(add_cmd, capture_output=True, text=True, timeout=30)
-    project_item_id = ""
-    if add_result.returncode == 0:
-        try:
-            project_item_id = (json.loads(add_result.stdout) or {}).get("id", "") or ""
-        except json.JSONDecodeError:
-            pass
 
     return {
-        "issue_number": issue_num,
-        "project_item_id": project_item_id,
-        "node_id": node_id,
+        "issue_number": result["issue_number"],
+        "project_item_id": result["project_item_id"],
+        "node_id": result["node_id"],
     }
 
 
