@@ -119,15 +119,26 @@ TYPE_DIRS = {
     "Feature":    "features",
     "Story":      "stories",
     "Defect":     "defects",
+    "Event":      "events",
 }
 
 PREFIX_TO_DIR = {
-    "I": "initiatives",
-    "E": "epics",
-    "F": "features",
-    "S": "stories",
-    "D": "defects",
-    "T": "stories",
+    "I":  "initiatives",
+    "E":  "epics",
+    "F":  "features",
+    "S":  "stories",
+    "D":  "defects",
+    "T":  "stories",
+    "EV": "events",
+}
+
+TYPE_PREFIX = {
+    "Initiative": "I",
+    "Epic":       "E",
+    "Feature":    "F",
+    "Story":      "S",
+    "Defect":     "D",
+    "Event":      "EV",
 }
 
 # -- SAFe Status Workflows -----------------------------------------------------
@@ -318,15 +329,12 @@ def next_id_for_type(root, item_type):
     """Determine the next available numeric ID for a given type.
 
     Scans existing files in the type directory and returns the next
-    sequential ID string (e.g. 'S-227').
+    sequential ID string (e.g. 'S-227'). Kept for migration tooling
+    and ad-hoc local-only flows in tests — interactive ``cmd_add`` now
+    requires GH sync and always derives the id from the GH issue
+    number, so this function is no longer on the user-facing path.
     """
-    prefix_map = {
-        "Initiative": "I",
-        "Epic":       "E",
-        "Feature":    "F",
-        "Story":      "S",
-    }
-    prefix = prefix_map.get(item_type)
+    prefix = TYPE_PREFIX.get(item_type)
     if not prefix:
         raise ValueError(f"Unknown item type: {item_type}")
 
@@ -953,62 +961,40 @@ def _read_sync_config(root):
     return None
 
 
-def _gh_create_issue(org, repo, item_type, title, parent_id=None):
-    """Create a GitHub issue. Returns (issue_number: int, issue_url: str)."""
-    import subprocess
-    body_parts = [f"**Type:** {item_type}"]
-    if parent_id:
-        body_parts.append(f"**Parent:** {parent_id}")
-    body_parts.append("\n_Created via EDPA — update fields in `.edpa/backlog/`._")
-    result = subprocess.run(
-        ["gh", "issue", "create",
-         "--repo", f"{org}/{repo}",
-         "--title", title,
-         "--body", "\n".join(body_parts)],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip())
-    url = result.stdout.strip()
-    return int(url.rstrip("/").split("/")[-1]), url
+def _load_org_issue_type_ids(org):
+    """Return {name → id} for the org's native Issue Types, or {} on failure.
 
-
-def _gh_set_issue_type(org, repo, issue_number, item_type):
-    """Set the GitHub Issue Type via GraphQL. Returns True on success."""
-    import sys, os
-    scripts_dir = os.path.dirname(os.path.abspath(__file__))
-    if scripts_dir not in sys.path:
-        sys.path.insert(0, scripts_dir)
+    Cached on the function object so multiple ``cmd_add`` calls in the
+    same Python process don't re-query GH (interactive use is mostly
+    one-shot, but bulk scripts that call ``cmd_add`` in a loop benefit).
+    """
+    cache = getattr(_load_org_issue_type_ids, "_cache", {})
+    if org in cache:
+        return cache[org]
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
-        from issue_types import get_org_issue_types, get_issue_node_id, assign_issue_type
+        from issue_types import get_org_issue_types  # noqa: E402
     except ImportError:
-        return False
-    issue_data = get_issue_node_id(org, repo, issue_number)
-    if not issue_data:
-        return False
-    types = get_org_issue_types(org)
-    type_map = {t["name"]: t["id"] for t in types}
-    type_id = type_map.get(item_type)
-    if not type_id:
-        return False
-    return assign_issue_type(issue_data["id"], type_id) is not None
+        return {}
+    finally:
+        sys.path.pop(0)
+    try:
+        types = get_org_issue_types(org)
+    except Exception:
+        return {}
+    mapping = {t["name"]: t["id"] for t in (types or [])}
+    cache[org] = mapping
+    _load_org_issue_type_ids._cache = cache
+    return mapping
 
 
-def _gh_add_to_project(org, project_num, issue_url):
-    """Add issue to GitHub Project. Returns project item ID string."""
-    import subprocess, json
-    result = subprocess.run(
-        ["gh", "project", "item-add", str(project_num),
-         "--owner", org, "--url", issue_url, "--format", "json"],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip())
-    return json.loads(result.stdout).get("id", "")
+def _update_issue_map(root, edpa_id, issue_number, project_item_id,
+                      org, repo, project_num, node_id=""):
+    """Upsert one entry in .edpa/config/issue_map.yaml.
 
-
-def _update_issue_map(root, edpa_id, issue_number, project_item_id, org, repo, project_num):
-    """Upsert one entry in .edpa/config/issue_map.yaml."""
+    ``node_id`` (GraphQL issue id) is persisted so subsequent ``add``
+    calls can resolve their parent's node_id without re-querying GH.
+    """
     issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
     data = {}
     if issue_map_path.exists():
@@ -1017,20 +1003,46 @@ def _update_issue_map(root, edpa_id, issue_number, project_item_id, org, repo, p
     data["github_repo"] = f"{org}/{repo}"
     data["github_project_number"] = project_num
     items = data.get("items") or {}
-    items[edpa_id] = {"issue_number": issue_number, "project_item_id": project_item_id}
+    items[edpa_id] = {
+        "issue_number": issue_number,
+        "project_item_id": project_item_id,
+        "node_id": node_id,
+    }
     data["items"] = items
     with open(issue_map_path, "w") as f:
         yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
+def _load_issue_map(root):
+    """Load .edpa/config/issue_map.yaml or return empty dict if missing."""
+    issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
+    if not issue_map_path.exists():
+        return {}
+    try:
+        with open(issue_map_path) as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
 # ------------------------------------------------------------------------------
 
 def cmd_add(root, backlog, args):
-    """Add a new work item.
+    """Add a new work item — strictly GH-first.
 
-    GH-first by default when sync config is present in edpa.yaml:
-      gh issue create → server-assigned number → ID suffix → local YAML → commit.
-    Falls back to local-first (sequential scan) when --local or no sync config.
+    Flow:
+      1. require sync config in .edpa/config/edpa.yaml (else fail-fast)
+      2. ``gh issue create`` → server-assigned issue number
+      3. ``gh issue edit --title`` → title becomes "{prefix}-{num}: {title}"
+      4. ``link_sub_issue`` if parent exists → parent shows child in GH UI
+      5. write local ``.md`` with ID = "{prefix}-{num}" (matches GH title)
+      6. update ``.edpa/config/issue_map.yaml`` with node_id
+      7. ``git add`` + ``git commit``
+
+    No local-first fallback: feedback from pilot users showed it produced
+    two divergent ID series (local sequential vs. GH issue numbers) that
+    later sync push could not reconcile. The single source of truth is
+    now the GH issue number.
     """
     item_type = args.type
     parent_id = args.parent
@@ -1043,7 +1055,6 @@ def cmd_add(root, backlog, args):
     tc = getattr(args, "tc", None)
     rr_oe = getattr(args, "rr_oe", None)
     raw_contributors = getattr(args, "contributor", None) or []
-    local_only = getattr(args, "local", False)
 
     # Parse --contributor PERSON:ROLE:CW triplets up front so a typo on
     # one entry rejects the whole add (item not yet created).
@@ -1093,43 +1104,97 @@ def cmd_add(root, backlog, args):
             print(color(f"  Error: Parent '{parent_id}' not found.", C.ERR))
             sys.exit(1)
 
-    # --- ID assignment ---
-    prefix_map = {"Initiative": "I", "Epic": "E", "Feature": "F", "Story": "S"}
-    prefix = prefix_map[item_type]
+    # --- ID assignment (always GH-first via shared factory) ---
+    sync = _read_sync_config(root)
+    if not sync:
+        print()
+        print(color(
+            "  Error: GitHub sync is not configured in .edpa/config/edpa.yaml.",
+            C.ERR))
+        print(color(
+            "  Run /edpa:setup first — interactive 'add' is GH-first only "
+            "(local-only mode was removed because it produced divergent ID "
+            "series that sync could not reconcile).",
+            C.MUTED))
+        sys.exit(1)
 
-    sync = None if local_only else _read_sync_config(root)
-    gh_issue_num = None
-    project_item_id = ""
-    issue_url = ""
+    org = sync["github_org"]
+    repo = sync["github_repo"]
+    project_num = int(sync["github_project_number"])
+
+    # Resolve parent node_id up-front so the factory can link in one pass.
+    parent_node_id = None
+    if parent_id:
+        issue_map = _load_issue_map(root)
+        parent_entry = (issue_map.get("items") or {}).get(parent_id) or {}
+        parent_node_id = parent_entry.get("node_id") or None
+        if not parent_node_id and parent_entry.get("issue_number"):
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            try:
+                from _gh_issue_factory import _resolve_node_id  # noqa: E402
+            finally:
+                sys.path.pop(0)
+            parent_node_id = _resolve_node_id(
+                org, repo, parent_entry["issue_number"]) or None
+
+    # Build minimal body — full field rendering happens in sync push.
+    body_parts = [f"**Type:** {item_type}"]
+    if parent_id:
+        body_parts.append(f"**Parent:** {parent_id}")
+    body_parts.append("\n_Created via EDPA — update fields in `.edpa/backlog/`._")
+    body = "\n".join(body_parts)
+
+    type_ids = _load_org_issue_type_ids(org)
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from _gh_issue_factory import create_gh_issue  # noqa: E402
+    finally:
+        sys.path.pop(0)
 
     print()
-    if sync:
-        org = sync["github_org"]
-        repo = sync["github_repo"]
-        project_num = int(sync["github_project_number"])
-        print(color(f"  Creating GH issue in {org}/{repo}...", C.MUTED))
-        try:
-            gh_issue_num, issue_url = _gh_create_issue(org, repo, item_type, title, parent_id)
-            new_id = f"{prefix}-{gh_issue_num}"
-            print(color(f"  Issue #{gh_issue_num} → {new_id}", C.OK))
-            if _gh_set_issue_type(org, repo, gh_issue_num, item_type):
-                print(color(f"  Issue Type: {item_type}", C.OK))
-            else:
-                print(color(f"  Warning: Issue Type '{item_type}' not set (run /edpa:setup to configure Issue Types for org {org})", C.WARN))
-            try:
-                project_item_id = _gh_add_to_project(org, project_num, issue_url)
-                print(color(f"  Added to Project #{project_num}", C.OK))
-            except RuntimeError as e:
-                print(color(f"  Warning: project item-add failed: {e}", C.WARN))
-        except RuntimeError as e:
-            print(color(f"  GH issue creation failed: {e}", C.ERR))
-            print(color(f"  Falling back to local-first.", C.WARN))
-            new_id = next_id_for_type(root, item_type)
-            sync = None
-    else:
-        if not local_only:
-            print(color("  No sync config — creating locally (run sync push after /edpa:setup).", C.MUTED))
-        new_id = next_id_for_type(root, item_type)
+    print(color(f"  Creating GH issue in {org}/{repo}...", C.MUTED))
+    try:
+        gh = create_gh_issue(
+            org, repo,
+            item_type=item_type,
+            raw_title=title,
+            body=body,
+            project_num=project_num,
+            type_ids=type_ids,
+            parent_node_id=parent_node_id,
+        )
+    except RuntimeError as e:
+        print(color(f"  GH issue creation failed: {e}", C.ERR))
+        print(color(
+            "  Aborting. Fix the GH error and retry; no local item was "
+            "written so there is no drift to clean up.", C.MUTED))
+        sys.exit(1)
+
+    gh_issue_num = gh["issue_number"]
+    new_id = gh["edpa_id"]
+    child_node_id = gh["node_id"]
+    issue_url = gh["url"]
+    project_item_id = gh["project_item_id"]
+    print(color(f"  Issue #{gh_issue_num} → {new_id}", C.OK))
+    if type_ids.get(item_type):
+        print(color(f"  Issue Type: {item_type}", C.OK))
+    if project_item_id:
+        print(color(f"  Added to Project #{project_num}", C.OK))
+    if parent_node_id and not any("sub-issue" in w for w in gh["warnings"]):
+        print(color(f"  Linked under {parent_id}", C.OK))
+    for w in gh["warnings"]:
+        if "Issue Type" in w:
+            print(color(
+                f"  Warning: {w} (run /edpa:setup to configure Issue "
+                f"Types for org {org})", C.WARN))
+        else:
+            print(color(f"  Warning: {w}", C.WARN))
+    if parent_id and not parent_node_id:
+        print(color(
+            f"  Warning: cannot link to {parent_id} — node_id missing "
+            f"(parent created before this version; run sync push to "
+            f"backfill).", C.WARN))
 
     # Build item data
     item_data = {
@@ -1174,16 +1239,15 @@ def cmd_add(root, backlog, args):
         sys.path.pop(0)
     _save_md(file_path, item_data, body="")
 
-    if sync and gh_issue_num:
-        _update_issue_map(root, new_id, gh_issue_num, project_item_id,
-                          org, repo, project_num)
-        import subprocess
-        issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
-        subprocess.run(["git", "add", str(file_path), str(issue_map_path)],
-                       capture_output=True, cwd=str(root))
-        subprocess.run(["git", "commit", "-m", f"feat({new_id}): {title}"],
-                       capture_output=True, cwd=str(root))
-        print(color(f"  Committed: feat({new_id}): {title}", C.OK))
+    _update_issue_map(root, new_id, gh_issue_num, project_item_id,
+                      org, repo, project_num, node_id=child_node_id)
+    import subprocess
+    issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
+    subprocess.run(["git", "add", str(file_path), str(issue_map_path)],
+                   capture_output=True, cwd=str(root))
+    subprocess.run(["git", "commit", "-m", f"feat({new_id}): {title}"],
+                   capture_output=True, cwd=str(root))
+    print(color(f"  Committed: feat({new_id}): {title}", C.OK))
 
     print()
     print(f"  {color('Created:', C.OK)} {color(bold(new_id), level_color(item_type))} {title}")
@@ -1243,9 +1307,6 @@ def main():
                             "PERSON:ROLE:CW where ROLE ∈ "
                             "{owner,key,reviewer,consulted} and CW ∈ "
                             "[0,1]. Example: --contributor turyna:owner:0.7")
-    p_add.add_argument("--local", action="store_true",
-                       help="Force local-first creation (skip GH issue create, "
-                            "use sequential ID scan). Use when offline or before setup.")
 
     args = parser.parse_args()
 

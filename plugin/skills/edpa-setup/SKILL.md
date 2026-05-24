@@ -196,20 +196,24 @@ The script:
 **CRITICAL** — every backlog item below the Initiative level MUST declare a `parent:` field referencing a higher-level item. The skill must refuse to emit flat lists, and the wizard must use the `backlog.py add` CLI rather than writing YAML files directly or calling `gh issue create` by hand:
 
 ```bash
-# Correct — backlog.py enforces parent + assigns the next ID
+# Correct — backlog.py enforces parent + creates the GH issue + rewrites
+# its title to "{ID}: {title}" + links it as a sub-issue of the parent
+# + writes the local .md + commits. All in one call, GH-first.
 python3 .edpa/engine/scripts/backlog.py add --type Initiative --title "Platform"
 python3 .edpa/engine/scripts/backlog.py add --type Epic        --parent I-1 --title "Auth"
 python3 .edpa/engine/scripts/backlog.py add --type Feature     --parent E-1 --title "OAuth"
 python3 .edpa/engine/scripts/backlog.py add --type Story       --parent F-1 --title "Login UI" --js 5
-
-# After items exist, sync push wires parent-child to GitHub sub-issues:
-python3 .edpa/engine/scripts/sync.py push
 ```
 
-**Forbidden** — these bypass hierarchy enforcement:
-- `gh issue create ...` directly (skips `backlog.py add` validation)
+`sync push` is no longer required after `backlog.py add` — the sub-issue
+link, title format, and Issue Type assignment all happen inside the add.
+Run sync push only when you've batch-edited fields directly in the local
+`.md` files and want those edits pushed to GH.
+
+**Forbidden** — these bypass hierarchy enforcement and the title/link pipeline:
+- `gh issue create ...` directly (skips title rewrite, Issue Type, sub-issue link)
 - Writing `.edpa/backlog/**/*.md` files via the editor without a `parent:` field on every non-Initiative entry
-- Skipping `sync push` after adding items locally — without it, GitHub Issues never get linked as sub-issues
+- Running `backlog.py add --local` — the flag was removed in 1.21.3 because it produced two divergent ID series
 
 ### 8. Commit + output confirmation
 

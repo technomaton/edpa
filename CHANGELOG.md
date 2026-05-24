@@ -2,6 +2,61 @@
 
 ## Unreleased
 
+### test+docs: cover `_gh_issue_factory` and `cmd_add`; sweep stale docs
+
+**29 new tests** locking in the PR1+PR2 behaviour so future regressions surface immediately:
+
+- `tests/test_gh_issue_factory.py` (23 tests) — pure-function coverage of `create_gh_issue` and `edpa_id_for`. Mocks subprocess at the `_gh` entry point. Asserts: known-id mode (single create with full title), new-id mode (create + edit), hard failures (create / title edit / subprocess OSError) raise `RuntimeError`, soft failures (Issue Type assign, project add, sub-issue link, node_id resolve) populate `warnings`, conditional pipeline steps (no `parent_node_id` → no link, no `project_num` → no item-add), `assignee_login` and `extra_labels` propagation, full happy-path return dict.
+
+- `tests/test_backlog_add_gh_first.py` (6 tests) — `cmd_add` orchestration with factory mocked. Asserts: fail-fast with exit code 1 + actionable message when sync config missing, Initiative writes `.md` + `issue_map.yaml` with `node_id`, child item forwards parent `node_id` from `issue_map.yaml`, parent without `node_id` warns but continues (older pre-PR1 maps), GH hard failure aborts without writing local state, derived `edpa_id` from factory wins over any local sequential scan (the PR1 invariant).
+
+**Docs sweep** — stale instructions removed/updated:
+
+- `plugin/skills/edpa-setup/SKILL.md`: removed the "run `sync push` after add to link sub-issues" instruction (now happens inside `add`), forbade `backlog.py add --local` (removed in PR1), updated example to reflect the unified add flow.
+- `docs/E2E-SKILLS-TEST-PLAN.md`: explicit expectation that bulk setup uses single `gh issue create` (full title) and `addSubIssue` GraphQL mutation, distinguishing it from the interactive `add` path's two-phase create+edit.
+- `docs/playbook.md`: corrected Epic example (missing `--parent I-1`) and added a paragraph explaining the strict GH-first contract and the title format mirror.
+- `docs/kashealth-pilot/KASHEALTH-PILOT.md`: rewrote section 2 — old positional syntax (`add Initiative "name"`) replaced with the current `--type X --title Y` form, dropped now-redundant `sync.py push` after add, added a preamble explaining the GH-first requirement.
+- `plugin/edpa/templates/edpa.yaml.tmpl`: added `event: "EV"` to `naming.item_prefixes` (Event type was introduced in 1.21.1 but the template still listed only Initiative/Epic/Feature/Story/Task/Defect).
+
+404 tests pass (the 2 preexisting `test_mcp_server.py` date-flakes remain deselected — they fail on `main` too, tracked separately).
+
+### refactor: extract `_gh_issue_factory` shared by backlog.py / sync.py / project_setup.py
+
+The three call sites that create GH issues (`backlog.py cmd_add`, `sync.py gh_create_issue`, `project_setup.py` STEP 6) had drifted copies of the same six-step pipeline (create → resolve node_id → rewrite title → assign Issue Type → add to project → link sub-issue). PR1 fixed the symptoms in `backlog.py` but left the duplication; this PR collapses all three into one `create_gh_issue` helper in `_gh_issue_factory.py`.
+
+The factory exposes two creation modes:
+- **known-id** (sync.py push, project_setup.py): caller passes `edpa_id`, factory does a single `gh issue create` with the final `"{ID}: {title}"` — saves one API round-trip per item.
+- **new-id** (backlog.py add): caller omits `edpa_id`, factory creates with the raw title, derives `"{prefix}-{num}"` from the server-assigned number, then `gh issue edit --title` to the canonical form.
+
+Hard failures (create, title rewrite) raise `RuntimeError`. Soft failures (Issue Type assign, project add, sub-issue link) populate a `warnings` list so each caller surfaces them in its own UX (`cmd_add` colored line, `sync.py push` inline `[failed]`, `project_setup.py` `info()` banner).
+
+Idempotency stays at the call site (`project_setup.py`'s `existing_issue_lookup` per-title cache is unchanged) because the three callers have incompatible idempotency models.
+
+Net diff: `backlog.py` −85 lines, `sync.py` −60 lines, `project_setup.py` −35 lines, factory +250 lines. Single source of truth for title format, node_id resolution, and Issue Type assignment — a future change to the pipeline now lands in one file.
+
+### feat(backlog)!: strict GH-first `backlog.py add` with mirrored title and sub-issue linking
+
+Three pilot-user findings about `backlog.py add`, all rooted in `cmd_add` having drifted from the `sync.py push` implementation:
+
+**1. Sub-issue links were never created.** `_gh_create_issue` returned `(num, url)` and `cmd_add` never called `_sub_issue_linker.link_sub_issue`, so every Epic/Feature/Story added through the CLI landed as a top-level issue in GH regardless of the local `parent:` field. The GH UI's "Sub-issues" panel stayed empty even though local `tree` rendered correctly.
+
+`_gh_create_issue` now resolves the child's `node_id` via GraphQL and returns `(num, url, node_id)`. `cmd_add` reads the parent's `node_id` from `issue_map.yaml` (falling back to a GraphQL lookup for entries created before this version) and calls `link_sub_issue`. Successes and failures are logged inline.
+
+**2. GH issue titles lacked the EDPA ID prefix.** `cmd_add` sent the raw title to `gh issue create`, so the GH UI showed `OAuth flow` while the local repo showed `F-8`. A search for `F-8` only landed on the local item, not on the GH issue.
+
+`_gh_create_issue` now does a two-phase create + `gh issue edit --title` so the GH title is always `"{prefix}-{num}: {title}"` (e.g. `S-42: OMOP parser impl.`). This matches what `sync.py push` and `project_setup.py` already did for bulk creation.
+
+**3. Two divergent ID series when `--local` was used.** The `--local` fallback (or auto-fallback on GH error) called `next_id_for_type` to assign a sequential local ID. If the GH project already had higher issue numbers, a later `sync push` couldn't reconcile the local `S-3` with `gh issue #47`. Pilot users reported "ghost items" that synced as duplicates.
+
+The `--local` flag is removed. `cmd_add` now requires sync config and fails fast with an explicit hint to run `/edpa:setup`. On any GH error (issue create, title edit) the add aborts without writing a local file — no drift to clean up. The single source of truth for IDs is now the GH issue number.
+
+Collateral cleanup:
+- `TYPE_DIRS` / `PREFIX_TO_DIR` / new `TYPE_PREFIX` constants include `Defect` (`D-`) and `Event` (`EV-`), previously missing from `cmd_add`'s prefix map.
+- `next_id_for_type` migrated to the shared `TYPE_PREFIX` constant (kept for migration tooling and tests).
+- `sync.py` GH-title parser (`map_gh_items_to_edpa`) now accepts `D-` and `EV-` prefixes so pulling these types back from GH works.
+- `_update_issue_map` persists `node_id` alongside `issue_number` and `project_item_id`.
+- `plugin/skills/edpa-add/SKILL.md` rewritten to reflect strict GH-first flow and the title format mirror; the "Offline / pre-setup fallback" section was removed and the `--local` mention deleted from "What NOT to do".
+
 ## 1.21.2 — 2026-05-15
 ### fix(PI planning): loadEdpaConfig scans .edpa/iterations/, Event prefix EV-
 

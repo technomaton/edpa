@@ -383,12 +383,21 @@ iteration: PI-2026-1.1
 Pridani noveho itemu:
 ```bash
 # Claude Code:
-/edpa setup    # interaktivne prida items
+/edpa:add    # interaktivne prida jeden item (Initiative/Epic/Feature/Story/Defect/Event)
 
 # CLI:
 python .claude/edpa/scripts/backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee dev1
-python .claude/edpa/scripts/backlog.py add --type Epic --title "..." --js 13 --bv 13 --tc 8 --rr 5
+python .claude/edpa/scripts/backlog.py add --type Epic --parent I-1 --title "..." --js 13 --bv 13 --tc 8 --rr 5
 ```
+
+`backlog.py add` is **strictly GH-first**: it requires a configured
+GitHub sync block in `.edpa/config/edpa.yaml` and aborts with exit
+code 1 otherwise. The GH issue is created first, its server-assigned
+number becomes the EDPA ID suffix (`S-42`, `E-15`, `I-3`), the GH
+title is rewritten to mirror `"{ID}: {title}"`, and the issue is
+linked under its parent via the GitHub sub-issue API. Only after all
+GH steps succeed does the local `.md` get written. Run `/edpa:setup`
+before the first `add` if sync is not yet configured.
 
 Overit integritu:
 

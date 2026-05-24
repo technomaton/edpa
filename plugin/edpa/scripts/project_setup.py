@@ -637,6 +637,15 @@ def main():
         except (ValueError, TypeError):
             existing_issue_lookup = {}
 
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from _gh_issue_factory import (   # noqa: E402
+            create_gh_issue as _factory_create,
+            _resolve_node_id as _factory_node_id,
+        )
+    finally:
+        sys.path.pop(0)
+
     for item in items:
         title = f"{item['id']}: {item['title']}"
         body_parts = [f"{item['level']}"]
@@ -649,68 +658,60 @@ def main():
         if item.get("iteration"): body_parts.append(f"iteration={item['iteration']}")
         body = ", ".join(body_parts)
 
-        # Add Enabler label only for items with type: Enabler in backlog
-        label_flag = ""
-        if item.get("type") == "Enabler":
-            label_flag = ' --label "Enabler"'
+        extra_labels = ["Enabler"] if item.get("type") == "Enabler" else None
 
         existing_num = existing_issue_lookup.get(title.strip())
         if existing_num:
+            # Reuse path: still need node_id + project_item_id resolved
+            # so downstream STEPs 7-8 can target the existing issue.
             issue_num = existing_num
             issue_url = f"https://github.com/{full_repo}/issues/{issue_num}"
             info(f"{title} → reusing #{issue_num}")
-            result = issue_url  # downstream code only checks truthiness
             issues_reused += 1
-        else:
-            result = run(f'gh issue create --repo {full_repo} --title "{title}" '
-                         f'--body "{body}"{label_flag}')
-            if result:
-                issue_url = result.strip()
-                issue_num = issue_url.split("/")[-1]
-                ok(f"{title} → #{issue_num}")
-                issues_created += 1
-        if result:
-            # Assign native Issue Type via GraphQL
-            issue_node_id = None
-            type_id = issue_type_ids.get(item["level"])
-            if type_id:
-                node_query = (
-                    f'{{ repository(owner: "{args.org}", name: "{args.repo}") '
-                    f'{{ issue(number: {issue_num}) {{ id }} }} }}'
-                )
-                node_result = gh_graphql(node_query)
-                if node_result and node_result.get("data"):
-                    issue_node_id = node_result["data"]["repository"]["issue"]["id"]
-                    mutation = (
-                        f'mutation {{ updateIssueIssueType(input: '
-                        f'{{ issueId: "{issue_node_id}", issueTypeId: "{type_id}" }}) '
-                        f'{{ issue {{ id }} }} }}'
-                    )
-                    gh_graphql(mutation)
-                    info(f"  Issue type → {item['level']}")
 
-            # Add to project
+            issue_node_id = _factory_node_id(args.org, args.repo, int(issue_num))
             add_result = run(f'gh project item-add {project_num} --owner {args.org} '
-                           f'--url {issue_url} --format json')
+                             f'--url {issue_url} --format json')
+            project_item_id = ""
             if add_result:
-                item_data = json.loads(add_result)
-                project_item_id = item_data.get("id", "")
-                # Resolve issue node ID if not already resolved (needed for sub-issue linking)
-                if not issue_node_id:
-                    node_query = (
-                        f'{{ repository(owner: "{args.org}", name: "{args.repo}") '
-                        f'{{ issue(number: {issue_num}) {{ id }} }} }}'
-                    )
-                    node_result = gh_graphql(node_query)
-                    if node_result and node_result.get("data"):
-                        issue_node_id = node_result["data"]["repository"]["issue"]["id"]
-                issue_map[item["id"]] = (issue_num, project_item_id, issue_node_id)
+                try:
+                    project_item_id = (json.loads(add_result) or {}).get("id", "") or ""
+                except json.JSONDecodeError:
+                    pass
+            issue_map[item["id"]] = (str(issue_num), project_item_id, issue_node_id)
+            if item["status"] == "Done":
+                run(f'gh issue close {issue_num} --repo {full_repo}')
+            continue
 
-                # Close done items
-                if item["status"] == "Done":
-                    run(f'gh issue close {issue_num} --repo {full_repo}')
-        else:
-            fail(f"Failed: {title}")
+        # Fresh-create path delegates to the shared factory so title
+        # rewrite, Issue Type assignment, and project add stay aligned
+        # with backlog.py and sync.py.
+        try:
+            gh = _factory_create(
+                args.org, args.repo,
+                item_type=item["level"],
+                raw_title=item["title"],
+                body=body,
+                edpa_id=item["id"],
+                project_num=int(project_num),
+                type_ids=issue_type_ids or None,
+                extra_labels=extra_labels,
+            )
+        except RuntimeError as e:
+            fail(f"Failed: {title} ({e})")
+            continue
+
+        issue_num = str(gh["issue_number"])
+        ok(f"{title} → #{issue_num}")
+        issues_created += 1
+        if issue_type_ids.get(item["level"]):
+            info(f"  Issue type → {item['level']}")
+        for w in gh["warnings"]:
+            info(f"  ! {w}")
+        issue_map[item["id"]] = (
+            issue_num, gh["project_item_id"], gh["node_id"])
+        if item["status"] == "Done":
+            run(f'gh issue close {issue_num} --repo {full_repo}')
 
     # ═══════════════════════════════════════════════════════════
     # STEP 7: Set custom field values

@@ -187,9 +187,17 @@ example use:
 
 **[expect Bash]** `gh project create --owner technomaton --title ...`
 **[expect Bash]** `gh project field-create ...` (loop, ~10 fields)
-**[expect Bash]** `gh issue create ...` (loop, one per backlog item)
-**[expect Bash]** `python3 .../project_setup.py` OR direct `gh` calls;
-either is acceptable as long as the orchestration is skill-driven.
+**[expect Bash]** `gh issue create ...` (loop, one per backlog item;
+each create call carries the canonical `"{ID}: {title}"` directly so
+no follow-up `gh issue edit --title` is needed during bulk setup —
+the title rewrite only runs in the interactive `backlog.py add` path
+where the EDPA ID is unknown until the GH issue number is assigned)
+**[expect Bash]** `gh api graphql ...` (addSubIssue mutation, one per
+item with a `parent:` field — STEP 8 of project_setup.py, ensures the
+parent-child hierarchy is visible in the GH UI, not only in local YAML)
+**[expect Bash]** `python3 .../project_setup.py` is the preferred path;
+direct `gh` calls are acceptable only if the orchestration is
+skill-driven and includes the sub-issue link step.
 
 The skill should narrate what it's doing — the assistant's chat history
 should read like a setup log, not like a wall of bash output.

@@ -129,16 +129,26 @@ pro všechny. Detail v guidu §4.
 
 ## 2. Naplnit počáteční backlog
 
+`backlog.py add` je striktně GH-first — vyžaduje, aby `/edpa:setup` už
+proběhl a v `.edpa/config/edpa.yaml` byla vyplněná sekce `sync`. Issue
+se vytvoří v GitHubu, server přidělí číslo a podle něj se odvodí EDPA
+ID (`I-1`, `E-12`, `S-42`); zároveň se titulek v GH UI přepíše na
+`"{ID}: {title}"` a item se nalinkuje pod parenta. Lokální `.md` soubor
+i `issue_map.yaml` se zapíšou až po úspěšném vytvoření v GH.
+
 ```bash
-python3 .claude/edpa/scripts/backlog.py add Initiative "Medical Platform MVP" --js 0
-python3 .claude/edpa/scripts/backlog.py add Epic "OMOP datový e-shop" --parent I-1 --js 21 --status Funnel
-python3 .claude/edpa/scripts/backlog.py add Story "Implement OMOP parser" \
-  --parent F-1 --js 5 --iteration PI-2026-1.1 \
+python3 .claude/edpa/scripts/backlog.py add --type Initiative --title "Medical Platform MVP" --js 0
+python3 .claude/edpa/scripts/backlog.py add --type Epic --parent I-1 --title "OMOP datový e-shop" --js 21 --status Funnel
+python3 .claude/edpa/scripts/backlog.py add --type Story --parent F-1 --title "Implement OMOP parser" \
+  --js 5 --iteration PI-2026-1.1 \
   --contributor turyna:owner:0.7 --contributor matousek:reviewer:0.3
 
 python3 .claude/edpa/scripts/validate_syntax.py --strict .edpa/backlog/
-python3 .claude/edpa/scripts/sync.py push
 ```
+
+(`sync.py push` už není potřeba — `backlog.py add` posílá do GH v jednom
+kroku. Push spouštěj jen pro hromadné změny polí, ne pro nově vytvořené
+items.)
 
 První PI typicky: 1 Initiative, 2–3 Epics, 4–6 Features, 8–12 Stories
 napříč PI-2026-1.{1..4}.
