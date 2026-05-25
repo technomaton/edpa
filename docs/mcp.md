@@ -23,6 +23,7 @@ context tight and makes the data shape predictable.
 | `edpa_people`    | Team registry from `people.yaml`                        | optional `team` filter             |
 | `edpa_backlog`   | Backlog items from `.edpa/backlog/`                    | optional `iteration`, `type`, `status` |
 | `edpa_item`      | Detail for one item                                     | required `item_id` (e.g. `S-200`)  |
+| `edpa_flow_metrics` | Cycle time, throughput, open item age                | optional `iteration`, `level`      |
 
 It also publishes resources for whole-file reads:
 
@@ -141,6 +142,36 @@ with `ERROR: invalid item_id ...` — the path lookup never sees raw input,
 which prevents `../` traversal and similar tricks. The handler resolves the
 type directory from the prefix (`S → stories`, `F → features`, `E → epics`,
 `I → initiatives`, `D → defects`, `T → tasks`).
+
+**Timestamp fields (v1.23.0+):** `edpa_backlog` and `edpa_item` include
+`created_at`, `closed_at`, and `updated_at` in their responses when the
+fields are present in the item's frontmatter (populated by `sync pull`).
+
+### `edpa_flow_metrics`
+
+```json
+{ "iteration": "PI-2026-1.3", "level": "Story" }
+```
+
+Both inputs are optional. When omitted, metrics cover the entire backlog.
+
+Returns:
+
+```json
+{
+  "cycle_time": { "mean": 4.2, "median": 3.0, "p85": 7.0, "unit": "days" },
+  "open_items_age": { "mean": 6.1, "median": 5.0, "p85": 12.0, "unit": "days" },
+  "throughput": { "count": 14, "period_days": 7 },
+  "items_detail": [
+    { "id": "S-200", "status": "Done", "cycle_days": 3, "created_at": "...", "closed_at": "..." }
+  ]
+}
+```
+
+`cycle_time` is computed from `created_at` to `closed_at` for items at
+`status: Done`. `open_items_age` is the elapsed time since `created_at`
+for items not yet closed. Both require timestamp fields synced from GitHub
+(see `sync pull` timestamp extraction).
 
 ---
 

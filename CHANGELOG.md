@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.23.0 — 2026-05-25
+
+Timestamp extraction, flow metrics, and improved conflict detection.
+
+### feat(sync): extract and store GitHub issue timestamps as read-only fields
+
+`sync pull` now reads `created_at`, `closed_at`, and `updated_at` from each GitHub issue and writes them as read-only frontmatter fields in the local backlog item. These fields are never modified by `sync push` -- they flow one-way from GitHub. Used by the new `edpa_flow_metrics` MCP tool and the improved conflict detection.
+
+### feat(sync): timestamp-based conflict detection via `updated_at`
+
+`_detect_remote_modifications()` compares the locally stored `updated_at` against the GitHub-side value. When the remote timestamp is newer, the item is flagged as remotely modified -- catching direct GitHub UI edits that bypass the `sync push` changelog. `sync conflicts` surfaces these alongside existing changelog-based checks.
+
+### feat(mcp): `edpa_flow_metrics` tool for cycle time, throughput, item age metrics
+
+New MCP tool computing delivery flow analytics from synced timestamps:
+- **cycle_time** (mean, median, p85) -- `created_at` to `closed_at` for Done items
+- **open_items_age** (mean, median, p85) -- elapsed since `created_at` for open items
+- **throughput** -- count of closed items in the period
+- **items_detail** -- per-item breakdown with status and timestamps
+
+Both `iteration` and `level` inputs are optional filters.
+
+### docs(setup): hint for GitHub timestamp project fields
+
+Updated `docs/mcp.md`, `docs/RUNBOOK.md`, `docs/quick-start.md`, and `README.md` to document the new timestamp fields, flow metrics tool, and conflict detection improvements.
+
 ## 1.22.1 — 2026-05-25
 
 Same-day patch: two sync bugs surfaced by a full end-to-end run against `technomaton/edpa-e2e-test-{ts}` (install → `project_setup` → `backlog add I/E/F/S` → 2× PI cycle → close). Both fixes pinned by new regression tests; full suite 420 passing.

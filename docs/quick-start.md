@@ -119,4 +119,5 @@ Check the frozen snapshot in `.edpa/snapshots/PI-2026-1.1.json`.
 
 - After 4-5 iterations: [auto-calibrate](auto-calibration.md) your CW heuristics
 - Explore [dual-view](dual-view.md) for per-item cost analysis
+- Use the `edpa_flow_metrics` MCP tool for cycle time, throughput, and item age analytics (requires synced timestamp fields -- see [MCP docs](mcp.md))
 - Set up the full [TECHNOMATON Hub](https://github.com/technomaton/technomaton-hub) for additional capabilities
