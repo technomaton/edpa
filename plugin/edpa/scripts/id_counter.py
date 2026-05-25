@@ -148,3 +148,53 @@ def next_id(item_type: str, root: Path | str) -> str:
         raise IdCounterError(
             f"Could not acquire {lock_path} within {_LOCK_TIMEOUT_SEC}s"
         ) from e
+
+
+def seed_counters_from_fs(root: Path | str) -> dict[str, int]:
+    """Scan all backlog dirs and set ``counter[type] = max(fs_scan)``.
+
+    Used by ``migrate_v1_to_v2.py`` to seed an ``id_counters.yaml`` for a
+    project whose IDs were previously allocated by GitHub (no local
+    counter file existed). Also useful as a recovery operation if the
+    counter file is lost or corrupted.
+
+    Returns the resulting ``{type: counter}`` map.
+    """
+    root = Path(root)
+    counter_path = root / _COUNTER_REL
+    lock_path = root / _LOCK_REL
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    backlog_root = root / ".edpa" / "backlog"
+
+    try:
+        with FileLock(str(lock_path), timeout=_LOCK_TIMEOUT_SEC):
+            counters: dict[str, int] = {}
+            for item_type, dir_name in TYPE_DIRS.items():
+                counters[item_type] = _scan_fs_max(
+                    backlog_root / dir_name, item_type,
+                )
+            counter_path.parent.mkdir(parents=True, exist_ok=True)
+            import tempfile as _tempfile
+            fd, tmp_path = _tempfile.mkstemp(
+                suffix=".yaml",
+                prefix=".id_counters_",
+                dir=str(counter_path.parent),
+            )
+            try:
+                with os.fdopen(fd, "w") as f:
+                    yaml.safe_dump(
+                        {"counters": counters}, f,
+                        sort_keys=True, default_flow_style=False,
+                    )
+                os.replace(tmp_path, counter_path)
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
+            return counters
+    except Timeout as e:
+        raise IdCounterError(
+            f"Could not acquire {lock_path} within {_LOCK_TIMEOUT_SEC}s"
+        ) from e
