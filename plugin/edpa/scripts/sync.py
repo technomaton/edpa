@@ -366,6 +366,8 @@ def compute_backlog_checksum(root):
 
 # -- GitHub CLI Interface ------------------------------------------------------
 
+READONLY_FIELDS = {"created_at", "closed_at", "updated_at"}
+
 SYNC_FIELDS = ["js", "bv", "tc", "rr_oe", "wsjf", "iteration", "status"]
 
 
@@ -538,6 +540,9 @@ def gh_set_field_value(state, project_item_id, edpa_field, value, item_level):
       - other            -> --text fallback
     Returns (ok: bool, message: str).
     """
+    if edpa_field in READONLY_FIELDS:
+        return
+
     project_id = state.get("project_id", "")
     field_ids = state.get("field_ids") or {}
     option_ids = state.get("option_ids") or {}
@@ -918,6 +923,13 @@ def map_gh_items_to_edpa(gh_data, fields_mapping):
                     else:
                         entry[edpa_key] = val
 
+        for ts_gh, ts_local in (("createdAt", "created_at"),
+                                 ("closedAt", "closed_at"),
+                                 ("updatedAt", "updated_at")):
+            ts_val = content.get(ts_gh)
+            if ts_val:
+                entry[ts_local] = ts_val
+
         items[edpa_id] = entry
 
     return items
@@ -944,6 +956,11 @@ def generate_mock_gh_data(root, fields_mapping=None):
             "status": item.get("status", ""),
             "issueType": {"name": item["level"].capitalize()},
             "labels": [item["level"].lower()],
+            "content": {
+                "createdAt": "2025-01-01T00:00:00Z",
+                "updatedAt": "2025-06-15T12:00:00Z",
+                "closedAt": None,
+            },
         }
 
         # Add custom fields using the mapped GitHub field names
@@ -1005,7 +1022,8 @@ def compute_diff(local_items, remote_items):
 
         # Both exist -- compare fields
         compare_fields = ["status", "title", "js", "bv", "tc", "rr_oe", "wsjf",
-                          "iteration", "assignee", "owner"]
+                          "iteration", "assignee", "owner",
+                          "created_at", "closed_at", "updated_at"]
         for field in compare_fields:
             local_val = local.get(field, "")
             remote_val = remote.get(field, "")
@@ -1077,7 +1095,8 @@ def apply_remote_changes(root, changes):
     """
     applied = 0
     updatable_fields = {"status", "js", "bv", "tc", "rr_oe", "wsjf", "owner",
-                        "assignee", "iteration", "title"}
+                        "assignee", "iteration", "title",
+                        "created_at", "closed_at", "updated_at"}
 
     for change in changes:
         if change["action"] != "field_changed":
