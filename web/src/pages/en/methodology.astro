@@ -386,7 +386,38 @@ Accuracy = Actual / Planned &times; 100 %</div>
       </table>
     </div>
 
-    <h3>9.3 Branch naming &amp; DoR</h3>
+    <h3>9.3 Timestamp fields and conflict detection</h3>
+    <p>During sync from GitHub Projects, three timestamp fields are automatically captured:</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Source</th><th>Usage</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>created_at</code></td><td>GitHub issue created date</td><td>Cycle time start, item age</td></tr>
+          <tr><td><code>updated_at</code></td><td>GitHub issue last update</td><td>Conflict detection during sync, freshness</td></tr>
+          <tr><td><code>closed_at</code></td><td>GitHub issue closed date</td><td>Cycle time end, throughput</td></tr>
+        </tbody>
+      </table>
+      <div class="note" style="margin-top:12px"><strong>Conflict detection:</strong> Sync compares the local YAML <code>updated_at</code> with the GitHub value. If both sides have changed since the last sync, the item is flagged as a conflict and requires manual resolution.</div>
+    </div>
+
+    <h3>9.4 Flow Metrics MCP tool</h3>
+    <p>The <code>edpa_flow_metrics</code> MCP tool provides work flow analytics based on timestamp fields:</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Metric</th><th>Calculation</th><th>Usage</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Cycle Time</strong></td><td><code>closed_at - created_at</code></td><td>How long it takes to deliver an item</td></tr>
+          <tr><td><strong>Throughput</strong></td><td>Closed items count / iteration</td><td>Predictability, capacity planning</td></tr>
+          <tr><td><strong>Item Age</strong></td><td><code>now - created_at</code> (open items)</td><td>Detecting stagnating items</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>9.5 Branch naming &amp; DoR</h3>
     <div class="formula" style="white-space:pre">feature/S-200-omop-parser
 defect/D-215-upload-validation
 feature/F-102-anon-engine</div>
