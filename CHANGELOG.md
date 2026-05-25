@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.23.1 — 2026-05-25
+
+Bugfix: sync pull now actually populates GitHub Issue timestamps.
+
+### fix(sync): enrich project items with issue timestamps
+
+`gh project item-list --format json` does **not** expose issue-level `createdAt`/`closedAt`/`updatedAt` in the `content` block (only `body`, `number`, `repository`, `title`, `type`, `url`). The 1.23.0 extractor in `map_gh_items_to_edpa` read those fields from `content` but they were never present, so local backlog YAML never received timestamps and `edpa_flow_metrics` always returned `n/a`.
+
+`gh_fetch_project_items` now post-processes the project item list by issuing one `gh issue list --repo <X> --json number,createdAt,closedAt,updatedAt --state all --limit 500` call per unique repository and merging the timestamps back into each item's `content`. Multi-repo projects are batched per repo. Failures (missing repo info, gh errors) degrade silently — items still return without timestamps.
+
+Existing tests were green because the fixtures injected timestamps directly into `content`, bypassing the real CLI output shape. Added regression tests in `tests/test_sync_timestamps.py` that monkey-patch `subprocess.run` with the realistic empty-timestamp shape to prevent recurrence.
+
 ## 1.23.0 — 2026-05-25
 
 Timestamp extraction, flow metrics, and improved conflict detection.

@@ -372,7 +372,15 @@ SYNC_FIELDS = ["js", "bv", "tc", "rr_oe", "wsjf", "iteration", "status"]
 
 
 def gh_fetch_project_items(sync_config):
-    """Fetch project items via `gh project item-list`."""
+    """Fetch project items via `gh project item-list`, enriched with
+    GitHub Issue timestamps (createdAt/closedAt/updatedAt).
+
+    `gh project item-list --format json` does NOT expose issue-level
+    timestamps in the `content` block — it only returns body/number/
+    repository/title/type/url. We enrich via `gh issue list --repo X
+    --json number,createdAt,closedAt,updatedAt` (one batched call per
+    unique repository).
+    """
     org = sync_config.get("github_org", "YOUR_ORG")
     project_num = sync_config.get("github_project_number", 1)
 
@@ -388,7 +396,7 @@ def gh_fetch_project_items(sync_config):
         if result.returncode != 0:
             print(color(f"  Error: gh CLI failed: {result.stderr.strip()}", C.ERR))
             return None
-        return json.loads(result.stdout)
+        data = json.loads(result.stdout)
     except FileNotFoundError:
         print(color("  Error: `gh` CLI not found. Install from https://cli.github.com/", C.ERR))
         return None
@@ -398,6 +406,65 @@ def gh_fetch_project_items(sync_config):
     except json.JSONDecodeError:
         print(color("  Error: Could not parse gh output as JSON", C.ERR))
         return None
+
+    _enrich_with_issue_timestamps(data)
+    return data
+
+
+def _enrich_with_issue_timestamps(data):
+    """Mutate `data` so each item's `content` gains createdAt/closedAt/updatedAt.
+
+    Groups items by repository and issues one `gh issue list` call per repo.
+    Silently skips items lacking repository/number; partial enrichment is OK.
+    """
+    by_repo = {}
+    for item in data.get("items", []):
+        content = item.get("content") or {}
+        repo = content.get("repository")
+        num = content.get("number")
+        if repo and num:
+            by_repo.setdefault(repo, []).append((content, num))
+
+    for repo, entries in by_repo.items():
+        ts_map = _fetch_repo_issue_timestamps(repo)
+        if not ts_map:
+            continue
+        for content, num in entries:
+            ts = ts_map.get(num)
+            if ts:
+                for key, val in ts.items():
+                    if val is not None:
+                        content[key] = val
+
+
+def _fetch_repo_issue_timestamps(repo):
+    """Return {issue_number: {createdAt, closedAt, updatedAt}} for `repo`.
+
+    Empty dict on failure — caller treats that as "no enrichment available".
+    """
+    cmd = [
+        "gh", "issue", "list", "--repo", repo,
+        "--json", "number,createdAt,closedAt,updatedAt",
+        "--state", "all",
+        "--limit", "500",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode != 0:
+            return {}
+        issues = json.loads(result.stdout)
+    except (FileNotFoundError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return {}
+
+    return {
+        issue["number"]: {
+            "createdAt": issue.get("createdAt"),
+            "closedAt": issue.get("closedAt"),
+            "updatedAt": issue.get("updatedAt"),
+        }
+        for issue in issues
+        if isinstance(issue, dict) and "number" in issue
+    }
 
 
 def gh_update_project_item(sync_config, item_id, project_id, field_id, value):

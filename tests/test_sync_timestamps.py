@@ -15,13 +15,18 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "plugin" / "edpa" / "scripts"))
 
+import json  # noqa: E402
+from types import SimpleNamespace  # noqa: E402
+
 from sync import (  # noqa: E402
     DEFAULT_SYNC_CONFIG,
     READONLY_FIELDS,
     compute_diff,
+    gh_fetch_project_items,
     gh_set_field_value,
     map_gh_items_to_edpa,
 )
+import sync  # noqa: E402
 from validate_syntax import ITEM_SCHEMA  # noqa: E402
 
 FIELDS = DEFAULT_SYNC_CONFIG["fields_mapping"]
@@ -134,3 +139,137 @@ def test_validator_accepts_timestamps_all_types():
             assert ts_field in schema["optional"], (
                 f"{item_type} schema missing {ts_field!r} in optional set"
             )
+
+
+# -- Integration: gh_fetch_project_items enrichment ----------------------------
+# Regression for v1.23.0 bug: gh project item-list --format json does NOT
+# include createdAt/closedAt/updatedAt in content. Enrichment must fetch them
+# from `gh issue list` and merge into content before returning.
+
+def _fake_subprocess_run_factory(item_list_payload, issue_list_payload):
+    """Build a subprocess.run replacement that returns either payload based on argv.
+
+    - `gh project item-list ...`  → item_list_payload (no timestamps)
+    - `gh issue list   ...`        → issue_list_payload (with timestamps)
+    """
+    calls = []
+
+    def fake_run(cmd, capture_output=False, text=False, timeout=None, **_kwargs):
+        calls.append(cmd)
+        if cmd[:3] == ["gh", "project", "item-list"]:
+            payload = item_list_payload
+        elif cmd[:3] == ["gh", "issue", "list"]:
+            payload = issue_list_payload
+        else:
+            return SimpleNamespace(returncode=1, stdout="", stderr=f"unexpected: {cmd}")
+        return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
+
+    return fake_run, calls
+
+
+def test_gh_fetch_project_items_enriches_missing_timestamps(monkeypatch):
+    """gh project item-list lacks timestamps → enrichment fills content from gh issue list."""
+    item_list_payload = {
+        "items": [
+            {
+                "id": "PVTI_x",
+                "title": "S-1: foo",
+                "status": "Implementing",
+                "content": {
+                    "body": "...",
+                    "number": 1,
+                    "repository": "acme/repo",
+                    "title": "S-1: foo",
+                    "type": "Issue",
+                    "url": "https://github.com/acme/repo/issues/1",
+                },
+            },
+            {
+                "id": "PVTI_y",
+                "title": "S-2: bar",
+                "status": "Done",
+                "content": {
+                    "body": "...",
+                    "number": 2,
+                    "repository": "acme/repo",
+                    "title": "S-2: bar",
+                    "type": "Issue",
+                    "url": "https://github.com/acme/repo/issues/2",
+                },
+            },
+        ],
+        "totalCount": 2,
+    }
+    issue_list_payload = [
+        {
+            "number": 1,
+            "createdAt": "2025-01-10T08:00:00Z",
+            "updatedAt": "2025-06-15T12:00:00Z",
+            "closedAt": None,
+        },
+        {
+            "number": 2,
+            "createdAt": "2025-02-01T00:00:00Z",
+            "updatedAt": "2025-07-01T00:00:00Z",
+            "closedAt": "2025-07-01T00:00:00Z",
+        },
+    ]
+
+    fake_run, calls = _fake_subprocess_run_factory(item_list_payload, issue_list_payload)
+    monkeypatch.setattr(sync.subprocess, "run", fake_run)
+
+    data = gh_fetch_project_items({"github_org": "acme", "github_project_number": 1})
+
+    item1, item2 = data["items"]
+    assert item1["content"]["createdAt"] == "2025-01-10T08:00:00Z"
+    assert item1["content"]["updatedAt"] == "2025-06-15T12:00:00Z"
+    assert "closedAt" not in item1["content"]  # None must not overwrite
+
+    assert item2["content"]["createdAt"] == "2025-02-01T00:00:00Z"
+    assert item2["content"]["closedAt"] == "2025-07-01T00:00:00Z"
+
+    # One project call + one issue-list call per unique repo (here: 1 repo).
+    issue_list_calls = [c for c in calls if c[:3] == ["gh", "issue", "list"]]
+    assert len(issue_list_calls) == 1
+    assert "--repo" in issue_list_calls[0]
+    assert "acme/repo" in issue_list_calls[0]
+
+
+def test_gh_fetch_project_items_batches_per_repo(monkeypatch):
+    """Items spanning multiple repos → one gh issue list call per unique repo."""
+    item_list_payload = {
+        "items": [
+            {"id": "A", "content": {"number": 1, "repository": "acme/repo-a"}},
+            {"id": "B", "content": {"number": 7, "repository": "acme/repo-b"}},
+            {"id": "C", "content": {"number": 2, "repository": "acme/repo-a"}},
+        ],
+        "totalCount": 3,
+    }
+    fake_run, calls = _fake_subprocess_run_factory(item_list_payload, [])
+    monkeypatch.setattr(sync.subprocess, "run", fake_run)
+
+    gh_fetch_project_items({"github_org": "acme", "github_project_number": 1})
+
+    issue_list_repos = sorted(
+        c[c.index("--repo") + 1] for c in calls if c[:3] == ["gh", "issue", "list"]
+    )
+    assert issue_list_repos == ["acme/repo-a", "acme/repo-b"]
+
+
+def test_gh_fetch_project_items_enrichment_failure_is_silent(monkeypatch):
+    """If gh issue list fails, items still return without timestamps."""
+    item_list_payload = {
+        "items": [{"id": "A", "content": {"number": 1, "repository": "acme/repo"}}],
+        "totalCount": 1,
+    }
+
+    def fake_run(cmd, **_kwargs):
+        if cmd[:3] == ["gh", "project", "item-list"]:
+            return SimpleNamespace(returncode=0, stdout=json.dumps(item_list_payload), stderr="")
+        return SimpleNamespace(returncode=1, stdout="", stderr="boom")
+
+    monkeypatch.setattr(sync.subprocess, "run", fake_run)
+    data = gh_fetch_project_items({"github_org": "acme", "github_project_number": 1})
+
+    assert data["items"][0]["content"]["number"] == 1
+    assert "createdAt" not in data["items"][0]["content"]
