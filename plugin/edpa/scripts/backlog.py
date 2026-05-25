@@ -1027,10 +1027,124 @@ def _load_issue_map(root):
 
 # ------------------------------------------------------------------------------
 
-def cmd_add(root, backlog, args):
-    """Add a new work item — strictly GH-first.
+_EVIDENCE_ROLES = ("owner", "key", "reviewer", "consulted")
 
-    Flow:
+
+def _parse_contributor_args(raw_contributors):
+    """Parse ``--contributor PERSON:ROLE:CW`` triplets into a list of dicts.
+
+    Returns ``(contributors_list, error_msg)`` — exactly one is non-None.
+    Shared between GH-first and V2 local paths so the user sees identical
+    diagnostics regardless of mode.
+    """
+    contributors = []
+    for raw in raw_contributors or []:
+        parts = raw.split(":")
+        if len(parts) != 3:
+            return None, (f"--contributor must be PERSON:ROLE:CW "
+                          f"(got {raw!r}; expected 3 colon-separated fields)")
+        person, role, cw_str = (p.strip() for p in parts)
+        if not person:
+            return None, f"--contributor missing person id (got {raw!r})"
+        if role not in _EVIDENCE_ROLES:
+            return None, (f"--contributor role={role!r} not in "
+                          f"{list(_EVIDENCE_ROLES)} (got {raw!r}). Job titles "
+                          f"like Dev/Arch/QA belong in people.yaml.")
+        try:
+            cw = float(cw_str)
+        except ValueError:
+            return None, (f"--contributor cw must be numeric "
+                          f"(got {cw_str!r} in {raw!r})")
+        if not (0.0 <= cw <= 1.0):
+            return None, f"--contributor cw must be in [0,1] (got {cw} in {raw!r})"
+        contributors.append({"person": person, "as": role, "cw": cw})
+    return contributors, None
+
+
+def _cmd_add_local(root, backlog, args):
+    """V2 local-first add — calls the MCP edpa_item_create handler in-process.
+
+    No ``gh`` calls. ID allocated via ``id_counter.next_id``, file written
+    via ``_md_frontmatter.save_md``, contributors (if any) appended via
+    ``edpa_item_update``, git add + commit at the end.
+
+    Errors from the handler are surfaced verbatim — the MCP handler is
+    the single source of truth for parent/type validation.
+    """
+    contributors, err = _parse_contributor_args(getattr(args, "contributor", None))
+    if err:
+        print(color(f"  Error: {err}", C.ERR))
+        sys.exit(1)
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        import mcp_server  # noqa: E402
+    finally:
+        sys.path.pop(0)
+
+    edpa_root = root / ".edpa"
+    create_args = {
+        "type": args.type,
+        "title": args.title,
+        "status": getattr(args, "status", None) or "Funnel",
+    }
+    for opt in ("parent", "iteration", "assignee", "js", "bv", "tc", "rr_oe"):
+        v = getattr(args, opt, None)
+        if v is not None:
+            create_args[opt] = v
+
+    result = mcp_server._handle_item_create(edpa_root, create_args)
+    text = result[0].text
+    if text.startswith("ERROR"):
+        print()
+        print(color(f"  {text}", C.ERR))
+        sys.exit(1)
+    import json as _json
+    created = _json.loads(text)
+    new_id = created["id"]
+    file_path = root / created["path"]
+    title = args.title
+
+    if contributors:
+        # MCP edpa_item_update intentionally does not expose contributors
+        # (structured signal that engine/CI materialize). Local-CLI path
+        # writes them directly via the frontmatter helper.
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        try:
+            from _md_frontmatter import load_md as _load_md  # noqa: E402
+            from _md_frontmatter import save_md as _save_md_helper  # noqa: E402
+        finally:
+            sys.path.pop(0)
+        item_data = _load_md(file_path) or {}
+        body = item_data.pop("body", "") if isinstance(item_data, dict) else ""
+        item_data["contributors"] = contributors
+        _save_md_helper(file_path, item_data, body=body)
+
+    # Git add + commit (mirrors GH path tail).
+    import subprocess
+    subprocess.run(["git", "add", str(file_path)],
+                   capture_output=True, cwd=str(root))
+    subprocess.run(["git", "commit", "-m", f"feat({new_id}): {title}"],
+                   capture_output=True, cwd=str(root))
+    print()
+    print(color(f"  Created (local): {bold(new_id)} {title}",
+                level_color(args.type)))
+    print(color(f"  File:    {file_path}", C.MUTED))
+    print(color(f"  Mode:    local (no gh calls; V2 path)", C.MUTED))
+    print()
+
+
+def cmd_add(root, backlog, args):
+    """Add a new work item — dual mode: GH-first (legacy) or local-first (V2).
+
+    Mode selection:
+      - ``--local`` flag set: always V2 local path (MCP edpa_item_create
+        in-process). No GH calls.
+      - Otherwise: GH-first path (server-assigned issue number → EDPA ID).
+        Fails fast if sync is not configured, with a hint to either run
+        ``/edpa:setup`` or pass ``--local`` for the V2 local-first path.
+
+    GH path (legacy, scheduled for removal in V2.0 hard cut):
       1. require sync config in .edpa/config/edpa.yaml (else fail-fast)
       2. ``gh issue create`` → server-assigned issue number
       3. ``gh issue edit --title`` → title becomes "{prefix}-{num}: {title}"
@@ -1038,12 +1152,9 @@ def cmd_add(root, backlog, args):
       5. write local ``.md`` with ID = "{prefix}-{num}" (matches GH title)
       6. update ``.edpa/config/issue_map.yaml`` with node_id
       7. ``git add`` + ``git commit``
-
-    No local-first fallback: feedback from pilot users showed it produced
-    two divergent ID series (local sequential vs. GH issue numbers) that
-    later sync push could not reconcile. The single source of truth is
-    now the GH issue number.
     """
+    if getattr(args, "local", False):
+        return _cmd_add_local(root, backlog, args)
     item_type = args.type
     parent_id = args.parent
     title = args.title
@@ -1112,9 +1223,9 @@ def cmd_add(root, backlog, args):
             "  Error: GitHub sync is not configured in .edpa/config/edpa.yaml.",
             C.ERR))
         print(color(
-            "  Run /edpa:setup first — interactive 'add' is GH-first only "
-            "(local-only mode was removed because it produced divergent ID "
-            "series that sync could not reconcile).",
+            "  Run /edpa:setup first — interactive 'add' is GH-first by "
+            "default (V1 behavior preserved). For the V2 local-first "
+            "path (no gh calls), pass --local.",
             C.MUTED))
         sys.exit(1)
 
@@ -1307,6 +1418,10 @@ def main():
                             "PERSON:ROLE:CW where ROLE ∈ "
                             "{owner,key,reviewer,consulted} and CW ∈ "
                             "[0,1]. Example: --contributor turyna:owner:0.7")
+    p_add.add_argument("--local", action="store_true",
+                       help="V2 local-first path: allocate ID from "
+                            ".edpa/config/id_counters.yaml (no gh call), "
+                            "no issue_map.yaml update, no GH project link.")
 
     args = parser.parse_args()
 

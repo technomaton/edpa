@@ -2,12 +2,12 @@
 name: edpa:add
 user-invocable: true
 description: >
-  Create a new backlog item (Initiative / Epic / Feature / Story / Defect / Event)
-  via strict GH-first flow: gh issue create → server-assigned number → EDPA ID =
-  "{prefix}-{num}" → GH title rewritten to "{ID}: {title}" → sub-issue link to
-  parent → local YAML → auto-commit. Requires sync config; no local-only mode.
+  Create a new backlog item (Initiative / Epic / Feature / Story / Defect /
+  Event / Risk). Dual mode: V1 GH-first (gh issue create → server number →
+  EDPA ID) or V2 local-first via --local (id_counter.yaml, no gh). Default:
+  GH-first when sync config exists; --local opts into the V2 path.
 license: MIT
-compatibility: GitHub CLI (gh), Python 3.10+, edpa.yaml sync config
+compatibility: GitHub CLI (gh) optional, Python 3.10+, MCP edpa server
 allowed-tools: Read Bash(python3 *) Bash(git *)
 ---
 
@@ -15,7 +15,9 @@ allowed-tools: Read Bash(python3 *) Bash(git *)
 
 ## What this does
 
-Creates a new work item in the EDPA backlog using **strict GH-first flow**:
+Creates a new work item in the EDPA backlog. Two paths are supported.
+
+### V1 GH-first (default when sync is configured)
 
 1. `gh issue create` → GitHub assigns an atomic issue number (#42)
 2. `gh issue edit --title` → GH title becomes `"S-42: <title>"` so the GH UI matches the local identifier
@@ -26,7 +28,22 @@ Creates a new work item in the EDPA backlog using **strict GH-first flow**:
 7. Updates `.edpa/config/issue_map.yaml` with `{issue_number, project_item_id, node_id}`
 8. `git commit -m "feat(S-42): <title>"`
 
-**Why strict GH-first (no local fallback):** Pilot feedback showed two ID series — sequential local + GH issue numbers — drifting whenever someone added items offline or before `/edpa:setup`. A later `sync push` couldn't reconcile them. GitHub's atomic issue counter is now the single source of truth. If sync is not configured, `add` fails fast with an explicit hint to run `/edpa:setup`.
+### V2 local-first (opt-in via `--local`)
+
+1. `id_counter.next_id(type)` from `.edpa/config/id_counters.yaml` → next available number; atomic via file lock + `max(counter, fs_scan)`
+2. EDPA ID = `{prefix}-{num}` (same shape as V1, but allocated locally — no `gh` roundtrip)
+3. MCP `edpa_item_create` handler validates parent type hierarchy in-process (Story→Feature, Feature→Epic, Epic→Initiative)
+4. Writes `.edpa/backlog/<type>/{ID}.md` directly via `_md_frontmatter.save_md`
+5. `git commit -m "feat({ID}): <title>"` — no `issue_map.yaml`, no GH calls
+
+**Default selection logic:**
+- Sync configured + no `--local` → GH-first path (V1 behavior preserved)
+- Sync missing + no `--local` → fail-fast with hint to run `/edpa:setup` OR pass `--local`
+- `--local` set → V2 local-first path regardless of sync config
+
+**Why we keep both for now:** V2 hard-cut happens in `docs/v2/plan.md` Krok 6. Until then, existing GH-coupled projects keep working unchanged; new projects (or those migrated via `migrate_v1_to_v2.py`) use `--local`.
+
+**Title format mirror (GH path only):** The GH issue title carries the EDPA ID prefix (`I-3: …`, `S-42: …`) so a search for `S-42` lands on the same item in repo and GH. The local path skips this — git history is the audit trail.
 
 **Title format mirror:** The GH issue title always carries the EDPA ID prefix (`I-3: …`, `S-42: …`) so a search for `S-42` lands on the same item in repo and GH. Sub-issue linking keeps the parent-child hierarchy visible in the GH UI, not just in local YAML.
 
@@ -41,24 +58,28 @@ Creates a new work item in the EDPA backlog using **strict GH-first flow**:
 
 ## Steps
 
-### 1. Verify sync config exists
+### 1. Choose mode
 
-Before invoking `backlog.py add`, ensure `.edpa/config/edpa.yaml` has the `sync.github_org`, `sync.github_repo`, and `sync.github_project_number` fields set. If they are missing, do **not** attempt the add — instead tell the user to run `/edpa:setup` first. The CLI will refuse the add anyway, but failing in the skill avoids a confusing CLI error.
+- **V1 GH-first (default):** confirm `.edpa/config/edpa.yaml` has `sync.github_org`, `sync.github_repo`, and `sync.github_project_number`. If missing, tell the user to either run `/edpa:setup` or pass `--local`.
+- **V2 local-first:** pass `--local`. Works without any sync config; ID comes from `.edpa/config/id_counters.yaml` (auto-created on first use).
+
+Pick V2 local when: the project is offline-only, hosted on GitLab/Forgejo, or the user already migrated to V2. Otherwise V1 GH-first stays the default until Krok 6 in `docs/v2/plan.md` deletes the GH path.
 
 ### 2. Parse arguments
 
 Extract from `$ARGUMENTS`:
-- **type** — one of `Initiative`, `Epic`, `Feature`, `Story`, `Defect`, `Event` (required)
+- **type** — one of `Initiative`, `Epic`, `Feature`, `Story`, `Defect`, `Event`, `Risk` (required)
 - **title** — item title (required)
-- **parent** — parent EDPA ID (required for Epic/Feature/Story/Defect/Event)
+- **parent** — parent EDPA ID (required for Epic/Feature/Story; flexible for Defect/Event/Risk)
 - **js** — Job Size, modified Fibonacci 1–100 (Stories only, optional)
 - **bv / tc / rr** — WSJF inputs (optional)
 - **assignee** — person ID from people.yaml (optional)
 - **iteration** — e.g. `PI-2026-1.2` (optional)
+- **local** — opt into V2 local-first path (no `gh`)
 
 If type or title is missing, ask the user before proceeding.
 
-If parent is missing for a non-Initiative item, show the current backlog tree and ask:
+If parent is missing for a non-Initiative non-Defect/Event/Risk item, show the current backlog tree and ask:
 ```bash
 python3 .edpa/engine/scripts/backlog.py tree
 ```
@@ -75,13 +96,13 @@ python3 .edpa/engine/scripts/backlog.py add \
   [--tc <TC>] \
   [--rr <RR>] \
   [--assignee <PERSON_ID>] \
-  [--iteration <ITER_ID>]
+  [--iteration <ITER_ID>] \
+  [--local]
 ```
 
 The script will:
-- fail-fast with exit code 1 if sync config is missing
-- create the GH issue, rewrite its title to `"<ID>: <title>"`, set the Issue Type, add it to the project, and link it under its parent
-- write the local `.md`, update `issue_map.yaml` (with `node_id`), and commit
+- without `--local`: fail-fast with exit code 1 if sync config is missing; otherwise create the GH issue, rewrite its title to `"<ID>: <title>"`, set the Issue Type, add it to the project, link it under its parent, write the local `.md`, update `issue_map.yaml`, and commit
+- with `--local`: allocate the next ID from `.edpa/config/id_counters.yaml`, write the local `.md` via the MCP `edpa_item_create` handler (parent type validated in-process), and commit. No `gh` calls.
 
 ### 4. Show result
 
@@ -99,9 +120,8 @@ python3 .edpa/engine/scripts/backlog.py tree
 
 ## What NOT to do
 
-- **Never write YAML files directly** — always use `backlog.py add` so hierarchy, ID assignment, GH issue creation, title rewrite, and sub-issue linking all happen atomically.
-- **Never call `gh issue create` manually** — it skips the title rewrite (no `S-42:` prefix) and the sub-issue link, leaving the GH UI inconsistent with the local backlog.
-- **Never invent IDs** — every EDPA ID is `{prefix}-{gh_issue_number}` where the number comes from `gh issue create`. Inventing them creates orphans.
-- **Never try a "local-only" workaround** when sync is not configured — the `--local` flag was removed because it produced divergent ID series. Run `/edpa:setup` first.
-- **Never skip `--parent`** for non-Initiative items — flat backlogs break WSJF calculation, engine allocation, and the GH sub-issue panel.
+- **Never write YAML files directly** — always use `backlog.py add` so ID allocation, parent validation, and frontmatter shape all go through one path (MCP `edpa_item_create` for `--local`, GH factory otherwise).
+- **Never call `gh issue create` manually** in the GH path — it skips the title rewrite (no `S-42:` prefix) and the sub-issue link, leaving the GH UI inconsistent with the local backlog.
+- **Never invent IDs.** GH path: ID comes from `gh issue create`. Local path: ID comes from `id_counter.next_id()` (counter file + fs_scan). Both are atomic; manual IDs cause collisions.
+- **Never skip `--parent`** for Story/Feature/Epic — flat backlogs break WSJF calculation, engine allocation, and (GH path) the sub-issue panel.
 - **Do not add `.github/ISSUE_TEMPLATE/` files** — EDPA uses org-level Issue Types (stronger than templates) and the skill covers all creation paths. GH UI templates would be a third source of truth with no consumer.
