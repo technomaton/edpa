@@ -19,6 +19,7 @@ Tento dokument je ADR-style log (Architecture Decision Records) pro V2 transici.
 | [ADR-010](#adr-010-keep-github-field-in-peopleyaml) | Zachovat `github:` field v `people.yaml` (optional) | Accepted |
 | [ADR-011](#adr-011-engine-evidence-via-optional-gh) | Engine evidence via optional `gh` s graceful fallback | **Superseded by ADR-012** |
 | [ADR-012](#adr-012-platform-specific-ci-materialization-layer) | Platform-specific CI materialization layer | Accepted |
+| [ADR-013](#adr-013-pr-event-handling--merge-only-default-with-live-opt-in) | PR event handling: merge-only default, live opt-in | Accepted |
 
 ---
 
@@ -555,6 +556,195 @@ Kombinovat, dedupe per signal event.
 - Pre-push hook se NEzměnil — pořád jen ID validation. Materializace evidence není jeho úkol.
 
 **Související:** [ADR-001](#adr-001), [ADR-010](#adr-010), [ADR-011 (superseded)](#adr-011-engine-evidence-via-optional-gh)
+
+---
+
+## ADR-013: PR event handling — merge-only default with live opt-in
+
+**Date:** 2026-05-25
+**Decider:** Jaroslav Urbánek
+**Status:** Accepted
+
+### Context
+
+[ADR-012](#adr-012-platform-specific-ci-materialization-layer) zavedlo CI materialization, ale nespecifikovalo **kdy** Action triggeruje. Typický PR vygeneruje 15-40 events během svého života (~5-15× `synchronize`, 2-5× `pull_request_review`, 5-20× `issue_comment`, 1× `closed`). Pokud Action commituje na každý event → ~30 commitů per PR jen na evidence. To vede k:
+
+- **History pollution** — PR a main jsou zaplaveny evidence commits
+- **Race conditions** — Action commits soutěží s developer pushes
+- **Squash interference** — squash-on-merge "ztratí" timeline evidence
+
+Otázka: kdy přesně Action commituje, kam, a jak handle merge?
+
+### Decision
+
+**Default `mode: merge-only`** — Action triggeruje pouze na `pull_request:closed` s `merged == true`. Pulluje VŠECHNA PR data (reviews, comments, approvals) jako batch a commitne jeden evidence commit do **base branch** (typicky main).
+
+**Opt-in `mode: live`** — pro audit-heavy teamy lze přepnout na per-event materialization (`pull_request: opened/synchronize/closed`, `pull_request_review:submitted`, `issue_comment:created`). Doporučeno se squash-on-merge pro clean main history.
+
+**Open PRs během iteration close** — `edpa:close-iteration` skill automaticky spustí `sync_pr_contributions.py --pr N --rebuild` pro všechny open PRs zmiňující items v zavírané iteraci. Manual fallback dostupný kdykoliv.
+
+### Alternatives considered
+
+- **A. Per-event commit (live default)** ([rejected]) — ~30 commits per PR clutterují history; squash-on-merge je sice mitigace, ale není universal
+- **B. Merge-only bez manual fallback** ([rejected]) — open PRs během iteration close nemají evidence v gitu, engine je missne, signál ztracen
+- **C. Separate evidence branch** (per-item evidence branches) ([rejected]) — komplexní repo struktura, mnoho branches, merge handling nejasný
+- **D. Git notes místo commits** ([rejected]) — git notes jsou unusual, většina tools je nerenderuje, audit UX horší
+- **E. Squash live commits at merge** ([rejected]) — komplexní Action logic (vyžaduje custom squash manipulation), riskantní s GH branch protection
+
+### Consequences
+
+**Pozitivní:**
+- **Clean main history** — default merge-only dává 1 evidence commit per merged PR
+- **Audit trail zachován** — `git show <merge-sha>` zobrazí kompletní contributors[] diff včetně všech materializovaných signálů
+- **Žádné race conditions na merge** — merge je atomická operace, žádné concurrent developer pushes po něm
+- **Squash-friendly** — squash-on-merge clean main, ale evidence je celý v jednom merge commit
+- **Opt-in pro real-time potřeby** — audit-heavy teamy mají volbu
+
+**Negativní:**
+- Open PRs mid-iteration vyžadují manual sync (mitigated: `edpa:close-iteration` auto-volá `sync_pr_contributions.py --rebuild`)
+- Live mode + non-squash merge = noisy main history (dokumentováno jako trade-off; team volí)
+
+### Implementační detaily
+
+**Workflow YAML (default merge-only):**
+
+```yaml
+name: EDPA — Sync PR contributions
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  sync:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}  # main, ne PR branch
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.10' }
+      - name: Sync contributions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 .claude/edpa/scripts/sync_pr_contributions.py \
+            --pr-number ${{ github.event.pull_request.number }} \
+            --mode merge \
+            --event-payload "$GITHUB_EVENT_PATH"
+      - name: Commit evidence
+        run: |
+          if [[ -n "$(git status --porcelain .edpa/backlog/)" ]]; then
+            git config user.name "edpa-bot"
+            git config user.email "edpa-bot@noreply.github.com"
+            git add .edpa/backlog/
+            git commit -m "evidence(merge): PR #${{ github.event.pull_request.number }} — contributors synced"
+            git push origin HEAD
+          fi
+```
+
+**Opt-in `mode: live` (sekce v komentáři workflow):**
+
+```yaml
+# OPT-IN: Real-time materialization (audit-heavy teams)
+# Uncomment to switch from merge-only to live mode:
+#
+# on:
+#   pull_request:
+#     types: [opened, synchronize, closed]
+#   pull_request_review:
+#     types: [submitted]
+#   issue_comment:
+#     types: [created]
+```
+
+**Fork PRs handling:**
+
+```yaml
+jobs:
+  sync:
+    # Default merge-only: vždy běží (na merge je code už v main context)
+    # Live mode: skip fork PRs per-event, jen merge
+    if: |
+      github.event.pull_request.merged == true ||
+      github.event.pull_request.head.repo.full_name == github.repository
+```
+
+**Race condition mitigace (live mode):**
+
+```bash
+# V workflow YAML step "Commit evidence":
+for attempt in 1 2 3; do
+  if git pull --rebase --strategy-option=ours origin HEAD && git push; then
+    break
+  fi
+  sleep $((attempt * 2))
+done
+```
+
+`--strategy-option=ours` — Action preferuje svou evidenci při konfliktu na YAML. Po 3 failed pokusech: exit clean, příští event re-syncne (idempotence přes `signals[].ref` zajistí konzistenci).
+
+**`edpa:close-iteration` mid-flight PR sync:**
+
+Skill před spuštěním engine pulluje:
+```bash
+# pseudocode v close-iteration skill
+for pr_num in $(gh pr list --state open --json number -q '.[].number'); do
+  items=$(extract_item_ids_from_pr $pr_num)
+  if intersect "$items" "$iteration_items"; then
+    python3 .claude/edpa/scripts/sync_pr_contributions.py \
+      --pr-number $pr_num \
+      --mode rebuild \
+      --skip-commit  # mid-flight: just update YAML locally, dev commits manually nebo iteration commit
+  fi
+done
+```
+
+### Multi-PR scénář (více PRs k jednomu item)
+
+PR #42 (impl, merged): turyna author, tuma+urbanek review
+PR #50 (bugfix, merged): tuma author, turyna review
+PR #58 (tests, merged): urbanek author, turyna review
+
+Každý Action run commitne evidenci ze svého PR. Akumulovaný stav po všech merge:
+
+```yaml
+# .edpa/backlog/stories/STO-79.md
+contributors:
+  - person: turyna
+    signals:
+      - {type: pr_author, ref: pr-42, weight: 3.4}
+      - {type: pr_reviewer, ref: pr-50-review-101, weight: 2.25}
+      - {type: pr_reviewer, ref: pr-58-review-102, weight: 2.25}
+  - person: tuma
+    signals:
+      - {type: pr_reviewer, ref: pr-42-review-100, weight: 2.25}
+      - {type: pr_author, ref: pr-50, weight: 3.4}
+  - person: urbanek
+    signals:
+      - {type: pr_reviewer, ref: pr-42-review-99, weight: 2.25}
+      - {type: pr_author, ref: pr-58, weight: 3.4}
+```
+
+Engine normalizuje na cw. **Funguje out of the box** díky unique `signals[].ref` per (PR × role × person).
+
+### Squash vs. rebase vs. merge-commit interakce
+
+| Merge strategie | merge-only mode | live mode |
+|---|---|---|
+| **Squash** (doporučen) | 1 evidence commit → squashed do merge commitu (audit přes `git show <sha>`) | ~30 evidence commits → all squashed, individual timeline ztracen |
+| **Rebase** | 1 evidence commit visible v main | ~30 evidence commits v main (noisy) |
+| **Merge-commit** | 1 evidence commit + merge commit | ~30 evidence commits + merge commit (noisy) |
+
+**Sweet spot:** squash-on-merge + merge-only mode = clean main + zachovaný audit (přes `git show`).
+
+**Související:** [ADR-001](#adr-001), [ADR-010](#adr-010), [ADR-012](#adr-012-platform-specific-ci-materialization-layer)
 
 ---
 

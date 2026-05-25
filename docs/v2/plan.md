@@ -363,7 +363,12 @@ V V2.0: **Drop**. Discussion se přesouvá do PR review commentů nebo externí 
    - Krok 2: Refactor `edpa-add` skill na MCP write tools (`backlog.py` stále má GH cesty, dual mode)
    - Krok 3: Implementovat `id_counter.py` (s file lockem) + `_git_timestamps.py`
    - Krok 4: Implementovat `validate_ids.py` + `renumber_collisions.py` + git hooks; `install.sh` instaluje hooks symlinkem do `.git/hooks/`
-   - Krok 4.5: **CI materialization layer** (per [ADR-012](./decisions.md#adr-012-platform-specific-ci-materialization-layer)) — implementovat `sync_pr_contributions.py` (platform-agnostic) + `.github/workflows/edpa-contribution-sync.yml` template. Refactor `detect_contributors.py` na čistě git-native (odstranění `gh` calls). Engine teď čte jen YAML; GH signály přicházejí přes CI commits.
+   - Krok 4.5: **CI materialization layer** (per [ADR-012](./decisions.md#adr-012-platform-specific-ci-materialization-layer) + [ADR-013](./decisions.md#adr-013-pr-event-handling--merge-only-default-with-live-opt-in)) — implementovat:
+     - `sync_pr_contributions.py` (platform-agnostic, deterministický) — viz ADR-013 implementační detaily
+     - `.github/workflows/edpa-contribution-sync.yml` template (default `mode: merge-only`, opt-in `mode: live` v commentech)
+     - Refactor `detect_contributors.py` na čistě git-native (odstranění `gh` calls)
+     - Update `edpa-close-iteration` skill o **mid-flight PR sync** pro open PRs (volá `sync_pr_contributions.py --rebuild --skip-commit` pro každý open PR zmiňující items v zavírané iteraci)
+     Engine teď čte jen YAML; GH signály přicházejí přes CI commits (merge) nebo manual sync (open PRs mid-iteration).
    - Krok 5: Migration skript (viz níže) + E2E test na sandboxu
    - **Gate 5→6:** Migration MUSÍ projít na sandboxu + minimálně 1 reálném projektu před krokem 6 (viz [verification.md § Finding 7.5](./verification.md#finding-75-migration-test-prerequisite)). Pokud migrace neprojde, zastavit V2.0 release a opravit.
    - Krok 6: Smazat GH kód (`sync.py`, `_gh_*`, skills) — **breaking change**
@@ -412,11 +417,17 @@ Po implementaci ověřit:
 10. **PI server roundtrip** (pokud zapnuto): `edpa-server start` → `curl localhost:3001/api/backlog` vrátí JSON identický s `mcp_server` výstupem
 11. **Migration na sandbox**: spustit `migrate_v1_to_v2.py` na E2E sandbox repu, ověřit, že timestamps sedí, counter je správně seedovaný, hooks instalované
 12. **Test suite**: `pytest tests/` — všechny green, vč. nových `test_id_counter.py`, `test_validate_ids.py`, `test_renumber_collisions.py`, `test_git_timestamps.py`, `test_migrate_v1_to_v2.py`
-13. **CI materialization E2E** (per [ADR-012](./decisions.md#adr-012-platform-specific-ci-materialization-layer)):
+13. **CI materialization E2E** (per [ADR-012](./decisions.md#adr-012-platform-specific-ci-materialization-layer) + [ADR-013](./decisions.md#adr-013-pr-event-handling--merge-only-default-with-live-opt-in)):
     - **(a) Engine fully local check:** `rg -n '\bgh\s' plugin/edpa/scripts/{engine,detect_contributors,mcp_server}.py` vrátí 0 hits. Engine literálně neumí volat `gh`.
-    - **(b) CI materialization end-to-end:** na sandbox repu vytvořit PR mentioning STO-X, simulovat review event (`gh pr review`), ověřit, že GH Action commits do PR branch s updated contributors[] obsahujícím `pr_reviewer` signal. Re-trigger Action 2× → no duplicit commits (idempotence přes `signals[].ref`).
-    - **(c) Determinism:** spustit `sync_pr_contributions.py` 2× se stejným event payload → stejný YAML diff (cross-platform shell hash).
-    - **(d) Bare git fallback:** na sandbox repu bez CI (žádný `.github/workflows/`), provést PR + review + merge ručně. Engine produkuje cw bez crashe, contributors[] obsahuje jen git-native signaly (commit_author, yaml_edit:*, gate_events, manual:commit_message). Žádný error, žádný warning — to je dokumentovaná known limitation pro projekty bez CI, ne run-time bug.
+    - **(b) Merge-only mode (default):** na sandbox repu vytvořit PR mentioning STO-X, přidat 3 review komenty + 1 approval. PR merge → Action fires JEDNOU na `pull_request:closed`, batch commits ALL evidence (pr_author, 3× issue_comment, 1× pr_reviewer) jako jeden commit do base branch. Verify: 1 evidence commit per PR v base branch po merge.
+    - **(c) Live mode (opt-in):** přepnout workflow YAML na live mode triggers. Stejný PR scenario → Action fires na každý event, materializuje incrementally do PR branch. Verify: ~5-7 evidence commits v PR branch před merge.
+    - **(d) Idempotence:** re-trigger Action 2× pro stejný PR (např. close → reopen → close again) → žádné duplicitní signals v contributors[] (dedupe přes `signals[].ref`).
+    - **(e) Determinismus:** spustit `sync_pr_contributions.py` 2× se stejným event payload → stejný YAML diff (cross-platform shell hash).
+    - **(f) Race condition handling:** v live mode simulovat developer push during Action commit — Action retry s `git pull --rebase --strategy-option=ours`, eventually consistent po max 3 retries.
+    - **(g) Fork PR:** fork PR opened/synchronize → Action skipne (no commit). Fork PR merged → Action běží v main contextu s plnými permissions, commitne batch evidence. Verify: žádný error, evidence v main po merge.
+    - **(h) Multi-PR per item:** 3 PRs (impl, bugfix, tests) všechny zmiňují STO-X. Po všech 3 merges → contributors[] obsahuje akumulované signály s unique `signals[].ref` per PR. Žádné lost signals.
+    - **(i) Mid-flight sync (open PR during iteration close):** otevřít PR mentioning STO-X v active iteration. Spustit `edpa-close-iteration` → skill automaticky volá `sync_pr_contributions.py --pr N --rebuild --skip-commit` pro open PR → engine vidí current PR state. Verify: contributors[] reflektuje open PR state.
+    - **(j) Bare git fallback:** na sandbox repu bez CI (žádný `.github/workflows/`), provést PR + review + merge ručně. Engine produkuje cw bez crashe, contributors[] obsahuje jen git-native signaly (commit_author, yaml_edit:*, gate_events, manual:commit_message). Žádný error, žádný warning — to je dokumentovaná known limitation pro projekty bez CI, ne run-time bug.
 
 ## Co se ztrácí (vědomě)
 
@@ -550,7 +561,7 @@ Klíčové oproti ADR-011: žádné dual-path engine, žádný honest framing ty
 ## Reference
 
 - **Concept overview:** [concept.md](./concept.md)
-- **Architecture Decision Records:** [decisions.md](./decisions.md) — proč jsme zvolili, co jsme zvolili (12 ADRs)
+- **Architecture Decision Records:** [decisions.md](./decisions.md) — proč jsme zvolili, co jsme zvolili (13 ADRs)
 - **Stávající MCP server docs:** [../mcp.md](../mcp.md)
 - **Předchozí migration doc (V1.x):** [../migration-v2.md](../migration-v2.md) (zachovat jako historický odkaz)
 - **PI planning tool:** `tools/pi-planning/`

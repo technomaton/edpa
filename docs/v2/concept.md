@@ -154,17 +154,21 @@ Vyřešeno (detail v [decisions.md](./decisions.md)):
 - `github:` field v `people.yaml` → **zachovat** jako optional (ADR-010)
 - Engine evidence z `gh` → **ADR-011 superseded by ADR-012** → engine je 100 % lokální, GH signály přes CI materialization
 
+Vyřešeno [ADR-013](./decisions.md#adr-013-pr-event-handling--merge-only-default-with-live-opt-in) (PR event handling):
+- **CI materialization timing**: default `mode: merge-only`, opt-in `mode: live` přes uncomment v workflow YAML
+- **Open PR mid-iteration**: `edpa:close-iteration` skill automaticky volá `sync_pr_contributions.py --rebuild` pro open PRs zmiňující items v zavírané iteraci
+- **Fork PRs**: Action skipuje per-event events (security), materializace odložena do `pull_request:closed/merged` v main contextu
+- **Race conditions**: `git pull --rebase --strategy-option=ours` + 3× retry s exponential backoff
+
 Zbývající open questions (V2.0):
 - **Server↔MCP transport** (PI server jak volá MCP server): long-lived subprocess vs. spawn-per-request → návrh long-lived
 - **Multi-user koordinace**: V2.0 nemá shared server, `git pull` je sync mechanismus pro tým
-- **CI materialization timing** (per ADR-012): `mode: merge-only` default (clean PR history) vs. `mode: live` opt-in (real-time audit trail)
-- **CI item resolution priority**: PR title regex vs. body vs. modified files vs. branch name → union se signál-splitting heuristikou
-- **Fork PRs handling**: Action skipuje fork PRs (permissions), materializace odložena do `pull_request:closed` (merged) v main contextu
+- **CI item resolution priority** (per ADR-013): PR title regex vs. body vs. modified files vs. branch name → návrh union se signál-splitting heuristikou; rozhodne se při V2.0 krok 4.5 (vyžaduje user testing s reálnými multi-item PRs)
 
 ## Reference
 
 - **Detailní plán implementace:** [plan.md](./plan.md)
-- **Architecture Decision Records:** [decisions.md](./decisions.md) — proč jsme zvolili, co jsme zvolili (12 ADRs)
+- **Architecture Decision Records:** [decisions.md](./decisions.md) — proč jsme zvolili, co jsme zvolili (13 ADRs)
 - **Předchozí migration doc (V1.x):** [../migration-v2.md](../migration-v2.md) (zachovat jako historický odkaz)
 - **EDPA MCP server současný stav:** [../mcp.md](../mcp.md)
 - **Plugin marketplace:** `.claude-plugin/marketplace.json`
