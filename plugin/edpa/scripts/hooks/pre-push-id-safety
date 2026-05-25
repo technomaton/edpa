@@ -1,0 +1,18 @@
+#!/bin/sh
+# EDPA V2 ID safety pre-push hook — verifies no ID collisions with upstream.
+# Layer 6 from docs/v2/plan.md.
+#
+# Install: symlink to .git/hooks/pre-push.
+#
+# Git invokes this with two args: remote_name and remote_url, and pipes
+# the push refs on stdin (local_ref local_sha remote_ref remote_sha).
+# Exit 1 to block the push.
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+[ -z "$REPO_ROOT" ] && exit 0
+
+VALIDATOR="$REPO_ROOT/.edpa/engine/scripts/validate_ids.py"
+[ ! -f "$VALIDATOR" ] && exit 0
+
+REMOTE="$1"
+exec python3 "$VALIDATOR" --pre-push --remote "$REMOTE"
