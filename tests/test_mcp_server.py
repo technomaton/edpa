@@ -262,15 +262,19 @@ def test_handle_item_feature():
 # ---------------------------------------------------------------------------
 
 def test_list_tools():
-    """Returns the documented EDPA tool surface."""
+    """Returns the documented EDPA tool surface (8 read + 7 V2 write)."""
     tools = asyncio.run(mcp_server.list_tools())
-    assert len(tools) == 8
+    assert len(tools) == 15
 
     names = {t.name for t in tools}
-    expected = {"edpa_status", "edpa_iterations", "edpa_people",
-                "edpa_backlog", "edpa_item", "edpa_validate",
-                "edpa_sync_people", "edpa_flow_metrics"}
-    assert names == expected
+    expected_read = {"edpa_status", "edpa_iterations", "edpa_people",
+                     "edpa_backlog", "edpa_item", "edpa_validate",
+                     "edpa_sync_people", "edpa_flow_metrics"}
+    expected_write = {"edpa_item_create", "edpa_item_update",
+                      "edpa_item_transition", "edpa_item_link_parent",
+                      "edpa_iteration_create", "edpa_iteration_close",
+                      "edpa_people_upsert"}
+    assert names == expected_read | expected_write
 
     # Verify each tool has a description and inputSchema
     for t in tools:

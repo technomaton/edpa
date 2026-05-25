@@ -99,11 +99,14 @@ def _read_plugin_version() -> str:
 SERVER_VERSION = _read_plugin_version()
 
 # ---------------------------------------------------------------------------
-# Input validation — guards against path traversal in item_id parameter
+# Input validation — guards against path traversal in tool parameters
 # ---------------------------------------------------------------------------
 
-# Item IDs are <type-prefix>-<digits>, e.g. S-200, F-12, I-1, D-3, T-99.
-ITEM_ID_RE = re.compile(r"^[A-Z]-\d{1,9}$")
+# Item IDs are <type-prefix>-<digits>: S-200, F-12, I-1, D-3, T-99,
+# plus 2-letter EV-3 (Event) and 1-letter R-2 (Risk) added in V2.
+ITEM_ID_RE = re.compile(r"^[A-Z]{1,3}-\d{1,9}$")
+ITERATION_ID_RE = re.compile(r"^PI-\d{4}-\d{1,2}(?:\.\d{1,2})?$")
+PERSON_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 
 def _safe_item_id(item_id: str) -> str | None:
@@ -111,6 +114,48 @@ def _safe_item_id(item_id: str) -> str | None:
     if not isinstance(item_id, str):
         return None
     return item_id if ITEM_ID_RE.match(item_id) else None
+
+
+def _safe_iteration_id(iter_id: str) -> str | None:
+    if not isinstance(iter_id, str):
+        return None
+    return iter_id if ITERATION_ID_RE.match(iter_id) else None
+
+
+def _safe_person_id(person_id: str) -> str | None:
+    if not isinstance(person_id, str):
+        return None
+    return person_id if PERSON_ID_RE.match(person_id) else None
+
+
+# Type metadata — single source of truth for write tools (mirrors
+# backlog.py constants; kept here to avoid an import cycle until
+# Krok 2 refactors backlog.py to import from id_counter).
+TYPE_DIRS = {
+    "Initiative": "initiatives",
+    "Epic":       "epics",
+    "Feature":    "features",
+    "Story":      "stories",
+    "Defect":     "defects",
+    "Event":      "events",
+    "Risk":       "risks",
+}
+PARENT_RULES = {
+    "Initiative": None,
+    "Epic":       "Initiative",
+    "Feature":    "Epic",
+    "Story":      "Feature",
+    "Defect":     None,
+    "Event":      None,
+    "Risk":       None,
+}
+PORTFOLIO_STATUSES = ("Funnel", "Reviewing", "Analyzing", "Ready", "Implementing", "Done")
+DELIVERY_STATUSES = (
+    "Funnel", "Analyzing", "Backlog", "Implementing",
+    "Validating", "Deploying", "Releasing", "Done",
+)
+PORTFOLIO_TYPES = {"Initiative", "Epic"}
+DELIVERY_TYPES = {"Feature", "Story", "Defect"}
 
 
 # ---------------------------------------------------------------------------
@@ -315,6 +360,155 @@ async def list_tools() -> list[Tool]:
                 "additionalProperties": False,
             },
         ),
+        Tool(
+            name="edpa_item_create",
+            description=(
+                "Create a new backlog item. Allocates the next local ID via "
+                "id_counter (no gh call), validates parent type hierarchy "
+                "(Story→Feature→Epic→Initiative), and writes "
+                ".edpa/backlog/{type}/{ID}.md with frontmatter + body."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string", "enum": list(TYPE_DIRS.keys())},
+                    "title": {"type": "string", "minLength": 1, "maxLength": 200},
+                    "body": {"type": "string"},
+                    "parent": {"type": "string"},
+                    "iteration": {"type": "string"},
+                    "assignee": {"type": "string"},
+                    "status": {"type": "string"},
+                    "js": {"type": "integer", "minimum": 0},
+                    "bv": {"type": "integer", "minimum": 0},
+                    "tc": {"type": "integer", "minimum": 0},
+                    "rr_oe": {"type": "integer", "minimum": 0},
+                },
+                "required": ["type", "title"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_item_update",
+            description=(
+                "Update one or more frontmatter fields on an existing item. "
+                "Atomic — all fields applied or none. Use edpa_item_transition "
+                "for status changes (it also stamps closed_at on Done)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "string"},
+                    "fields": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string"},
+                            "iteration": {"type": "string"},
+                            "iteration_half": {"type": "integer", "minimum": 1, "maximum": 2},
+                            "assignee": {"type": "string"},
+                            "js": {"type": "integer", "minimum": 0},
+                            "bv": {"type": "integer", "minimum": 0},
+                            "tc": {"type": "integer", "minimum": 0},
+                            "rr_oe": {"type": "integer", "minimum": 0},
+                        },
+                        "additionalProperties": False,
+                        "minProperties": 1,
+                    },
+                },
+                "required": ["item_id", "fields"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_item_transition",
+            description=(
+                "Change an item's status. Validates against the SAFe workflow for "
+                "its type (portfolio vs delivery). Auto-stamps closed_at when "
+                "transitioning to Done (first time only)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "string"},
+                    "status": {"type": "string"},
+                },
+                "required": ["item_id", "status"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_item_link_parent",
+            description=(
+                "Set the parent reference on an item. Validates parent exists "
+                "and matches the expected type per the hierarchy "
+                "(Story→Feature, Feature→Epic, Epic→Initiative)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "string"},
+                    "parent_id": {"type": "string"},
+                },
+                "required": ["item_id", "parent_id"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_iteration_create",
+            description=(
+                "Create a new iteration YAML at .edpa/iterations/{id}.yaml. "
+                "The PI parent ID is derived from the iteration ID (e.g. "
+                "PI-2026-1.3 → PI-2026-1). Status defaults to 'planned'."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "start_date": {"type": "string", "pattern": r"^\d{4}-\d{2}-\d{2}$"},
+                    "end_date": {"type": "string", "pattern": r"^\d{4}-\d{2}-\d{2}$"},
+                    "type": {"type": "string", "enum": ["Iteration", "IP"]},
+                },
+                "required": ["id", "start_date", "end_date"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_iteration_close",
+            description=(
+                "Mark an iteration as closed in its YAML file. Does NOT run "
+                "the engine or generate reports — those are orchestrated by "
+                "the edpa:close-iteration skill."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                },
+                "required": ["id"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_people_upsert",
+            description=(
+                "Add a new person to .edpa/config/people.yaml or update fields "
+                "on an existing one. Atomic write via tmp + rename."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "role": {"type": "string"},
+                    "team": {"type": "string"},
+                    "fte": {"type": "number", "minimum": 0, "maximum": 1},
+                    "capacity": {"type": "number", "minimum": 0},
+                    "github": {"type": "string"},
+                    "availability": {"type": "string"},
+                },
+                "required": ["id"],
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -356,6 +550,20 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 arguments.get("iteration"),
                 arguments.get("level"),
             )
+        elif name == "edpa_item_create":
+            return _handle_item_create(edpa_root, arguments)
+        elif name == "edpa_item_update":
+            return _handle_item_update(edpa_root, arguments)
+        elif name == "edpa_item_transition":
+            return _handle_item_transition(edpa_root, arguments)
+        elif name == "edpa_item_link_parent":
+            return _handle_item_link_parent(edpa_root, arguments)
+        elif name == "edpa_iteration_create":
+            return _handle_iteration_create(edpa_root, arguments)
+        elif name == "edpa_iteration_close":
+            return _handle_iteration_close(edpa_root, arguments)
+        elif name == "edpa_people_upsert":
+            return _handle_people_upsert(edpa_root, arguments)
         logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception:
@@ -743,6 +951,383 @@ def _handle_flow_metrics(
         "skipped_no_timestamps": skipped,
     }
     return [TextContent(type="text", text=json.dumps(payload, indent=2, ensure_ascii=False))]
+
+
+# ---------------------------------------------------------------------------
+# Write tool helpers
+# ---------------------------------------------------------------------------
+
+def _ok(data: dict) -> list[TextContent]:
+    return [TextContent(type="text", text=json.dumps(data, indent=2, ensure_ascii=False))]
+
+
+def _err(msg: str) -> list[TextContent]:
+    return [TextContent(type="text", text=f"ERROR: {msg}")]
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _find_item_file(edpa_root: Path, item_id: str) -> Path | None:
+    """Locate the .md file for item_id by scanning all backlog/{type}/ dirs.
+
+    Returns None if not found. Drops the YAML load cache for the item's
+    type dir so concurrent edits across MCP calls are not masked.
+    """
+    backlog = edpa_root / "backlog"
+    for type_dir in TYPE_DIRS.values():
+        candidate = backlog / type_dir / f"{item_id}.md"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _save_md_item(file_path: Path, item: dict, body: str) -> None:
+    """Wrapper over _md_frontmatter.save_md with sys.path mgmt."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from _md_frontmatter import save_md  # noqa: E402
+        save_md(file_path, item, body=body)
+    finally:
+        sys.path.pop(0)
+
+
+def _load_md_item(file_path: Path) -> dict | None:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from _md_frontmatter import load_md  # noqa: E402
+        return load_md(file_path)
+    finally:
+        sys.path.pop(0)
+
+
+def _allocate_id(item_type: str, repo_root: Path) -> str:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from id_counter import next_id  # noqa: E402
+        return next_id(item_type, repo_root)
+    finally:
+        sys.path.pop(0)
+
+
+def _write_yaml_atomic(path: Path, data: dict) -> None:
+    """tmp + rename. yaml.safe_dump with sort_keys=False, allow_unicode=True."""
+    import tempfile as _tempfile
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = _tempfile.mkstemp(
+        suffix=".yaml", prefix=f".{path.stem}_", dir=str(path.parent)
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            yaml.safe_dump(
+                data, f, sort_keys=False, default_flow_style=False, allow_unicode=True
+            )
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+    _load_yaml_cache_clear()
+
+
+def _allowed_statuses(item_type: str) -> tuple[str, ...] | None:
+    if item_type in PORTFOLIO_TYPES:
+        return PORTFOLIO_STATUSES
+    if item_type in DELIVERY_TYPES:
+        return DELIVERY_STATUSES
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Write tool handlers
+# ---------------------------------------------------------------------------
+
+def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
+    item_type = args.get("type")
+    title = args.get("title")
+    if item_type not in TYPE_DIRS:
+        return _err(f"invalid type {item_type!r}; expected one of {sorted(TYPE_DIRS)}")
+    if not isinstance(title, str) or not title.strip():
+        return _err("title is required and must be a non-empty string")
+
+    parent = args.get("parent")
+    if parent is not None:
+        safe_parent = _safe_item_id(parent)
+        if safe_parent is None:
+            return _err(f"invalid parent id {parent!r}")
+        parent_path = _find_item_file(edpa_root, safe_parent)
+        if not parent_path:
+            return _err(f"parent {safe_parent} not found")
+        expected = PARENT_RULES.get(item_type)
+        if expected:
+            parent_data = _load_md_item(parent_path) or {}
+            if parent_data.get("type") != expected:
+                return _err(
+                    f"parent {safe_parent} is {parent_data.get('type')!r}, "
+                    f"expected {expected!r} for {item_type}"
+                )
+    elif PARENT_RULES.get(item_type):
+        return _err(
+            f"type {item_type} requires --parent (expected {PARENT_RULES[item_type]})"
+        )
+
+    iteration = args.get("iteration")
+    if iteration is not None and _safe_iteration_id(iteration) is None:
+        return _err(f"invalid iteration id {iteration!r}")
+    assignee = args.get("assignee")
+    if assignee is not None and _safe_person_id(assignee) is None:
+        return _err(f"invalid assignee id {assignee!r}")
+
+    repo_root = edpa_root.parent
+    new_id = _allocate_id(item_type, repo_root)
+
+    item: dict = {
+        "id": new_id,
+        "type": item_type,
+        "title": title.strip(),
+        "status": args.get("status") or "Funnel",
+    }
+    if parent:
+        item["parent"] = parent
+    if iteration:
+        item["iteration"] = iteration
+    if assignee:
+        item["assignee"] = assignee
+    for field in ("js", "bv", "tc", "rr_oe"):
+        if args.get(field) is not None:
+            item[field] = args[field]
+    js, bv, tc, rr = (args.get(k) or 0 for k in ("js", "bv", "tc", "rr_oe"))
+    if js and (bv or tc or rr):
+        item["wsjf"] = round((bv + tc + rr) / js, 2)
+
+    file_path = edpa_root / "backlog" / TYPE_DIRS[item_type] / f"{new_id}.md"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    _save_md_item(file_path, item, body=args.get("body") or "")
+    _load_yaml_cache_clear()
+
+    logger.info("edpa_item_create: id=%s type=%s", new_id, item_type)
+    return _ok({
+        "id": new_id,
+        "type": item_type,
+        "path": str(file_path.relative_to(repo_root)),
+    })
+
+
+_UPDATE_ALLOWED_FIELDS = frozenset({
+    "title", "iteration", "iteration_half", "assignee",
+    "js", "bv", "tc", "rr_oe",
+})
+
+
+def _handle_item_update(edpa_root: Path, args: dict) -> list[TextContent]:
+    raw_id = args.get("item_id", "")
+    safe_id = _safe_item_id(raw_id)
+    if safe_id is None:
+        return _err(f"invalid item_id {raw_id!r}")
+    fields = args.get("fields") or {}
+    if not isinstance(fields, dict) or not fields:
+        return _err("fields must be a non-empty object")
+    invalid = set(fields) - _UPDATE_ALLOWED_FIELDS
+    if invalid:
+        return _err(
+            f"fields {sorted(invalid)!r} not allowed by edpa_item_update "
+            f"(use edpa_item_transition for status, edpa_item_link_parent for parent)"
+        )
+
+    path = _find_item_file(edpa_root, safe_id)
+    if not path:
+        return _err(f"item {safe_id} not found")
+
+    if "iteration" in fields and fields["iteration"] is not None:
+        if _safe_iteration_id(fields["iteration"]) is None:
+            return _err(f"invalid iteration id {fields['iteration']!r}")
+    if "assignee" in fields and fields["assignee"] is not None:
+        if _safe_person_id(fields["assignee"]) is None:
+            return _err(f"invalid assignee id {fields['assignee']!r}")
+
+    item = _load_md_item(path) or {}
+    body = item.pop("body", "") if isinstance(item, dict) else ""
+    item.update(fields)
+    js, bv, tc, rr = (item.get(k) or 0 for k in ("js", "bv", "tc", "rr_oe"))
+    if js and (bv or tc or rr):
+        item["wsjf"] = round((bv + tc + rr) / js, 2)
+    _save_md_item(path, item, body=body)
+    _load_yaml_cache_clear()
+
+    logger.info("edpa_item_update: id=%s fields=%s", safe_id, list(fields))
+    return _ok({"id": safe_id, "updated": list(fields)})
+
+
+def _handle_item_transition(edpa_root: Path, args: dict) -> list[TextContent]:
+    raw_id = args.get("item_id", "")
+    safe_id = _safe_item_id(raw_id)
+    if safe_id is None:
+        return _err(f"invalid item_id {raw_id!r}")
+    status = args.get("status")
+    if not isinstance(status, str) or not status:
+        return _err("status is required")
+
+    path = _find_item_file(edpa_root, safe_id)
+    if not path:
+        return _err(f"item {safe_id} not found")
+
+    item = _load_md_item(path) or {}
+    item_type = item.get("type")
+    allowed = _allowed_statuses(item_type)
+    if allowed is not None and status not in allowed:
+        return _err(
+            f"status {status!r} not valid for {item_type}; "
+            f"allowed: {list(allowed)}"
+        )
+
+    body = item.pop("body", "") if isinstance(item, dict) else ""
+    item["status"] = status
+    closed_at = item.get("closed_at")
+    if status == "Done" and not closed_at:
+        closed_at = _utc_now_iso()
+        item["closed_at"] = closed_at
+    _save_md_item(path, item, body=body)
+    _load_yaml_cache_clear()
+
+    logger.info("edpa_item_transition: id=%s status=%s", safe_id, status)
+    return _ok({"id": safe_id, "status": status, "closed_at": closed_at})
+
+
+def _handle_item_link_parent(edpa_root: Path, args: dict) -> list[TextContent]:
+    raw_id = args.get("item_id", "")
+    safe_id = _safe_item_id(raw_id)
+    if safe_id is None:
+        return _err(f"invalid item_id {raw_id!r}")
+    raw_parent = args.get("parent_id", "")
+    safe_parent = _safe_item_id(raw_parent)
+    if safe_parent is None:
+        return _err(f"invalid parent_id {raw_parent!r}")
+    if safe_id == safe_parent:
+        return _err("item cannot be its own parent")
+
+    path = _find_item_file(edpa_root, safe_id)
+    if not path:
+        return _err(f"item {safe_id} not found")
+    parent_path = _find_item_file(edpa_root, safe_parent)
+    if not parent_path:
+        return _err(f"parent {safe_parent} not found")
+
+    item = _load_md_item(path) or {}
+    parent_data = _load_md_item(parent_path) or {}
+    expected = PARENT_RULES.get(item.get("type"))
+    if expected and parent_data.get("type") != expected:
+        return _err(
+            f"parent {safe_parent} is {parent_data.get('type')!r}, "
+            f"expected {expected!r} for {item.get('type')}"
+        )
+
+    body = item.pop("body", "") if isinstance(item, dict) else ""
+    item["parent"] = safe_parent
+    _save_md_item(path, item, body=body)
+    _load_yaml_cache_clear()
+
+    logger.info("edpa_item_link_parent: id=%s parent=%s", safe_id, safe_parent)
+    return _ok({"id": safe_id, "parent": safe_parent})
+
+
+def _handle_iteration_create(edpa_root: Path, args: dict) -> list[TextContent]:
+    raw_id = args.get("id", "")
+    safe_id = _safe_iteration_id(raw_id)
+    if safe_id is None:
+        return _err(f"invalid iteration id {raw_id!r}; expected pattern PI-YYYY-N[.M]")
+    start = args.get("start_date")
+    end = args.get("end_date")
+    if not start or not end:
+        return _err("start_date and end_date are required")
+
+    iter_path = edpa_root / "iterations" / f"{safe_id}.yaml"
+    if iter_path.exists():
+        return _err(f"iteration {safe_id} already exists at {iter_path.name}")
+
+    pi_id = safe_id.rsplit(".", 1)[0] if "." in safe_id else safe_id
+    data: dict = {
+        "iteration": {
+            "id": safe_id,
+            "pi": pi_id,
+            "start_date": start,
+            "end_date": end,
+            "status": "planned",
+        }
+    }
+    if args.get("type"):
+        data["iteration"]["type"] = args["type"]
+
+    _write_yaml_atomic(iter_path, data)
+    logger.info("edpa_iteration_create: id=%s", safe_id)
+    return _ok({
+        "id": safe_id,
+        "path": str(iter_path.relative_to(edpa_root.parent)),
+    })
+
+
+def _handle_iteration_close(edpa_root: Path, args: dict) -> list[TextContent]:
+    raw_id = args.get("id", "")
+    safe_id = _safe_iteration_id(raw_id)
+    if safe_id is None:
+        return _err(f"invalid iteration id {raw_id!r}")
+
+    iter_path = edpa_root / "iterations" / f"{safe_id}.yaml"
+    if not iter_path.exists():
+        return _err(f"iteration {safe_id} not found")
+
+    with open(iter_path, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    iteration = data.get("iteration") or {}
+    if iteration.get("status") == "closed":
+        return _ok({"id": safe_id, "status": "closed", "already_closed": True})
+    iteration["status"] = "closed"
+    data["iteration"] = iteration
+    _write_yaml_atomic(iter_path, data)
+
+    logger.info("edpa_iteration_close: id=%s", safe_id)
+    return _ok({"id": safe_id, "status": "closed"})
+
+
+_PEOPLE_ALLOWED_FIELDS = frozenset({
+    "name", "role", "team", "fte", "capacity",
+    "capacity_per_iteration", "github", "availability", "contract",
+})
+
+
+def _handle_people_upsert(edpa_root: Path, args: dict) -> list[TextContent]:
+    raw_id = args.get("id", "")
+    safe_id = _safe_person_id(raw_id)
+    if safe_id is None:
+        return _err(f"invalid person id {raw_id!r}")
+    fields = {k: v for k, v in args.items() if k != "id" and v is not None}
+    invalid = set(fields) - _PEOPLE_ALLOWED_FIELDS
+    if invalid:
+        return _err(f"fields {sorted(invalid)!r} not allowed for people.yaml")
+
+    people_path = edpa_root / "config" / "people.yaml"
+    if not people_path.exists():
+        return _err(f"{people_path.name} not found")
+
+    with open(people_path, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    people = data.get("people") or []
+    existing = next((p for p in people if p.get("id") == safe_id), None)
+    if existing is not None:
+        existing.update(fields)
+        action = "updated"
+    else:
+        if not fields.get("name"):
+            return _err(f"creating new person {safe_id!r} requires 'name'")
+        people.append({"id": safe_id, **fields})
+        action = "created"
+    data["people"] = people
+    _write_yaml_atomic(people_path, data)
+
+    logger.info("edpa_people_upsert: id=%s action=%s", safe_id, action)
+    return _ok({"id": safe_id, "action": action, "fields": sorted(fields)})
 
 
 # ---------------------------------------------------------------------------
