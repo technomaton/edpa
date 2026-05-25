@@ -2032,6 +2032,18 @@ def resolve_conflicts(github_changes, git_changes, strategy):
     return plan
 
 
+def _detect_remote_modifications(remote_items, last_pull_ts):
+    """Return item IDs whose GitHub updated_at exceeds last_pull."""
+    modified = set()
+    if not last_pull_ts:
+        return modified
+    for item_id, item in remote_items.items():
+        remote_updated = item.get("updated_at", "")
+        if remote_updated and remote_updated > last_pull_ts:
+            modified.add(item_id)
+    return modified
+
+
 def cmd_conflicts(root, sync_config, args):
     """Show items changed in both sources, optionally auto-resolve.
 
@@ -2127,6 +2139,21 @@ def cmd_conflicts(root, sync_config, args):
                 "local": change.get("local_val", ""),
                 "remote": change.get("remote_val", ""),
             })
+        ts_modified = _detect_remote_modifications(remote_items, last_pull)
+        for item_id in ts_modified:
+            if item_id in git_changes or item_id in augmented_ids:
+                continue
+            if item_id not in conflict_ids:
+                augmented_ids.add(item_id)
+                augmented_changes[item_id] = [{
+                    "ts": remote_items[item_id].get("updated_at", ""),
+                    "source": "github",
+                    "action": "field_changed",
+                    "item": item_id,
+                    "field": "(detected via updated_at)",
+                    "old": "",
+                    "new": "(remote modification detected)",
+                }]
     conflict_ids = conflict_ids | augmented_ids
 
     if not conflict_ids:
