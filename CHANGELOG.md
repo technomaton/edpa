@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.22.1 — 2026-05-25
+
+Same-day patch: two sync bugs surfaced by a full end-to-end run against `technomaton/edpa-e2e-test-{ts}` (install → `project_setup` → `backlog add I/E/F/S` → 2× PI cycle → close). Both fixes pinned by new regression tests; full suite 420 passing.
+
+### fix(sync): correct off-by-one in EDPA ID parser (sync push duplicate-create regression)
+
+Commit `5363149` (the 1.22.0 "strict GH-first add" PR) generalized the 2-char prefix check in `map_gh_items_to_edpa` to also accept `D-` and `EV-` by parameterizing `plen` — but wrote `plen = len(prefix) - 1` instead of `plen = len(prefix)`. The dash stayed inside `candidate[plen:]`, so `.isdigit()` always returned `False` and the function silently returned `{}` for every real GH issue.
+
+End-to-end consequence: after `backlog add` (which is GH-first and uses server-assigned issue numbers as the EDPA ID), the very next `sync push` saw `Remote items: 0` and re-created the same 5 items as fresh GH issues #6–#10 — duplicating the project on every push and rewriting `issue_map.yaml` to point at the wrong numbers. The contract that EDPA ID equals `{prefix}-{GH issue #}` was broken.
+
+Fix: drop the `- 1`. `tests/test_sync_id_parser.py` adds 7 cases covering all six supported prefixes (`I-`, `E-`, `F-`, `S-`, `D-`, `EV-`) and edge cases (unprefixed titles, duplicate-ID collision); without the fix 6 of 7 fail.
+
+### fix(sync): preserve local assignee/owner on pull when GH-side is empty
+
+`gh project item-list --format json` does not expose user-picker fields — `assignee` and `owner` always come back empty even when the GH issue has assignees set. Without a guard, `compute_diff` proposed wiping the local `assignee:` value on every pull, so the loop `push → pull` immediately undid the push. The push side is fine: `cmd_push` calls `gh issue edit --add-assignee` and the native GH assignee is set correctly; only the pull-side deserialization is blind.
+
+Fix: extend the existing iteration-empty guard at `compute_diff` to also cover `assignee` and `owner` — empty-remote no longer overwrites non-empty local for these three fields. Real remote values still propagate (pinned by `test_pull_still_applies_remote_assignee_when_remote_has_value`), other fields (status, js, …) still propagate empty values as before.
+
+A richer pull path (GraphQL `ProjectV2ItemFieldUserValue` or `gh issue list --json number,assignees` joined into `remote_items`) is the longer-term fix and would let pull actually mirror manual GH-side reassignments instead of silently ignoring them — tracked as a follow-up. The guard is the conservative choice today: never lose work.
+
+`tests/test_sync_pull_preserves_local.py` adds 6 cases pinning the guarded behaviour and the unchanged status/js behaviour.
+
 ## 1.22.0 — 2026-05-25
 
 Pilot-feedback release: strict GH-first `backlog.py add` (title mirror, sub-issue linking, single ID series), shared GH issue factory, full test+docs sweep, plus housekeeping (Vercel auto-build off, mcp-server date-flake fix, `.lean-ctx/` ignored).
