@@ -589,6 +589,18 @@ def main():
     info(f"Fields: {len(field_ids)}, Options: {len(option_ids)}")
 
     # ═══════════════════════════════════════════════════════════
+    # STEP 3b: Hint — GitHub native timestamp fields (manual)
+    # ═══════════════════════════════════════════════════════════
+    step("3b", "Timestamp Fields (manual)")
+    info("GitHub supports native timestamp fields for Projects.")
+    info("To enable cycle-time and conflict-detection features, manually")
+    info("add these fields via the project's Settings → Fields menu:")
+    info("")
+    info(f"  {C.GREEN}Created{C.RESET}  — when the issue was created")
+    info(f"  {C.GREEN}Closed{C.RESET}   — when the issue was closed")
+    info(f"  {C.GREEN}Updated{C.RESET}  — when the issue was last updated")
+
+    # ═══════════════════════════════════════════════════════════
     # STEP 4: Link project to repo
     # ═══════════════════════════════════════════════════════════
     step(4, "Linking project to repository")
