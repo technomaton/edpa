@@ -17,7 +17,8 @@ Tento dokument je ADR-style log (Architecture Decision Records) pro V2 transici.
 | [ADR-008](#adr-008-hard-cut-release-v-v20) | Hard cut release v V2.0 (vs. deprecation cycle) | Accepted |
 | [ADR-009](#adr-009-with-server-flag-default-off) | `--with-server` flag default OFF | Accepted |
 | [ADR-010](#adr-010-keep-github-field-in-peopleyaml) | Zachovat `github:` field v `people.yaml` (optional) | Accepted |
-| [ADR-011](#adr-011-engine-evidence-via-optional-gh) | Engine evidence via optional `gh` s graceful fallback | Accepted |
+| [ADR-011](#adr-011-engine-evidence-via-optional-gh) | Engine evidence via optional `gh` s graceful fallback | **Superseded by ADR-012** |
+| [ADR-012](#adr-012-platform-specific-ci-materialization-layer) | Platform-specific CI materialization layer | Accepted |
 
 ---
 
@@ -419,45 +420,141 @@ V V2.x (kdy PI server bude canonical, viz [ADR-006](#adr-006)) překlopit na def
 
 **Date:** 2026-05-25
 **Decider:** Jaroslav Urbánek
-**Status:** Accepted
+**Status:** **Superseded by [ADR-012](#adr-012-platform-specific-ci-materialization-layer)** (2026-05-25)
 
-### Context
-Engine (`engine.py`) dnes čte PR review komenty přes `gh` jako CW evidence. Po [ADR-001](#adr-001) ("disconnect from GH") je otázka, zda toto použití `gh` také odstranit, nebo zachovat. Conflict: ADR-001 zakazuje `gh` v EDPA scriptech, ale PR komenty mají reálnou signal hodnotu pro engine.
+> **Důvod nahrazení:** Verifikace ([verification.md § 4.2](../v2/verification.md)) ukázala, že "graceful fallback" znamená ~50-60 % signal loss pro review-heavy teamy bez `gh auth`. ADR-012 nabízí čistší řešení: engine zůstává 100 % lokální, GH-specifické signály se materializují do gitu přes deterministickou CI (GH Action / GitLab CI / Forgejo Action) — žádný fallback potřebný.
 
-### Decision
-**Optional `gh` dependency s graceful fallback.** Zpřesnit jazyk celého V2 plánu.
+### Context (historický)
+Engine (`engine.py`) dnes čte PR review komenty přes `gh` jako CW evidence. Po [ADR-001](#adr-001) ("disconnect from GH") byla otázka, zda toto použití `gh` také odstranit, nebo zachovat. Conflict: ADR-001 zakazoval `gh` v EDPA scriptech, ale PR komenty mají reálnou signal hodnotu pro engine.
+
+### Decision (původní, nyní nahrazená)
+~~Optional `gh` dependency s graceful fallback.~~ ADR-012 řeší totéž čistěji.
 
 ```python
-# engine.py
+# engine.py — PŮVODNÍ návrh (nepoužije se):
 def fetch_pr_evidence(item_id, repo_root):
     if gh_authenticated() and edpa_config.get("evidence", {}).get("use_gh", True):
-        return fetch_via_gh(item_id)         # PR review comments, full signal
-    return fetch_via_git_only(item_id)       # commit messages, diff stats only
+        return fetch_via_gh(item_id)
+    return fetch_via_git_only(item_id)
 ```
 
-**Závazný jazyk pro celý plán:**
-> ❌ ~~"Žádný `gh` v EDPA scriptech."~~
-> ✅ **"Žádný `gh` v sync / ID / project board / setup. Engine evidence smí `gh` použít jako optional read-only enhancement; fallback na čistě git data, pokud `gh` chybí."**
+### Proč nahrazeno
+- "Optional `gh`" znamenalo dual-path engine code (víc test scénářů, víc bugs)
+- Honest framing "runs ≠ runs equally well" byl ústupek místo řešení
+- Verifikace simulací S-200 ukázala konkrétní ztrátu kreditu pro reviewera bez `gh`
+- ADR-012 zachovává plný signál **bez** runtime `gh` dependency engine
+
+### Co z ADR-011 zůstává platné
+- Klíčový rozdíl mezi `gh` pro **coupling** vs. **read-only enrichment** — koncepčně správný
+- Schema `github:` v `people.yaml` ([ADR-010](#adr-010)) — zachováno, používá se v ADR-012 pro mapping GH login → person
+
+**Související:** [ADR-001](#adr-001), [ADR-010](#adr-010), [ADR-012](#adr-012-platform-specific-ci-materialization-layer)
+
+---
+
+## ADR-012: Platform-specific CI materialization layer
+
+**Date:** 2026-05-25
+**Decider:** Jaroslav Urbánek
+**Status:** Accepted (supersedes [ADR-011](#adr-011-engine-evidence-via-optional-gh))
+
+### Context
+[ADR-011](#adr-011) původně přijala "optional `gh` s graceful fallback". Verifikace ukázala dva problémy:
+
+1. **Signal degradace**: review-heavy teamy bez `gh auth` ztrácejí ~50-60 % signálu (viz simulace S-200 — reviewer cw=0.0)
+2. **Engine dual-path**: `if gh else git_only` v engine kódu znamená dvě cesty, dvě test sady, drift bugs
+
+Otázka: existuje varianta, která zachová engine 100 % lokální (jediná cesta kódu), ale neztratí GH-specifické signály?
+
+### Decision
+**Engine je 100 % lokální (čte výhradně z gitu / YAML).** GH-specifické signály (pr_author, pr_reviewer, issue_comment, assignee) jsou **materializované do gitu** deterministickou platform-specific CI (GH Action / GitLab CI / Forgejo Action) na PR lifecycle eventy.
+
+Dvě jasně oddělené vrstvy:
+
+```
+LAYER A: Engine + tools (universal, local-only)
+  └─ engine.py, board.py, MCP server, autocalib, reports
+  └─ Reads: .edpa/ YAML + git log
+  └─ Žádný `gh` nikde, ani jako optional
+
+LAYER B: Platform CI materialization (per-platform, optional)
+  └─ GH Action / GitLab CI / Forgejo Action
+  └─ Triggers: PR opened, review submitted, comment created, PR merged
+  └─ Runs: sync_pr_contributions.py (platform-agnostic Python skript)
+  └─ Output: commit do .edpa/backlog/{type}/{ID}.md s updated contributors[]
+```
+
+Komunikace Layer A ↔ Layer B **jen přes git** (žádné API).
+
+### Klíčové vlastnosti
+
+- **Determinismus**: Skript `sync_pr_contributions.py` je čistě deterministický (event payload → signal type → weight). Žádný LLM, žádné uvažování. Stejný vstup → stejný výstup.
+- **Auth**: CI běží s platform-provided tokenem (`GITHUB_TOKEN` / `CI_JOB_TOKEN`) — žádný setup pro developery, nikdo nepotřebuje `gh auth` lokálně.
+- **Idempotence**: Každý signal event má unique `ref` (review ID, comment ID, …). Opakovaná synchronizace neredupli kuje.
+- **Multi-platform**: stejný Python skript, jen tenký CI wrapper per platform (GH workflow YAML / GitLab YAML / Forgejo Actions YAML).
 
 ### Alternatives considered
-- **Plně odstranit `gh` z engine** ([rejected]) — ztráta signálu (PR review komenty obsahují kvalitu code review, discussion, schválení), engine evidence se zhorší
-- **Always `gh` (no fallback)** ([rejected]) — porušuje offline-first promise, brání projektům bez `gh auth`
-- **Migrate PR komenty do YAML** ([rejected]) — replikuje sync architekturu, kterou se snažíme odstranit
+
+- **ADR-011 graceful fallback** ([superseded]) — degraded signal, dual-path code
+- **Pre-push hook calling `gh` lokálně** ([rejected]) — coupling do developer machine, vyžaduje `gh auth` pro každého contributora, blokuje push o ~1-2s
+- **LLM-driven skill `edpa:sync-pr`** ([rejected]) — non-determinism, drahé tokens, nedostupné v offline / CI prostředí
+- **Embed PR data do YAML body při create** ([rejected]) — neřeší post-create review/comment evidence
+- **Status quo (`gh` v engine)** ([rejected per ADR-001]) — runtime coupling
 
 ### Consequences
 
 **Pozitivní:**
-- Engine evidence si zachovává plný signál pro projekty s `gh`
-- Projekty bez `gh` (solo dev, offline, jiný git host) fungují s sníženým signálem ale nezalomeny
-- Offline-first promise zachována (engine pravidelně neběží na critical path)
+- Engine je opravdu 100 % lokální — žádný runtime decision tree, jediná cesta kódu
+- Žádný `gh auth` setup pro developery (CI má vlastní token)
+- Per-platform replikace triviální (GitLab/Forgejo dostanou stejný skript + thin wrapper)
+- Audit trail v gitu (evidence commits jsou trvalý záznam)
+- DR-friendly: ztratíš GH, evidence v gitu zůstává
+- ADR-001 "disconnect from GH" je nyní **literál** (žádný gh v engine path), ne metaforický
+- Honest framing odstraněn: V2 + CI = "runs identically as V1", ne "runs ≠ runs equally well"
 
 **Negativní:**
-- Jazyk "žádný `gh`" v plánu musel být zpřesněn — zvýšená nuance pro čtenáře
-- Engine má dvě cesty kódu (gh / git-only), víc test scénářů
+- Vyžaduje CI infrastrukturu (projekty s self-hosted gitem bez Actions mají pořád redukovaný signál, ale konzistentní per-team policy)
+- Commit pollution potential — Action může vkládat commits do PR historie (mitigace: `mode: merge-only` defaultně, opt-in `mode: live`)
+- Race conditions mezi Action commitem a developer pushem (mitigace: Action retry s `git pull --rebase`)
+- Action permissions `contents: write` může být restricted v některých orgs (mitigace: deploy key / PAT fallback)
 
-**Klíčový rozdíl:** `gh` pro **identitu a coupling** = pryč (to byl problém). `gh` pro **read-only enrichment** = optional (užitečné, neničí offline-first).
+### Implementační skica
 
-**Související:** [ADR-001](#adr-001), [ADR-010](#adr-010)
+**Komponenty:**
+
+1. **`plugin/edpa/scripts/sync_pr_contributions.py`** (vendored přes `install.sh` do `.claude/edpa/scripts/`)
+   - Platform-agnostic Python skript
+   - Vstupy: PR number, event type, event payload JSON path, platform adapter (`gh` / `glab` / `tea`)
+   - Identifikuje items dotčené PR (regex + body parsing + modified files)
+   - Mapuje event → signal type + weight (z `cw_heuristics.yaml`)
+   - Dedupe přes `signals[].ref`
+   - Aktualizuje YAML
+
+2. **`.github/workflows/edpa-contribution-sync.yml`** (templated do user's projektu při `edpa-setup`)
+   - Triggers: `pull_request`, `pull_request_review`, `issue_comment`
+   - Permissions: `contents: write`, `pull-requests: read`
+   - Skipuje fork PRs (bezpečnost)
+   - Commit-and-push pokud došlo ke změnám
+
+3. **Multi-platform variants** (V2.x):
+   - `.gitlab-ci.yml` job pro GitLab
+   - `.forgejo/workflows/edpa-contribution-sync.yml` pro Forgejo
+
+**Item resolution priority** (jak Action určí, ke kterým EDPA items PR patří):
+1. PR title regex: `STO-\d+`, `EPI-\d+`, …
+2. PR body: `Closes STO-79`, `Refs STO-42, STO-43`
+3. Modified files: PR mění `.edpa/backlog/stories/STO-79.md`
+4. Branch name: `feature/STO-79-...`
+
+Kombinovat, dedupe per signal event.
+
+### Co se MĚNÍ vs. původní V2 plán
+
+- `detect_contributors.py` se zjednoduší na **čistě git-native** (commit_author z git logu, yaml_edit_signals delegace, transitions, manual:commit_message). Žádný `gh` call. Dříve navrhovaný "gh-optional refactor s fallbackem" se nepoužije.
+- `evidence.use_gh` v `edpa.yaml` schema → **odstraněno**. Engine nezná pojem "evidence source" — vždy čte z YAML.
+- Pre-push hook se NEzměnil — pořád jen ID validation. Materializace evidence není jeho úkol.
+
+**Související:** [ADR-001](#adr-001), [ADR-010](#adr-010), [ADR-011 (superseded)](#adr-011-engine-evidence-via-optional-gh)
 
 ---
 

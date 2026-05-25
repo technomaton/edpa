@@ -317,10 +317,10 @@ V V2.0: **Drop**. Discussion se přesouvá do PR review commentů nebo externí 
 - `plugin/edpa/scripts/backlog.py` — `cmd_add` přestane volat `_gh_issue_factory`, volá `id_counter.next()` + zapíše YAML přímo
 - `plugin/edpa/scripts/project_setup.py` — osekat z ~1050 na ~150 ř., zachovat jen init `.edpa/` struktury
 - `plugin/edpa/scripts/engine.py` — timestamps via `_git_timestamps.py` místo GH metadat
-- `plugin/edpa/scripts/detect_contributors.py` — **refactor na gh-optional** (viz [verification.md § Finding 7.1](./verification.md#finding-71-detect_contributorspy-do-critical-files--modifikace)): `if gh_authenticated() and config.evidence.use_gh: full pipeline else: git_only_fallback()` + stderr warning. V git-only fallbacku zachovat `commit_author`, `manual:commit_message`, delegovat na `yaml_edit_signals.py` a `transitions.py`. **CRITICAL**: bez tohoto refactoru engine v V2 bez `gh auth` crashne nebo produkuje degradované cw bez warningu.
-- `plugin/edpa/scripts/autocalibrate.py` — detekuje mode (`gh_authenticated()`), v "no-gh" profilu vynechá zkoumání GH-only signal weights (viz [verification.md § Finding 7.3](./verification.md#finding-73-autocalib-mode-detection))
+- `plugin/edpa/scripts/detect_contributors.py` — **refactor na čistě git-native** (per [ADR-012](./decisions.md#adr-012-platform-specific-ci-materialization-layer)): odstranit všechny `gh` calls. Zachovat `commit_author` (z git logu), `manual:commit_message` (parse commit msg), delegovat na `yaml_edit_signals.py` a `transitions.py`. GH-specifické signály (`pr_author`, `pr_reviewer`, `issue_comment`, `assignee`) přicházejí přes CI materialization layer (`sync_pr_contributions.py`) — žádný runtime `gh` call.
+- `plugin/edpa/scripts/autocalibrate.py` — beze změny v V2.0 (Monte Carlo nad weights funguje; projekty bez CI mají degradovaný signál jako známé omezení, viz [verification.md](./verification.md))
 - `plugin/edpa/scripts/_md_frontmatter.py` — beze změny (už dnes generic)
-- `plugin/skills/edpa-setup/SKILL.md` — vystřihnout GH provisioning sekce, přidat `evidence:` blok do default `edpa.yaml`
+- `plugin/skills/edpa-setup/SKILL.md` — vystřihnout GH provisioning sekce; přidat templating `.github/workflows/edpa-contribution-sync.yml` pro GH-hosted projekty (auto-detect z `git remote get-url`)
 - `plugin/skills/edpa-add/SKILL.md` — přepsat na "MCP-first, local counter"
 
 **Nové:**
@@ -328,9 +328,11 @@ V V2.0: **Drop**. Discussion se přesouvá do PR review commentů nebo externí 
 - `plugin/edpa/scripts/_git_timestamps.py` — timestamps z git logu
 - `plugin/edpa/scripts/validate_ids.py` — sdílená validace pro pre-commit + pre-push (`--staged`, `--pre-push`)
 - `plugin/edpa/scripts/renumber_collisions.py` — semi-auto resolution kolizí
+- `plugin/edpa/scripts/sync_pr_contributions.py` — **platform-agnostic Python skript** pro CI materialization layer (per [ADR-012](./decisions.md#adr-012-platform-specific-ci-materialization-layer)): pulluje PR event data, identifikuje EDPA items, computuje signály deterministicky, dedupe přes `signals[].ref`, zapisuje YAML
 - `plugin/edpa/scripts/migrate_v1_to_v2.py` — viz Migrace níže
 - `plugin/edpa/hooks/pre-commit` — shell wrapper, instalován symlinkem do `.git/hooks/`
 - `plugin/edpa/hooks/pre-push` — shell wrapper, instalován symlinkem do `.git/hooks/`
+- `plugin/edpa/templates/github-workflows/edpa-contribution-sync.yml` — GH Action template, kopírován do user's `.github/workflows/` při `edpa-setup` (jen pro GH-hosted projekty)
 - `plugin/skills/edpa-server/SKILL.md` + `plugin/commands/server.md` — start/stop PI server
 
 **Smazat:**
@@ -348,6 +350,7 @@ V V2.0: **Drop**. Discussion se přesouvá do PR review commentů nebo externí 
 - `tests/test_validate_ids.py` (NEW) — pre-commit + pre-push scénáře (staged duplicit, upstream collision, counter monotonie)
 - `tests/test_renumber_collisions.py` (NEW) — auto-resolution s parent: ref propagation
 - `tests/test_git_timestamps.py` (NEW) — created/updated/closed extraction z fixture repos
+- `tests/test_sync_pr_contributions.py` (NEW) — determinism (same event → same YAML diff), idempotence (re-run = no-op), item resolution priority (title/body/files/branch), dedupe via `signals[].ref`
 - `tests/test_migrate_v1_to_v2.py` (NEW) — round-trip migrace na sandbox repu
 
 ## Release strategie
@@ -360,7 +363,7 @@ V V2.0: **Drop**. Discussion se přesouvá do PR review commentů nebo externí 
    - Krok 2: Refactor `edpa-add` skill na MCP write tools (`backlog.py` stále má GH cesty, dual mode)
    - Krok 3: Implementovat `id_counter.py` (s file lockem) + `_git_timestamps.py`
    - Krok 4: Implementovat `validate_ids.py` + `renumber_collisions.py` + git hooks; `install.sh` instaluje hooks symlinkem do `.git/hooks/`
-   - Krok 4.5: Refactor `detect_contributors.py` na gh-optional (graceful fallback, stderr warning) + `evidence.use_gh` v `edpa.yaml` schema (viz Decisions Q3). **Prerequisite k testování engine v no-gh režimu.**
+   - Krok 4.5: **CI materialization layer** (per [ADR-012](./decisions.md#adr-012-platform-specific-ci-materialization-layer)) — implementovat `sync_pr_contributions.py` (platform-agnostic) + `.github/workflows/edpa-contribution-sync.yml` template. Refactor `detect_contributors.py` na čistě git-native (odstranění `gh` calls). Engine teď čte jen YAML; GH signály přicházejí přes CI commits.
    - Krok 5: Migration skript (viz níže) + E2E test na sandboxu
    - **Gate 5→6:** Migration MUSÍ projít na sandboxu + minimálně 1 reálném projektu před krokem 6 (viz [verification.md § Finding 7.5](./verification.md#finding-75-migration-test-prerequisite)). Pokud migrace neprojde, zastavit V2.0 release a opravit.
    - Krok 6: Smazat GH kód (`sync.py`, `_gh_*`, skills) — **breaking change**
@@ -409,7 +412,11 @@ Po implementaci ověřit:
 10. **PI server roundtrip** (pokud zapnuto): `edpa-server start` → `curl localhost:3001/api/backlog` vrátí JSON identický s `mcp_server` výstupem
 11. **Migration na sandbox**: spustit `migrate_v1_to_v2.py` na E2E sandbox repu, ověřit, že timestamps sedí, counter je správně seedovaný, hooks instalované
 12. **Test suite**: `pytest tests/` — všechny green, vč. nových `test_id_counter.py`, `test_validate_ids.py`, `test_renumber_collisions.py`, `test_git_timestamps.py`, `test_migrate_v1_to_v2.py`
-13. **No-gh fallback E2E** (viz [verification.md § Finding 7.4](./verification.md#finding-74-verification-section-v-planmd--chybí-no-gh-test)): na sandbox repu odhlásit `gh auth logout`, spustit `edpa-close-iteration` → engine produkuje cw bez crashe, warning na stderr, contributors[] obsahuje jen git-native signal typy (commit_author, manual:commit_message, yaml_edit:*, gate_events). Resulting reports mají flag `evidence: git-only`. Cross-check, že workflow s `gh auth login` zpět produkuje **stejné** cw jako před logout (tj. fallback je deterministický bypass, ne destruktivní change).
+13. **CI materialization E2E** (per [ADR-012](./decisions.md#adr-012-platform-specific-ci-materialization-layer)):
+    - **(a) Engine fully local check:** `rg -n '\bgh\s' plugin/edpa/scripts/{engine,detect_contributors,mcp_server}.py` vrátí 0 hits. Engine literálně neumí volat `gh`.
+    - **(b) CI materialization end-to-end:** na sandbox repu vytvořit PR mentioning STO-X, simulovat review event (`gh pr review`), ověřit, že GH Action commits do PR branch s updated contributors[] obsahujícím `pr_reviewer` signal. Re-trigger Action 2× → no duplicit commits (idempotence přes `signals[].ref`).
+    - **(c) Determinism:** spustit `sync_pr_contributions.py` 2× se stejným event payload → stejný YAML diff (cross-platform shell hash).
+    - **(d) Bare git fallback:** na sandbox repu bez CI (žádný `.github/workflows/`), provést PR + review + merge ručně. Engine produkuje cw bez crashe, contributors[] obsahuje jen git-native signaly (commit_author, yaml_edit:*, gate_events, manual:commit_message). Žádný error, žádný warning — to je dokumentovaná known limitation pro projekty bez CI, ne run-time bug.
 
 ## Co se ztrácí (vědomě)
 
@@ -487,39 +494,49 @@ Proč: V2.0 explicitně říká, že PI tool je komplement, ne canonical. Větš
   github: jurby           # optional — pro engine PR evidence + budoucí integrace
 ```
 
-Proč: engine evidence z PR (viz Q3) potřebuje mapping GH author → person. Náklad zachování = 1 optional field. Deprecation by byla symbolická, ne praktická. Pro projekty bez `gh` zůstává prázdné.
+Proč: `github:` login slouží jako mapping GH author → person pro CI materialization layer (per [ADR-012](./decisions.md#adr-012-platform-specific-ci-materialization-layer)). Náklad zachování = 1 optional field. Pro projekty mimo GH zůstává prázdné nebo se použije platform-specific equivalent (`gitlab:`, `forgejo:`).
 
-### Q3: Engine evidence z `gh` — fully local nebo optional dependency?
+### Q3: Engine evidence — jak řešit GH-specifické signály bez runtime gh dependency?
 
-**Rozhodnutí:** **Optional `gh` dependency s graceful fallback.** Jazyk "žádný `gh`" upřesněn na scope sync/ID/board/setup.
+**Rozhodnutí:** **CI materialization layer** (viz [ADR-012](./decisions.md#adr-012-platform-specific-ci-materialization-layer)). Žádný `gh` v engine. Žádný fallback. Engine je vždy 100 % lokální.
 
-**Schema v `edpa.yaml`** (V2 přidává):
-```yaml
-evidence:
-  use_gh: true            # auto-detect z gh auth; override na false pro forced git-only
-  warn_on_fallback: true  # emit stderr warning, když gh chybí a fallback aktivován
+> **Note:** Předchozí návrh (Q3 v dřívější verzi: "optional `gh` s graceful fallback") je superseded. Důvod: verifikace ukázala ~50-60 % signal loss pro review-heavy teamy. Materializace přes CI je čistší.
+
+**Architektura:**
+
+```
+PR events (opened, review submitted, comment, merged)
+       │
+       ▼
+GH Action (.github/workflows/edpa-contribution-sync.yml)
+       │
+       ▼
+sync_pr_contributions.py (deterministic Python skript)
+       │  - Identifies EDPA items (PR title/body/files/branch)
+       │  - Maps event type → signal type → weight (z cw_heuristics.yaml)
+       │  - Dedupe via signals[].ref
+       ▼
+Commit do .edpa/backlog/{type}/{ID}.md
+       │
+       ▼
+Engine reads YAML (žádný gh call)
 ```
 
-Default `use_gh: true` — většina uživatelů má `gh auth` setup. CI / no-auth scénáře mohou nastavit `false`.
-
-**Pipeline v `detect_contributors.py`** (viz Critical files):
-```python
-def collect_signals(repo, item_id):
-    if gh_authenticated() and config.evidence.use_gh:
-        return full_pipeline_with_gh(repo, item_id)
-    if config.evidence.warn_on_fallback:
-        sys.stderr.write("⚠️  Reduced signal — gh not available, falling back to git-only evidence\n")
-    return git_only_fallback(repo, item_id)
-```
+**Klíčové vlastnosti:**
+- **Engine je 100 % lokální** — jediná cesta kódu, žádný `if gh else`
+- **Deterministické** — žádný LLM, žádné uvažování, stejný event → stejný YAML diff
+- **Per-platform replikovatelné** — stejný Python skript + thin CI wrapper (GH workflow YAML → GitLab CI → Forgejo Actions)
+- **Žádný `gh auth` setup** pro developery — CI má vlastní token
 
 **Závazný jazyk pro celý plán a docs:**
 
-> ❌ ~~"Žádný `gh` v EDPA scriptech."~~
-> ✅ **"Žádný `gh` v sync / ID / project board / setup. Engine evidence smí `gh` použít jako optional read-only enhancement; fallback na čistě git data, pokud `gh` chybí."**
+> ✅ **"Engine je 100 % lokální (čte výhradně git + YAML). Platform-specific signály (PR review, comment, assignee) se materializují do gitu přes CI workflow — tato cesta je optional pro projekty bez CI infrastructure, ale doporučená pro plný signal."**
 
-Klíčový rozdíl: `gh` pro **identitu a coupling** = pryč (to byl problém). `gh` pro **read-only enrichment** = optional (užitečné, neničí offline-first promise).
+Klíčové oproti ADR-011: žádné dual-path engine, žádný honest framing typu "offline ≠ runs equally well". Engine sám se nestará o evidence sources — čte to, co je v YAML. Co tam je, závisí na CI setup (full signal s CI / redukovaný bez CI).
 
-**Důležité:** Pro tým s formálním PR review workflow je `gh auth` **strongly recommended** — bez něj se ztratí ~50-60 % signal kvality pro review-heavy roles (viz [verification.md § 4.2](./verification.md#42-v2-bez-gh-offline--no-auth)). V2 "offline" znamená "runs", ne "runs equally well".
+**Pro projekty bez CI** (self-hosted git bez Actions, lokální git serverz):
+- Pořád funguje, ale signál redukovaný (jen `commit_author`, `yaml_edit:*`, `transitions`, `manual:commit_message`)
+- Pro tým s review-heavy workflow lze doporučit: nastavit jakoukoliv CI (GitHub Actions free tier, GitLab CI free, self-hosted Forgejo Actions) a vendorovat `sync_pr_contributions.py`
 
 ## Open questions (zbývající)
 
@@ -533,7 +550,7 @@ Klíčový rozdíl: `gh` pro **identitu a coupling** = pryč (to byl problém). 
 ## Reference
 
 - **Concept overview:** [concept.md](./concept.md)
-- **Architecture Decision Records:** [decisions.md](./decisions.md) — proč jsme zvolili, co jsme zvolili (11 ADRs)
+- **Architecture Decision Records:** [decisions.md](./decisions.md) — proč jsme zvolili, co jsme zvolili (12 ADRs)
 - **Stávající MCP server docs:** [../mcp.md](../mcp.md)
 - **Předchozí migration doc (V1.x):** [../migration-v2.md](../migration-v2.md) (zachovat jako historický odkaz)
 - **PI planning tool:** `tools/pi-planning/`
