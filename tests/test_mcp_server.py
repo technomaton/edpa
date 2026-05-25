@@ -73,7 +73,13 @@ def test_find_edpa_root_missing(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_handle_status():
-    """Returns correct project name, PI, team size, capacity, active iteration."""
+    """Returns correct project name, PI, team size, capacity, active iteration.
+
+    Iteration dates are read from .edpa/iterations/PI-2026-1.4.yaml — if
+    that file's start/end dates change (e.g. when the cadence is
+    reshuffled), update the asserts below to match. The 1-week-iteration
+    schedule of PI-2026-1 was set in commit 0417727 (5×1 week instead of
+    the original 2×2 weeks)."""
     data = parse_result(_handle_status(EDPA_ROOT))
 
     assert data["project"] == "Medical Platform & Datovy e-shop"
@@ -81,8 +87,8 @@ def test_handle_status():
     assert data["team_size"] == 9
     assert data["total_capacity_per_iteration"] == 400
     assert data["active_iteration"] == "PI-2026-1.4"
-    assert data["active_iteration_start"] == "2026-05-18"
-    assert data["active_iteration_end"] == "2026-05-29"
+    assert data["active_iteration_start"] == "2026-04-27"
+    assert data["active_iteration_end"] == "2026-05-01"
     assert data["iterations_total"] == 5
     assert data["iterations_closed"] == 3
     assert "cadence" in data
@@ -107,7 +113,10 @@ def test_handle_status_missing_config(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_handle_iterations_all():
-    """Returns all 5 iterations."""
+    """Returns all 5 iterations of the active PI.
+
+    end_date for iteration 1 reflects the 1-week cadence (commit
+    0417727 changed PI-2026-1 from 2×2 weeks to 5×1 week)."""
     data = parse_result(_handle_iterations(EDPA_ROOT, None))
     iters = data["iterations"]
     assert len(iters) == 5
@@ -116,7 +125,7 @@ def test_handle_iterations_all():
     assert "PI-2026-1.5" in ids
     # ISO date fields replace the legacy "dates" string.
     assert iters[0]["start_date"] == "2026-04-06"
-    assert iters[0]["end_date"] == "2026-04-17"
+    assert iters[0]["end_date"] == "2026-04-10"
 
 
 def test_handle_iterations_filter_active():
