@@ -20,8 +20,10 @@ import json
 import logging
 import os
 import re
+import statistics
 import sys
 from collections import OrderedDict
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:
@@ -290,6 +292,29 @@ async def list_tools() -> list[Tool]:
                          "or use the /edpa:sync-people skill."),
             inputSchema={"type": "object", "properties": {}, "additionalProperties": False},
         ),
+        Tool(
+            name="edpa_flow_metrics",
+            description=(
+                "Compute flow metrics: cycle time, lead time, throughput, and "
+                "average age of open items. Requires timestamp data from a prior "
+                "sync pull."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "iteration": {
+                        "type": "string",
+                        "description": "Filter by iteration ID (e.g., PI-2026-1.3).",
+                    },
+                    "level": {
+                        "type": "string",
+                        "description": "Filter by item level.",
+                        "enum": ["Story", "Feature", "Epic", "Initiative"],
+                    },
+                },
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -325,6 +350,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_validate(edpa_root)
         elif name == "edpa_sync_people":
             return _handle_sync_people(edpa_root)
+        elif name == "edpa_flow_metrics":
+            return _handle_flow_metrics(
+                edpa_root,
+                arguments.get("iteration"),
+                arguments.get("level"),
+            )
         logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception:
@@ -534,7 +565,7 @@ def _handle_backlog(edpa_root: Path, iteration: str | None, type_filter: str | N
             if status_filter and (data.get("status", "").lower() != status_filter.lower()):
                 continue
 
-            items.append({
+            entry = {
                 "id": data.get("id", md_file.stem),
                 "type": data.get("type", level),
                 "title": data.get("title", ""),
@@ -543,7 +574,12 @@ def _handle_backlog(edpa_root: Path, iteration: str | None, type_filter: str | N
                 "iteration": data.get("iteration", ""),
                 "assignee": data.get("assignee") or data.get("owner", ""),
                 "parent": data.get("parent", ""),
-            })
+            }
+            for ts_field in ("created_at", "closed_at", "updated_at"):
+                ts_val = data.get(ts_field)
+                if ts_val is not None:
+                    entry[ts_field] = str(ts_val)
+            items.append(entry)
 
     return [TextContent(type="text", text=json.dumps(items, indent=2, ensure_ascii=False))]
 
@@ -571,6 +607,142 @@ def _handle_item(edpa_root: Path, item_id: str) -> list[TextContent]:
                 return [TextContent(type="text", text=json.dumps(data, indent=2, ensure_ascii=False, default=str))]
 
     return [TextContent(type="text", text=f"ERROR: Item {item_id} not found in backlog.")]
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    """Parse an ISO-8601 timestamp string into a timezone-aware datetime.
+
+    Handles ``Z`` suffix (GitHub convention), explicit ``+00:00`` offsets,
+    bare ISO strings (treated as UTC), and ``datetime.date`` objects from
+    YAML parsing. Returns ``None`` for anything unparseable.
+    """
+    if value is None:
+        return None
+    # YAML may parse a bare date (2026-05-01) as a datetime.date object.
+    from datetime import date as _date
+    if isinstance(value, _date) and not isinstance(value, datetime):
+        return datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+    s = str(value).strip()
+    if not s:
+        return None
+    # Normalise Z → +00:00 for fromisoformat (Python < 3.11 compat)
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError):
+        return None
+
+
+def _handle_flow_metrics(
+    edpa_root: Path,
+    iteration: str | None,
+    level: str | None,
+) -> list[TextContent]:
+    """Compute cycle time, open-item age, and throughput from timestamp data."""
+    backlog_dir = edpa_root / "backlog"
+    if not backlog_dir.exists():
+        return [TextContent(type="text", text=json.dumps(
+            {"error": "No backlog directory found."}, indent=2))]
+
+    type_dirs = {
+        "stories": "Story",
+        "features": "Feature",
+        "epics": "Epic",
+        "initiatives": "Initiative",
+    }
+
+    now = datetime.now(timezone.utc)
+    cycle_times: list[float] = []
+    open_ages: list[float] = []
+    done_items: list[dict] = []
+    open_items: list[dict] = []
+    skipped = 0
+
+    for dir_name, item_level in type_dirs.items():
+        type_dir = backlog_dir / dir_name
+        if not type_dir.exists():
+            continue
+        if level and item_level != level:
+            continue
+
+        for md_file in sorted(type_dir.glob("*.md")):
+            data = load_yaml(md_file)
+            if not data or not isinstance(data, dict):
+                continue
+            if iteration and data.get("iteration") != iteration:
+                continue
+
+            item_id = data.get("id", md_file.stem)
+            title = data.get("title", "")
+            status = (data.get("status") or "").strip()
+            is_done = status.lower() == "done"
+
+            created = _parse_timestamp(data.get("created_at"))
+            closed = _parse_timestamp(data.get("closed_at"))
+
+            if is_done:
+                if created and closed:
+                    ct = max((closed - created).total_seconds() / 86400.0, 0.0)
+                    cycle_times.append(ct)
+                    done_items.append({
+                        "id": item_id, "title": title, "status": status,
+                        "cycle_time_days": round(ct, 2),
+                    })
+                else:
+                    skipped += 1
+                    done_items.append({
+                        "id": item_id, "title": title, "status": status,
+                        "cycle_time_days": None,
+                    })
+            else:
+                if created:
+                    age = max((now - created).total_seconds() / 86400.0, 0.0)
+                    open_ages.append(age)
+                    open_items.append({
+                        "id": item_id, "title": title, "status": status,
+                        "age_days": round(age, 2),
+                    })
+                else:
+                    skipped += 1
+                    open_items.append({
+                        "id": item_id, "title": title, "status": status,
+                        "age_days": None,
+                    })
+
+    def _stats(values: list[float]) -> dict:
+        if not values:
+            return {"min": None, "max": None, "avg": None, "median": None,
+                    "p90": None, "count": 0}
+        s = sorted(values)
+        p90_idx = int(len(s) * 0.9)
+        p90_idx = min(p90_idx, len(s) - 1)
+        return {
+            "min": round(s[0], 2),
+            "max": round(s[-1], 2),
+            "avg": round(statistics.mean(s), 2),
+            "median": round(statistics.median(s), 2),
+            "p90": round(s[p90_idx], 2),
+            "count": len(s),
+        }
+
+    payload = {
+        "cycle_time": _stats(cycle_times),
+        "open_items_age": _stats(open_ages),
+        "throughput": {
+            "total_done": len(done_items),
+            "total_open": len(open_items),
+            "total_items": len(done_items) + len(open_items),
+        },
+        "items_detail": done_items + open_items,
+        "skipped_no_timestamps": skipped,
+    }
+    return [TextContent(type="text", text=json.dumps(payload, indent=2, ensure_ascii=False))]
 
 
 # ---------------------------------------------------------------------------
