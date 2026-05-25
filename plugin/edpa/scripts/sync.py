@@ -1021,11 +1021,15 @@ def compute_diff(local_items, remote_items):
             elif str(local_val) == str(remote_val):
                 continue
 
-            # Optional fields not yet present on GH should not wipe local
-            # values. Iteration is created lazily during setup; without this
-            # guard, every pull would clear local iteration tags whenever the
-            # GH field is missing.
-            if field == "iteration" and not remote_val and local_val:
+            # Fields whose remote value is not exposed by `gh project
+            # item-list --format json` (iteration when its single-select
+            # option isn't created yet; assignee/owner because the CLI
+            # surface omits user-picker values entirely) must not wipe
+            # the local value when remote reads back as empty. Push side
+            # still writes them via `gh issue edit --add-assignee`
+            # (assignee/owner) and `gh_set_field_value` (iteration), so
+            # this guard only affects the pull direction.
+            if field in ("iteration", "assignee", "owner") and not remote_val and local_val:
                 continue
 
             changes.append({
