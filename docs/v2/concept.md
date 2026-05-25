@@ -3,6 +3,7 @@
 > **Status:** Návrh, čeká na schválení.
 > **Detailní plán:** [plan.md](./plan.md)
 > **Architecture Decision Records:** [decisions.md](./decisions.md)
+> **Verification (signal analysis + simulace):** [verification.md](./verification.md)
 
 ## TL;DR
 
@@ -97,13 +98,15 @@ v1.x  ──┐
         │
         └──► main: pokračuje V2 vývojem
                 │
-                ├─ Krok 1: přidat MCP write tools (bez odstranění čehokoliv)
-                ├─ Krok 2: refactor edpa-add na MCP
-                ├─ Krok 3: id_counter.py (+ file lock) + _git_timestamps.py
-                ├─ Krok 4: validate_ids.py + renumber_collisions.py + git hooks
-                ├─ Krok 5: migrate_v1_to_v2.py skript
-                ├─ Krok 6: smazat GH kód (BREAKING)
-                ├─ Krok 7: edpa-server skill (optional)
+                ├─ Krok 1:  přidat MCP write tools (bez odstranění čehokoliv)
+                ├─ Krok 2:  refactor edpa-add na MCP
+                ├─ Krok 3:  id_counter.py (+ file lock) + _git_timestamps.py
+                ├─ Krok 4:  validate_ids.py + renumber_collisions.py + git hooks
+                ├─ Krok 4.5: detect_contributors.py gh-optional refactor + evidence.use_gh schema
+                ├─ Krok 5:  migrate_v1_to_v2.py + E2E test na sandboxu
+                │   ├── Gate: migrace MUSÍ projít před krokem 6 ──┐
+                ├─ Krok 6:  smazat GH kód (BREAKING) ◀────────────┘
+                ├─ Krok 7:  edpa-server skill (optional)
                 └─ Release V2.0 + CHANGELOG s migration steps
 ```
 
