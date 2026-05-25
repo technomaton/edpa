@@ -89,12 +89,28 @@ python3 .claude/edpa/scripts/sync.py status
 
 Shows last sync timestamp, number of local/remote changes, conflict count.
 
+## Timestamp fields
+
+During pull, the sync engine auto-populates three read-only frontmatter fields on each item:
+
+| Field | Source | Description |
+|-------|--------|-------------|
+| `created_at` | GitHub Issue `createdAt` | When the item was first created |
+| `closed_at` | GitHub Issue `closedAt` | When the item was closed (null if open) |
+| `updated_at` | GitHub Issue `updatedAt` | Last modification timestamp on the GitHub side |
+
+These fields are **read-only** in the local YAML. Manual edits are overwritten on the next pull. They power `edpa_flow_metrics` (cycle time, throughput, open-item age) and timestamp-based conflict detection.
+
 ## Conflict handling
 
 When both local and remote changed the same field:
 1. Show conflict to user with both values
 2. Ask user to choose: local, remote, or manual merge
 3. Log resolution in `.edpa/changelog.jsonl`
+
+### Timestamp-based conflict detection
+
+In addition to field-level diffing, sync compares each item's `updated_at` timestamp against the value stored from the last pull. If `updated_at` on GitHub is newer than the stored value and the local YAML also has uncommitted changes to the same item, sync flags a conflict — this catches direct GitHub UI edits that would otherwise be silently overwritten by a push.
 
 ## Error handling
 

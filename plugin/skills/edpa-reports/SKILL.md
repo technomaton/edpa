@@ -123,6 +123,10 @@ import openpyxl
 # Create workbook with sheets: Summary, Per-Person, Per-Item, Validation
 ```
 
+## Flow metrics
+
+For lightweight analytics without a full engine run, use the `edpa_flow_metrics` MCP tool. It computes cycle time (median days from `created_at` to `closed_at`), throughput (items closed per week), and open-item age from the timestamp fields populated by sync. No `edpa_results.json` required — it reads backlog YAML directly.
+
 ## Error handling
 
 - Missing edpa_results.json → "Run edpa-engine for {iteration} first."
