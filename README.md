@@ -2,7 +2,7 @@
 
 **Derive hours from Git evidence. No timesheets.**
 
-[![EDPA](https://img.shields.io/badge/EDPA-1.22.1-34d399)](docs/methodology.md)
+[![EDPA](https://img.shields.io/badge/EDPA-1.23.0-34d399)](docs/methodology.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/Made_for-GitHub-181717?logo=github)](https://github.com)
 
@@ -29,7 +29,7 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 ```
 $ python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
 
-EDPA 1.22.1 — Iteration PI-2026-1.3
+EDPA 1.23.0 — Iteration PI-2026-1.3
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -53,7 +53,8 @@ All invariants passed: YES
 - **Zero manual input** — hours derived from GitHub delivery evidence (commits, PRs, reviews, comments)
 - **Mathematical guarantee** — derived hours always sum to declared capacity
 - **Gates mode (default)** — credits each Initiative/Epic/Feature status transition as a mini-deliverable, so prep work (LBC, decomposition, design) gets credited as it happens, not only at final Done. Validated to ±0.35 pp stability under ±20 % CW perturbation across 100 Monte Carlo runs.
-- **Bidirectional GitHub Projects sync** — `sync push` creates issues with custom fields, `sync pull` mirrors GH UI changes back into local YAML; conflict auto-resolution with `last-write-wins` / `local-wins` / `remote-wins` strategies.
+- **Bidirectional GitHub Projects sync** — `sync push` creates issues with custom fields, `sync pull` mirrors GH UI changes back into local YAML (including `created_at`, `closed_at`, `updated_at` timestamps); conflict auto-resolution with `last-write-wins` / `local-wins` / `remote-wins` strategies; timestamp-based detection of direct GitHub UI edits.
+- **Flow metrics** — `edpa_flow_metrics` MCP tool computes cycle time, throughput, and open item age from synced timestamps, filterable by iteration and level.
 - **Dual-view** — per-person timesheets AND per-item cost allocation from the same data
 - **Audit-grade** — frozen snapshots, immutable records, BankID signing support
 - **Self-tuning** — auto-calibrates heuristics using Karpathy's autoresearch loop
@@ -84,7 +85,7 @@ EDPA Installer
   mcp (MCP SDK) ✓
   openpyxl ✓
   ...
-EDPA 1.22.1 installed successfully!
+EDPA 1.23.0 installed successfully!
 ```
 
 Three config files were seeded from templates:
@@ -125,7 +126,7 @@ python3 .claude/edpa/scripts/engine.py --status
 ```
 
 ```
-EDPA 1.22.1 — Status
+EDPA 1.23.0 — Status
 ========================================
 ✓ .edpa/ found at .edpa
 ✓ people.yaml — 2 members, 1.5 FTE, 60h/iteration
@@ -193,7 +194,7 @@ python3 .claude/edpa/scripts/engine.py \
 
 ```
 ======================================================================
-EDPA 1.22.1 — Iteration PI-2026-1.1
+EDPA 1.23.0 — Iteration PI-2026-1.1
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -408,7 +409,7 @@ cp -r .claude/skills/* ~/.gemini/skills/
 
 | Document | Description |
 |----------|-------------|
-| [Methodology](docs/methodology.md) | Full EDPA v1.22.1 specification |
+| [Methodology](docs/methodology.md) | Full EDPA v1.23.0 specification |
 | [Quick Start](docs/quick-start.md) | 10-minute setup guide |
 | [Evidence Detection](docs/evidence-detection.md) | How GitHub signals map to CW |
 | [Dual-View](docs/dual-view.md) | Per-person vs per-item perspectives |

@@ -136,9 +136,27 @@ workflow work end-to-end.
   `--number` or `--single-select-option-id` based on field type.
 - Status `→ Done` also closes the issue. Reverting from Done reopens it.
 
+**Timestamp fields (v1.23.0+):** `sync pull` now extracts `created_at`,
+`closed_at`, and `updated_at` from each GitHub issue and stores them as
+read-only frontmatter fields in the local YAML/Markdown item. These are
+populated automatically; do not edit them by hand. They are used for flow
+metrics computation and conflict detection.
+
+**Conflict detection (v1.23.0+):** `_detect_remote_modifications()` compares
+the local `updated_at` timestamp against the GitHub-side value. If the
+remote `updated_at` is newer than the locally stored one, the item is
+flagged as remotely modified (e.g. someone edited the issue directly in
+the GitHub UI, bypassing `sync push`). `sync conflicts` surfaces these
+items alongside the existing changelog-based conflict checks.
+
 **Conflict policy:** items changed on both sides since last sync are surfaced
 by `sync conflicts`. Resolution is manual today — edit `.edpa/backlog/...yaml`
 to the desired state and run `push`. Local then wins.
+
+**Flow metrics (v1.23.0+):** with timestamps in place, the MCP tool
+`edpa_flow_metrics` computes cycle time, throughput, and open item age
+from the synced data. See [`docs/mcp.md`](mcp.md) for inputs and output
+schema.
 
 **Common failure modes:**
 
