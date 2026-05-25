@@ -191,6 +191,8 @@ The script:
 - Writes `.edpa/config/issue_map.yaml` mapping local IDs ↔ GitHub Issue numbers
 - Offers to call `create_project_views.py` to seed kanban views
 
+**Timestamp fields (manual step):** After provisioning, add three Date fields in the GitHub Project settings UI: **Created**, **Closed**, and **Updated**. These are populated automatically by the sync engine (`created_at`, `closed_at`, `updated_at` in local YAML) and drive `edpa_flow_metrics` and timestamp-based conflict detection. GitHub Projects does not yet support auto-populating Date fields via API, so this step is manual.
+
 ### 7. Hierarchy is mandatory — never produce a flat backlog
 
 **CRITICAL** — every backlog item below the Initiative level MUST declare a `parent:` field referencing a higher-level item. The skill must refuse to emit flat lists, and the wizard must use the `backlog.py add` CLI rather than writing YAML files directly or calling `gh issue create` by hand:

@@ -11,7 +11,7 @@
     {
       "name": "edpa",
       "source": "./plugin",
-      "description": "EDPA — Evidence-Driven Proportional Allocation. Derive hours from Git delivery evidence. Zero timesheets, Monte Carlo calibrated CW weights, bidirectional sync with GitHub Projects.",
+      "description": "EDPA — Evidence-Driven Proportional Allocation. Derive hours from Git delivery evidence. Zero timesheets, Monte Carlo calibrated CW weights, bidirectional sync with GitHub Projects. Timestamp-based conflict detection and flow metrics (cycle time, throughput, open-item age).",
       "license": "MIT",
       "tags": ["governance", "edpa", "capacity", "community"]
     }

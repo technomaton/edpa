@@ -75,7 +75,7 @@ plugin/
 └── edpa/
     ├── scripts/                     # 31 Python modules
     │   ├── engine.py                # Core engine (Score, DerivedHours, invariants)
-    │   ├── mcp_server.py            # MCP server for /edpa:status, /edpa:backlog, /edpa:iterations
+    │   ├── mcp_server.py            # MCP server for /edpa:status, /edpa:backlog, /edpa:iterations, /edpa:flow_metrics
     │   ├── calibrate_signals.py     # CW signal-weights calibrator (Monte Carlo + coordinate descent)
     │   ├── backlog.py               # Git-native backlog CLI
     │   ├── sync.py                  # GitHub Projects ↔ Git bidirectional sync
@@ -135,6 +135,19 @@ The plugin ships standard `SKILL.md` files (Claude Code Agent Skill frontmatter 
 ```
 
 Note: Skills carry the text content (instructions), but Claude Code is the only target that runs `.mcp.json` (MCP servers), `hooks/hooks.json` (PostToolUse + SessionStart), and `${CLAUDE_PLUGIN_ROOT}` script anchoring. On other tools, run the Python CLI scripts manually (`python3 .claude/edpa/scripts/<name>.py`).
+
+### MCP tools provided by `mcp_server.py`
+
+| Tool | What it does |
+|------|-------------|
+| `edpa_status` | Project governance summary (PI, iteration, team) |
+| `edpa_backlog` | Query backlog items with filters |
+| `edpa_iterations` | List iterations with status/dates |
+| `edpa_people` | Capacity registry lookup |
+| `edpa_item` | Single item detail |
+| `edpa_validate` | Schema + invariant validation |
+| `edpa_sync_people` | Collaborator reconciliation |
+| `edpa_flow_metrics` | Cycle time, throughput, and open-item age computed from `created_at`/`closed_at` timestamp fields |
 
 ## Target project layout (after install)
 
