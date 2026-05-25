@@ -382,6 +382,7 @@ async def list_tools() -> list[Tool]:
                     "bv": {"type": "integer", "minimum": 0},
                     "tc": {"type": "integer", "minimum": 0},
                     "rr_oe": {"type": "integer", "minimum": 0},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
                 },
                 "required": ["type", "title"],
                 "additionalProperties": False,
@@ -413,6 +414,7 @@ async def list_tools() -> list[Tool]:
                         "additionalProperties": False,
                         "minProperties": 1,
                     },
+                    "idempotency_key": {"type": "string", "maxLength": 128},
                 },
                 "required": ["item_id", "fields"],
                 "additionalProperties": False,
@@ -430,6 +432,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "item_id": {"type": "string"},
                     "status": {"type": "string"},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
                 },
                 "required": ["item_id", "status"],
                 "additionalProperties": False,
@@ -447,6 +450,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "item_id": {"type": "string"},
                     "parent_id": {"type": "string"},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
                 },
                 "required": ["item_id", "parent_id"],
                 "additionalProperties": False,
@@ -466,6 +470,7 @@ async def list_tools() -> list[Tool]:
                     "start_date": {"type": "string", "pattern": r"^\d{4}-\d{2}-\d{2}$"},
                     "end_date": {"type": "string", "pattern": r"^\d{4}-\d{2}-\d{2}$"},
                     "type": {"type": "string", "enum": ["Iteration", "IP"]},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
                 },
                 "required": ["id", "start_date", "end_date"],
                 "additionalProperties": False,
@@ -482,6 +487,7 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "id": {"type": "string"},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
                 },
                 "required": ["id"],
                 "additionalProperties": False,
@@ -504,6 +510,7 @@ async def list_tools() -> list[Tool]:
                     "capacity": {"type": "number", "minimum": 0},
                     "github": {"type": "string"},
                     "availability": {"type": "string"},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
                 },
                 "required": ["id"],
                 "additionalProperties": False,
@@ -1042,9 +1049,103 @@ def _allowed_statuses(item_type: str) -> tuple[str, ...] | None:
 
 
 # ---------------------------------------------------------------------------
+# Idempotency (V2 plan.md Layer 3)
+# ---------------------------------------------------------------------------
+
+_IDEMPOTENCY_LOG_REL = Path(".edpa/.idempotency.log")
+_IDEMPOTENCY_TTL_SEC = 24 * 3600
+
+
+def _idempotency_path(edpa_root: Path) -> Path:
+    return edpa_root.parent / _IDEMPOTENCY_LOG_REL
+
+
+def _idempotency_lookup(edpa_root: Path, tool: str, key: str) -> str | None:
+    """Return the cached response text if (tool, key) was logged within TTL.
+
+    Scans the JSONL log newest-to-oldest; first match wins. Returns None
+    if the key is absent, expired, or the log doesn't exist.
+    """
+    if not key:
+        return None
+    log = _idempotency_path(edpa_root)
+    if not log.exists():
+        return None
+    try:
+        from datetime import datetime as _dt
+        now = _dt.now(timezone.utc)
+        # Read backwards (small log; OK to read full).
+        for raw in reversed(log.read_text(encoding="utf-8").splitlines()):
+            try:
+                entry = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if entry.get("tool") != tool or entry.get("key") != key:
+                continue
+            ts = entry.get("ts")
+            if not ts:
+                continue
+            try:
+                t = _dt.fromisoformat(ts.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if (now - t).total_seconds() > _IDEMPOTENCY_TTL_SEC:
+                return None
+            return entry.get("response")
+    except OSError:
+        return None
+    return None
+
+
+def _idempotency_record(edpa_root: Path, tool: str, key: str,
+                        response_text: str) -> None:
+    if not key:
+        return
+    log = _idempotency_path(edpa_root)
+    log.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "ts": _utc_now_iso(),
+        "tool": tool,
+        "key": key,
+        "response": response_text,
+    }
+    try:
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        logger.warning("idempotency log append failed: %s", exc)
+
+
+def _idempotent(tool: str):
+    """Decorator: short-circuit on cached idempotency_key, record on success.
+
+    Wraps a handler ``(edpa_root, args) -> list[TextContent]``. Looks up
+    ``args['idempotency_key']``; if a non-error cached response exists,
+    returns it unchanged. Otherwise runs the handler and records the
+    response unless it starts with ``"ERROR"``.
+    """
+    def decorator(fn):
+        def wrapper(edpa_root: Path, args: dict) -> list[TextContent]:
+            key = args.get("idempotency_key") if isinstance(args, dict) else None
+            if key:
+                cached = _idempotency_lookup(edpa_root, tool, key)
+                if cached is not None:
+                    return [TextContent(type="text", text=cached)]
+            result = fn(edpa_root, args)
+            if key and result and not result[0].text.startswith("ERROR"):
+                _idempotency_record(edpa_root, tool, key, result[0].text)
+            return result
+        wrapper.__name__ = fn.__name__
+        wrapper.__doc__ = fn.__doc__
+        return wrapper
+    return decorator
+
+
+# ---------------------------------------------------------------------------
 # Write tool handlers
 # ---------------------------------------------------------------------------
 
+@_idempotent("edpa_item_create")
 def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
     item_type = args.get("type")
     title = args.get("title")
@@ -1122,6 +1223,7 @@ _UPDATE_ALLOWED_FIELDS = frozenset({
 })
 
 
+@_idempotent("edpa_item_update")
 def _handle_item_update(edpa_root: Path, args: dict) -> list[TextContent]:
     raw_id = args.get("item_id", "")
     safe_id = _safe_item_id(raw_id)
@@ -1161,6 +1263,7 @@ def _handle_item_update(edpa_root: Path, args: dict) -> list[TextContent]:
     return _ok({"id": safe_id, "updated": list(fields)})
 
 
+@_idempotent("edpa_item_transition")
 def _handle_item_transition(edpa_root: Path, args: dict) -> list[TextContent]:
     raw_id = args.get("item_id", "")
     safe_id = _safe_item_id(raw_id)
@@ -1196,6 +1299,7 @@ def _handle_item_transition(edpa_root: Path, args: dict) -> list[TextContent]:
     return _ok({"id": safe_id, "status": status, "closed_at": closed_at})
 
 
+@_idempotent("edpa_item_link_parent")
 def _handle_item_link_parent(edpa_root: Path, args: dict) -> list[TextContent]:
     raw_id = args.get("item_id", "")
     safe_id = _safe_item_id(raw_id)
@@ -1233,6 +1337,7 @@ def _handle_item_link_parent(edpa_root: Path, args: dict) -> list[TextContent]:
     return _ok({"id": safe_id, "parent": safe_parent})
 
 
+@_idempotent("edpa_iteration_create")
 def _handle_iteration_create(edpa_root: Path, args: dict) -> list[TextContent]:
     raw_id = args.get("id", "")
     safe_id = _safe_iteration_id(raw_id)
@@ -1268,6 +1373,7 @@ def _handle_iteration_create(edpa_root: Path, args: dict) -> list[TextContent]:
     })
 
 
+@_idempotent("edpa_iteration_close")
 def _handle_iteration_close(edpa_root: Path, args: dict) -> list[TextContent]:
     raw_id = args.get("id", "")
     safe_id = _safe_iteration_id(raw_id)
@@ -1297,12 +1403,14 @@ _PEOPLE_ALLOWED_FIELDS = frozenset({
 })
 
 
+@_idempotent("edpa_people_upsert")
 def _handle_people_upsert(edpa_root: Path, args: dict) -> list[TextContent]:
     raw_id = args.get("id", "")
     safe_id = _safe_person_id(raw_id)
     if safe_id is None:
         return _err(f"invalid person id {raw_id!r}")
-    fields = {k: v for k, v in args.items() if k != "id" and v is not None}
+    fields = {k: v for k, v in args.items()
+              if k not in ("id", "idempotency_key") and v is not None}
     invalid = set(fields) - _PEOPLE_ALLOWED_FIELDS
     if invalid:
         return _err(f"fields {sorted(invalid)!r} not allowed for people.yaml")

@@ -17,6 +17,11 @@ Thumbs.db
 # reports/
 # data/ground_truth.yaml
 
+# EDPA V2 — local-only runtime state (per-machine, no audit value)
+.edpa/.id_counter.lock
+.edpa/.idempotency.log
+.edpa/.server.pid
+
 # Temporary
 *.tmp
 *.bak
