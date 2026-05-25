@@ -11,6 +11,6 @@ When releasing a new EDPA version, complete ALL steps — do not consider the re
    - Plugin docs: `plugin/README.md`, relevant `plugin/skills/*/SKILL.md` files
    - Metadata: `.claude-plugin/marketplace.json`
    - Website: Astro pages in `web/src/pages/` (both CZ and EN versions)
-6. **Web build + deploy** — run `npm run build` in `web/`, then `vercel deploy --prebuilt --prod --cwd <path-to-web>`
-7. **Verify web version** — confirm the deployed site shows the correct version (header + footer read from `plugin/.claude-plugin/plugin.json` via `web/src/lib/version.ts`)
+6. **Web build + deploy** — run `vercel build --prod --cwd <path-to-web>` (NOT `astro build` — that skips `.vercel/output/`), then `vercel deploy --prebuilt --prod --cwd <path-to-web>`
+7. **Verify web version** — run `curl -s https://edpa.technomaton.com/ | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+'` to confirm the correct version is live (do not trust WebFetch — it caches for 15 min)
 8. **GitHub release** — create via `gh release create v{version}` with release notes from CHANGELOG
