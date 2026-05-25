@@ -91,7 +91,15 @@ _CONTRIBUTE_PATTERN = re.compile(
 
 
 def run_gh(args, *, repo: str | None = None):
-    """Run `gh` CLI command, return parsed JSON or None on failure."""
+    """Run `gh` CLI command, return parsed JSON or None on failure.
+
+    V2 opt-out: set ``EDPA_NO_GH=1`` to force all gh calls to return
+    None. Callers degrade to git-only signals; PR data is expected
+    to be materialized into YAML by the CI ``sync_pr_contributions.py``
+    layer instead. See ADR-012 in docs/v2/decisions.md.
+    """
+    if os.environ.get("EDPA_NO_GH") == "1":
+        return None
     cmd = ["gh"] + list(args)
     if repo and "--repo" not in cmd:
         cmd.extend(["--repo", repo])

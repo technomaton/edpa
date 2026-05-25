@@ -1,0 +1,78 @@
+# EDPA V2 — PR contribution materialization (ADR-012, ADR-013).
+#
+# Triggers on PR merge (default: merge-only mode) and writes PR signals
+# (pr_author, pr_reviewer, issue_comment) into .edpa/backlog/{type}/{ID}.md
+# as a single commit per PR. Engine then reads YAML — no runtime gh call.
+#
+# Copy this file to .github/workflows/edpa-contribution-sync.yml in your
+# repo. The default mode is merge-only (1 commit per PR; clean main
+# history). For audit-heavy teams, uncomment the "live mode" triggers
+# below to materialize on every review/comment event.
+
+name: EDPA contribution sync
+
+on:
+  # MERGE-ONLY MODE (default). One commit per PR after merge.
+  pull_request:
+    types: [closed]
+
+  # LIVE MODE (opt-in). Uncomment to materialize on every event.
+  # Recommended with squash-on-merge so main stays clean.
+  # pull_request:
+  #   types: [opened, synchronize, closed]
+  # pull_request_review:
+  #   types: [submitted, edited]
+  # issue_comment:
+  #   types: [created, edited]
+
+jobs:
+  materialize:
+    # Default mode: only run when PR is actually merged.
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install EDPA engine deps
+        run: |
+          if [ -f .edpa/engine/requirements.txt ]; then
+            pip install -r .edpa/engine/requirements.txt
+          else
+            pip install pyyaml ruamel.yaml filelock
+          fi
+
+      - name: Configure git
+        run: |
+          git config user.name "edpa-bot"
+          git config user.email "edpa-bot@users.noreply.github.com"
+
+      - name: Materialize PR signals
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 .edpa/engine/scripts/sync_pr_contributions.py \
+            --pr ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }}
+
+      - name: Push (with retry)
+        run: |
+          for i in 1 2 3; do
+            if git push origin HEAD:${{ github.event.pull_request.base.ref }}; then
+              exit 0
+            fi
+            git pull --rebase --strategy-option=ours
+          done
+          echo "::error::Failed to push after 3 retries"
+          exit 1

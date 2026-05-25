@@ -60,6 +60,31 @@ capacity this iteration (PTO, sick leave, overtime, onboarding ramp).
 Skip Stage 1 to here when `--skip-prep` or for closed iterations
 already audited.
 
+### Stage 2a (V2-only) — Mid-flight PR sync
+
+If `.github/workflows/edpa-contribution-sync.yml` is installed (V2
+project with CI materialization, per ADR-013), refresh the YAML signals
+for any **open** PRs mentioning items in this iteration. The CI
+workflow only commits on `pull_request:closed` by default, so open PRs
+at close time would otherwise leave their evidence outside the engine's
+view.
+
+For each open PR referencing items in the closing iteration:
+
+```bash
+python3 .edpa/engine/scripts/sync_pr_contributions.py \
+  --pr <PR_NUMBER> --rebuild --skip-commit
+```
+
+The `--skip-commit` flag writes the YAML in-process so engine sees
+current state without spamming the git log with mid-iteration commits.
+After Stage 2 completes, decide whether to commit those YAML changes
+(the close commit batch is the natural place).
+
+Skip this stage if `EDPA_NO_GH=1` is set or the workflow file is absent.
+
+### Stage 2b — Engine + reports
+
 Invoke the existing skills in sequence:
 
 1. `edpa-engine` — computes derived hours from delivery evidence
