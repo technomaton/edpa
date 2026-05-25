@@ -18,11 +18,13 @@
     "./skills/edpa-reports",
     "./skills/edpa-autocalib",
     "./skills/edpa-sync",
-    "./skills/edpa-sync-people"
+    "./skills/edpa-sync-people",
+    "./skills/edpa-server"
   ],
   "commands": [
     "./commands/close-iteration.md",
-    "./commands/board.md"
+    "./commands/board.md",
+    "./commands/server.md"
   ],
   "agents": []
 }

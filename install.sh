@@ -26,6 +26,16 @@ set -e
 
 REPO="technomaton/edpa"
 TARGET=".edpa/engine"
+WITH_SERVER=0
+
+# Parse args (only --with-server supported today; everything else stays
+# legacy for backwards compatibility).
+for arg in "$@"; do
+  case "$arg" in
+    --with-server) WITH_SERVER=1 ;;
+    *) ;;
+  esac
+done
 
 echo "EDPA Installer"
 echo "=============="
@@ -194,6 +204,27 @@ PYEOF
 fi
 
 touch ".edpa/changelog.jsonl" ".edpa/sync_state.json"
+
+# --- Optional: PI planning server vendoring (--with-server flag) ---
+if [ "$WITH_SERVER" = "1" ]; then
+  SERVER_SRC="$TMPDIR/edpa/plugin/tools/pi-planning"
+  SERVER_DST=".claude/edpa/server"
+  if [ -d "$SERVER_SRC" ]; then
+    echo ""
+    echo "Vendoring PI planning server (--with-server)..."
+    mkdir -p "$SERVER_DST"
+    cp -R "$SERVER_SRC/." "$SERVER_DST/"
+    echo "  Vendored to $SERVER_DST/"
+    echo "  Build deps + dist: cd $SERVER_DST && npm install && npm run build"
+    echo "  Start later: /edpa:server start"
+  else
+    echo ""
+    echo "  --with-server requested but server source not in payload — skipping."
+  fi
+else
+  echo ""
+  echo "  (Optional: re-run with --with-server to vendor the PI planning UI.)"
+fi
 
 echo ""
 echo "EDPA $PINNED installed."
