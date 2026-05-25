@@ -843,7 +843,7 @@ def map_gh_items_to_edpa(gh_data, fields_mapping):
             if title.startswith(prefix):
                 parts = title.split(" ", 1)
                 candidate = parts[0].rstrip(":")
-                plen = len(prefix) - 1   # digits start after "I-" / "EV-"
+                plen = len(prefix)   # digits start after "I-" / "EV-"
                 if len(candidate) > plen and candidate[plen:].isdigit():
                     edpa_id = candidate
                     title = parts[1].lstrip(": ") if len(parts) > 1 else title
