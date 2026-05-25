@@ -384,7 +384,38 @@ Accuracy = Actual / Planned &times; 100 %</div>
       </table>
     </div>
 
-    <h3>9.3 Branch naming &amp; DoR</h3>
+    <h3>9.3 Timestamp pole a detekce konfliktů</h3>
+    <p>Při sync z GitHub Projects se automaticky zachycují tři timestamp pole:</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Pole</th><th>Zdroj</th><th>Využití</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>created_at</code></td><td>GitHub issue created date</td><td>Cycle time start, item age</td></tr>
+          <tr><td><code>updated_at</code></td><td>GitHub issue last update</td><td>Detekce konfliktů při sync, freshness</td></tr>
+          <tr><td><code>closed_at</code></td><td>GitHub issue closed date</td><td>Cycle time end, throughput</td></tr>
+        </tbody>
+      </table>
+      <div class="note" style="margin-top:12px"><strong>Detekce konfliktů:</strong> Sync porovnává <code>updated_at</code> v lokálním YAML s hodnotou na GitHubu. Pokud se obě strany změnily od posledního sync, položka je označena jako konflikt a vyžaduje manuální řešení.</div>
+    </div>
+
+    <h3>9.4 Flow Metrics MCP tool</h3>
+    <p>MCP tool <code>edpa_flow_metrics</code> poskytuje analytiku toku práce na základě timestamp polí:</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Metrika</th><th>Výpočet</th><th>Využití</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Cycle Time</strong></td><td><code>closed_at - created_at</code></td><td>Jak dlouho trvá dodání položky</td></tr>
+          <tr><td><strong>Throughput</strong></td><td>Počet uzavřených položek / iterace</td><td>Prediktabilita, kapacitní plánování</td></tr>
+          <tr><td><strong>Item Age</strong></td><td><code>now - created_at</code> (otevřené)</td><td>Detekce stagnujících položek</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>9.5 Branch naming &amp; DoR</h3>
     <div class="formula" style="white-space:pre">feature/S-200-omop-parser
 defect/D-215-upload-validation
 feature/F-102-anon-engine</div>

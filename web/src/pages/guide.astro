@@ -160,6 +160,9 @@ status: Backlog
 parent: F-1        # Rodičovská Feature
 assignee: jnovak
 iteration: PI-2026-1.1
+created_at: "2026-05-10T08:00:00Z"   # auto z GitHubu při sync
+updated_at: "2026-05-12T14:30:00Z"   # auto z GitHubu při sync
+# closed_at se doplní automaticky při přechodu do Done
 
 # Po vytvoření YAMLů poproste Claude Code:
 "Zvaliduj backlog a ukaž mi strom"
@@ -176,6 +179,9 @@ status: Backlog
 parent: F-1        # Rodičovská Feature
 assignee: jnovak
 iteration: PI-2026-1.1
+created_at: "2026-05-10T08:00:00Z"   # auto z GitHubu při sync
+updated_at: "2026-05-12T14:30:00Z"   # auto z GitHubu při sync
+# closed_at se doplní automaticky při přechodu do Done
 
 # CLI fallback (bez Claude Code)
 python3 .edpa/engine/scripts/backlog.py validate
@@ -195,7 +201,7 @@ I-1: Medical Platform
     num: 7,
     title: 'Tým začne pracovat',
     color: 'var(--pk)',
-    desc: 'Tým pracuje standardním GitHub flow — branch naming konvence, commity s referencemi na items, PR a code review. EDPA vše sleduje automaticky.',
+    desc: 'Tým pracuje standardním GitHub flow — branch naming konvence, commity s referencemi na items, PR a code review. EDPA vše sleduje automaticky. Sync zachycuje timestampy (created_at, updated_at, closed_at) a detekuje konflikty přes updated_at.',
     code: `# Branch naming (CI kontroluje formát)
 git checkout -b feature/S-1-login-endpoint
 
@@ -217,7 +223,13 @@ Evidence detekována (signal weights → contribution_score):
   jnovak: assignee 4.0 + pr_author 3.4 + commit_author 2.78 = 10.18
   pkral:  pr_reviewer 2.25                                  =  2.25
   → cw[jnovak, S-1] = 10.18 / 12.43 = 0.82
-  → cw[pkral,  S-1] =  2.25 / 12.43 = 0.18`,
+  → cw[pkral,  S-1] =  2.25 / 12.43 = 0.18
+
+Timestamps (auto z GitHub sync):
+  S-1: created_at=2026-05-10, updated_at=2026-05-15, closed_at=2026-05-15
+
+Flow metrics (MCP tool edpa_flow_metrics):
+  S-1 cycle time: 5d | Throughput: 4 items/iter`,
   },
   {
     num: 8,

@@ -114,6 +114,9 @@ status: Backlog
 parent: F-1      # Parent Feature
 assignee: jnovak
 iteration: PI-2026-1.1
+created_at: "2026-05-10T08:00:00Z"   # auto from GitHub sync
+updated_at: "2026-05-12T14:30:00Z"   # auto from GitHub sync
+# closed_at is populated automatically when status → Done
 
 # Validate backlog
 python3 .edpa/engine/scripts/backlog.py validate
@@ -133,7 +136,7 @@ I-1: Medical Platform
     num: 6,
     title: 'Team Starts Working',
     color: 'var(--pk)',
-    desc: 'The team works using standard GitHub flow — branch naming conventions, commits referencing items, PRs and code review. EDPA tracks everything automatically.',
+    desc: 'The team works using standard GitHub flow — branch naming conventions, commits referencing items, PRs and code review. EDPA tracks everything automatically. Sync captures timestamps (created_at, updated_at, closed_at) and detects conflicts via updated_at.',
     code: `# Branch naming (CI enforces format)
 git checkout -b feature/S-1-login-endpoint
 
@@ -153,7 +156,13 @@ PR #42: "S-1: Login endpoint"
 
 Evidence detected:
   jnovak: assignee (+4), PR author (+2), commits (+1)
-  pkral:  PR reviewer (+1)`,
+  pkral:  PR reviewer (+1)
+
+Timestamps (auto from GitHub sync):
+  S-1: created_at=2026-05-10, updated_at=2026-05-15, closed_at=2026-05-15
+
+Flow metrics (MCP tool edpa_flow_metrics):
+  S-1 cycle time: 5d | Throughput: 4 items/iter`,
   },
   {
     num: 7,
