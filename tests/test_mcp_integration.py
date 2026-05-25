@@ -223,7 +223,7 @@ class TestToolsAdvertised:
             assert names == {
                 "edpa_status", "edpa_iterations", "edpa_people",
                 "edpa_backlog", "edpa_item", "edpa_validate",
-                "edpa_sync_people",
+                "edpa_sync_people", "edpa_flow_metrics",
             }, f"Tool set drift: {names}"
 
     def test_edpa_item_requires_item_id(self, edpa_workspace):
