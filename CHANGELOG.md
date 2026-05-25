@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 1.22.0 — 2026-05-25
+
+Pilot-feedback release: strict GH-first `backlog.py add` (title mirror, sub-issue linking, single ID series), shared GH issue factory, full test+docs sweep, plus housekeeping (Vercel auto-build off, mcp-server date-flake fix, `.lean-ctx/` ignored).
+
+### fix(tests): align `test_mcp_server` iteration date asserts with 1-week cadence
+
+`test_handle_status` and `test_handle_iterations_all` had hardcoded iteration dates from the original 2×2-week PI-2026-1 cadence. Commit `0417727` restructured PI-2026-1 to 5×1-week iterations, but the asserts didn't move — they sat red on `main` for three days. Fixed three numbers (`active_iteration_start/end`, `iters[0].end_date`) and added inline comments pointing at the source YAML files so the next cadence shuffle is a 30-second update.
+
+### chore: disable Vercel auto-build on git push
+
+Vercel auto-detection saw `requirements.txt` in the root, decided EDPA was a Python service, and failed to find an entry point on every commit — spamming red checks on PRs. `vercel.json` now sets `git.deploymentEnabled: false`. The `web/` Astro site is built and deployed manually via `vercel deploy --prebuilt web/dist` (cheaper than burning Vercel build minutes on every commit).
+
+### chore: ignore `.lean-ctx/` cache files
+
+Per-machine MCP knowledge-graph cache no longer gets staged. Two stale entries removed from the index (already absent from disk).
 
 ### test+docs: cover `_gh_issue_factory` and `cmd_add`; sweep stale docs
 

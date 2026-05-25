@@ -25,6 +25,9 @@ Thumbs.db
 web/dist/
 web/.vercel/
 
+# lean-ctx MCP server cache (per-machine knowledge graph + metadata)
+.lean-ctx/
+
 # Environment
 .env
 .env.local
