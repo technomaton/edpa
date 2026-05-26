@@ -1,5 +1,114 @@
 # Changelog
 
+## 1.24.0-rc1 — 2026-05-26 — V2 local-first staging
+
+Release candidate for the V2 local-first architecture. **All changes are
+additive** — V1 GH-coupled flows still work unchanged. V2 paths are
+opt-in (`--local` flag, `EDPA_NO_GH=1` env, `--with-server`). The hard
+cut that deletes GH code is scheduled for the next major (2.0.0).
+
+Plan: [docs/v2/concept.md](docs/v2/concept.md), [docs/v2/plan.md](docs/v2/plan.md).
+
+### feat(v2): local-first ID allocation (krok 3)
+
+- `plugin/edpa/scripts/id_counter.py` — atomic `next_id(type, root)` with
+  file lock and `max(counter, fs_scan)` resolution. Counter file lives
+  at `.edpa/config/id_counters.yaml`.
+- `plugin/edpa/scripts/_git_timestamps.py` — `created_at`/`updated_at`/
+  `closed_at` derived from `git log` (replaces GH Issue API metadata).
+- New runtime dep: `filelock>=3.12` (cross-platform).
+
+### feat(v2): MCP write tools — 7 new (krok 1)
+
+- `edpa_item_create`, `edpa_item_update`, `edpa_item_transition`,
+  `edpa_item_link_parent`, `edpa_iteration_create`, `edpa_iteration_close`,
+  `edpa_people_upsert`.
+- Each handler does atomic write (tmp + rename), validates the SAFe
+  parent hierarchy (Story→Feature→Epic→Initiative) and status workflow.
+- `ITEM_ID_RE` extended to `^[A-Z]{1,3}-\d{1,9}$` (Event uses 2-letter
+  `EV-`).
+
+### feat(v2): MCP write tool idempotency (krok 1.5)
+
+- `@_idempotent("tool_name")` wraps all 7 write handlers; passing
+  `idempotency_key` short-circuits to the cached response within 24h
+  TTL. JSONL log at `.edpa/.idempotency.log` (gitignored).
+- ERROR responses are not cached — user can fix + retry.
+
+### feat(v2): `edpa-add --local` dual mode (krok 2)
+
+- `backlog.py cmd_add --local` calls `mcp_server._handle_item_create`
+  in-process; no `gh issue create`, no `issue_map.yaml` update.
+- Default still GH-first when sync config exists (V1 behavior).
+- `edpa-add` skill updated to explain mode selection.
+
+### feat(v2): ID safety hooks + collision renumber (krok 4)
+
+- `plugin/edpa/scripts/validate_ids.py` — pre-commit and pre-push
+  validator. Catches filename≡frontmatter id mismatches, duplicate IDs
+  in staged set, counter monotonicity, and HEAD/upstream collisions.
+- `plugin/edpa/scripts/renumber_collisions.py` — semi-auto resolution
+  (fetch upstream, find ADDED files with colliding IDs, rename file,
+  rewrite `id:`, propagate `parent:` refs, bump counter).
+- Hook wrappers `plugin/edpa/scripts/hooks/{pre-commit,pre-push}-id-safety`
+  delegate to validator. Opt-in install via symlink.
+
+### feat(v2): CI materialization layer (krok 4.5, ADR-012 + ADR-013)
+
+- `plugin/edpa/scripts/sync_pr_contributions.py` — platform-agnostic
+  deterministic script. Pulls PR data (gh in Action or `--event`
+  JSON), extracts EDPA item refs from title/body/branch, emits signals
+  (pr_author, pr_reviewer, issue_comment) into `ci_signals[]` block.
+  Idempotent via dedupe on `signals[].ref`. 3× race retry with
+  `git pull --rebase --strategy-option=ours`.
+- `plugin/edpa/templates/github-workflows/edpa-contribution-sync.yml`
+  — workflow template. Default mode: merge-only (1 commit/PR). Live
+  mode opt-in via commented-out triggers.
+- `detect_contributors.py:run_gh()` honors `EDPA_NO_GH=1` env →
+  suppresses all gh calls. V2 opt-in. Safer than removing gh code now.
+- `commands/close-iteration.md` Stage 2a — mid-flight PR sync for open
+  PRs at iteration close.
+
+### feat(v2): migration script (krok 5)
+
+- `plugin/edpa/scripts/migrate_v1_to_v2.py` — idempotent 6-step
+  conversion of a V1 GH-coupled project to V2 local-first: final
+  sync pull → seed counter → backfill timestamps → archive
+  `issue_map.yaml` → strip `sync:` from `edpa.yaml` → single
+  migration commit. `--dry-run` and `--skip-pull` flags supported.
+- `id_counter.seed_counters_from_fs()` — public helper used by
+  migration and as recovery for lost counter files.
+
+### feat(v2): edpa-server skill scaffold (krok 7)
+
+- `plugin/skills/edpa-server/SKILL.md` — start/stop/status of an
+  optional Node HTTP server serving the React PI planning UI from
+  `.claude/edpa/server/`. Localhost-only, per-developer, single-user.
+- `plugin/commands/server.md` — thin command wrapper.
+- `install.sh --with-server` flag vendors `tools/pi-planning/`. Build
+  pipeline (npm install + dist) is follow-up work.
+
+### Open gates (not in rc1)
+
+- **E2E migration test on a real V1 project.** `migrate_v1_to_v2.py`
+  is unit-tested against a sandbox repo. Plan requires one real-world
+  smoke before the GH-removal hard cut in 2.0.0.
+- **GH code removal (Krok 6).** `sync.py` (~1800 lines),
+  `_gh_issue_factory.py`, `_sub_issue_linker.py`, `sync_collaborators.py`,
+  `plugin/skills/edpa-sync/`, `plugin/skills/edpa-sync-people/` remain
+  in tree. 2.0.0 will delete them.
+- **PI planning server build pipeline.** `tools/pi-planning/` ships as
+  source; `--with-server` vendors source, user runs `npm install &&
+  npm run build` manually.
+
+### Tests
+
+580 pytest tests pass. New suites: `test_id_counter` (17),
+`test_git_timestamps` (11), `test_mcp_write_tools` (40),
+`test_backlog_add_local` (12), `test_validate_ids` (8),
+`test_renumber_collisions` (3), `test_sync_pr_contributions` (11),
+`test_migrate_v1_to_v2` (9), `test_mcp_idempotency` (13).
+
 ## 1.23.1 — 2026-05-25
 
 Bugfix: sync pull now actually populates GitHub Issue timestamps.
