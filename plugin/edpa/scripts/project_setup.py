@@ -130,6 +130,16 @@ def seed_configs(root: Path) -> None:
     else:
         info("edpa.yaml already present — leaving as-is")
 
+    # V2.1 C7: seed cw_heuristics.yaml so engine reads the documented
+    # defaults (signal weights, gate transitions, yaml_edit weights)
+    # from .edpa/config/ instead of falling through to a hardcoded
+    # minimum that lacks gate_weights entirely.
+    if _seed_one(templates / "cw_heuristics.yaml.tmpl",
+                 edpa / "config" / "cw_heuristics.yaml"):
+        ok("Seeded .edpa/config/cw_heuristics.yaml (tune weights here)")
+    else:
+        info("cw_heuristics.yaml already present — leaving as-is")
+
     for f in ("changelog.jsonl", "sync_state.json"):
         (edpa / f).touch()
 

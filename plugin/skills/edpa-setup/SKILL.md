@@ -114,6 +114,36 @@ python3 .edpa/engine/scripts/migrate_evidence_rename.py
 
 (idempotent; `--dry-run` for preview)
 
+## Tuning weights — `.edpa/config/cw_heuristics.yaml`
+
+`project_setup.py` seeds this file with sensible defaults. Three
+sections matter:
+
+- **`signals:`** — per-signal-type weight (commit_author 2.78,
+  pr_reviewer 2.25, issue_comment 1.14, …). Higher = more influence
+  on a person's `cw` share for an item. Calibrate via
+  `/edpa:calibrate` after collecting ≥20 ground-truth records.
+
+- **`gate_weights:`** — fires when a Feature/Epic/Initiative status
+  transitions inside an iteration window. Splits the parent's
+  `job_size` across its lifecycle (`Funnel→Analyzing` … `Releasing→Done`)
+  so prep + delivery + acceptance work all gets credited. Stories
+  flow through the regular Done-only path; they don't generate gate
+  events.
+
+- **`yaml_edit_weights:`** — credits structural changes to
+  `.edpa/backlog/*.md` YAML (new block added, list item added, scalar
+  changed, …). Captures work that doesn't go through a commit
+  attribution flow.
+
+When gate transitions fire (multi-iteration Feature/Epic work),
+strategic roles (PM, Arch, BO) get credit via gate events that would
+otherwise be invisible. For Story-only sprints, gate_weights is dead
+weight — engine still works, just produces empty `gate_events: []`.
+
+Edit + commit `cw_heuristics.yaml` like any other YAML in `.edpa/`;
+no special migration needed.
+
 ## What NOT to do
 
 - **Never modify `.edpa/engine/` by hand.** It's a vendored copy of

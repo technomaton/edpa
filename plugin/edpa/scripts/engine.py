@@ -478,17 +478,31 @@ def run_edpa(capacity_config, heuristics, items, *,
 def load_heuristics(edpa_root):
     """Load CW heuristics from .edpa/config/, with fallback chain.
 
-    Tries: heuristics.yaml → cw_heuristics.yaml → template in .claude/
+    Tries (in order):
+      1. .edpa/config/heuristics.yaml         (legacy v1.x)
+      2. .edpa/config/cw_heuristics.yaml      (V2.1 seeded by project_setup)
+      3. .edpa/engine/templates/cw_heuristics.yaml.tmpl  (V2 vendored)
+      4. .claude/edpa/templates/cw_heuristics.yaml.tmpl  (legacy V1 location)
+      5. Hardcoded minimal default (no gate_weights — gate events skipped)
+
+    Without one of 1-4 hitting, the engine loses gate_weights and
+    yaml_edit_weights — only signal_weights from contributors[] are
+    used. Krok C7 added (2) seeding so the typical install reaches the
+    documented defaults from path 2.
     """
     edpa_root = Path(edpa_root)
     for name in ("heuristics.yaml", "cw_heuristics.yaml"):
         path = edpa_root / "config" / name
         if path.exists():
             return load_yaml(path)
-    # Fallback to template (installed plugin)
-    template = edpa_root.parent / ".claude" / "edpa" / "templates" / "cw_heuristics.yaml.tmpl"
-    if template.exists():
-        return load_yaml(template)
+    # Fallbacks: V2 vendored layout first, then legacy V1 path.
+    candidates = [
+        edpa_root / "engine" / "templates" / "cw_heuristics.yaml.tmpl",
+        edpa_root.parent / ".claude" / "edpa" / "templates" / "cw_heuristics.yaml.tmpl",
+    ]
+    for template in candidates:
+        if template.exists():
+            return load_yaml(template)
     return {"evidence_threshold": 1.0, "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15}}
 
 
