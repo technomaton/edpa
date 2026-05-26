@@ -81,6 +81,27 @@ gate_weights:
     "Implementing→Done":        0.50
 
 # ─────────────────────────────────────────────────────────────────────
+# STORY ACTIVITY EVENTS (v2.1+) — in-flight Story credit
+# ─────────────────────────────────────────────────────────────────────
+#
+# Stories normally credit only at status=Done (full Story.js × cw).
+# That loses refinement / spillover work — a Story being analyzed and
+# decomposed across an iteration but not yet Done gets 0 hours, while
+# the work clearly happened.
+#
+# When a Story has yaml_edit signals in the iteration window but
+# hasn't reached Done, the engine emits a synthetic activity event
+# with job_size = story.js * credit_factor. The remaining
+# (1.0 - credit_factor) is reserved for the iteration when Done lands
+# (full Story.js × cw credit kicks in via the regular Done filter).
+#
+# Set credit_factor: 0 to disable in-flight Story credit entirely
+# (V2.0 behaviour — Done-only).
+#
+story_activity:
+  credit_factor: 0.40             # 40% of Story.js reserved for in-flight work
+
+# ─────────────────────────────────────────────────────────────────────
 # YAML EDIT SIGNALS (v1.17+) — structural deltas in .edpa/backlog/*.yaml
 # ─────────────────────────────────────────────────────────────────────
 # Every commit touching backlog YAML is a signal of work on that item.

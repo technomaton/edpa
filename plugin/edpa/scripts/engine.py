@@ -737,6 +737,82 @@ def _build_person_resolver(people):
     return resolver
 
 
+def load_story_activity_events(edpa_root, iteration_id, heuristics,
+                                yaml_edit_signals):
+    """V2.1 C7.5 — emit synthetic items for in-flight Stories with activity.
+
+    Stories normally credit only at status=Done (full Story.js × cw)
+    via load_backlog_items. That loses refinement work on Stories that
+    spill across iterations: yaml_edit signals exist but the Story
+    isn't in items[] yet, so enrichment skips it.
+
+    This function emits one synthetic item per (in-flight Story with
+    yaml_edit_signals in the iter window). The synthetic item has:
+      id        = f"{story_id}@activity"
+      level     = "Story"
+      job_size  = story.js * credit_factor    (configurable; default 0.40)
+      contributors = []  (filled by _enrich_items_with_yaml_edit_signals)
+
+    The credit_factor is reserved capacity for "in-progress activity"
+    — a refinement-heavy iteration crediting 40 % of Story.js per
+    contributor matches the empirical observation that prep + grooming
+    typically consume 30–50 % of a Story's overall delivery effort.
+    Tune via ``story_activity.credit_factor`` in cw_heuristics.yaml.
+
+    Skip rules:
+      - status=Done             → load_backlog_items already credits
+      - no yaml_edit signals     → no activity to credit
+      - story.js <= 0            → engine can't score zero-js items
+      - factor <= 0              → C7.5 disabled by config
+
+    Returns (events, audit). events go into items[]; audit logged into
+    edpa_results.json for inspection.
+    """
+    if not iteration_id or not yaml_edit_signals:
+        return [], []
+    factor = float(((heuristics or {}).get("story_activity") or {}).get(
+        "credit_factor", 0.40))
+    if factor <= 0:
+        return [], []
+
+    stories_dir = Path(edpa_root) / "backlog" / "stories"
+    if not stories_dir.is_dir():
+        return [], []
+
+    events = []
+    audit = []
+    for story_path in sorted(stories_dir.glob("*.md")):
+        data = load_yaml(story_path) or {}
+        story_id = data.get("id")
+        if not story_id:
+            continue
+        if (data.get("status") or "").lower() in ("done", "closed", "accepted"):
+            continue
+        sigs = yaml_edit_signals.get(story_id) or []
+        if not sigs:
+            continue
+        js = data.get("js") or data.get("job_size") or 0
+        if js <= 0:
+            continue
+
+        events.append({
+            "id": f"{story_id}@activity",
+            "level": "Story",
+            "job_size": round(js * factor, 4),
+            "title": data.get("title", ""),
+            "contributors": [],  # populated by yaml_edit enrichment
+        })
+        audit.append({
+            "item_id": story_id,
+            "type": "story_activity",
+            "credit_factor": factor,
+            "story_js": js,
+            "effective_js": round(js * factor, 4),
+            "n_yaml_edit_signals": len(sigs),
+        })
+    return events, audit
+
+
 def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
     """Convert status transitions into scoring 'events' for mode=gates.
 
@@ -1387,15 +1463,26 @@ def main():
         except Exception as exc:  # noqa: BLE001
             print(f"WARN: yaml_edit_signals collection skipped: {exc}",
                   file=sys.stderr)
+        # C7.5: in-flight Story activity events — emit synthetic items
+        # for Stories that have yaml_edit activity in this iteration
+        # window but haven't reached Done. Credit_factor of story.js
+        # (default 0.40) reserved for "ongoing work" attribution.
+        story_activity_events, story_audit = load_story_activity_events(
+            edpa_root, iteration_id, heuristics, yaml_edit_signals,
+        )
+        items.extend(story_activity_events)
         if yaml_edit_signals:
             people_for_resolve = (capacity or {}).get("people", []) or []
             _enrich_items_with_yaml_edit_signals(
                 items, yaml_edit_signals, people_for_resolve,
             )
         n_yaml = sum(len(v) for v in yaml_edit_signals.values())
+        done_count = (len(items) - len(gate_events)
+                      - len(story_activity_events))
         print(f"Loaded {len(items)} items "
-              f"({len(items) - len(gate_events)} Done Stories/Defects + "
-              f"{len(gate_events)} gate events"
+              f"({done_count} Done Stories/Defects + "
+              f"{len(gate_events)} gate events + "
+              f"{len(story_activity_events)} story activity events"
               f"{', ' + str(n_yaml) + ' yaml_edit signals' if n_yaml else ''})")
         if iteration_id:
             print(f"Filtered to iteration: {iteration_id}")
