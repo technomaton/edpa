@@ -48,22 +48,32 @@ Resulting layout:
 `$ARGUMENTS` — optional flags:
 
 - `--with-ci` — copy `edpa-contribution-sync.yml` to
-  `.github/workflows/`. Required for the engine to see PR signals
-  (pr_author, pr_reviewer, issue_comment); without it the engine sees
-  git-only signals (commit_author, yaml_edit, transitions, manual
-  /contribute directives).
-- `--with-hooks` — install pre-commit + pre-push ID-safety validators
-  into `.git/hooks/`. Catches filename≡id mismatches, duplicate IDs,
-  and cross-branch ID collisions before they reach upstream.
+  `.github/workflows/`. Optional enhancement that materialises
+  pr_reviewer / issue_comment signals (PR-thread-only events) from
+  GitHub Actions into `evidence[]`. Local commit_author signals
+  flow regardless via `--with-hooks`.
+- `--with-hooks` — install the full git-hook stack into `.git/hooks/`:
+  - **pre-commit**: ID-safety validator (filename≡frontmatter id,
+    counter monotonicity, HEAD collisions)
+  - **commit-msg**: require EDPA item reference in commit subject/body
+    (or `no-ticket:` escape) — catches "did work, forgot to attribute"
+  - **post-commit**: `local_evidence.py` emits commit_author and
+    `/contribute` signals into the referenced item's `evidence[]`
+  - **pre-push**: upstream ID collision check
+- `--with-rules` — copy `plugin/rules/*.md` to `.claude/rules/`.
+  Claude Code auto-loads these into every agent session, so
+  AI assistants in this repo follow the same ticket-first workflow
+  as humans.
 
-Both flags are recommended for any team workflow.
+All three flags are recommended for any team workflow.
 
 ## Steps
 
 ### 1. Run the bootstrap script
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py --with-ci --with-hooks
+python3 ${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py \
+  --with-ci --with-hooks --with-rules
 ```
 
 The script is idempotent — safe to re-run when adding hooks/CI after

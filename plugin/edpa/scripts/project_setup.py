@@ -160,6 +160,40 @@ def install_ci_workflow(root: Path) -> bool:
     return True
 
 
+def install_rules(root: Path) -> bool:
+    """Copy plugin/rules/*.md into the project's .claude/rules/.
+
+    Claude Code auto-loads files under .claude/rules/ into every agent
+    session in that workspace, so this is the supported path for
+    distributing architectural rules with a plugin. Idempotent: existing
+    files at the destination are not overwritten (so user edits survive
+    re-runs).
+    """
+    src_dir = HERE.parent / "rules"
+    if not src_dir.exists():
+        src_dir = root / ".edpa" / "engine" / "rules"
+    if not src_dir.exists():
+        warn(f"Rules source dir missing — skipping ({src_dir})")
+        return False
+    dst_dir = root / ".claude" / "rules"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    installed: list[str] = []
+    skipped: list[str] = []
+    for rule in sorted(src_dir.glob("*.md")):
+        dst = dst_dir / rule.name
+        if dst.exists():
+            skipped.append(rule.name)
+            continue
+        shutil.copy(rule, dst)
+        installed.append(rule.name)
+    if installed:
+        ok(f"Installed rules: {', '.join(installed)} → .claude/rules/")
+        info("Auto-loaded into every Claude Code agent session in this repo")
+    if skipped:
+        info(f"Already present (preserved): {', '.join(skipped)}")
+    return True
+
+
 def install_hooks(root: Path) -> bool:
     git_hooks = root / ".git" / "hooks"
     if not git_hooks.exists():
@@ -216,7 +250,13 @@ def main() -> int:
     )
     parser.add_argument(
         "--with-hooks", action="store_true",
-        help="Install pre-commit + pre-push ID safety hooks into .git/hooks/",
+        help="Install pre-commit + commit-msg + post-commit + pre-push hooks "
+             "into .git/hooks/ (ID safety + ticket-attached + local evidence)",
+    )
+    parser.add_argument(
+        "--with-rules", action="store_true",
+        help="Copy plugin's architectural rules to .claude/rules/ so they "
+             "auto-load into every Claude Code session in this repo.",
     )
     parser.add_argument(
         "--root", type=Path, default=None,
@@ -246,6 +286,11 @@ def main() -> int:
     if args.with_hooks:
         step(next_step, "Git hooks (--with-hooks)")
         install_hooks(root)
+        next_step += 1
+
+    if args.with_rules:
+        step(next_step, "Architectural rules (--with-rules)")
+        install_rules(root)
 
     print(f"\n{C.GREEN}{C.BOLD}EDPA setup complete.{C.RESET}\n")
     print("Next steps:")
@@ -254,9 +299,10 @@ def main() -> int:
     print("  3. Create your first item:")
     print("       python3 .edpa/engine/scripts/backlog.py add \\")
     print("         --type Initiative --title 'Project Apollo'")
-    if not args.with_ci:
-        print("  4. (Optional) Enable PR signal materialization:")
-        print(f"       python3 {Path(__file__).name} --with-ci --with-hooks")
+    if not (args.with_ci and args.with_hooks and args.with_rules):
+        print("  4. (Recommended) Enable full local-first attribution:")
+        print(f"       python3 {Path(__file__).name} "
+              f"--with-ci --with-hooks --with-rules")
     return 0
 
 

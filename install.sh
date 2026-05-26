@@ -155,6 +155,9 @@ mkdir -p "$TARGET"
 cp -R "$PLUGIN_SRC/edpa/scripts"   "$TARGET/"
 cp -R "$PLUGIN_SRC/edpa/schemas"   "$TARGET/"
 cp -R "$PLUGIN_SRC/edpa/templates" "$TARGET/"
+if [ -d "$PLUGIN_SRC/rules" ]; then
+  cp -R "$PLUGIN_SRC/rules" "$TARGET/"
+fi
 
 # Pin the vendored plugin version so /edpa:setup --update-engine and CI
 # workflows can sanity-check the engine tree.
