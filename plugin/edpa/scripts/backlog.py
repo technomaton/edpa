@@ -1046,12 +1046,31 @@ def cmd_add(root, backlog, args):
         item_data["contributors"] = contributors
         _save_md_helper(file_path, item_data, body=body)
 
-    # Git add + commit (mirrors GH path tail).
+    # Git add + commit. Stage the counter file alongside the new item
+    # so the pre-commit ID-safety hook sees them as one consistent
+    # transaction (otherwise the hook sees a "new item" but the counter
+    # in HEAD is still 0 and rejects the commit).
     import subprocess
-    subprocess.run(["git", "add", str(file_path)],
-                   capture_output=True, cwd=str(root))
-    subprocess.run(["git", "commit", "-m", f"feat({new_id}): {title}"],
-                   capture_output=True, cwd=str(root))
+    counter_path = root / ".edpa" / "config" / "id_counters.yaml"
+    add_args = ["git", "add", str(file_path)]
+    if counter_path.exists():
+        add_args.append(str(counter_path))
+    subprocess.run(add_args, capture_output=True, cwd=str(root))
+    commit = subprocess.run(
+        ["git", "commit", "-m", f"feat({new_id}): {title}"],
+        capture_output=True, text=True, cwd=str(root),
+    )
+    if commit.returncode != 0:
+        # Hooks rejected the commit. Surface the reason — silent failure
+        # leaves an uncommitted .md on disk and confuses downstream tools.
+        print()
+        print(color(f"  Item {new_id} written to disk but git commit failed:",
+                    C.ERR))
+        if commit.stdout:
+            print(commit.stdout.rstrip())
+        if commit.stderr:
+            print(commit.stderr.rstrip())
+        sys.exit(2)
     print()
     print(color(f"  Created (local): {bold(new_id)} {title}",
                 level_color(args.type)))
