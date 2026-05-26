@@ -83,7 +83,25 @@ After Stage 2 completes, decide whether to commit those YAML changes
 
 Skip this stage if `EDPA_NO_GH=1` is set or the workflow file is absent.
 
-### Stage 2b — Engine + reports
+### Stage 2b — Refresh contributors[] (V2.1 C7.6)
+
+Before invoking the engine, refresh `contributors[]` on **every**
+backlog item that has accumulated `evidence[]` signals since the
+last close. Without this step, Feature/Epic/Initiative gate events
+inherit a stale `contributors[]` snapshot (typically set when the
+LBC was first written) — the engine then credits whoever happened
+to be in that early snapshot, not the people who actually moved
+the item through its lifecycle in this iteration.
+
+```bash
+python3 .edpa/engine/scripts/detect_contributors.py --all-items
+```
+
+Idempotent: items without `evidence[]` are no-ops. Cost is trivial
+(<1s for typical backlogs). Auto-commits as `chore(contributors): …`
+follow-up.
+
+### Stage 2c — Engine + reports
 
 Invoke the existing skills in sequence:
 

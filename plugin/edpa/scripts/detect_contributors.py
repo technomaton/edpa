@@ -717,6 +717,50 @@ def cmd_ci(edpa_root: Path, repo: str, dry_run: bool = False) -> int:
     return cmd_pr(edpa_root, repo, int(pr_number), dry_run=dry_run)
 
 
+def cmd_all_items(edpa_root: Path, dry_run: bool = False) -> int:
+    """V2.1 C7.6 — refresh contributors[] for EVERY item with evidence.
+
+    Run before engine at close-iteration so gate events (Feature/Epic/
+    Initiative) and Story Done credits see fresh contributors[]
+    reflecting the latest evidence[] aggregation — not the stale
+    snapshot from whenever someone last edited the item.
+
+    Idempotent: items without evidence[] are no-ops. Cost is O(items)
+    file reads + O(signals) aggregations; trivial for backlogs <1000
+    items.
+    """
+    weights = load_signal_weights(edpa_root)
+    people_map = load_people_map(edpa_root)
+    issue_map: dict = {}  # V2 doesn't use GH issue map
+
+    type_dirs = ("initiatives", "epics", "features", "stories",
+                 "defects", "events", "risks")
+    n_touched = 0
+    n_total = 0
+    for type_dir in type_dirs:
+        dir_path = edpa_root / "backlog" / type_dir
+        if not dir_path.exists():
+            continue
+        for f in sorted(dir_path.glob("*.md")):
+            item_id = f.stem
+            n_total += 1
+            try:
+                changed, n_signals = process_item(
+                    edpa_root, repo="", item_id=item_id,
+                    weights=weights, people_map=people_map,
+                    issue_map=issue_map, pr_scope=[], dry_run=dry_run,
+                )
+                if n_signals > 0:
+                    n_touched += 1
+            except Exception as e:
+                print(f"WARN: process_item({item_id}) failed: {e}",
+                      file=sys.stderr)
+    verb = "would refresh" if dry_run else "refreshed"
+    print(f"{verb}: {n_touched} item(s) with evidence "
+          f"(scanned {n_total} total)")
+    return 0
+
+
 # ─── _parse_relative_since (preserved API) ─────────────────────────────────
 
 
@@ -760,6 +804,9 @@ def main():
     )
     ap.add_argument("--pr", type=int, help="Recompute contributors for items in this PR")
     ap.add_argument("--item", help="Recompute contributors for a single item ID (e.g. S-200)")
+    ap.add_argument("--all-items", action="store_true",
+                    help="V2.1: refresh contributors[] for every item with "
+                         "evidence (run before edpa-engine at close-iteration)")
     ap.add_argument("--since", default="30days",
                     help="With --item: how far back to scan PRs (default: 30days)")
     ap.add_argument("--repo",
@@ -769,6 +816,10 @@ def main():
     args = ap.parse_args()
 
     edpa_root = find_edpa_root()
+
+    # --all-items doesn't need a repo (V2 evidence-only path).
+    if args.all_items:
+        return cmd_all_items(edpa_root, dry_run=args.dry_run)
 
     repo = args.repo or detect_repo_from_config(edpa_root)
     if not repo:
