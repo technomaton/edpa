@@ -251,14 +251,22 @@ def load_issue_map(edpa_root: Path) -> dict[str, int]:
 # ─── Signal collection ──────────────────────────────────────────────────────
 
 
-def read_ci_signals(item_path: Path) -> list[dict]:
-    """Read CI-materialized PR signals from an item's YAML ``ci_signals[]``.
+def read_evidence(item_path: Path) -> list[dict]:
+    """Read materialized PR/local signals from an item's YAML ``evidence[]``.
 
-    V2 ADR-012: PR signals (pr_author, pr_reviewer, issue_comment) arrive
-    via the ``edpa-contribution-sync.yml`` workflow → ``sync_pr_contributions.py``
-    writes them as ``ci_signals[]``. This returns them shaped like
-    ``_signal()`` output so the aggregator can mix them in.
-    Returns ``[]`` if the file is missing or has no block.
+    V2.1 ADR-012 rename (was ``ci_signals[]`` in V2.0): the block holds
+    deterministic event-derived signals (pr_author, pr_reviewer,
+    issue_comment from CI; commit_author, yaml_edit:* from local hooks
+    in V2.1+). Returns the entries shaped like ``_signal()`` output so
+    the aggregator can mix them with any remaining live collectors.
+
+    Backward compatible: if the YAML still has the legacy
+    ``ci_signals[]`` block (V2.0 items not yet migrated), it is read
+    transparently. The next write through ``sync_pr_contributions.py``
+    or ``migrate_evidence_rename.py`` converges the file on
+    ``evidence[]``.
+
+    Returns ``[]`` if the file is missing or has neither block.
     """
     if not item_path.exists():
         return []
@@ -268,7 +276,9 @@ def read_ci_signals(item_path: Path) -> list[dict]:
     finally:
         sys.path.pop(0)
     data = load_md(item_path) or {}
-    raw = data.get("ci_signals") or []
+    raw = data.get("evidence")
+    if raw is None:
+        raw = data.get("ci_signals") or []
     if not isinstance(raw, list):
         return []
     out = []
@@ -283,6 +293,10 @@ def read_ci_signals(item_path: Path) -> list[dict]:
             "detected_at": s.get("at", utc_now_iso()),
         })
     return out
+
+
+# Backward-compat alias for V2.0 callers; will be removed in V3.0.
+read_ci_signals = read_evidence
 
 
 def _signal(stype: str, ref: str, login: str, weight: float,
@@ -607,10 +621,11 @@ def process_item(edpa_root: Path, repo: str, item_id: str,
         pr_nums = list(pr_scope)
 
     signals: list[dict] = []
-    # V2 ADR-012: PR signals normally arrive via CI-materialized
-    # ci_signals[] block on the item itself; the runtime gh path below
-    # is a no-op unless EDPA_USE_GH=1 (escape hatch for local debug).
-    signals.extend(read_ci_signals(item_path))
+    # V2 ADR-012: signals arrive via the item's evidence[] block —
+    # written by sync_pr_contributions.py (CI) or local hooks. The
+    # runtime gh path below is a no-op unless EDPA_USE_GH=1 (escape
+    # hatch for local debug).
+    signals.extend(read_evidence(item_path))
     if issue_num:
         signals.extend(collect_assignee_signals(repo, issue_num, weights["assignee"]))
         signals.extend(collect_issue_signals(repo, issue_num, weights))

@@ -9,10 +9,10 @@ GitHub:
   sync_pr_contributions.py --event …  (real subprocess, not import)
         │
         ▼
-  ci_signals[] block written into .edpa/backlog/{type}/{ID}.md
+  evidence[] block written into .edpa/backlog/{type}/{ID}.md
         │
         ▼
-  detect_contributors.read_ci_signals() returns the same data
+  detect_contributors.read_evidence() returns the same data
         │
         ▼
   Engine aggregation can mix CI signals with git-native signals
@@ -150,8 +150,8 @@ def _run_sync(project: Path, event_path: Path, *,
 # ─── Synthetic-flow tests (always run) ──────────────────────────────────────
 
 
-def test_synthetic_pr_event_writes_ci_signals(project: Path, tmp_path: Path) -> None:
-    """One PR → pr_author + reviews + comments materialized as ci_signals."""
+def test_synthetic_pr_event_writes_evidence(project: Path, tmp_path: Path) -> None:
+    """One PR → pr_author + reviews + comments materialized as evidence."""
     event = _write_event(
         tmp_path / "evt.json",
         number=100,
@@ -174,7 +174,7 @@ def test_synthetic_pr_event_writes_ci_signals(project: Path, tmp_path: Path) -> 
     assert result.returncode == 0, result.stderr
 
     s1 = load_md(project / ".edpa/backlog/stories/S-1.md")
-    sigs = s1.get("ci_signals", [])
+    sigs = s1.get("evidence", [])
     assert len(sigs) == 4, f"expected 4 signals (1 author + 2 reviews + 1 comment), got {len(sigs)}: {sigs}"
 
     types = sorted(s.get("type") for s in sigs)
@@ -197,7 +197,7 @@ def test_synthetic_idempotent_rerun(project: Path, tmp_path: Path) -> None:
     _run_sync(project, event)
     second = load_md(project / ".edpa/backlog/stories/S-1.md")
 
-    assert len(second["ci_signals"]) == len(first["ci_signals"]) == 1
+    assert len(second["evidence"]) == len(first["evidence"]) == 1
 
 
 def test_synthetic_multi_pr_accumulates(project: Path, tmp_path: Path) -> None:
@@ -208,7 +208,7 @@ def test_synthetic_multi_pr_accumulates(project: Path, tmp_path: Path) -> None:
         assert result.returncode == 0, result.stderr
 
     s1 = load_md(project / ".edpa/backlog/stories/S-1.md")
-    sigs = s1["ci_signals"]
+    sigs = s1["evidence"]
     assert len(sigs) == 3
     refs = {s["ref"] for s in sigs}
     assert refs == {"PR#301:author", "PR#302:author", "PR#303:author"}
@@ -231,9 +231,9 @@ def test_synthetic_pr_referencing_multiple_items_explodes(
 
     s1 = load_md(project / ".edpa/backlog/stories/S-1.md")
     s2 = load_md(project / ".edpa/backlog/stories/S-2.md")
-    assert len(s1["ci_signals"]) == 1
-    assert len(s2["ci_signals"]) == 1
-    assert s1["ci_signals"][0]["ref"] == s2["ci_signals"][0]["ref"] == "PR#400:author"
+    assert len(s1["evidence"]) == 1
+    assert len(s2["evidence"]) == 1
+    assert s1["evidence"][0]["ref"] == s2["evidence"][0]["ref"] == "PR#400:author"
 
 
 def test_synthetic_pr_with_no_item_refs_is_noop(
@@ -253,8 +253,8 @@ def test_synthetic_pr_with_no_item_refs_is_noop(
 
     s1 = load_md(project / ".edpa/backlog/stories/S-1.md")
     s2 = load_md(project / ".edpa/backlog/stories/S-2.md")
-    assert "ci_signals" not in s1
-    assert "ci_signals" not in s2
+    assert "evidence" not in s1
+    assert "evidence" not in s2
 
 
 def test_synthetic_unknown_item_skipped_silently(
@@ -276,10 +276,10 @@ def test_synthetic_unknown_item_skipped_silently(
 # ─── Engine integration ────────────────────────────────────────────────────
 
 
-def test_read_ci_signals_returns_engine_shape(
+def test_read_evidence_returns_engine_shape(
     project: Path, tmp_path: Path,
 ) -> None:
-    """detect_contributors.read_ci_signals() returns the same shape as _signal()."""
+    """detect_contributors.read_evidence() returns the same shape as _signal()."""
     event = _write_event(
         tmp_path / "evt.json",
         number=700,
@@ -290,7 +290,7 @@ def test_read_ci_signals_returns_engine_shape(
     _run_sync(project, event)
 
     s1_path = project / ".edpa/backlog/stories/S-1.md"
-    signals = dc.read_ci_signals(s1_path)
+    signals = dc.read_evidence(s1_path)
 
     assert len(signals) == 2
     # Each entry must have the keys expected by aggregate_signals().
@@ -301,15 +301,15 @@ def test_read_ci_signals_returns_engine_shape(
     assert types == ["pr_author", "pr_reviewer"]
 
 
-def test_read_ci_signals_empty_when_no_block(project: Path) -> None:
+def test_read_evidence_empty_when_no_block(project: Path) -> None:
     """An untouched item returns [] — not None, not crash."""
     s2_path = project / ".edpa/backlog/stories/S-2.md"
-    assert dc.read_ci_signals(s2_path) == []
+    assert dc.read_evidence(s2_path) == []
 
 
-def test_read_ci_signals_handles_missing_file(project: Path) -> None:
+def test_read_evidence_handles_missing_file(project: Path) -> None:
     """Missing item file returns [] — no exception."""
-    assert dc.read_ci_signals(project / ".edpa/backlog/stories/S-404.md") == []
+    assert dc.read_evidence(project / ".edpa/backlog/stories/S-404.md") == []
 
 
 # ─── Mid-flight close-iteration sync (ADR-013) ─────────────────────────────
@@ -338,7 +338,7 @@ def test_skip_commit_writes_yaml_without_git_commit(
 
     # YAML on disk has the new signal even though it isn't committed
     s1 = load_md(project / ".edpa/backlog/stories/S-1.md")
-    assert len(s1["ci_signals"]) == 1
+    assert len(s1["evidence"]) == 1
 
 
 # ─── Real-GitHub variant (opt-in, requires gh + EDPA_E2E_REPO) ─────────────
@@ -359,7 +359,7 @@ def test_real_github_pr_roundtrip(tmp_path: Path) -> None:
       4. Merges the PR via ``gh pr merge --squash``.
       5. Polls for the contribution-sync workflow run to complete.
       6. Pulls and asserts ``.edpa/backlog/stories/S-1.md`` now has
-         a ``ci_signals[]`` entry with type ``pr_author``.
+         a ``evidence[]`` entry with type ``pr_author``.
 
     Slow (~3 min); skipped by default. Opt-in via ``pytest -m e2e``.
     """
@@ -428,7 +428,7 @@ def test_real_github_pr_roundtrip(tmp_path: Path) -> None:
             break
 
     assert found_commit, (
-        f"contribution-sync workflow did not commit ci_signals for PR#{pr_num} "
+        f"contribution-sync workflow did not commit evidence for PR#{pr_num} "
         f"within 5 min — check GH Actions logs for {repo}"
     )
 
@@ -438,6 +438,6 @@ def test_real_github_pr_roundtrip(tmp_path: Path) -> None:
                    check=True, capture_output=True)
 
     s1 = load_md(work / ".edpa/backlog/stories/S-1.md")
-    sigs = s1.get("ci_signals", [])
+    sigs = s1.get("evidence", [])
     refs = {s.get("ref") for s in sigs}
     assert f"PR#{pr_num}:author" in refs, f"missing pr_author signal: {sigs}"

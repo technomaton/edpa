@@ -2,7 +2,7 @@
 
 Exercise the deterministic event→YAML pipeline without hitting gh:
 build a synthetic PR payload, feed it through ``event_to_signals`` +
-``apply_signals``, assert ``ci_signals`` block is written/deduped.
+``apply_signals``, assert ``evidence`` block is written/deduped.
 """
 from __future__ import annotations
 
@@ -109,7 +109,7 @@ def test_signals_empty_when_no_refs(edpa_root: Path) -> None:
 # apply_signals + dedupe
 # ---------------------------------------------------------------------------
 
-def test_apply_writes_ci_signals_block(edpa_root: Path) -> None:
+def test_apply_writes_evidence_block(edpa_root: Path) -> None:
     pr = _pr_payload()
     weights = spc._load_weights(edpa_root)
     signals = spc.event_to_signals(pr, weights)
@@ -117,8 +117,8 @@ def test_apply_writes_ci_signals_block(edpa_root: Path) -> None:
 
     assert summary == {"S-1": 1}
     data = load_md(edpa_root / "backlog" / "stories" / "S-1.md")
-    assert len(data["ci_signals"]) == 1
-    sig = data["ci_signals"][0]
+    assert len(data["evidence"]) == 1
+    sig = data["evidence"][0]
     assert sig["type"] == "pr_author"
     assert sig["person"] == "alice"
     assert sig["ref"] == "PR#42:author"
@@ -132,7 +132,7 @@ def test_apply_is_idempotent(edpa_root: Path) -> None:
     spc.apply_signals(edpa_root, signals)
 
     data = load_md(edpa_root / "backlog" / "stories" / "S-1.md")
-    assert len(data["ci_signals"]) == 1, "Re-applying same signals should dedupe"
+    assert len(data["evidence"]) == 1, "Re-applying same signals should dedupe"
 
 
 def test_apply_merges_new_signals_into_existing(edpa_root: Path) -> None:
@@ -150,7 +150,7 @@ def test_apply_merges_new_signals_into_existing(edpa_root: Path) -> None:
     spc.apply_signals(edpa_root, spc.event_to_signals(pr2, weights))
 
     data = load_md(edpa_root / "backlog" / "stories" / "S-1.md")
-    refs = {s["ref"] for s in data["ci_signals"]}
+    refs = {s["ref"] for s in data["evidence"]}
     assert refs == {"PR#1:author", "PR#2:author", "PR#2:review:RV1"}
 
 

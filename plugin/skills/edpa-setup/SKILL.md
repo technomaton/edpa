@@ -93,8 +93,16 @@ python3 ${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py --with-ci
 
 Then push the new workflow to `main`. After merge of any PR
 referencing an EDPA item, the workflow runs `sync_pr_contributions.py`
-which writes `ci_signals[]` into the item's YAML. The engine reads
-this on the next `edpa-engine` run.
+which writes `evidence[]` into the item's YAML. The engine reads this
+on the next `edpa-engine` run.
+
+Migrating from V2.0 (where the block was named `ci_signals[]`):
+
+```bash
+python3 .edpa/engine/scripts/migrate_evidence_rename.py
+```
+
+(idempotent; `--dry-run` for preview)
 
 ## What NOT to do
 

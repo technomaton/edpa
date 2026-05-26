@@ -237,11 +237,19 @@ def apply_signals(edpa_root: Path, signals: list[dict]) -> dict[str, int]:
         if not path:
             continue
         item = load_md(path) or {}
-        existing = item.get("ci_signals") or []
+        # V2.1 rename: ci_signals[] → evidence[]. Read from either
+        # (backward-compat for items written by V2.0); always write
+        # to evidence[] and drop any legacy ci_signals[] entry so the
+        # YAML converges on the new shape.
+        existing = item.get("evidence")
+        if existing is None:
+            existing = item.get("ci_signals") or []
         if not isinstance(existing, list):
             existing = []
         merged = _dedupe_signals(existing, new_signals)
-        item["ci_signals"] = merged
+        item["evidence"] = merged
+        if "ci_signals" in item:
+            del item["ci_signals"]
         save_md_item(path, item)
         summary[item_id] = len(merged)
     return summary
@@ -298,7 +306,7 @@ def main() -> int:
     summary = apply_signals(edpa_root, signals)
     print(f"Materialized {len(signals)} signal(s) into {len(summary)} item(s):")
     for iid, n in sorted(summary.items()):
-        print(f"  {iid}: {n} total ci_signals after merge")
+        print(f"  {iid}: {n} total evidence after merge")
 
     if args.skip_commit:
         return 0
