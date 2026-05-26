@@ -1,0 +1,16 @@
+#!/bin/sh
+# EDPA V2.1 commit-msg hook — require an EDPA item reference (or escape).
+#
+# Git invokes this with $1 = path to COMMIT_EDITMSG. Exit non-zero
+# aborts the commit; the user keeps the message in the buffer to fix.
+#
+# Disable with: export EDPA_NO_TICKET_CHECK=1
+# Bypass once:  git commit --no-verify
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+[ -z "$REPO_ROOT" ] && exit 0
+
+CHECKER="$REPO_ROOT/.edpa/engine/scripts/check_ticket_attached.py"
+[ ! -f "$CHECKER" ] && exit 0
+
+exec python3 "$CHECKER" "$1"

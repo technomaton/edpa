@@ -178,6 +178,13 @@ def install_hooks(root: Path) -> bool:
             shutil.copy(src, dst)
             dst.chmod(0o755)
             installed.append(hook)
+    # Commit-msg: ticket-attached check (V2.1)
+    cm_src = src_dir / "commit-msg-ticket-attached"
+    cm_dst = git_hooks / "commit-msg"
+    if cm_src.exists() and not cm_dst.exists():
+        shutil.copy(cm_src, cm_dst)
+        cm_dst.chmod(0o755)
+        installed.append("commit-msg")
     # Post-commit: local evidence emitter (V2.1)
     pc_src = src_dir / "post-commit-evidence"
     pc_dst = git_hooks / "post-commit"
@@ -188,6 +195,7 @@ def install_hooks(root: Path) -> bool:
     if installed:
         ok(f"Installed git hooks: {', '.join(installed)}")
         info("pre-commit/pre-push: filename≡id, no upstream collisions")
+        info("commit-msg: require EDPA item ref (or 'no-ticket:' escape)")
         info("post-commit: emit commit_author signals into item evidence[]")
     else:
         info("Hooks already installed or sources missing — no changes")
