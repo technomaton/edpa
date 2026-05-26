@@ -76,12 +76,21 @@ def _gh_json(args: list[str]) -> dict | list | None:
             ["gh", *args], capture_output=True, text=True, check=False,
         )
     except FileNotFoundError:
+        print("ERROR: gh CLI not found in PATH", file=sys.stderr)
         return None
     if r.returncode != 0:
+        # Surface stderr so workflow logs show *why* gh failed (auth,
+        # bad json field, rate limit, missing repo, …) instead of just
+        # "cannot fetch PR".
+        if r.stderr:
+            print(f"gh error (exit {r.returncode}): {r.stderr.rstrip()}",
+                  file=sys.stderr)
         return None
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError:
+        print(f"ERROR: gh returned non-JSON output: {r.stdout[:200]!r}",
+              file=sys.stderr)
         return None
 
 
@@ -120,9 +129,18 @@ def find_item_path(edpa_root: Path, item_id: str) -> Path | None:
 
 
 def fetch_pr(pr_number: int, repo: str | None) -> dict | None:
-    """Pull a PR's title/body/author/reviews/comments via gh CLI."""
-    args = ["pr", "view", str(pr_number),
-            "--json", "number,title,body,author,reviews,comments,headRefName,state,merged"]
+    """Pull a PR's title/body/author/reviews/comments via gh CLI.
+
+    Note: ``merged`` is not a valid ``gh pr view --json`` field. Use
+    ``state`` (returns ``OPEN``/``CLOSED``/``MERGED``) instead. The
+    workflow already gates on ``pull_request.merged == true`` before
+    invoking this script, so state checking here is informational only.
+    """
+    args = [
+        "pr", "view", str(pr_number),
+        "--json",
+        "number,title,body,author,reviews,comments,headRefName,state",
+    ]
     if repo:
         args.extend(["--repo", repo])
     data = _gh_json(args)
