@@ -1,5 +1,38 @@
 # Changelog
 
+## 2.1.1 — 2026-05-27 — Expose story_activity audit in results JSON
+
+Patch release follow-up to C7.5. `load_story_activity_events()` already
+computed a per-Story audit log (item_id, credit_factor, story_js,
+effective_js, n_yaml_edit_signals) but the data was captured into a
+local variable and dropped before `edpa_results.json` was written.
+
+This release wires the audit into the output JSON next to `gate_events`,
+so post-iteration inspection can see which in-flight Stories received
+credit and with what multiplier without grepping git history.
+
+### feat(v2.1): expose story_activity audit in edpa_results.json
+
+Two-line wiring in `engine.py`'s `main()`:
+
+```json
+"story_activity_events": [
+  {
+    "item_id": "S-501",
+    "type": "story_activity",
+    "credit_factor": 0.4,
+    "story_js": 8,
+    "effective_js": 3.2,
+    "n_yaml_edit_signals": 3
+  }
+]
+```
+
+Empty list ⇒ key omitted (truthy check) so clean iterations don't carry
+empty arrays in their snapshots.
+
+No schema change, no test broken — 541 tests still pass.
+
 ## 2.1.0 — 2026-05-26 — Local-first attribution complete
 
 V2.0 closed the GH-coupling architectural gap. V2.1 closes the local
