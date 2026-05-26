@@ -1,13 +1,24 @@
-# EDPA V2 — PR contribution materialization (ADR-012, ADR-013).
+# EDPA V2.1 — Optional CI complement for PR-thread signals
+# (ADR-012, ADR-013, Krok C6 demotion).
 #
-# Triggers on PR merge (default: merge-only mode) and writes PR signals
-# (pr_author, pr_reviewer, issue_comment) into .edpa/backlog/{type}/{ID}.md
-# as a single commit per PR. Engine then reads YAML — no runtime gh call.
+# This workflow is OPTIONAL. The primary attribution path in V2.1+ is
+# the local post-commit hook (`local_evidence.py`), which emits
+# `commit_author` for every commit that references an EDPA item — no
+# GH Action required, works on GitLab/Forgejo/offline git too.
 #
-# Copy this file to .github/workflows/edpa-contribution-sync.yml in your
-# repo. The default mode is merge-only (1 commit per PR; clean main
-# history). For audit-heavy teams, uncomment the "live mode" triggers
-# below to materialize on every review/comment event.
+# Install this workflow only when your team has signals that DON'T
+# exist in git history and you want them counted:
+#
+#   - pr_reviewer    — review submitter (lives in GH PR thread)
+#   - issue_comment  — comment author   (lives in GH issue/PR thread)
+#
+# Skip this workflow when your team is single-dev, review-light, or
+# entirely off GitHub.
+#
+# Mode (default merge-only): triggers once per PR after merge and
+# writes the PR's review + comment events as `evidence[]` entries.
+# For audit-heavy teams, uncomment the live-mode triggers below to
+# materialize on every review/comment event.
 
 name: EDPA contribution sync
 

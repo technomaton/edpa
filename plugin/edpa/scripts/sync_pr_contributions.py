@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
-"""CI materialization layer — write PR signals into .edpa/backlog/ YAML.
+"""CI complement — write PR-thread signals into .edpa/backlog/ YAML.
 
-V2 ADR-012 implementation. Triggered by a platform-specific CI workflow
-(GH Actions / GitLab CI / Forgejo Actions); reads a PR event payload,
-identifies the EDPA items the PR touches, computes signals
-(pr_author, pr_reviewer, issue_comment, …), dedupes via ``signals[].ref``,
-and rewrites ``.edpa/backlog/{type}/{ID}.md`` with the merged
-``contributors[]`` block.
+V2 ADR-012 + V2.1 Krok C6 demotion. Triggered by a platform-specific
+CI workflow (GH Actions / GitLab CI / Forgejo Actions); reads a PR
+event payload, identifies the EDPA items the PR touches, and emits
+ONLY the signals that don't exist in local git history:
+
+  - ``pr_reviewer``   (review submitter — PR-thread event)
+  - ``issue_comment`` (comment author   — issue-thread event)
+
+The primary attribution source in V2.1+ is ``local_evidence.py``
+(post-commit hook), which emits ``commit_author`` for every commit
+mentioning an item ID. This script is the optional complement that
+adds PR-thread-only signals on top.
+
+Result is merged into the item's ``evidence[]`` block, dedup by ref.
 
 Deterministic: same input event → same YAML diff. No LLM. No heuristics
 about who to credit — just maps event → signal type → weight from
@@ -59,10 +67,11 @@ _ITEM_REF_RE = re.compile(r"\b([A-Z]{1,3}-\d{1,9})\b")
 
 # Defaults if cw_heuristics.yaml is missing.
 DEFAULT_WEIGHTS = {
-    "pr_author": 3.4,
+    # V2.1: pr_author + assignee are NOT emitted by this script —
+    # commit_author from local_evidence.py covers them. Listed here only
+    # for callers who fork the script with a custom emitter.
     "pr_reviewer": 2.25,
     "issue_comment": 1.14,
-    "assignee": 4.0,
 }
 
 
@@ -150,6 +159,25 @@ def fetch_pr(pr_number: int, repo: str | None) -> dict | None:
 def event_to_signals(pr: dict, weights: dict[str, float]) -> list[dict]:
     """Turn a PR payload into a flat list of (item_id, signal) tuples.
 
+    V2.1 demotion: this script is the OPTIONAL CI complement to
+    ``local_evidence.py`` (the primary local hook). It emits only
+    PR-thread events that can't be detected from git alone:
+
+      - ``pr_reviewer``   (review submitter — lives in GH PR thread)
+      - ``issue_comment`` (comment author   — lives in GH issue thread)
+
+    What it deliberately does NOT emit:
+
+      - ``pr_author`` — the PR author wrote at least one commit, and
+        ``local_evidence.py`` already credits them as ``commit_author``
+        (weight 2.78, ref ``commit/{sha}``). Emitting pr_author here
+        would double-count the same human action.
+
+    Projects without local hooks installed and that want pr_author
+    attribution should either (a) install hooks via
+    ``project_setup.py --with-hooks``, or (b) fork this script with a
+    custom emitter.
+
     Returns ``[{item_id, signal: {type, person, weight, ref, at}}]``.
     """
     item_ids = set()
@@ -162,20 +190,6 @@ def event_to_signals(pr: dict, weights: dict[str, float]) -> list[dict]:
     pr_url_base = f"PR#{pr_num}"
     now = _utc_now()
     signals: list[dict] = []
-
-    author = (pr.get("author") or {}).get("login")
-    if author:
-        for iid in item_ids:
-            signals.append({
-                "item_id": iid,
-                "signal": {
-                    "type": "pr_author",
-                    "person": author,
-                    "weight": weights.get("pr_author", 0),
-                    "ref": f"{pr_url_base}:author",
-                    "at": now,
-                },
-            })
 
     for rv in pr.get("reviews") or []:
         login = (rv.get("author") or {}).get("login")

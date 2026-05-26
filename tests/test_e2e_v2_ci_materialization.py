@@ -151,7 +151,8 @@ def _run_sync(project: Path, event_path: Path, *,
 
 
 def test_synthetic_pr_event_writes_evidence(project: Path, tmp_path: Path) -> None:
-    """One PR → pr_author + reviews + comments materialized as evidence."""
+    """V2.1: PR with reviews + comments → pr_reviewer + issue_comment
+    materialized (NO pr_author — local_evidence handles commit_author)."""
     event = _write_event(
         tmp_path / "evt.json",
         number=100,
@@ -175,14 +176,16 @@ def test_synthetic_pr_event_writes_evidence(project: Path, tmp_path: Path) -> No
 
     s1 = load_md(project / ".edpa/backlog/stories/S-1.md")
     sigs = s1.get("evidence", [])
-    assert len(sigs) == 4, f"expected 4 signals (1 author + 2 reviews + 1 comment), got {len(sigs)}: {sigs}"
+    assert len(sigs) == 3, (
+        f"expected 3 signals (2 reviews + 1 comment, NO pr_author), "
+        f"got {len(sigs)}: {sigs}"
+    )
 
     types = sorted(s.get("type") for s in sigs)
-    assert types == ["issue_comment", "pr_author", "pr_reviewer", "pr_reviewer"]
+    assert types == ["issue_comment", "pr_reviewer", "pr_reviewer"]
 
     refs = {s["ref"] for s in sigs}
     assert refs == {
-        "PR#100:author",
         "PR#100:review:RV1",
         "PR#100:review:RV2",
         "PR#100:comment:C1",
@@ -190,8 +193,12 @@ def test_synthetic_pr_event_writes_evidence(project: Path, tmp_path: Path) -> No
 
 
 def test_synthetic_idempotent_rerun(project: Path, tmp_path: Path) -> None:
-    """Running same event twice → dedupe via signals[].ref; no duplicates."""
-    event = _write_event(tmp_path / "evt.json", number=200, author="alice-gh")
+    """V2.1: same review event run twice → dedupe by ref; no duplicates."""
+    event = _write_event(
+        tmp_path / "evt.json", number=200, author="alice-gh",
+        reviews=[{"id": "RV1", "author": {"login": "bob-gh"},
+                  "submittedAt": "2026-05-25T12:00:00Z"}],
+    )
     _run_sync(project, event)
     first = load_md(project / ".edpa/backlog/stories/S-1.md")
     _run_sync(project, event)
@@ -201,9 +208,13 @@ def test_synthetic_idempotent_rerun(project: Path, tmp_path: Path) -> None:
 
 
 def test_synthetic_multi_pr_accumulates(project: Path, tmp_path: Path) -> None:
-    """Three separate PRs touching S-1 → signals accumulate, refs unique."""
-    for n, author in [(301, "alice-gh"), (302, "bob-gh"), (303, "carol-gh")]:
-        evt = _write_event(tmp_path / f"evt-{n}.json", number=n, author=author)
+    """V2.1: three PRs each with one reviewer → 3 pr_reviewer signals."""
+    for n, reviewer in [(301, "alice-gh"), (302, "bob-gh"), (303, "carol-gh")]:
+        evt = _write_event(
+            tmp_path / f"evt-{n}.json", number=n, author="other-gh",
+            reviews=[{"id": "RV1", "author": {"login": reviewer},
+                      "submittedAt": "2026-05-25T12:00:00Z"}],
+        )
         result = _run_sync(project, evt)
         assert result.returncode == 0, result.stderr
 
@@ -211,20 +222,23 @@ def test_synthetic_multi_pr_accumulates(project: Path, tmp_path: Path) -> None:
     sigs = s1["evidence"]
     assert len(sigs) == 3
     refs = {s["ref"] for s in sigs}
-    assert refs == {"PR#301:author", "PR#302:author", "PR#303:author"}
-    authors = sorted(s["person"] for s in sigs)
-    assert authors == ["alice-gh", "bob-gh", "carol-gh"]
+    assert refs == {"PR#301:review:RV1", "PR#302:review:RV1", "PR#303:review:RV1"}
+    reviewers = sorted(s["person"] for s in sigs)
+    assert reviewers == ["alice-gh", "bob-gh", "carol-gh"]
 
 
 def test_synthetic_pr_referencing_multiple_items_explodes(
     project: Path, tmp_path: Path,
 ) -> None:
-    """One PR mentioning S-1 AND S-2 → both items get the signals."""
+    """V2.1: PR mentioning S-1 AND S-2, with a reviewer → both items
+    get a pr_reviewer signal each."""
     event = _write_event(
         tmp_path / "evt.json",
         number=400,
         title="S-1 + S-2: unified auth refactor",
         author="alice-gh",
+        reviews=[{"id": "RV1", "author": {"login": "bob-gh"},
+                  "submittedAt": "2026-05-25T12:00:00Z"}],
     )
     result = _run_sync(project, event)
     assert result.returncode == 0, result.stderr
@@ -233,7 +247,7 @@ def test_synthetic_pr_referencing_multiple_items_explodes(
     s2 = load_md(project / ".edpa/backlog/stories/S-2.md")
     assert len(s1["evidence"]) == 1
     assert len(s2["evidence"]) == 1
-    assert s1["evidence"][0]["ref"] == s2["evidence"][0]["ref"] == "PR#400:author"
+    assert s1["evidence"][0]["ref"] == s2["evidence"][0]["ref"] == "PR#400:review:RV1"
 
 
 def test_synthetic_pr_with_no_item_refs_is_noop(
@@ -279,13 +293,15 @@ def test_synthetic_unknown_item_skipped_silently(
 def test_read_evidence_returns_engine_shape(
     project: Path, tmp_path: Path,
 ) -> None:
-    """detect_contributors.read_evidence() returns the same shape as _signal()."""
+    """V2.1: PR with reviewer + commenter → 2 signals (no pr_author)."""
     event = _write_event(
         tmp_path / "evt.json",
         number=700,
         author="alice-gh",
         reviews=[{"id": "RV1", "author": {"login": "bob-gh"},
                   "submittedAt": "2026-05-25T12:00:00Z"}],
+        comments=[{"id": "C1", "author": {"login": "carol-gh"},
+                   "createdAt": "2026-05-25T13:00:00Z"}],
     )
     _run_sync(project, event)
 
@@ -298,7 +314,7 @@ def test_read_evidence_returns_engine_shape(
         assert set(s.keys()) >= {"type", "ref", "login", "weight", "detected_at"}
         assert isinstance(s["weight"], float)
     types = sorted(s["type"] for s in signals)
-    assert types == ["pr_author", "pr_reviewer"]
+    assert types == ["issue_comment", "pr_reviewer"]
 
 
 def test_read_evidence_empty_when_no_block(project: Path) -> None:
@@ -325,7 +341,11 @@ def test_skip_commit_writes_yaml_without_git_commit(
         capture_output=True, text=True, check=True,
     ).stdout.strip()
 
-    event = _write_event(tmp_path / "evt.json", number=800, author="alice-gh")
+    event = _write_event(
+        tmp_path / "evt.json", number=800, author="alice-gh",
+        reviews=[{"id": "RV1", "author": {"login": "bob-gh"},
+                  "submittedAt": "2026-05-25T12:00:00Z"}],
+    )
     result = _run_sync(project, event)  # --skip-commit baked into helper
     assert result.returncode == 0
 
