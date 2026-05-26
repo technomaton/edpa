@@ -1416,6 +1416,7 @@ def main():
         sys.exit(0)
 
     gate_audit = None
+    story_audit = None
     if args.demo:
         # Demo data has no git history — gates extraction returns 0
         # transitions and engine just credits Done items declaratively.
@@ -1526,6 +1527,8 @@ def main():
     }
     if gate_audit is not None:
         output["gate_events"] = gate_audit
+    if story_audit:
+        output["story_activity_events"] = story_audit
 
     # Write output
     if args.output:
