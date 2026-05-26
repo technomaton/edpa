@@ -1142,12 +1142,16 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
         item["iteration"] = iteration
     if assignee:
         item["assignee"] = assignee
+    # V2.1 strict defaults — WSJF fields always present so engine reads a
+    # deterministic value (no implicit-zero coercion) and so the YAML
+    # surfaces "this item has not been WSJF-scored yet" visibly to humans.
     for field in ("js", "bv", "tc", "rr_oe"):
-        if args.get(field) is not None:
-            item[field] = args[field]
-    js, bv, tc, rr = (args.get(k) or 0 for k in ("js", "bv", "tc", "rr_oe"))
-    if js and (bv or tc or rr):
-        item["wsjf"] = round((bv + tc + rr) / js, 2)
+        item[field] = args[field] if args.get(field) is not None else 0
+    js = item["js"]
+    bv = item["bv"]
+    tc = item["tc"]
+    rr = item["rr_oe"]
+    item["wsjf"] = round((bv + tc + rr) / js, 2) if js > 0 else 0.0
 
     file_path = edpa_root / "backlog" / TYPE_DIRS[item_type] / f"{new_id}.md"
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1198,9 +1202,14 @@ def _handle_item_update(edpa_root: Path, args: dict) -> list[TextContent]:
     item = _load_md_item(path) or {}
     body = item.pop("body", "") if isinstance(item, dict) else ""
     item.update(fields)
-    js, bv, tc, rr = (item.get(k) or 0 for k in ("js", "bv", "tc", "rr_oe"))
-    if js and (bv or tc or rr):
-        item["wsjf"] = round((bv + tc + rr) / js, 2)
+    # V2.1 — keep WSJF fields explicit (write 0 if any are still missing
+    # after the update; this also handles legacy items that pre-date the
+    # strict-defaults rule). wsjf is always recomputed deterministically.
+    for f in ("js", "bv", "tc", "rr_oe"):
+        if item.get(f) is None:
+            item[f] = 0
+    js, bv, tc, rr = item["js"], item["bv"], item["tc"], item["rr_oe"]
+    item["wsjf"] = round((bv + tc + rr) / js, 2) if js > 0 else 0.0
     _save_md_item(path, item, body=body)
     _load_yaml_cache_clear()
 

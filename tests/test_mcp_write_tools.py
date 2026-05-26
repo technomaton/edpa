@@ -96,6 +96,88 @@ def test_create_initiative(edpa_root: Path) -> None:
     assert md["status"] == "Funnel"
 
 
+# ---------------------------------------------------------------------------
+# WSJF strict defaults (V2.1 Krok C1)
+# ---------------------------------------------------------------------------
+
+def test_create_writes_all_wsjf_fields_even_when_unspecified(edpa_root: Path) -> None:
+    """V2.1: js/bv/tc/rr_oe/wsjf are always present in YAML (default 0).
+
+    Previously they were omitted when unspecified, which meant the engine
+    silently coerced None→0. Strict defaults surface that "this item
+    hasn't been WSJF-scored yet" visibly to humans reading the YAML."""
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "I",
+    }))
+    md = _read_md(edpa_root, "I-1")
+    for field in ("js", "bv", "tc", "rr_oe"):
+        assert field in md, f"{field} missing — strict defaults broken"
+        assert md[field] == 0
+    assert md["wsjf"] == 0.0  # js=0 → wsjf=0 (not div-by-zero)
+
+
+def test_create_with_partial_wsjf_zero_fills_rest(edpa_root: Path) -> None:
+    """If user passes only --js, bv/tc/rr_oe still get 0 defaults."""
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "I", "js": 5,
+    }))
+    md = _read_md(edpa_root, "I-1")
+    assert md["js"] == 5
+    assert md["bv"] == 0
+    assert md["tc"] == 0
+    assert md["rr_oe"] == 0
+    assert md["wsjf"] == 0.0
+
+
+def test_create_wsjf_computed_when_all_inputs_present(edpa_root: Path) -> None:
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "I",
+        "js": 5, "bv": 8, "tc": 3, "rr_oe": 2,
+    }))
+    md = _read_md(edpa_root, "I-1")
+    assert md["wsjf"] == round((8 + 3 + 2) / 5, 2)
+
+
+def test_update_zero_fills_missing_wsjf_fields_on_legacy_items(edpa_root: Path) -> None:
+    """Legacy items written before V2.1 may lack js/bv/tc/rr_oe. An
+    update operation backfills them to 0 so subsequent reads are
+    deterministic."""
+    sys.path.insert(0, str(ROOT / "plugin" / "edpa" / "scripts"))
+    from _md_frontmatter import save_md_item
+    # Plant a legacy item missing the WSJF block entirely.
+    path = edpa_root / "backlog" / "initiatives" / "I-1.md"
+    save_md_item(path, {
+        "id": "I-1", "type": "Initiative", "title": "Legacy", "status": "Funnel",
+    })
+    # Touch via update → all WSJF fields should appear at 0.
+    _parse(_handle_item_update(edpa_root, {
+        "item_id": "I-1", "fields": {"title": "Renamed"},
+    }))
+    md = _read_md(edpa_root, "I-1")
+    assert md["title"] == "Renamed"
+    for f in ("js", "bv", "tc", "rr_oe"):
+        assert md[f] == 0
+    assert md["wsjf"] == 0.0
+
+
+def test_update_recomputes_wsjf_when_inputs_change_to_zero(edpa_root: Path) -> None:
+    """Zeroing one input → wsjf re-derived. (Regression guard: V2.0's
+    conditional `if bv or tc or rr` skipped the recompute on
+    all-zero-but-still-explicit, leaving stale wsjf.)"""
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "I",
+        "js": 5, "bv": 8, "tc": 3, "rr_oe": 2,
+    }))
+    md = _read_md(edpa_root, "I-1")
+    assert md["wsjf"] > 0
+
+    _parse(_handle_item_update(edpa_root, {
+        "item_id": "I-1", "fields": {"bv": 0, "tc": 0, "rr_oe": 0},
+    }))
+    md = _read_md(edpa_root, "I-1")
+    assert md["wsjf"] == 0.0
+
+
 def test_create_story_under_feature(edpa_root: Path) -> None:
     _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "I1"}))
     _parse(_handle_item_create(edpa_root, {"type": "Epic", "title": "E1", "parent": "I-1"}))
