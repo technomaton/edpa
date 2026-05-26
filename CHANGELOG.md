@@ -1,5 +1,76 @@
 # Changelog
 
+## 2.0.0 — 2026-05-26 — V2 local-first hard cut (BREAKING)
+
+The V2 local-first architecture is now the only supported path. All
+runtime `gh` dependencies in the engine, MCP server, and CLI have been
+removed; PR-derived signals arrive exclusively via the CI materialization
+layer (workflow + `sync_pr_contributions.py` from `1.24.0-rc1`).
+
+For V1 → V2 migration, run `migrate_v1_to_v2.py` first. The V1 codebase
+remains available at the `v1-github-coupled` git tag for projects that
+need it.
+
+### BREAKING — files removed
+
+- `plugin/edpa/scripts/sync.py` (~1800 lines)
+- `plugin/edpa/scripts/_gh_issue_factory.py`
+- `plugin/edpa/scripts/_sub_issue_linker.py`
+- `plugin/edpa/scripts/sync_collaborators.py`
+- `plugin/edpa/scripts/create_project_views.py`
+- `plugin/edpa/scripts/project_views.py`
+- `plugin/edpa/scripts/lookup_org.py`
+- `plugin/skills/edpa-sync/`
+- `plugin/skills/edpa-sync-people/`
+- MCP tool `edpa_sync_people` (handler + dispatch)
+- `backlog.py cmd_add` — V1 GH-first path (the `--local` flag is gone;
+  the V2 local path is the only path)
+
+### BREAKING — behavior changes
+
+- `backlog.py add` is now V2 local-first by default. No `gh` calls,
+  no `issue_map.yaml` write. The CLI flag `--local` was removed —
+  V2 behavior is the default and only behavior.
+- `project_setup.py` rewritten from ~1050 lines to ~250 lines. It no
+  longer creates a GitHub Project, custom fields, or labels. New
+  flags: `--with-ci` (copy contribution-sync workflow), `--with-hooks`
+  (install pre-commit + pre-push ID safety hooks).
+- `detect_contributors.run_gh()` now returns `None` by default — the
+  engine is fully local. Escape hatch: `EDPA_USE_GH=1` env var
+  re-enables direct gh calls for local debugging (inverse of the
+  `EDPA_NO_GH=1` flag introduced in 1.24.0-rc1).
+- Engine now reads `ci_signals[]` from each item's YAML via the new
+  `detect_contributors.read_ci_signals()` and mixes them with
+  git-native signals during aggregation. CI commits are the only
+  source of PR-derived signals.
+
+### Removed tests
+
+13 sync-related test files deleted (1× e2e, 11× unit, 1× conflict). See
+git history at the 2.0.0 commit for the list. Total test count dropped
+580 → 447; all 447 remaining pass.
+
+### Skill updates
+
+- `edpa-add` skill rewritten — V1 dual-mode docs removed, V2-only.
+- `edpa-setup` skill rewritten — describes V2 bootstrap flow (no GH
+  Project provisioning, optional `--with-ci` + `--with-hooks`).
+- `edpa-sync` and `edpa-sync-people` skills removed.
+
+### Migration
+
+1. `python3 .edpa/engine/scripts/migrate_v1_to_v2.py --dry-run` to preview.
+2. `python3 .edpa/engine/scripts/migrate_v1_to_v2.py` to apply.
+3. `python3 .edpa/engine/scripts/project_setup.py --with-ci --with-hooks`
+   to opt into the new CI workflow and git hooks.
+4. Archive (don't delete) the GitHub Project board for audit history.
+
+If you need to stay on V1 indefinitely, pin to `v1-github-coupled`:
+
+```bash
+git checkout v1-github-coupled
+```
+
 ## 1.24.0-rc1 — 2026-05-26 — V2 local-first staging
 
 Release candidate for the V2 local-first architecture. **All changes are

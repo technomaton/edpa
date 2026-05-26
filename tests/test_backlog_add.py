@@ -73,7 +73,6 @@ def _args(**overrides) -> argparse.Namespace:
         "status": "Funnel",
         "iteration": None,
         "contributor": [],
-        "local": True,
     }
     base.update(overrides)
     return argparse.Namespace(**base)
@@ -264,53 +263,9 @@ def test_local_bad_contributor_cw_exits(tmp_path, silence_git, capsys):
     assert "[0,1]" in capsys.readouterr().out
 
 
-# --- mode selection (dual path) -------------------------------------------
-
-def test_default_path_with_sync_uses_gh_not_local(tmp_path, monkeypatch,
-                                                  silence_git, capsys):
-    """Without --local and with sync config present → GH path engages.
-
-    We don't run the GH flow end-to-end here (other test suite covers it);
-    just assert that local handler is NOT called when --local is absent.
-    """
-    root = _write_workspace(tmp_path, with_sync=True)
-    bl = backlog.load_backlog(root)
-
-    called = {"local": False}
-    real_local = backlog._cmd_add_local
-
-    def spy(*a, **kw):
-        called["local"] = True
-        return real_local(*a, **kw)
-
-    monkeypatch.setattr(backlog, "_cmd_add_local", spy)
-
-    # Without --local, GH path tries to call _gh_issue_factory and we don't
-    # mock it here — it'll fail. But we only need to assert that
-    # _cmd_add_local was not invoked.
-    try:
-        backlog.cmd_add(root, bl, _args(
-            type="Initiative", title="x", local=False,
-        ))
-    except SystemExit:
-        pass
-    assert called["local"] is False
-
-
-def test_fails_without_sync_and_without_local_flag(tmp_path, capsys):
-    """Backwards compatibility: V1 fail-fast message still fires.
-
-    Plan keeps the V1 fail-fast as the default so V1 users without sync
-    aren't silently switched to local mode — they get the hint to either
-    setup or opt in to --local.
-    """
-    root = _write_workspace(tmp_path, with_sync=False)
-    bl = backlog.load_backlog(root)
-    with pytest.raises(SystemExit) as exc:
-        backlog.cmd_add(root, bl, _args(
-            type="Initiative", title="x", local=False,
-        ))
-    assert exc.value.code == 1
-    out = capsys.readouterr().out
-    assert "sync is not configured" in out
-    assert "--local" in out
+# --- mode selection ----------------------------------------------------------
+#
+# V1 dual-mode tests (test_default_path_with_sync_uses_gh_not_local,
+# test_fails_without_sync_and_without_local_flag) were removed in V2.0
+# (Krok 6): there is no longer a GH-first path, so there's nothing to
+# fall back from. See git history at branch v1-github-coupled.

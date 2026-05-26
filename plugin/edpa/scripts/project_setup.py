@@ -1,1050 +1,247 @@
 #!/usr/bin/env python3
-"""
-EDPA GitHub Project Setup — Automated initialization of GitHub Projects v2.
+"""EDPA V2 project bootstrap — local-only, no GitHub provisioning.
 
-Creates a fully configured GitHub Project with:
-- Custom fields (Job Size, BV, TC, RR, WSJF Score, Team)
-- Issues for all backlog items (from .edpa/ per-item YAML files)
-- Native Issue Types assigned via GraphQL (Initiative, Epic, Feature, Story)
-- Enabler label for technical work items
-- Field values set on all project items
-- Project linked to repository
+Initializes ``.edpa/`` for a new project. Idempotent: safe to re-run.
+
+What it does:
+  1. Create directory tree (config, backlog/*, iterations, reports, …).
+  2. Seed ``.edpa/config/people.yaml`` + ``.edpa/config/edpa.yaml`` from
+     ``plugin/edpa/templates/*.tmpl`` if missing (idempotent).
+  3. Seed ``.edpa/config/id_counters.yaml`` from existing file IDs.
+  4. Optionally copy the CI workflow template (``--with-ci``) to
+     ``.github/workflows/edpa-contribution-sync.yml`` so the engine
+     can read PR signals materialized from PR events.
+  5. Optionally install git hooks (``--with-hooks``) — pre-commit +
+     pre-push ID safety validators.
+
+What it does NOT do (V2.0 hard cut from V1):
+  - No ``gh project`` calls
+  - No ``gh issue create``
+  - No GitHub Issue Types
+  - No issue_map.yaml
+  - No GraphQL anywhere
 
 Usage:
-    python .claude/edpa/scripts/project_setup.py --org technomaton --repo edpa-simulation
-    python .claude/edpa/scripts/project_setup.py --org technomaton --repo edpa-simulation --dry-run
-
-Prerequisite:
-    gh auth login (with project scope)
-    .edpa/backlog/ directory with per-item YAML files (initiatives/, epics/, features/, stories/)
+    python3 .edpa/engine/scripts/project_setup.py
+    python3 .edpa/engine/scripts/project_setup.py --with-ci --with-hooks
 """
 
+from __future__ import annotations
+
 import argparse
-import json
-import re
-import subprocess
+import shutil
 import sys
-import textwrap
 from pathlib import Path
 
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 try:
-    import yaml
-except ImportError:
-    print("ERROR: PyYAML required. Install with: pip install pyyaml")
-    sys.exit(1)
+    from id_counter import seed_counters_from_fs, TYPE_DIRS  # noqa: E402
+finally:
+    sys.path.pop(0)
 
 
-# ANSI colors
+# ─── Display helpers ────────────────────────────────────────────────────────
+
+
 class C:
     RESET = "\033[0m"
     BOLD = "\033[1m"
     DIM = "\033[2m"
     GREEN = "\033[32m"
     YELLOW = "\033[33m"
-    BLUE = "\033[34m"
-    MAGENTA = "\033[35m"
     CYAN = "\033[36m"
     RED = "\033[31m"
-    GRAY = "\033[38;5;245m"
-    PURPLE = "\033[38;5;93m"
 
 
-def run(cmd, check=True):
-    """Run a shell command and return stdout, or None on failure.
-
-    On failure the captured stderr is echoed to ours so callers (and
-    test suites that pipe stderr) can see *why* the call failed instead
-    of just receiving a bare None.
-    """
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    if check and result.returncode != 0:
-        if result.stderr:
-            print(result.stderr.rstrip(), file=sys.stderr)
-        return None
-    return result.stdout.strip()
+def step(n: int, text: str) -> None:
+    print(f"\n  {C.CYAN}{C.BOLD}[{n}]{C.RESET} {text}")
 
 
-def gh_graphql(query):
-    """Execute GitHub GraphQL query."""
-    result = subprocess.run(
-        ["gh", "api", "graphql", "-f", f"query={query}"],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        return None
-    return json.loads(result.stdout)
-
-
-def step(num, text):
-    print(f"\n  {C.CYAN}{C.BOLD}[{num}]{C.RESET} {text}")
-
-
-def ok(text):
+def ok(text: str) -> None:
     print(f"      {C.GREEN}✓{C.RESET} {text}")
 
 
-def fail(text):
-    print(f"      {C.RED}✗{C.RESET} {text}")
+def warn(text: str) -> None:
+    print(f"      {C.YELLOW}!{C.RESET} {text}")
 
 
-def _extend_iteration_options_via_graphql(*, project_id: str, wanted: list[str]):
-    """Append any missing iteration options to the existing Iteration
-    single-select field on the project.
+def info(text: str) -> None:
+    print(f"      {C.DIM}· {text}{C.RESET}")
 
-    GitHub's `updateProjectV2Field` replaces the full option list, so we
-    fetch the current options, union with `wanted`, and submit the
-    combined list with the existing IDs preserved (which keeps the
-    mutation a true append rather than a destructive overwrite).
 
-    Returns:
-        list[str]  — the option names that were newly added.
-        None       — the GraphQL update isn't available (mutation
-                     missing on this GitHub deployment, or the lookup
-                     failed). Caller falls back to the previous
-                     "manual add via UI" advice.
-    """
-    if not wanted:
-        return []
-    # Look up the field id + existing options for the Iteration field.
-    fields_query = (
-        f'{{ node(id: "{project_id}") {{ ... on ProjectV2 {{ '
-        f'fields(first: 100) {{ nodes {{ '
-        f'... on ProjectV2SingleSelectField {{ id name '
-        f'options {{ id name color description }} }} }} }} }} }} }}'
-    )
-    data = gh_graphql(fields_query)
-    if not data or "data" not in data:
-        return None
-    nodes = (data["data"].get("node") or {}).get("fields", {}).get("nodes", []) or []
-    iter_field = next((n for n in nodes if n.get("name") == "Iteration"), None)
-    if not iter_field:
-        return None
-    existing_options = iter_field.get("options") or []
-    existing_names = {o["name"] for o in existing_options}
-    missing = [w for w in wanted if w not in existing_names]
-    if not missing:
-        return []
+# ─── Bootstrap steps ────────────────────────────────────────────────────────
 
-    def _opt_to_input(o, *, has_id):
-        # color / description are required fields on the input shape;
-        # we round-trip whatever's already there for existing options
-        # and pick a neutral default for new ones.
-        parts = [
-            f'name: "{o["name"]}"',
-            f'color: {o.get("color") or "GRAY"}',
-            f'description: "{(o.get("description") or "").replace(chr(34), chr(92) + chr(34))}"',
-        ]
-        if has_id and o.get("id"):
-            parts.insert(0, f'id: "{o["id"]}"')
-        return "{ " + ", ".join(parts) + " }"
 
-    existing_inputs = [_opt_to_input(o, has_id=True) for o in existing_options]
-    new_inputs = [_opt_to_input({"name": n}, has_id=False) for n in missing]
-    full_list = "[" + ", ".join(existing_inputs + new_inputs) + "]"
-    mutation = (
-        f'mutation {{ updateProjectV2Field(input: {{ '
-        f'fieldId: "{iter_field["id"]}" '
-        f'singleSelectOptions: {full_list} }}) {{ '
-        f'projectV2Field {{ ... on ProjectV2SingleSelectField '
-        f'{{ id options {{ id name }} }} }} }} }}'
-    )
-    result = gh_graphql(mutation)
-    if not result or "data" not in result:
-        return None
-    return missing
+def find_repo_root(start: Path) -> Path:
+    """Walk up to git repo root; fall back to start if not a git repo."""
+    p = start.resolve()
+    while p != p.parent:
+        if (p / ".git").exists():
+            return p
+        p = p.parent
+    return start.resolve()
 
 
-def _bootstrap_pi_stub_if_empty(iter_dir: Path) -> None:
-    """Drop a stub PI-{year}-1.yaml + per-iteration child files into
-    iterations/ if the directory has no PI YAML yet.
+def create_directory_tree(root: Path) -> None:
+    edpa = root / ".edpa"
+    for d in ("config", "iterations", "reports", "snapshots",
+              "pi-objectives", "archive"):
+        (edpa / d).mkdir(parents=True, exist_ok=True)
+    for backlog_dir in TYPE_DIRS.values():
+        (edpa / "backlog" / backlog_dir).mkdir(parents=True, exist_ok=True)
+    ok(f"Directory tree at {edpa.relative_to(root)}/")
 
-    Defaults: 1-week iterations × 5 per PI (4 delivery + 1 IP), status
-    planning, starting next Monday. Each child PI-{year}-1.{1..N}.yaml
-    holds the start/end window that transitions.py needs to scope
-    `--iteration` queries — without these the engine couldn't compute
-    gates because parse_iteration_dates only knows the per-iteration
-    file format. Customer edits or replaces these during PI Planning.
-    """
-    iter_dir.mkdir(parents=True, exist_ok=True)
-    if any(iter_dir.glob("PI-*.yaml")):
-        return
-    from datetime import date, timedelta
-    today = date.today()
-    monday = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
-    weeks = 5  # pi_iterations × iteration_weeks (1)
-    pi_id = f"PI-{monday.year}-1"
-    end = monday + timedelta(weeks=weeks) - timedelta(days=1)
-    stub = (
-        f"# PI-level metadata. Per-iteration files live alongside as\n"
-        f"# {pi_id}.{{1..N}}.yaml; the assistant reconstructs the\n"
-        f"# timeline at runtime via _pi_loader.py.\n\n"
-        f"pi:\n"
-        f"  id: {pi_id}\n"
-        f"  status: planning\n"
-        f"  iteration_weeks: 1\n"
-        f"  pi_iterations: {weeks}\n"
-        f"  start_date: {monday.isoformat()}\n"
-        f"  end_date: {end.isoformat()}\n"
-    )
-    (iter_dir / f"{pi_id}.yaml").write_text(stub, encoding="utf-8")
-    ok(f"Bootstrapped {iter_dir}/{pi_id}.yaml (1-week × {weeks})")
 
-    # Per-iteration child files. The last one is marked as the IP
-    # (Innovation & Planning) iteration so reports / engine can tell
-    # delivery iterations from IP without extra config.
-    delivery = weeks - 1
-    for idx in range(1, weeks + 1):
-        sub_id = f"{pi_id}.{idx}"
-        sub_path = iter_dir / f"{sub_id}.yaml"
-        if sub_path.exists():
-            continue
-        sub_start = monday + timedelta(weeks=idx - 1)
-        sub_end = sub_start + timedelta(days=6)
-        sub_type = "ip" if idx > delivery else "delivery"
-        sub_status = "planning" if idx == 1 else "future"
-        body = (
-            f"iteration:\n"
-            f"  id: {sub_id}\n"
-            f"  pi: {pi_id}\n"
-            f"  type: {sub_type}\n"
-            f"  sequence: {idx}\n"
-            f"  start_date: {sub_start.isoformat()}\n"
-            f"  end_date: {sub_end.isoformat()}\n"
-            f"  status: {sub_status}\n"
-        )
-        sub_path.write_text(body, encoding="utf-8")
-    ok(f"Bootstrapped {weeks} child iterations ({pi_id}.1..{pi_id}.{weeks})")
-
-
-def info(text):
-    print(f"      {C.GRAY}{text}{C.RESET}")
-
-
-def warn(text):
-    print(f"      {C.YELLOW}⚠{C.RESET} {text}")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="EDPA GitHub Project Setup")
-    parser.add_argument("--org", required=True, help="GitHub organization")
-    parser.add_argument("--repo", required=True, help="Repository name")
-    parser.add_argument("--project-title", default="EDPA — Medical Platform",
-                        help="Project title")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Print plan without executing")
-    parser.add_argument("--non-interactive", action="store_true",
-                        help="Skip interactive prompts (e.g. project-views "
-                             "configuration). Useful for CI / scripted runs.")
-    parser.add_argument("--no-commit", action="store_true",
-                        help="Do not auto-commit setup state changes "
-                             "(.edpa/config/edpa.yaml, issue_map.yaml, "
-                             "iterations/). By default setup commits these "
-                             "so a subsequent git checkout / squash-merge "
-                             "doesn't lose project IDs.")
-    parser.add_argument("--check-only", action="store_true",
-                        help="Run Stage 0 preflight only (gh scopes, org "
-                             "access, Issue Types, git config) and exit. "
-                             "Performs no provisioning.")
-    parser.add_argument("--skip-preflight", action="store_true",
-                        help="Skip Stage 0 preflight. Use only for repeat "
-                             "runs where preflight already passed in this "
-                             "session. CI / first-time setup should NOT skip.")
-    parser.add_argument("--auto-fix", action="store_true",
-                        help="In Stage 0, auto-apply offered fixes (e.g. "
-                             "create missing org Issue Types) without "
-                             "prompting.")
-    parser.add_argument("--no-views", action="store_true",
-                        help="Skip the optional GH Project views step "
-                             "(STEP 10). Equivalent to declining the prompt "
-                             "in interactive mode, but explicit so CI / "
-                             "scripted runs don't have to know that "
-                             "--non-interactive auto-skips views.")
-    args = parser.parse_args()
-
-    full_repo = f"{args.org}/{args.repo}"
-
-    # ═══════════════════════════════════════════════════════════
-    # STAGE 0: Preflight readiness check (v1.10.0+)
-    # ═══════════════════════════════════════════════════════════
-    # Block before provisioning when toolchain, gh scopes, org
-    # access, Issue Types, or git config are not in place. Replaces
-    # the manual `docs/kashealth-pilot/preflight.sh` step + the
-    # cryptic GraphQL-error path when org Issue Types are missing.
-    if not args.skip_preflight:
-        try:
-            from preflight import run_preflight
-        except ImportError:
-            sys.path.insert(0, str(Path(__file__).resolve().parent))
-            from preflight import run_preflight  # noqa: E402
-        rc = run_preflight(
-            org=args.org,
-            repo=args.repo,
-            non_interactive=args.non_interactive,
-            auto_fix=args.auto_fix,
-        )
-        if rc != 0:
-            print(f"\n{C.RED}Preflight failed — resolve the ✗ items above "
-                  f"before re-running setup.{C.RESET}")
-            sys.exit(rc)
-        if args.check_only:
-            print(f"\n{C.GREEN}✓ Preflight only (--check-only) — exiting "
-                  f"before provisioning.{C.RESET}")
-            sys.exit(0)
-    elif args.check_only:
-        print(f"{C.RED}--check-only and --skip-preflight are "
-              f"mutually exclusive.{C.RESET}")
-        sys.exit(2)
-
-    print(f"\n{C.BOLD}{C.PURPLE}  EDPA GitHub Project Setup{C.RESET}")
-    print(f"  {C.GRAY}Organization: {args.org}")
-    print(f"  Repository:  {full_repo}")
-    print(f"  Backlog:     .edpa/backlog/ (per-item files){C.RESET}")
-
-    if args.dry_run:
-        print(f"  {C.YELLOW}Mode: DRY RUN{C.RESET}")
-
-    # Load items from per-file .edpa/backlog/ directories
-    backlog_dir = Path(".edpa/backlog")
-    if not backlog_dir.is_dir():
-        fail("Cannot find .edpa/backlog/ directory")
-        sys.exit(1)
-
-    items = []
-    for type_dir in ["initiatives", "epics", "features", "stories"]:
-        dir_path = backlog_dir / type_dir
-        if not dir_path.exists():
-            continue
-        for f in sorted(dir_path.glob("*.yaml")):
-            raw = yaml.safe_load(open(f))
-            if not raw:
-                continue
-            entry = {
-                "id": raw["id"],
-                "title": raw.get("title", ""),
-                "level": raw.get("type", ""),
-                "js": raw.get("js", 0),
-                "bv": raw.get("bv", 0),
-                "tc": raw.get("tc", 0),
-                "rr_oe": raw.get("rr_oe", 0),
-                "wsjf": raw.get("wsjf", 0),
-                "status": raw.get("status", "Active"),
-                "owner": raw.get("owner", ""),
-                "assignee": raw.get("assignee", ""),
-                "iteration": raw.get("iteration", ""),
-                "type": raw.get("epic_type", ""),
-                "parent": raw.get("parent", ""),
-            }
-            items.append(entry)
-
-    print(f"\n  {C.BOLD}Backlog: {len(items)} items{C.RESET}")
-    for level in ["Initiative", "Epic", "Feature", "Story"]:
-        count = sum(1 for i in items if i["level"] == level)
-        if count:
-            print(f"    {level}: {count}")
-
-    if args.dry_run:
-        print(f"\n  {C.YELLOW}Dry run complete. {len(items)} items would be created.{C.RESET}")
-        return
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 1: Create labels
-    # ═══════════════════════════════════════════════════════════
-    step(1, "Creating labels")
-    labels = {
-        "Enabler": ("fbbf24", "Technical work without direct business value"),
-    }
-    for name, (color, desc) in labels.items():
-        result = run(f'gh label create "{name}" --color "{color}" --description "{desc}" --repo {full_repo}')
-        if result is not None:
-            ok(f"{name} ({color})")
-        else:
-            info(f"{name} (already exists)")
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 2: Create or reuse GitHub Project
-    # ═══════════════════════════════════════════════════════════
-    # `gh project create` happily creates duplicates when a project with
-    # the same title exists, so we always look up existing projects first
-    # and reuse on exact title match. This makes setup idempotent so a
-    # rerun fixes a half-finished setup instead of doubling everything.
-    step(2, "Creating or reusing GitHub Project")
-    project_id = None
-    project_num = None
-    list_result = run(f'gh project list --owner {args.org} --format json --limit 100')
-    if list_result:
-        try:
-            existing = json.loads(list_result).get("projects", [])
-        except (ValueError, TypeError):
-            existing = []
-        match = [p for p in existing if p.get("title", "") == args.project_title]
-        if match:
-            project_num = match[0]["number"]
-            project_id = match[0]["id"]
-            info(f"Reusing existing project #{project_num} (exact title match)")
-    if not project_id:
-        result = run(f'gh project create --owner {args.org} --title "{args.project_title}" --format json')
-        if result:
-            project_data = json.loads(result)
-            project_id = project_data["id"]
-            project_num = project_data["number"]
-            ok(f"Project #{project_num} created (id={project_id})")
-        else:
-            fail("Could not create or find project")
-            sys.exit(1)
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 3: Create custom fields (idempotent)
-    # ═══════════════════════════════════════════════════════════
-    # Snapshot existing fields up front so a rerun on a partially-set-up
-    # project skips fields that already exist instead of erroring out
-    # with "name already taken".
-    step(3, "Creating custom fields")
-    pre_field_json = run(f'gh project field-list {project_num} --owner {args.org} '
-                         f'--format json --limit 100')
-    existing_field_names = set()
-    if pre_field_json:
-        try:
-            for f in json.loads(pre_field_json).get("fields", []):
-                existing_field_names.add(f.get("name", ""))
-        except (ValueError, TypeError):
-            existing_field_names = set()
-
-    def _create_field(name, *, data_type, options=None):
-        if name in existing_field_names:
-            info(f"{name} (already exists)")
-            return
-        cmd_args = ["gh", "project", "field-create", str(project_num),
-                    "--owner", args.org, "--name", name,
-                    "--data-type", data_type]
-        if options:
-            cmd_args += ["--single-select-options", options]
-        result = subprocess.run(cmd_args, capture_output=True, text=True)
-        if result.returncode == 0:
-            ok(f"{name} ({data_type})")
-            existing_field_names.add(name)
-            return
-        # Distinguish "already exists" (idempotent re-run noise) from real
-        # failure. GitHub's GraphQL surface returns "Name has already been
-        # taken" when the field exists; we treat that as success-equivalent
-        # so the operator doesn't see a misleading red ✗ on a benign re-run.
-        stderr = (result.stderr or "").lower()
-        if ("already been taken" in stderr
-                or "already exists" in stderr
-                or "name has already" in stderr):
-            info(f"{name} (already exists)")
-            existing_field_names.add(name)
-            return
-        # Real failure — surface stderr so the operator can debug.
-        fail(f"{name} ({data_type}) — field-create failed")
-        if result.stderr:
-            print(f"      {C.GRAY}{result.stderr.strip()}{C.RESET}")
-
-    number_fields = ["Job Size", "Business Value", "Time Criticality",
-                     "Risk Reduction & Opportunity Enablement", "WSJF Score"]
-    for name in number_fields:
-        _create_field(name, data_type="NUMBER")
-
-    _create_field("Team", data_type="SINGLE_SELECT",
-                  options="Core,Platform,Management")
-
-    # Create typed SAFe status fields (single-select per level)
-    # Portfolio: Initiative + Epic share one workflow
-    # Delivery: Feature + Story share another workflow
-    portfolio_opts = "Funnel,Reviewing,Analyzing,Ready,Implementing,Done"
-    delivery_opts = "Funnel,Analyzing,Backlog,Implementing,Validating,Deploying,Releasing,Done"
-
-    typed_status_fields = {
-        "Initiative Status": portfolio_opts,
-        "Epic Status": portfolio_opts,
-        "Feature Status": delivery_opts,
-        "Story Status": delivery_opts,
-    }
-
-    for fname, opts in typed_status_fields.items():
-        _create_field(fname, data_type="SINGLE_SELECT", options=opts)
-
-    # Iteration field — populated from .edpa/iterations/*.yaml IDs and
-    # from any `iteration:` value used by backlog items. GitHub's native
-    # ITERATION type requires a fixed cadence + duration that doesn't
-    # always match SAFe PI windows; SINGLE_SELECT is more flexible and
-    # lets sync round-trip the iteration tag verbatim.
-    iter_dir = Path(".edpa/iterations")
-    iteration_options: list[str] = []
-    seen_iters: set[str] = set()
-    if iter_dir.is_dir():
-        for f in sorted(iter_dir.glob("*.yaml")):
-            try:
-                iter_doc = yaml.safe_load(open(f)) or {}
-                iid = iter_doc.get("iteration", {}).get("id") or f.stem
-                if iid and iid not in seen_iters:
-                    iteration_options.append(iid)
-                    seen_iters.add(iid)
-            except (yaml.YAMLError, OSError):
-                continue
-    # Pull any iteration tags referenced by backlog items so a fresh
-    # setup with stories tagged "PI-2026-1.1" doesn't silently fail
-    # every push with `[failed: no option_id for 'Iteration':'PI-2026-1.1']`.
-    for it in items:
-        iid = (it.get("iteration") or "").strip()
-        if iid and iid not in seen_iters:
-            iteration_options.append(iid)
-            seen_iters.add(iid)
-    # Always create the Iteration field. Without it, every subsequent push
-    # of an item with `iteration:` set fails with "no field_id for 'Iteration'"
-    # and pull wipes local iteration tags. Use a TBD placeholder when no
-    # iterations exist yet; real options are added later via setup-refresh
-    # or sync add-iteration once iteration YAMLs land.
-    if not iteration_options:
-        iteration_options = ["TBD"]
-    opts_str = ",".join(iteration_options)
-    if "Iteration" in existing_field_names:
-        # Iteration field already exists. gh CLI can't extend
-        # single-select options, but the GraphQL `updateProjectV2Field`
-        # mutation can — provided we send the FULL option list (existing
-        # ∪ new), since the mutation replaces rather than appends.
-        added = _extend_iteration_options_via_graphql(
-            project_id=project_id,
-            wanted=iteration_options,
-        )
-        if added is None:
-            info("Iteration (already exists, options unchanged — "
-                 "GraphQL update unavailable)")
-            if iteration_options:
-                info(f"  expected options: {', '.join(iteration_options)}")
-        elif added:
-            ok(f"Iteration (extended with {len(added)} new option(s): "
-               f"{', '.join(added)})")
-        else:
-            info(f"Iteration (already exists, all wanted options already present)")
-    else:
-        result = subprocess.run(
-            ["gh", "project", "field-create", str(project_num),
-             "--owner", args.org, "--name", "Iteration",
-             "--data-type", "SINGLE_SELECT",
-             "--single-select-options", opts_str],
-            capture_output=True, text=True,
-        )
-        if result.returncode == 0:
-            ok(f"Iteration (SINGLE_SELECT, {len(iteration_options)} options)")
-        else:
-            stderr = (result.stderr or "").lower()
-            if ("already been taken" in stderr
-                    or "already exists" in stderr
-                    or "name has already" in stderr):
-                info("Iteration (already exists)")
-            else:
-                fail("Iteration (SINGLE_SELECT) — field-create failed")
-                if result.stderr:
-                    print(f"      {C.GRAY}{result.stderr.strip()}{C.RESET}")
-
-    # Refresh field IDs after creating typed status fields. GitHub's
-    # ProjectV2 API occasionally returns partial data right after a
-    # burst of field-create calls (eventual consistency). We need *all*
-    # 4 typed Status fields persisted — without Initiative Status or
-    # Story Status, sync push/pull silently drops those item levels —
-    # so we retry until they appear (or give up loudly after a max).
-    import time
-    expected_typed_status = set(typed_status_fields.keys())
-    field_ids = {}
-    option_ids = {}
-    fields = []
-    last_seen = set()
-    for attempt in range(6):  # ~ 0+1+2+3+5+8 ≈ 19s upper bound
-        field_json = run(f'gh project field-list {project_num} --owner {args.org} '
-                         f'--format json --limit 100')
-        if not field_json:
-            time.sleep(1 + attempt)
-            continue
-        try:
-            fields = json.loads(field_json).get("fields", [])
-        except (ValueError, TypeError) as exc:
-            fail(f"Could not parse field-list JSON ({exc}); raw output: {field_json[:200]!r}")
-            sys.exit(1)
-        field_ids = {f["name"]: f["id"] for f in fields}
-        option_ids = {}
-        for f in fields:
-            for opt in f.get("options", []):
-                option_ids[f"{f['name']}:{opt['name']}"] = opt["id"]
-        last_seen = set(field_ids.keys())
-        if expected_typed_status.issubset(last_seen):
-            break
-        missing = sorted(expected_typed_status - last_seen)
-        info(f"field-list returned {len(field_ids)} fields, "
-             f"waiting on {missing} (attempt {attempt + 1}/6)")
-        time.sleep(1 + attempt)
-
-    if not field_ids:
-        fail(f"gh project field-list returned no output for project #{project_num}. "
-             f"Check that gh CLI is authenticated and the project is reachable.")
-        sys.exit(1)
-
-    missing_typed = expected_typed_status - last_seen
-    if missing_typed:
-        fail(f"typed Status fields missing after retries: {sorted(missing_typed)}. "
-             f"Push/pull for those item levels will not work. Re-run setup or "
-             f"`sync.py setup-refresh` once the GitHub API stabilizes.")
-        # don't exit — persist what we have so user isn't blocked, but
-        # the loud message points them at the recovery path.
-
-    info(f"Fields: {len(field_ids)}, Options: {len(option_ids)}")
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 3b: Hint — GitHub native timestamp fields (manual)
-    # ═══════════════════════════════════════════════════════════
-    step("3b", "Timestamp Fields (manual)")
-    info("GitHub supports native timestamp fields for Projects.")
-    info("To enable cycle-time and conflict-detection features, manually")
-    info("add these fields via the project's Settings → Fields menu:")
-    info("")
-    info(f"  {C.GREEN}Created{C.RESET}  — when the issue was created")
-    info(f"  {C.GREEN}Closed{C.RESET}   — when the issue was closed")
-    info(f"  {C.GREEN}Updated{C.RESET}  — when the issue was last updated")
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 4: Link project to repo
-    # ═══════════════════════════════════════════════════════════
-    step(4, "Linking project to repository")
-    run(f'gh project link {project_num} --owner {args.org} --repo {full_repo}')
-    ok(f"Linked to {full_repo}")
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 5: Query native Issue Type IDs from organization
-    # ═══════════════════════════════════════════════════════════
-    step(5, "Querying organization Issue Type IDs")
-    issue_type_ids = {}
-    type_query = f'{{ organization(login: "{args.org}") {{ issueTypes(first: 20) {{ nodes {{ id name }} }} }} }}'
-    type_result = gh_graphql(type_query)
-    if type_result and type_result.get("data"):
-        for t in type_result["data"]["organization"]["issueTypes"]["nodes"]:
-            issue_type_ids[t["name"]] = t["id"]
-        ok(f"Found {len(issue_type_ids)} issue types: {', '.join(issue_type_ids.keys())}")
-    else:
-        fail("Could not query issue types from org. Run 'issue_types.py setup --org ORG' first.")
-        fail("Issue Type assignment will be skipped.")
-        issue_type_ids = {}
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 6: Create issues (idempotent — reuse on title match)
-    # ═══════════════════════════════════════════════════════════
-    step(6, f"Creating {len(items)} issues")
-    issue_map = {}  # item_id → (issue_number, project_item_id, node_id)
-    issues_created = 0
-    issues_reused = 0
-
-    # Snapshot existing issues so a rerun finds and reuses them by title
-    # instead of creating duplicates (this was the F4 bug — the second
-    # setup created S-1, F-1, etc. as fresh issues, breaking issue_map
-    # and orphaning the old ones).
-    existing_issue_lookup = {}
-    list_issues_json = run(
-        f'gh issue list --repo {full_repo} --state all --limit 1000 '
-        f'--json number,title'
-    )
-    if list_issues_json:
-        try:
-            for it in json.loads(list_issues_json):
-                t = (it.get("title") or "").strip()
-                if t and t not in existing_issue_lookup:
-                    existing_issue_lookup[t] = str(it["number"])
-        except (ValueError, TypeError):
-            existing_issue_lookup = {}
-
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    try:
-        from _gh_issue_factory import (   # noqa: E402
-            create_gh_issue as _factory_create,
-            _resolve_node_id as _factory_node_id,
-        )
-    finally:
-        sys.path.pop(0)
-
-    for item in items:
-        title = f"{item['id']}: {item['title']}"
-        body_parts = [f"{item['level']}"]
-        if item.get("js"): body_parts.append(f"JS={item['js']}")
-        if item.get("bv"): body_parts.append(f"BV={item['bv']}")
-        if item.get("tc"): body_parts.append(f"TC={item['tc']}")
-        if item.get("rr_oe"): body_parts.append(f"RR&OE={item['rr_oe']}")
-        if item.get("wsjf"): body_parts.append(f"WSJF={item['wsjf']}")
-        if item.get("assignee"): body_parts.append(f"owner={item['assignee']}")
-        if item.get("iteration"): body_parts.append(f"iteration={item['iteration']}")
-        body = ", ".join(body_parts)
-
-        extra_labels = ["Enabler"] if item.get("type") == "Enabler" else None
-
-        existing_num = existing_issue_lookup.get(title.strip())
-        if existing_num:
-            # Reuse path: still need node_id + project_item_id resolved
-            # so downstream STEPs 7-8 can target the existing issue.
-            issue_num = existing_num
-            issue_url = f"https://github.com/{full_repo}/issues/{issue_num}"
-            info(f"{title} → reusing #{issue_num}")
-            issues_reused += 1
-
-            issue_node_id = _factory_node_id(args.org, args.repo, int(issue_num))
-            add_result = run(f'gh project item-add {project_num} --owner {args.org} '
-                             f'--url {issue_url} --format json')
-            project_item_id = ""
-            if add_result:
-                try:
-                    project_item_id = (json.loads(add_result) or {}).get("id", "") or ""
-                except json.JSONDecodeError:
-                    pass
-            issue_map[item["id"]] = (str(issue_num), project_item_id, issue_node_id)
-            if item["status"] == "Done":
-                run(f'gh issue close {issue_num} --repo {full_repo}')
-            continue
-
-        # Fresh-create path delegates to the shared factory so title
-        # rewrite, Issue Type assignment, and project add stay aligned
-        # with backlog.py and sync.py.
-        try:
-            gh = _factory_create(
-                args.org, args.repo,
-                item_type=item["level"],
-                raw_title=item["title"],
-                body=body,
-                edpa_id=item["id"],
-                project_num=int(project_num),
-                type_ids=issue_type_ids or None,
-                extra_labels=extra_labels,
-            )
-        except RuntimeError as e:
-            fail(f"Failed: {title} ({e})")
-            continue
-
-        issue_num = str(gh["issue_number"])
-        ok(f"{title} → #{issue_num}")
-        issues_created += 1
-        if issue_type_ids.get(item["level"]):
-            info(f"  Issue type → {item['level']}")
-        for w in gh["warnings"]:
-            info(f"  ! {w}")
-        issue_map[item["id"]] = (
-            issue_num, gh["project_item_id"], gh["node_id"])
-        if item["status"] == "Done":
-            run(f'gh issue close {issue_num} --repo {full_repo}')
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 7: Set custom field values
-    # ═══════════════════════════════════════════════════════════
-    step(7, "Setting custom field values on project items")
-
-    # Map item level to its typed status field name
-    level_status_field = {
-        "Initiative": "Initiative Status",
-        "Epic": "Epic Status",
-        "Feature": "Feature Status",
-        "Story": "Story Status",
-    }
-
-    set_count = 0
-    for item in items:
-        mapping = issue_map.get(item["id"])
-        if not mapping:
-            continue
-        _, proj_item_id, _ = mapping
-
-        def set_field(field_name, number=None, option_id=None):
-            nonlocal set_count
-            fid = field_ids.get(field_name)
-            if not fid:
-                return
-            cmd = f'gh project item-edit --project-id {project_id} --id {proj_item_id} --field-id {fid}'
-            if number is not None:
-                cmd += f' --number {number}'
-            elif option_id:
-                cmd += f' --single-select-option-id {option_id}'
-            else:
-                return
-            run(cmd)
-            set_count += 1
-
-        # Set typed status field based on item level
-        status_field_name = level_status_field.get(item["level"])
-        if status_field_name and item.get("status"):
-            status_opt = option_ids.get(f"{status_field_name}:{item['status']}")
-            if status_opt:
-                set_field(status_field_name, option_id=status_opt)
-
-        # Set number fields
-        if item.get("js"):
-            set_field("Job Size", number=item["js"])
-        if item.get("bv"):
-            set_field("Business Value", number=item["bv"])
-        if item.get("tc"):
-            set_field("Time Criticality", number=item["tc"])
-        if item.get("rr_oe"):
-            set_field("Risk Reduction & Opportunity Enablement", number=item["rr_oe"])
-        if item.get("wsjf"):
-            set_field("WSJF Score", number=item["wsjf"])
-
-        # Set iteration field (single-select) when item has one assigned
-        if item.get("iteration"):
-            iter_opt = option_ids.get(f"Iteration:{item['iteration']}")
-            if iter_opt:
-                set_field("Iteration", option_id=iter_opt)
-
-    ok(f"{set_count} field values set")
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 8: Link sub-issues (parent-child hierarchy)
-    # ═══════════════════════════════════════════════════════════
-    step(8, "Linking sub-issues (parent-child hierarchy)")
-
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _sub_issue_linker import link_items  # noqa: E402
-
-    counts = link_items(
-        items, issue_map,
-        on_skip=lambda cid, pid, msg: info(f"  {cid} → {pid} (skipped, {msg})"),
-        on_error=lambda cid, pid, msg: info(f"  {cid} → {pid} (failed: {msg})"),
-    )
-    if counts["linked"]:
-        ok(f"{counts['linked']} sub-issue links created")
-    if counts["errors"]:
-        info(f"{counts['errors']} links failed (see above)")
-    if counts == {"linked": 0, "errors": 0, "skipped": 0}:
-        info("No parent references found in backlog items")
-    link_count = counts["linked"]   # downstream summary uses this
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 9: Persist GitHub state for sync
-    # ═══════════════════════════════════════════════════════════
-    step(9, "Persisting GitHub state (.edpa/config/edpa.yaml + issue_map.yaml)")
-    config_path = Path(".edpa/config/edpa.yaml")
-    if not config_path.exists():
-        tmpl = Path(__file__).resolve().parent.parent / "templates" / "edpa.yaml.tmpl"
-        if tmpl.exists():
-            import shutil
-            shutil.copy(tmpl, config_path)
-            ok("Created .edpa/config/edpa.yaml from template")
-        else:
-            warn("edpa.yaml template not found — creating minimal config")
-            config_path.write_text("project:\n  name: 'My Project'\nsync: {}\n")
-    if config_path.exists():
-        with open(config_path) as f:
-            config = yaml.safe_load(f) or {}
-        sync = config.get("sync", {})
-        sync["github_org"] = args.org
-        sync["github_repo"] = args.repo
-        sync["github_project_number"] = project_num
-        sync["github_project_id"] = project_id
-        sync["field_ids"] = dict(field_ids)
-        sync["option_ids"] = dict(option_ids)
-        config["sync"] = sync
-
-        # Persist project.name from --project-title so MCP edpa_status
-        # stops reporting "unknown" after a fresh setup. Only overwrite
-        # the placeholder; respect a name the user set by hand.
-        project = config.get("project") or {}
-        if not project.get("name") or project.get("name") in ("My Project", "", None):
-            project["name"] = args.project_title
-            config["project"] = project
-
-        with open(config_path, "w") as f:
-            yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-        ok(f"Project #{project_num}, {len(field_ids)} fields, {len(option_ids)} options saved")
-
-        # Bootstrap a stub PI-level YAML if iterations/ is empty so the
-        # assistant has something to report immediately after setup.
-        # AI-native defaults: 1-week iterations × 5 per PI. Customer
-        # creates the per-iteration files (PI-{id}.{n}.yaml) as the team
-        # plans them; gaps surface via edpa_validate.
-        iter_dir = Path(".edpa/iterations")
-        _bootstrap_pi_stub_if_empty(iter_dir)
-
-        # Seed the Iteration field with one option per bootstrapped child
-        # iteration. Without this, every subsequent `sync.py push` for
-        # items with `iteration:` set fails with
-        # "no option_id for 'Iteration':'PI-2026-1.X'" until the operator
-        # finds the (undocumented) `sync.py add-iteration` workaround.
-        # Re-query field options after the mutation so option_ids picks
-        # up the new IDs and persists them to edpa.yaml in this same step.
-        iter_ids = []
-        for p in sorted(iter_dir.glob("PI-*.yaml")):
-            sub_id = p.stem
-            # Match child iteration format PI-{year}-{n}.{i}; skip parent
-            # PI-{year}-{n} which has only one segment after the year.
-            if re.match(r"^PI-\d+-\d+\.\d+$", sub_id):
-                iter_ids.append(sub_id)
-        if iter_ids:
-            added = _extend_iteration_options_via_graphql(
-                project_id=project_id, wanted=iter_ids,
-            )
-            if added is None:
-                info("Iteration options NOT seeded "
-                     "(GraphQL update unavailable). Run "
-                     "`sync.py add-iteration <id>` per iter or re-run setup.")
-            elif added:
-                ok(f"Iteration field: seeded {len(added)} option(s) "
-                   f"({', '.join(added)})")
-                # Refetch options so edpa.yaml gets the freshly-created IDs.
-                refetch = run(
-                    f"gh project field-list {project_num} --owner {args.org} "
-                    f"--format json --limit 100"
-                )
-                if refetch:
-                    try:
-                        for f in json.loads(refetch).get("fields", []):
-                            for opt in f.get("options", []):
-                                option_ids[f"{f['name']}:{opt['name']}"] = opt["id"]
-                    except (ValueError, TypeError):
-                        pass
-            else:
-                info("Iteration field: all wanted options already present")
-
-        # Persist the (possibly extended) option_ids before writing edpa.yaml.
-        sync["option_ids"] = dict(option_ids)
-        config["sync"] = sync
-        with open(config_path, "w") as f:
-            yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-
-    issue_map_path = Path(".edpa/config/issue_map.yaml")
-    serializable_map = {
-        "github_repo": f"{args.org}/{args.repo}",
-        "github_project_number": project_num,
-        "items": {
-            iid: {
-                "issue_number": int(num),
-                "project_item_id": pid,
-                "node_id": nid,
-            }
-            for iid, (num, pid, nid) in issue_map.items()
-            if num and pid
-        },
-    }
-    issue_map_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(issue_map_path, "w") as f:
-        yaml.dump(serializable_map, f, default_flow_style=False, allow_unicode=True, sort_keys=True)
-    ok(f"issue_map.yaml: {len(serializable_map['items'])} items mapped")
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 9b: Auto-commit setup state so a subsequent git checkout
-    # (or squash-merge of an unrelated PR) can't silently lose the
-    # GitHub Project IDs / issue_map / bootstrapped iterations.
-    # E2E v1.8.0-beta hit this directly when the maintainer ran
-    # setup, made an unrelated PR, merged it, and pulled — the
-    # uncommitted edpa.yaml mutations got reverted to the pre-setup
-    # version. Fix: commit only the EDPA-managed paths (specific git
-    # add, no `-a`) so unrelated work-in-progress stays uncommitted.
-    # ═══════════════════════════════════════════════════════════
-    if not args.no_commit:
-        step("9b", "Committing setup state to git")
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        try:
-            from _auto_commit import maybe_commit  # noqa: E402
-        finally:
-            sys.path.pop(0)
-        committed = maybe_commit(
-            paths=[
-                ".edpa/config/edpa.yaml",
-                ".edpa/config/issue_map.yaml",
-                ".edpa/iterations",
-            ],
-            message=f"EDPA: persist setup state for project #{project_num}",
-        )
-        if committed == "committed":
-            ok("Setup state committed (.edpa/config/* + .edpa/iterations/)")
-        elif committed == "no-op":
-            info("Setup state already up to date in git — nothing to commit")
-        else:
-            info("Auto-commit skipped (not a git repo or git unavailable). "
-                 "Manually: git add .edpa/config/edpa.yaml .edpa/config/issue_map.yaml "
-                 ".edpa/iterations && git commit -m 'EDPA setup state'")
-
-    # ═══════════════════════════════════════════════════════════
-    # STEP 10 (optional): Configure GitHub Project views by issue type
-    # ═══════════════════════════════════════════════════════════
-    views_created = _maybe_create_project_views(args, project_num,
-                                                non_interactive=args.non_interactive)
-
-    # ═══════════════════════════════════════════════════════════
-    # DONE
-    # ═══════════════════════════════════════════════════════════
-    print(f"\n{'═' * 70}")
-    print(f"  {C.GREEN}{C.BOLD}Setup complete!{C.RESET}")
-    print(f"  Project: https://github.com/orgs/{args.org}/projects/{project_num}")
-    if issues_reused:
-        print(f"  Issues:  {issues_created} created, {issues_reused} reused "
-              f"({len(issue_map)} mapped)")
-    else:
-        print(f"  Issues:  {issues_created} created")
-    print(f"  Fields:  {set_count} values set")
-    print(f"  Links:   {link_count} sub-issue links")
-    if views_created is True:
-        print(f"  Views:   created automatically (Initiative / Epic / Feature / Story / Status)")
-    elif views_created is False:
-        print(f"  Views:   creation failed — see warnings above; run "
-              f"`python .edpa/engine/scripts/create_project_views.py` to retry")
-    else:
-        print(f"  Views:   skipped — run `python .edpa/engine/scripts/create_project_views.py` "
-              f"when you want them")
-    print(f"\n  {C.YELLOW}{C.BOLD}Next steps:{C.RESET}")
-    print(f"  1. Enable automations in GitHub UI (Settings → Workflows):")
-    print(f"     - Item added to project → Set status to Todo")
-    print(f"     - Auto-add issues from linked repository")
-    print(f"{'═' * 70}\n")
-
-
-def _maybe_create_project_views(args, project_num, non_interactive=False):
-    """Optional STEP 10: ask the maintainer whether to auto-create the
-    standard GitHub Project views (per-level filters + status board).
-    Try once; on subprocess failure, log + continue (non-fatal).
-
-    Returns:
-      True   — views created successfully
-      False  — invocation tried but failed (warning printed)
-      None   — user declined, --no-views set, or non-interactive auto-skip
-    """
-    step(10, "Configure GitHub Project views (optional)")
-    if getattr(args, "no_views", False):
-        info("--no-views — skipped (no warning; explicit operator choice)")
-        return None
-    if non_interactive:
-        # Views require Playwright + an interactive GH login on first run,
-        # so a non-interactive setup can't drive them. Print a louder
-        # message than a quiet `info(...)` so the operator knows this is
-        # an automatic skip, not a silent feature dropout.
-        warn("non-interactive mode — skipping views (Playwright requires "
-             "an interactive GH login on first run)")
-        hint = (f"      Run later with an interactive shell: "
-                f"python3 .edpa/engine/scripts/create_project_views.py "
-                f"--url https://github.com/orgs/{args.org}/projects/{project_num}")
-        print(hint)
-        return None
-    try:
-        answer = input(f"      Configure standard views now? [Y/n] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        info("no input available — skipping")
-        return None
-    if answer in ("n", "no"):
-        info("skipped — you can run create_project_views.py later")
-        return None
-
-    views_script = Path(__file__).resolve().parent / "create_project_views.py"
-    if not views_script.exists():
-        fail(f"create_project_views.py not found at {views_script}")
+def _seed_one(template_path: Path, target: Path) -> bool:
+    if target.exists():
         return False
-
-    project_url = f"https://github.com/orgs/{args.org}/projects/{project_num}"
-    try:
-        result = subprocess.run(
-            ["python3", str(views_script), "--url", project_url],
-            capture_output=True, text=True, timeout=120,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        fail(f"create_project_views invocation failed: {exc}")
+    if not template_path.exists():
+        warn(f"Template missing: {template_path}")
         return False
-
-    if result.returncode != 0:
-        fail(f"create_project_views returned exit {result.returncode}")
-        if result.stderr:
-            print(f"      {result.stderr.strip()}")
-        return False
-    ok("Views configured (Initiative / Epic / Feature / Story / Status)")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(template_path, target)
     return True
 
 
+def _find_templates_dir(root: Path) -> Path:
+    """Returns templates dir whether running from source or vendored layout."""
+    candidates = [
+        HERE.parent / "templates",
+        root / ".edpa" / "engine" / "templates",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0]
+
+
+def seed_configs(root: Path) -> None:
+    templates = _find_templates_dir(root)
+    edpa = root / ".edpa"
+
+    if _seed_one(templates / "people.yaml.tmpl", edpa / "config" / "people.yaml"):
+        ok("Seeded .edpa/config/people.yaml (edit with your team)")
+    else:
+        info("people.yaml already present — leaving as-is")
+
+    if _seed_one(templates / "edpa.yaml.tmpl", edpa / "config" / "edpa.yaml"):
+        ok("Seeded .edpa/config/edpa.yaml (edit project.name)")
+    else:
+        info("edpa.yaml already present — leaving as-is")
+
+    for f in ("changelog.jsonl", "sync_state.json"):
+        (edpa / f).touch()
+
+
+def seed_id_counters(root: Path) -> None:
+    counters = seed_counters_from_fs(root)
+    nonzero = {k: v for k, v in counters.items() if v}
+    ok(f"id_counters.yaml seeded ({len(nonzero)} type(s) with existing items)")
+    if nonzero:
+        info(f"current max IDs: {nonzero}")
+
+
+def install_ci_workflow(root: Path) -> bool:
+    templates = _find_templates_dir(root)
+    src = templates / "github-workflows" / "edpa-contribution-sync.yml"
+    if not src.exists():
+        warn(f"CI workflow template missing — skipping ({src})")
+        return False
+    dst_dir = root / ".github" / "workflows"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    dst = dst_dir / "edpa-contribution-sync.yml"
+    if dst.exists():
+        info(f"{dst.relative_to(root)} already present — leaving as-is")
+        return True
+    shutil.copy(src, dst)
+    ok(f"Copied CI workflow → {dst.relative_to(root)}")
+    info("PR signals will be materialized into YAML after merge")
+    return True
+
+
+def install_hooks(root: Path) -> bool:
+    git_hooks = root / ".git" / "hooks"
+    if not git_hooks.exists():
+        warn("Not a git repo (no .git/hooks) — skipping hooks install")
+        return False
+    src_dir = HERE / "hooks"
+    if not (src_dir / "pre-commit-id-safety").exists():
+        src_dir = root / ".edpa" / "engine" / "scripts" / "hooks"
+
+    installed = []
+    for hook in ("pre-commit", "pre-push"):
+        src = src_dir / f"{hook}-id-safety"
+        dst = git_hooks / hook
+        if src.exists() and not dst.exists():
+            shutil.copy(src, dst)
+            dst.chmod(0o755)
+            installed.append(hook)
+    if installed:
+        ok(f"Installed git hooks: {', '.join(installed)}")
+        info("ID safety validates filename≡frontmatter, no upstream collisions")
+    else:
+        info("Hooks already installed or sources missing — no changes")
+    return True
+
+
+# ─── Main ────────────────────────────────────────────────────────────────────
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        prog="project_setup",
+        description="EDPA V2 project bootstrap (local-only, no gh).",
+    )
+    parser.add_argument(
+        "--with-ci", action="store_true",
+        help="Copy edpa-contribution-sync.yml to .github/workflows/",
+    )
+    parser.add_argument(
+        "--with-hooks", action="store_true",
+        help="Install pre-commit + pre-push ID safety hooks into .git/hooks/",
+    )
+    parser.add_argument(
+        "--root", type=Path, default=None,
+        help="Project root (default: walk up from CWD to .git/)",
+    )
+    args = parser.parse_args()
+
+    root = args.root.resolve() if args.root else find_repo_root(Path.cwd())
+    print(f"{C.BOLD}EDPA V2 project bootstrap{C.RESET}")
+    print(f"Root: {root}")
+
+    step(1, "Directory tree")
+    create_directory_tree(root)
+
+    step(2, "Config templates")
+    seed_configs(root)
+
+    step(3, "ID counter")
+    seed_id_counters(root)
+
+    next_step = 4
+    if args.with_ci:
+        step(next_step, "CI workflow (--with-ci)")
+        install_ci_workflow(root)
+        next_step += 1
+
+    if args.with_hooks:
+        step(next_step, "Git hooks (--with-hooks)")
+        install_hooks(root)
+
+    print(f"\n{C.GREEN}{C.BOLD}EDPA setup complete.{C.RESET}\n")
+    print("Next steps:")
+    print("  1. Edit .edpa/config/people.yaml — replace example team")
+    print("  2. Edit .edpa/config/edpa.yaml — set project.name")
+    print("  3. Create your first item:")
+    print("       python3 .edpa/engine/scripts/backlog.py add \\")
+    print("         --type Initiative --title 'Project Apollo'")
+    if not args.with_ci:
+        print("  4. (Optional) Enable PR signal materialization:")
+        print(f"       python3 {Path(__file__).name} --with-ci --with-hooks")
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

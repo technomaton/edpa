@@ -79,19 +79,19 @@ def test_updates_when_version_diverges(tmp_path):
     target_version = (tmp_path / ".edpa/engine/VERSION").read_text().strip()
     assert target_version == _current_plugin_version()
     # Scripts directory got re-vendored with the real plugin tree.
-    assert (tmp_path / ".edpa/engine/scripts/sync.py").read_text() != "# old\n"
+    assert (tmp_path / ".edpa/engine/scripts/backlog.py").read_text() != "# old\n"
     # Migration script is reachable from the vendored tree.
     assert (tmp_path / ".edpa/engine/scripts/migrate_backlog_yaml_to_md.py").exists()
 
 
 def test_warm_path_no_update_when_versions_match(tmp_path):
     _seed_engine(tmp_path, version=_current_plugin_version())
-    (tmp_path / ".edpa/engine/scripts/sync.py").write_text("# pinned\n", encoding="utf-8")
+    (tmp_path / ".edpa/engine/scripts/backlog.py").write_text("# pinned\n", encoding="utf-8")
     result = _run(tmp_path)
     assert result.returncode == 0
     assert "updating engine" not in result.stderr
     # Local file untouched.
-    assert (tmp_path / ".edpa/engine/scripts/sync.py").read_text() == "# pinned\n"
+    assert (tmp_path / ".edpa/engine/scripts/backlog.py").read_text() == "# pinned\n"
 
 
 # ─── Legacy .yaml backlog warning ───────────────────────────────────────────

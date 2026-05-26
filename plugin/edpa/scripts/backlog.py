@@ -943,89 +943,7 @@ def cmd_validate(backlog, args):
     return len(errors)
 
 
-# -- GH-first helpers for cmd_add ---------------------------------------------
-
-def _read_sync_config(root):
-    """Return sync section from edpa.yaml if fully configured, else None."""
-    config_path = root / ".edpa" / "config" / "edpa.yaml"
-    if not config_path.exists():
-        return None
-    try:
-        with open(config_path) as f:
-            data = yaml.safe_load(f) or {}
-        sync = data.get("sync") or {}
-        if sync.get("github_org") and sync.get("github_repo") and sync.get("github_project_number"):
-            return sync
-    except Exception:
-        pass
-    return None
-
-
-def _load_org_issue_type_ids(org):
-    """Return {name → id} for the org's native Issue Types, or {} on failure.
-
-    Cached on the function object so multiple ``cmd_add`` calls in the
-    same Python process don't re-query GH (interactive use is mostly
-    one-shot, but bulk scripts that call ``cmd_add`` in a loop benefit).
-    """
-    cache = getattr(_load_org_issue_type_ids, "_cache", {})
-    if org in cache:
-        return cache[org]
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    try:
-        from issue_types import get_org_issue_types  # noqa: E402
-    except ImportError:
-        return {}
-    finally:
-        sys.path.pop(0)
-    try:
-        types = get_org_issue_types(org)
-    except Exception:
-        return {}
-    mapping = {t["name"]: t["id"] for t in (types or [])}
-    cache[org] = mapping
-    _load_org_issue_type_ids._cache = cache
-    return mapping
-
-
-def _update_issue_map(root, edpa_id, issue_number, project_item_id,
-                      org, repo, project_num, node_id=""):
-    """Upsert one entry in .edpa/config/issue_map.yaml.
-
-    ``node_id`` (GraphQL issue id) is persisted so subsequent ``add``
-    calls can resolve their parent's node_id without re-querying GH.
-    """
-    issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
-    data = {}
-    if issue_map_path.exists():
-        with open(issue_map_path) as f:
-            data = yaml.safe_load(f) or {}
-    data["github_repo"] = f"{org}/{repo}"
-    data["github_project_number"] = project_num
-    items = data.get("items") or {}
-    items[edpa_id] = {
-        "issue_number": issue_number,
-        "project_item_id": project_item_id,
-        "node_id": node_id,
-    }
-    data["items"] = items
-    with open(issue_map_path, "w") as f:
-        yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-
-
-def _load_issue_map(root):
-    """Load .edpa/config/issue_map.yaml or return empty dict if missing."""
-    issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
-    if not issue_map_path.exists():
-        return {}
-    try:
-        with open(issue_map_path) as f:
-            return yaml.safe_load(f) or {}
-    except Exception:
-        return {}
-
-
-# ------------------------------------------------------------------------------
+# -- cmd_add helpers ----------------------------------------------------------
 
 _EVIDENCE_ROLES = ("owner", "key", "reviewer", "consulted")
 
@@ -1061,15 +979,23 @@ def _parse_contributor_args(raw_contributors):
     return contributors, None
 
 
-def _cmd_add_local(root, backlog, args):
-    """V2 local-first add — calls the MCP edpa_item_create handler in-process.
+def cmd_add(root, backlog, args):
+    """Add a new work item — V2 local-first (no GH calls).
 
-    No ``gh`` calls. ID allocated via ``id_counter.next_id``, file written
-    via ``_md_frontmatter.save_md``, contributors (if any) appended via
-    ``edpa_item_update``, git add + commit at the end.
+    1. Parse + validate ``--contributor`` triplets up front.
+    2. Allocate ID via ``id_counter.next_id`` (called by MCP handler).
+    3. Write ``.edpa/backlog/{type}/{ID}.md`` via MCP
+       ``edpa_item_create`` handler (single source of truth for
+       parent/type validation).
+    4. Append ``contributors[]`` directly via ``_md_frontmatter`` if
+       ``--contributor`` was given (MCP update doesn't expose that
+       structured field — engine/CI materialize it).
+    5. ``git add`` + ``git commit -m "feat({ID}): {title}"``.
 
-    Errors from the handler are surfaced verbatim — the MCP handler is
-    the single source of truth for parent/type validation.
+    PR-derived signals (pr_author, pr_reviewer, issue_comment) arrive
+    asynchronously via the CI workflow at
+    ``.github/workflows/edpa-contribution-sync.yml`` (see
+    ``sync_pr_contributions.py``) — not handled here.
     """
     contributors, err = _parse_contributor_args(getattr(args, "contributor", None))
     if err:
@@ -1134,240 +1060,6 @@ def _cmd_add_local(root, backlog, args):
     print()
 
 
-def cmd_add(root, backlog, args):
-    """Add a new work item — dual mode: GH-first (legacy) or local-first (V2).
-
-    Mode selection:
-      - ``--local`` flag set: always V2 local path (MCP edpa_item_create
-        in-process). No GH calls.
-      - Otherwise: GH-first path (server-assigned issue number → EDPA ID).
-        Fails fast if sync is not configured, with a hint to either run
-        ``/edpa:setup`` or pass ``--local`` for the V2 local-first path.
-
-    GH path (legacy, scheduled for removal in V2.0 hard cut):
-      1. require sync config in .edpa/config/edpa.yaml (else fail-fast)
-      2. ``gh issue create`` → server-assigned issue number
-      3. ``gh issue edit --title`` → title becomes "{prefix}-{num}: {title}"
-      4. ``link_sub_issue`` if parent exists → parent shows child in GH UI
-      5. write local ``.md`` with ID = "{prefix}-{num}" (matches GH title)
-      6. update ``.edpa/config/issue_map.yaml`` with node_id
-      7. ``git add`` + ``git commit``
-    """
-    if getattr(args, "local", False):
-        return _cmd_add_local(root, backlog, args)
-    item_type = args.type
-    parent_id = args.parent
-    title = args.title
-    js = args.js
-    assignee = getattr(args, "assignee", None)
-    status = getattr(args, "status", None) or "Funnel"
-    iteration = getattr(args, "iteration", None)
-    bv = getattr(args, "bv", None)
-    tc = getattr(args, "tc", None)
-    rr_oe = getattr(args, "rr_oe", None)
-    raw_contributors = getattr(args, "contributor", None) or []
-
-    # Parse --contributor PERSON:ROLE:CW triplets up front so a typo on
-    # one entry rejects the whole add (item not yet created).
-    EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
-    contributors = []
-    for raw in raw_contributors:
-        parts = raw.split(":")
-        if len(parts) != 3:
-            print(color(f"  Error: --contributor must be PERSON:ROLE:CW "
-                        f"(got {raw!r}; expected 3 colon-separated fields)",
-                        C.ERR))
-            sys.exit(1)
-        person, role, cw_str = (p.strip() for p in parts)
-        if not person:
-            print(color(f"  Error: --contributor missing person id "
-                        f"(got {raw!r})", C.ERR))
-            sys.exit(1)
-        if role not in EVIDENCE_ROLES:
-            print(color(f"  Error: --contributor role={role!r} not in "
-                        f"{sorted(EVIDENCE_ROLES)} (got {raw!r}). Job titles "
-                        f"like Dev/Arch/QA belong in people.yaml.", C.ERR))
-            sys.exit(1)
-        try:
-            cw = float(cw_str)
-        except ValueError:
-            print(color(f"  Error: --contributor cw must be numeric "
-                        f"(got {cw_str!r} in {raw!r})", C.ERR))
-            sys.exit(1)
-        if not (0.0 <= cw <= 1.0):
-            print(color(f"  Error: --contributor cw must be in [0,1] "
-                        f"(got {cw} in {raw!r})", C.ERR))
-            sys.exit(1)
-        contributors.append({"person": person, "cw": cw})
-
-    # Validate type
-    if item_type not in TYPE_DIRS:
-        print(color(f"  Error: Invalid type '{item_type}'. Must be one of: {', '.join(TYPE_DIRS.keys())}", C.ERR))
-        sys.exit(1)
-
-    # Validate parent exists (unless Initiative)
-    if item_type != "Initiative":
-        if not parent_id:
-            print(color(f"  Error: --parent is required for type '{item_type}'.", C.ERR))
-            sys.exit(1)
-        parent_item = find_item(backlog, parent_id, root=root)
-        if not parent_item:
-            print(color(f"  Error: Parent '{parent_id}' not found.", C.ERR))
-            sys.exit(1)
-
-    # --- ID assignment (always GH-first via shared factory) ---
-    sync = _read_sync_config(root)
-    if not sync:
-        print()
-        print(color(
-            "  Error: GitHub sync is not configured in .edpa/config/edpa.yaml.",
-            C.ERR))
-        print(color(
-            "  Run /edpa:setup first — interactive 'add' is GH-first by "
-            "default (V1 behavior preserved). For the V2 local-first "
-            "path (no gh calls), pass --local.",
-            C.MUTED))
-        sys.exit(1)
-
-    org = sync["github_org"]
-    repo = sync["github_repo"]
-    project_num = int(sync["github_project_number"])
-
-    # Resolve parent node_id up-front so the factory can link in one pass.
-    parent_node_id = None
-    if parent_id:
-        issue_map = _load_issue_map(root)
-        parent_entry = (issue_map.get("items") or {}).get(parent_id) or {}
-        parent_node_id = parent_entry.get("node_id") or None
-        if not parent_node_id and parent_entry.get("issue_number"):
-            sys.path.insert(0, str(Path(__file__).resolve().parent))
-            try:
-                from _gh_issue_factory import _resolve_node_id  # noqa: E402
-            finally:
-                sys.path.pop(0)
-            parent_node_id = _resolve_node_id(
-                org, repo, parent_entry["issue_number"]) or None
-
-    # Build minimal body — full field rendering happens in sync push.
-    body_parts = [f"**Type:** {item_type}"]
-    if parent_id:
-        body_parts.append(f"**Parent:** {parent_id}")
-    body_parts.append("\n_Created via EDPA — update fields in `.edpa/backlog/`._")
-    body = "\n".join(body_parts)
-
-    type_ids = _load_org_issue_type_ids(org)
-
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    try:
-        from _gh_issue_factory import create_gh_issue  # noqa: E402
-    finally:
-        sys.path.pop(0)
-
-    print()
-    print(color(f"  Creating GH issue in {org}/{repo}...", C.MUTED))
-    try:
-        gh = create_gh_issue(
-            org, repo,
-            item_type=item_type,
-            raw_title=title,
-            body=body,
-            project_num=project_num,
-            type_ids=type_ids,
-            parent_node_id=parent_node_id,
-        )
-    except RuntimeError as e:
-        print(color(f"  GH issue creation failed: {e}", C.ERR))
-        print(color(
-            "  Aborting. Fix the GH error and retry; no local item was "
-            "written so there is no drift to clean up.", C.MUTED))
-        sys.exit(1)
-
-    gh_issue_num = gh["issue_number"]
-    new_id = gh["edpa_id"]
-    child_node_id = gh["node_id"]
-    issue_url = gh["url"]
-    project_item_id = gh["project_item_id"]
-    print(color(f"  Issue #{gh_issue_num} → {new_id}", C.OK))
-    if type_ids.get(item_type):
-        print(color(f"  Issue Type: {item_type}", C.OK))
-    if project_item_id:
-        print(color(f"  Added to Project #{project_num}", C.OK))
-    if parent_node_id and not any("sub-issue" in w for w in gh["warnings"]):
-        print(color(f"  Linked under {parent_id}", C.OK))
-    for w in gh["warnings"]:
-        if "Issue Type" in w:
-            print(color(
-                f"  Warning: {w} (run /edpa:setup to configure Issue "
-                f"Types for org {org})", C.WARN))
-        else:
-            print(color(f"  Warning: {w}", C.WARN))
-    if parent_id and not parent_node_id:
-        print(color(
-            f"  Warning: cannot link to {parent_id} — node_id missing "
-            f"(parent created before this version; run sync push to "
-            f"backfill).", C.WARN))
-
-    # Build item data
-    item_data = {
-        "id": new_id,
-        "type": item_type,
-        "title": title,
-        "status": status,
-        "parent": parent_id,
-    }
-    if js is not None:
-        item_data["js"] = js
-    if bv is not None:
-        item_data["bv"] = bv
-    if tc is not None:
-        item_data["tc"] = tc
-    if rr_oe is not None:
-        item_data["rr_oe"] = rr_oe
-    if assignee:
-        item_data["assignee"] = assignee
-    if iteration:
-        item_data["iteration"] = iteration
-    if contributors:
-        item_data["contributors"] = contributors
-
-    # Compute WSJF if we have enough data
-    if js and js > 0:
-        _bv = bv or 0
-        _tc = tc or 0
-        _rr = rr_oe or 0
-        if _bv or _tc or _rr:
-            item_data["wsjf"] = round((_bv + _tc + _rr) / js, 2)
-
-    # Write `.md` (YAML frontmatter + empty body for a fresh item).
-    type_dir = TYPE_DIRS[item_type]
-    dir_path = root / ".edpa" / "backlog" / type_dir
-    dir_path.mkdir(parents=True, exist_ok=True)
-    file_path = dir_path / f"{new_id}.md"
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    try:
-        from _md_frontmatter import save_md as _save_md  # noqa: E402
-    finally:
-        sys.path.pop(0)
-    _save_md(file_path, item_data, body="")
-
-    _update_issue_map(root, new_id, gh_issue_num, project_item_id,
-                      org, repo, project_num, node_id=child_node_id)
-    import subprocess
-    issue_map_path = root / ".edpa" / "config" / "issue_map.yaml"
-    subprocess.run(["git", "add", str(file_path), str(issue_map_path)],
-                   capture_output=True, cwd=str(root))
-    subprocess.run(["git", "commit", "-m", f"feat({new_id}): {title}"],
-                   capture_output=True, cwd=str(root))
-    print(color(f"  Committed: feat({new_id}): {title}", C.OK))
-
-    print()
-    print(f"  {color('Created:', C.OK)} {color(bold(new_id), level_color(item_type))} {title}")
-    if issue_url:
-        print(f"  {color('Issue:', C.MUTED)}   {issue_url}")
-    print(f"  {color('File:', C.MUTED)}    {file_path}")
-    print()
-
-
 # -- Main ----------------------------------------------------------------------
 
 def main():
@@ -1418,10 +1110,6 @@ def main():
                             "PERSON:ROLE:CW where ROLE ∈ "
                             "{owner,key,reviewer,consulted} and CW ∈ "
                             "[0,1]. Example: --contributor turyna:owner:0.7")
-    p_add.add_argument("--local", action="store_true",
-                       help="V2 local-first path: allocate ID from "
-                            ".edpa/config/id_counters.yaml (no gh call), "
-                            "no issue_map.yaml update, no GH project link.")
 
     args = parser.parse_args()
 

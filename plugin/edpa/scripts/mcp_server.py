@@ -330,14 +330,6 @@ async def list_tools() -> list[Tool]:
             inputSchema={"type": "object", "properties": {}, "additionalProperties": False},
         ),
         Tool(
-            name="edpa_sync_people",
-            description=("Diff GitHub repo collaborators against .edpa/config/people.yaml. "
-                         "Read-only — reports adds/removes/unchanged. To apply, run "
-                         "`python plugin/edpa/scripts/sync_collaborators.py apply` "
-                         "or use the /edpa:sync-people skill."),
-            inputSchema={"type": "object", "properties": {}, "additionalProperties": False},
-        ),
-        Tool(
             name="edpa_flow_metrics",
             description=(
                 "Compute flow metrics: cycle time, lead time, throughput, and "
@@ -549,8 +541,6 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_item(edpa_root, safe_id)
         elif name == "edpa_validate":
             return _handle_validate(edpa_root)
-        elif name == "edpa_sync_people":
-            return _handle_sync_people(edpa_root)
         elif name == "edpa_flow_metrics":
             return _handle_flow_metrics(
                 edpa_root,
@@ -678,51 +668,6 @@ def _handle_validate(edpa_root: Path) -> list[TextContent]:
         "iteration_count": sum(len(p.get("iterations", [])) for p in pis),
         "errors": errors,
         "warnings": warnings,
-    }
-    return [TextContent(type="text", text=json.dumps(payload, indent=2, ensure_ascii=False))]
-
-
-def _handle_sync_people(edpa_root: Path) -> list[TextContent]:
-    """Read-only diff between repo collaborators and .edpa/config/people.yaml.
-
-    Returns the same shape as `sync_collaborators.py status --json`.
-    Apply paths (write) are intentionally not exposed via MCP — keep the
-    server read-only; use the /edpa:sync-people skill or the CLI for that.
-    """
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from sync_collaborators import (  # noqa: E402
-        diff, list_collaborators, resolve_repo_from_config,
-    )
-
-    people_cfg = load_yaml(edpa_root / "config" / "people.yaml") or {}
-    people = people_cfg.get("people", []) or []
-
-    repo = resolve_repo_from_config(edpa_root)
-    if not repo:
-        return [TextContent(type="text", text=json.dumps({
-            "ok": False,
-            "error": "edpa.yaml has no sync.github_org / sync.github_repo configured",
-        }, indent=2, ensure_ascii=False))]
-
-    collabs = list_collaborators(repo)
-    if collabs is None:
-        return [TextContent(type="text", text=json.dumps({
-            "ok": False,
-            "error": f"could not fetch collaborators for {repo} (gh auth / rate limit?)",
-            "repo": repo,
-        }, indent=2, ensure_ascii=False))]
-
-    d = diff(people, collabs)
-    payload = {
-        "ok": True,
-        "repo": repo,
-        "adds": [a["login"] for a in d["adds"]],
-        "removes": [{"login": r["login"], "person_id": r["person"].get("id")}
-                    for r in d["removes"]],
-        "unchanged_count": len(d["unchanged"]),
-        "hint": ("Apply via `python plugin/edpa/scripts/sync_collaborators.py "
-                 "apply --auto-add` or the /edpa:sync-people skill — MCP is "
-                 "read-only.") if (d["adds"] or d["removes"]) else None,
     }
     return [TextContent(type="text", text=json.dumps(payload, indent=2, ensure_ascii=False))]
 

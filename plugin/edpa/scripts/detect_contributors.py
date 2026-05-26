@@ -93,12 +93,17 @@ _CONTRIBUTE_PATTERN = re.compile(
 def run_gh(args, *, repo: str | None = None):
     """Run `gh` CLI command, return parsed JSON or None on failure.
 
-    V2 opt-out: set ``EDPA_NO_GH=1`` to force all gh calls to return
-    None. Callers degrade to git-only signals; PR data is expected
-    to be materialized into YAML by the CI ``sync_pr_contributions.py``
-    layer instead. See ADR-012 in docs/v2/decisions.md.
+    V2 default: returns None — engine is 100% local, reads PR signals
+    from the ``ci_signals[]`` field that ``sync_pr_contributions.py``
+    materializes via CI workflow (ADR-012 in docs/v2/decisions.md).
+
+    Escape hatch: set ``EDPA_USE_GH=1`` to re-enable direct gh calls
+    for the engine — useful only for local debugging against a single
+    repo with ``gh auth`` configured. Not recommended for normal use;
+    the CI layer is deterministic and avoids the per-developer auth
+    requirement.
     """
-    if os.environ.get("EDPA_NO_GH") == "1":
+    if os.environ.get("EDPA_USE_GH") != "1":
         return None
     cmd = ["gh"] + list(args)
     if repo and "--repo" not in cmd:
@@ -244,6 +249,40 @@ def load_issue_map(edpa_root: Path) -> dict[str, int]:
 
 
 # ─── Signal collection ──────────────────────────────────────────────────────
+
+
+def read_ci_signals(item_path: Path) -> list[dict]:
+    """Read CI-materialized PR signals from an item's YAML ``ci_signals[]``.
+
+    V2 ADR-012: PR signals (pr_author, pr_reviewer, issue_comment) arrive
+    via the ``edpa-contribution-sync.yml`` workflow → ``sync_pr_contributions.py``
+    writes them as ``ci_signals[]``. This returns them shaped like
+    ``_signal()`` output so the aggregator can mix them in.
+    Returns ``[]`` if the file is missing or has no block.
+    """
+    if not item_path.exists():
+        return []
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from _md_frontmatter import load_md  # noqa: E402
+    finally:
+        sys.path.pop(0)
+    data = load_md(item_path) or {}
+    raw = data.get("ci_signals") or []
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for s in raw:
+        if not isinstance(s, dict):
+            continue
+        out.append({
+            "type": s.get("type", ""),
+            "ref": s.get("ref", ""),
+            "login": s.get("person", ""),
+            "weight": float(s.get("weight", 0)),
+            "detected_at": s.get("at", utc_now_iso()),
+        })
+    return out
 
 
 def _signal(stype: str, ref: str, login: str, weight: float,
@@ -568,6 +607,10 @@ def process_item(edpa_root: Path, repo: str, item_id: str,
         pr_nums = list(pr_scope)
 
     signals: list[dict] = []
+    # V2 ADR-012: PR signals normally arrive via CI-materialized
+    # ci_signals[] block on the item itself; the runtime gh path below
+    # is a no-op unless EDPA_USE_GH=1 (escape hatch for local debug).
+    signals.extend(read_ci_signals(item_path))
     if issue_num:
         signals.extend(collect_assignee_signals(repo, issue_num, weights["assignee"]))
         signals.extend(collect_issue_signals(repo, issue_num, weights))
