@@ -1,5 +1,180 @@
 # Changelog
 
+## 2.1.0 — 2026-05-26 — Local-first attribution complete
+
+V2.0 closed the GH-coupling architectural gap. V2.1 closes the local
+attribution gaps that were exposed once V2.0's CI-only signal source
+was demoted: local git hooks now emit commit attribution signals, all
+item types get fresh contributors[] before engine scoring, and
+in-flight Stories get partial credit instead of all-or-nothing-at-Done.
+
+The release also includes the architectural rule file that ships in
+the plugin for Claude Code / agent consumers.
+
+### feat(v2.1): WSJF strict defaults (krok C1)
+
+`_handle_item_create` always writes `js:0, bv:0, tc:0, rr_oe:0,
+wsjf:0.0` to YAML. V2.0 omitted these when unspecified, letting the
+engine silently coerce None → 0. V2.1 makes the "this item hasn't
+been WSJF-scored yet" state visible to humans reading the YAML.
+
+`_handle_item_update` zero-fills missing WSJF fields on legacy items
+so reads remain deterministic.
+
+New migration helper: `migrate_wsjf_defaults.py` backfills existing
+V2.0 projects.
+
+### refactor(v2.1)!: rename `ci_signals[]` → `evidence[]` (krok C2)
+
+The raw signal log in each item's frontmatter is now `evidence[]`,
+matching EDPA's "Evidence-Driven Proportional Allocation" vocabulary
+(the V2.0 name `ci_signals[]` implied CI-only, which V2.1 broadened).
+
+Backward compatible: `detect_contributors.read_evidence()` reads
+either block; writes always go to `evidence[]` and drop any
+`ci_signals[]` entry. `read_ci_signals` is preserved as an alias for
+V2.0 callers (slated for removal in V3.0).
+
+New migration helper: `migrate_evidence_rename.py` for bulk on-disk
+conversion (idempotent, `--dry-run`).
+
+### feat(v2.1): local evidence emitter — post-commit hook (krok C3)
+
+`plugin/edpa/scripts/local_evidence.py` runs as a `post-commit` git
+hook. For every commit referencing an EDPA item ID (in subject/body
+or via changed `.edpa/backlog/{type}/{ID}.md` paths) it emits:
+
+- `commit_author` — author of the commit (resolved via people.yaml
+  email/name/github lookup) — weight 2.78
+- `manual:commit_message` — parsed from `/contribute @login weight:N`
+  directives in commit body — weight per directive
+
+Self-recursion guarded by the `chore(evidence):` subject prefix on
+its own follow-up commits.
+
+Skip rules: env opt-out (`EDPA_NO_LOCAL_EVIDENCE=1`), merge commits,
+bot commits, unknown authors (logged to stderr, doesn't block commit).
+
+This closes the V2.0 hole where projects without GH CI got NO
+PR-style attribution at all — local commit_author signals now flow
+into every project, regardless of GH Actions availability.
+
+### feat(v2.1): commit-msg ticket-attached hook (krok C4)
+
+`plugin/edpa/scripts/check_ticket_attached.py` runs as a `commit-msg`
+git hook. Blocks commits that have non-trivial diffs but no EDPA item
+ID, with helpful fix instructions (use existing ID, `/edpa:add` to
+create one, `no-ticket:` escape prefix, or `--no-verify` bypass).
+
+Auto-passes: auto-generated prefixes (chore(evidence):, Merge…,
+Revert…, Initial commit, fixup!/squash!), operational paths only
+(LICENSE, README, .gitignore, package.json, .github/, .vscode/), and
+empty diffs.
+
+### feat(v2.1): architectural rules for Claude Code / agents (krok C5)
+
+`plugin/rules/edpa-work-rules.md` ships in the plugin as the
+canonical rule file. `project_setup.py --with-rules` copies it to
+`.claude/rules/` so Claude Code auto-loads it into every agent
+session in the repo. Non-CC tooling can read the markdown directly.
+
+Rule core: "every commit attributes to an EDPA backlog item; create
+one first if it doesn't exist." Plus the C4 hook escape hatches and
+operator guidance.
+
+### refactor(v2.1)!: demote CI workflow — drop pr_author (krok C6)
+
+`sync_pr_contributions.py` no longer emits `pr_author`. After C3,
+`local_evidence.py` already credits the PR author as `commit_author`
+locally — emitting `pr_author` from CI would double-count the same
+human action.
+
+The CI workflow is now strictly the optional source for PR-thread
+signals that don't exist in git: `pr_reviewer` and `issue_comment`.
+Updated workflow template comment explains when to install (review-
+heavy GH teams) vs. skip (single-dev, off-GitHub, review-light).
+
+### fix(v2.1): cw_heuristics.yaml wired end-to-end (krok C7)
+
+Two latent bugs found during C6 investigation:
+
+1. `project_setup.seed_configs` did NOT seed `cw_heuristics.yaml` to
+   `.edpa/config/`. Typical install had no config file.
+2. `engine.load_heuristics` fallback chain pointed at the V1 location
+   (`.claude/edpa/templates/`), not the V2 vendored location
+   (`.edpa/engine/templates/`). So when (1) hit, the engine fell all
+   the way through to a hardcoded minimal lacking `gate_weights`.
+
+Combined effect: `gate_events` was ALWAYS empty for V2.0 projects —
+PM/Arch credit from multi-iteration Feature/Epic gate transitions
+was silently dropped. With C7, the typical install now uses the
+documented gate_weights from the template.
+
+### feat(v2.1): in-flight Story credit via activity events (krok C7.5)
+
+`engine.load_story_activity_events()` emits synthetic items for
+in-flight Stories with `yaml_edit_signals` in the iteration window:
+
+```
+id        = "{story_id}@activity"
+level     = "Story"
+job_size  = story.js * credit_factor    (default 0.40)
+contributors = []  (filled by _enrich_items_with_yaml_edit_signals)
+```
+
+The credit_factor reserves a fraction of Story.js for "in-progress
+activity" — refinement-heavy iterations now credit prep work
+instead of giving 0 hours until Done lands.
+
+Configure via `story_activity.credit_factor` in cw_heuristics.yaml
+(set to 0 to disable, matching V2.0 Done-only behaviour).
+
+### feat(v2.1): refresh contributors[] for all types at close (krok C7.6)
+
+`detect_contributors.py --all-items` (new CLI flag) walks every
+backlog type and refreshes contributors[] from accumulated
+evidence[]. Run before engine at close-iteration so gate events
+on Feature/Epic/Initiative inherit fresh contributors[] reflecting
+the latest evidence aggregation — not the stale snapshot from
+whenever someone last edited the item.
+
+Bug it fixes: V2.0 stored contributors[] on Feature/Epic/Initiative
+ONCE when the LBC was first written. Gate events inherited that
+snapshot forever, so the LBC author dominated all gate-event credit
+even when other people did all subsequent transitions and delivery.
+
+Wired into `close-iteration` SKILL as Stage 2b (between mid-flight
+PR sync and engine run).
+
+### Tests
+
+541 passing (vs. 484 in V2.0 baseline). New suites:
+
+- `test_migrate_wsjf_defaults` (8) — C1 backfill
+- `test_migrate_evidence_rename` (13) — C2 rename + backward-compat
+- `test_local_evidence` (16) — C3 post-commit emitter
+- `test_check_ticket_attached` (16) — C4 commit-msg hook
+- `test_project_setup_rules` (4) — C5 rule installation
+- `test_heuristics_wiring` (6) — C7 lookup chain
+- `test_story_activity_events` (10) — C7.5 in-flight Story credit
+- `test_refresh_all_contributors` (6) — C7.6 all-types refresh
+
+### Migration from V2.0
+
+Run these once per project after upgrading the engine:
+
+```bash
+python3 .edpa/engine/scripts/migrate_wsjf_defaults.py    # C1: add 0 defaults
+python3 .edpa/engine/scripts/migrate_evidence_rename.py  # C2: rename block
+python3 .edpa/engine/scripts/project_setup.py \
+  --with-ci --with-hooks --with-rules                    # C5/C7: re-seed
+```
+
+The hooks installed by `--with-hooks` now include `commit-msg`
+(ticket-required) and `post-commit` (local_evidence) on top of the
+existing `pre-commit` (ID-safety) and `pre-push` (collision check).
+`--with-rules` installs the architectural rules into `.claude/rules/`.
+
 ## 2.0.0 — 2026-05-26 — V2 local-first hard cut (BREAKING)
 
 The V2 local-first architecture is now the only supported path. All
