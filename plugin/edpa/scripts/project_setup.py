@@ -170,6 +170,7 @@ def install_hooks(root: Path) -> bool:
         src_dir = root / ".edpa" / "engine" / "scripts" / "hooks"
 
     installed = []
+    # Pre-commit + pre-push: ID safety
     for hook in ("pre-commit", "pre-push"):
         src = src_dir / f"{hook}-id-safety"
         dst = git_hooks / hook
@@ -177,9 +178,17 @@ def install_hooks(root: Path) -> bool:
             shutil.copy(src, dst)
             dst.chmod(0o755)
             installed.append(hook)
+    # Post-commit: local evidence emitter (V2.1)
+    pc_src = src_dir / "post-commit-evidence"
+    pc_dst = git_hooks / "post-commit"
+    if pc_src.exists() and not pc_dst.exists():
+        shutil.copy(pc_src, pc_dst)
+        pc_dst.chmod(0o755)
+        installed.append("post-commit")
     if installed:
         ok(f"Installed git hooks: {', '.join(installed)}")
-        info("ID safety validates filename≡frontmatter, no upstream collisions")
+        info("pre-commit/pre-push: filename≡id, no upstream collisions")
+        info("post-commit: emit commit_author signals into item evidence[]")
     else:
         info("Hooks already installed or sources missing — no changes")
     return True

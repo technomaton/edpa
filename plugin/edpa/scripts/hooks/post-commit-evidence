@@ -1,0 +1,22 @@
+#!/bin/sh
+# EDPA V2.1 local-evidence post-commit hook.
+#
+# Runs after every commit. Detects item refs in the commit (msg + paths),
+# emits commit_author + manual:commit_message signals, writes them into
+# the referenced items' evidence[] blocks, and creates a follow-up
+# commit `chore(evidence): …`. Self-recursion is gated by the subject
+# prefix check inside local_evidence.py.
+#
+# Disable with: export EDPA_NO_LOCAL_EVIDENCE=1
+# Install: chain from .git/hooks/post-commit (project_setup --with-hooks).
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+[ -z "$REPO_ROOT" ] && exit 0
+
+EMITTER="$REPO_ROOT/.edpa/engine/scripts/local_evidence.py"
+[ ! -f "$EMITTER" ] && exit 0
+
+# Fire-and-forget: never block the user's commit. Errors are logged to
+# stderr by the python script but exit codes are ignored.
+python3 "$EMITTER" || true
+exit 0
