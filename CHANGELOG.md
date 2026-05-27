@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.1.4 — 2026-05-27 — V2.1 local-first narrative parity in plugin metadata
+
+Patch release sweeping the last customer-facing texts still describing EDPA
+as a GitHub-coupled system with "bidirectional sync" as the headline value
+prop. The 2.1.2 cleanup pass fixed the web hero, README, FAQ, and several
+docs but missed four customer-facing surfaces:
+
+- `plugin/.claude-plugin/plugin.json` description — visible in Claude Code
+  plugin marketplace listings.
+- `.claude-plugin/marketplace.json` plugins[] description — visible to
+  users running `/plugin marketplace add technomaton/edpa`.
+- `plugin/README.md` file tree comment for `sync.py` — readers were not
+  signalled that sync is now an optional UI.
+- `web/src/pages/en/index.astro` "GitHub-native" feature card — CZ
+  equivalent was renamed to "Git-native, GitHub-friendly" in 2.1.2 but
+  the EN page was missed.
+
+All four now align with the V2.1 local-first narrative: `.edpa/backlog/`
+YAML as source of truth, git as the audit trail, GitHub Projects sync
+explicitly optional.
+
+No engine, schema, or behavior changes.
+
 ## 2.1.3 — 2026-05-27 — E2E findings + verify scripts parameterized
 
 Patch release applying the 5 actionable findings surfaced by the V2 full
