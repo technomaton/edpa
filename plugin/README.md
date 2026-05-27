@@ -78,7 +78,7 @@ plugin/
     │   ├── mcp_server.py            # MCP server for /edpa:status, /edpa:backlog, /edpa:iterations, /edpa:flow_metrics
     │   ├── calibrate_signals.py     # CW signal-weights calibrator (Monte Carlo + coordinate descent)
     │   ├── backlog.py               # Git-native backlog CLI
-    │   ├── sync.py                  # GitHub Projects ↔ Git bidirectional sync
+    │   ├── sync.py                  # GitHub Projects ↔ Git bidirectional sync (optional UI)
     │   ├── sync_collaborators.py    # Collaborator reconciliation (drives /edpa:sync-people)
     │   ├── project_setup.py         # GitHub Project initialization (Stage 0 preflight + provisioning)
     │   ├── project_views.py + create_project_views.py
