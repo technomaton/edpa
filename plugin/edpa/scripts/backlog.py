@@ -1112,9 +1112,14 @@ def main():
 
     # add
     p_add = sub.add_parser("add", help="Add a new work item")
-    p_add.add_argument("--type", required=True, choices=["Initiative", "Epic", "Feature", "Story"],
-                       help="Item type")
-    p_add.add_argument("--parent", help="Parent item ID (required for Epic, Feature, Story)")
+    p_add.add_argument("--type", required=True,
+                       choices=["Initiative", "Epic", "Feature", "Story",
+                                "Defect", "Event", "Risk"],
+                       help="Item type (Defect/Event/Risk land at top level — no parent required)")
+    p_add.add_argument("--parent",
+                       help="Parent item ID. Required for Epic (-> Initiative), "
+                            "Feature (-> Epic), Story (-> Feature). Optional for "
+                            "Initiative/Defect/Event/Risk.")
     p_add.add_argument("--title", required=True, help="Item title")
     p_add.add_argument("--js", type=int, help="Job Size")
     p_add.add_argument("--bv", type=int, help="Business Value")
