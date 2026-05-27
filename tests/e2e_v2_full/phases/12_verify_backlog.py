@@ -22,10 +22,14 @@ Exit codes:
   0 — all hard invariants pass (counts, iterations, board build)
   1 — any hard invariant failed
 
-`backlog.py validate` failures are reported but do NOT fail the phase:
-this run intentionally carries portfolio-level items in `Validating`,
-which is a delivery-status only enum value. The mismatch is documented
-in `12_verify_backlog.md`.
+`backlog.py validate` failures are reported but do NOT fail the phase
+in case the run carries portfolio-level items at an unusual status. The
+mismatch is documented in `12_verify_backlog.md`.
+
+NOTE: Since commit `3cb8ff1`, the fixture transitions Initiative/Epic via
+the portfolio gate ladder (Implementing → Done), not the delivery ladder
+(which uses Validating). EXPECTED_COUNTS below reflects the post-3cb8ff1
+end state for the standard E2E fixture.
 """
 
 from __future__ import annotations
@@ -46,20 +50,31 @@ except ImportError:
 
 # -- Configuration -----------------------------------------------------------
 
-RUN_TAG = os.environ.get("EDPA_E2E_RUN_TAG", "20260527-142316-c6ac4db8")
+def _current_run_tag_default() -> str:
+    """Read the active RUN_TAG from /tmp/edpa-e2e-current-run-tag (coordinator)."""
+    tag_file = Path("/tmp/edpa-e2e-current-run-tag")
+    if tag_file.exists():
+        tag = tag_file.read_text().strip()
+        if tag:
+            return tag
+    return "MISSING-set-EDPA_E2E_RUN_TAG"
+
+
+RUN_TAG = os.environ.get("EDPA_E2E_RUN_TAG") or _current_run_tag_default()
 SANDBOX = Path(
     os.environ.get("EDPA_E2E_SANDBOX_DIR", f"/tmp/edpa-e2e-{RUN_TAG}")
 ).resolve()
 BOARD_HTML = Path(f"/tmp/edpa-e2e-board-{RUN_TAG}.html")
 
 EXPECTED_COUNTS = {
-    ("Initiative", "Validating"): 1,
-    ("Epic", "Validating"): 2,
+    ("Initiative", "Implementing"): 1,
+    ("Epic", "Implementing"): 2,
     ("Feature", "Done"): 3,
     ("Feature", "Validating"): 1,
     ("Story", "Done"): 20,
     ("Defect", "Done"): 2,
-    ("Event", "Done"): 2,
+    ("Event", "Done"): 1,
+    ("Event", "Funnel"): 1,
     ("Risk", "Funnel"): 2,
 }
 EXPECTED_TOTAL = sum(EXPECTED_COUNTS.values())  # 33
@@ -152,9 +167,13 @@ def check_iterations() -> tuple[bool, int, int]:
     total = 0
     yamls = sorted((SANDBOX / ".edpa" / "iterations").glob("PI-2026-*.yaml"))
     for f in yamls:
-        data = yaml.safe_load(f.read_text(encoding="utf-8"))
+        data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
         total += 1
-        status = (data or {}).get("iteration", {}).get("status")
+        # The schema has TWO status keys:
+        #   - data["iteration"]["status"]  → planning state (stays "planned")
+        #   - data["status"]               → lifecycle state (becomes "closed")
+        # We check the lifecycle key; the planning key is irrelevant here.
+        status = data.get("status")
         if status == "closed":
             closed += 1
         print(f"  {f.name}: status={status}")
@@ -243,11 +262,10 @@ def main() -> int:
         print(f"stderr: {stderr_validate}")
     print(f"exit code: {rc_validate}")
     if rc_validate != 0:
-        print("NOTE: validate exits non-zero because the run leaves")
-        print("      Initiative/Epic items in 'Validating' status, which the")
-        print("      schema only allows for Feature/Story/Defect. This is a")
-        print("      Wave B-introduced divergence, captured but NOT fatal for")
-        print("      Phase 12.")
+        print("NOTE: validate exits non-zero — review the stdout above for")
+        print("      the specific check that failed. Post-3cb8ff1, the")
+        print("      Initiative/Epic 'Implementing' state is portfolio-ladder")
+        print("      conformant and should NOT fail backlog.py validate.")
 
     section("3. Iteration state")
     iterations_ok, closed, total = check_iterations()

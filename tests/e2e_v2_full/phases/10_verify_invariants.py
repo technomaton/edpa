@@ -23,13 +23,37 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import yaml
 
-SANDBOX = Path('/tmp/edpa-e2e-20260527-142316-c6ac4db8')
+
+def _resolve_sandbox() -> Path:
+    """Resolve sandbox path from env var or /tmp/edpa-e2e-current-run-tag.
+
+    Priority:
+      1. EDPA_E2E_SANDBOX_DIR env var (set by run_e2e.sh harness)
+      2. /tmp/edpa-e2e-current-run-tag file (written by coordinator pre-flight)
+    """
+    explicit = os.environ.get('EDPA_E2E_SANDBOX_DIR')
+    if explicit:
+        return Path(explicit)
+    tag_file = Path('/tmp/edpa-e2e-current-run-tag')
+    if tag_file.exists():
+        tag = tag_file.read_text().strip()
+        if tag:
+            return Path(f'/tmp/edpa-e2e-{tag}')
+    raise SystemExit(
+        'ERROR: cannot resolve sandbox path. '
+        'Set EDPA_E2E_SANDBOX_DIR or write the RUN_TAG to '
+        '/tmp/edpa-e2e-current-run-tag.'
+    )
+
+
+SANDBOX = _resolve_sandbox()
 ITERATIONS_DIR = SANDBOX / '.edpa' / 'iterations'
 REPORTS_GLOB = '.edpa/reports/iteration-PI-*/edpa_results.json'
 SNAPSHOT_GLOB = '.edpa/snapshots/PI-2026-*.json'
