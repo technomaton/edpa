@@ -446,7 +446,7 @@ feature/F-102-anon-engine</div>
     <h3>10.3 Auditni princip</h3>
     <p>Průkaznost stojí na 5 pilírich:</p>
     <ol class="audit-pillars">
-      <li>GitHub delivery evidence</li>
+      <li>Lokální git delivery evidence (commit_author, yaml_edit, gate_events, story_activity)</li>
       <li>Capacity registry (YAML)</li>
       <li>Frozen snapshot (reprodukovatelný vstup)</li>
       <li>Reprodukovatelný výpočet (Score = JS &times; CW; CW = additivní agregace + per-item normalizace)</li>
@@ -497,7 +497,7 @@ feature/F-102-anon-engine</div>
       </div>
       <div class="card" style="border-left:3px solid var(--gn)">
         <h3 style="color:var(--gn);margin-bottom:8px">EDPA v{VERSION}</h3>
-        <p style="font-size:14px;color:var(--t2)">Evidence-Driven Proportional Allocation. Hodiny se odvozují automaticky z GitHub delivery evidence (commity, PR, reviews). Matematická garance: &Sigma; = Capacity.</p>
+        <p style="font-size:14px;color:var(--t2)">Evidence-Driven Proportional Allocation. Hodiny se odvozují automaticky z lokální git evidence (commity, yaml edits, status přechody, in-flight Story aktivita); GitHub Projects + Actions jsou volitelný doplněk. Matematická garance: &Sigma; = Capacity.</p>
       </div>
       <div class="card" style="border-left:3px solid var(--rd)">
         <h3 style="color:var(--rd);margin-bottom:8px">Ruční timesheets</h3>

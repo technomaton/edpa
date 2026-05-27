@@ -3,7 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import { VERSION } from '../lib/version';
 ---
 
-<Layout title="Evidence-Driven Proportional Allocation" description={`EDPA v${VERSION} — automatické odvození pracovních hodin z GitHub delivery evidence. Gates mode credituje každý status přechod, bidirectional sync s GitHub Projects. Bez timesheetů, s matematickou garancí.`}>
+<Layout title="Evidence-Driven Proportional Allocation" description={`EDPA v${VERSION} — automatické odvození pracovních hodin z lokální git evidence (commity, yaml edits, status přechody). Gates mode + C7.5 in-flight Story credit. Volitelný GitHub Projects sync pro PM UI. Bez timesheetů, s matematickou garancí.`}>
 
   <!-- Hero Section -->
   <section class="hero section">
@@ -11,10 +11,12 @@ import { VERSION } from '../lib/version';
       <p class="tag">Evidence-Driven Proportional Allocation · v{VERSION}</p>
       <h1 class="hero-headline">Čas se neměří — odvozuje se</h1>
       <p class="hero-subtitle">
-        EDPA v{VERSION} nahrazuje ruční timesheety automatickým odvozením hodin
-        z GitHub delivery evidence. <strong>Gates mode</strong> credituje každý
-        status přechod (LBC, design, refinement) — ne jen finální Done.
-        <strong>Bidirectional sync</strong> mezi GitHub Projects a lokálními YAMLy.
+        EDPA v{VERSION} nahrazuje ruční timesheety odvozením hodin z
+        <strong>lokální git evidence</strong> — post-commit hook, yaml edits,
+        status přechody. <strong>Gates mode</strong> credituje každý gate (LBC,
+        design, refinement) a <strong>C7.5 in-flight credit</strong> zachytí
+        rozdělanou práci na Stories ještě před uzavřením. GitHub Projects sync
+        je volitelné PM/BO UI, ne zdroj evidence.
       </p>
       <div class="grid grid-4 hero-stats">
         <div class="card accent">
@@ -28,9 +30,9 @@ import { VERSION } from '../lib/version';
           <p class="stat-desc">spread pod ±20 % CW (100 MC runs)</p>
         </div>
         <div class="card cyan">
-          <p class="stat-label">Sync</p>
-          <p class="stat-value">Bidirectional</p>
-          <p class="stat-desc">push + pull + auto-resolve konfliktů</p>
+          <p class="stat-label">Evidence</p>
+          <p class="stat-value">Local-first</p>
+          <p class="stat-desc">git hooks + log, žádný cloud lock-in</p>
         </div>
         <div class="card yellow">
           <p class="stat-label">Kalibrace</p>
@@ -62,18 +64,18 @@ import { VERSION } from '../lib/version';
           </p>
         </div>
         <div class="card green">
-          <h3 class="card-heading">GitHub Projects sync</h3>
+          <h3 class="card-heading">In-flight Story credit (C7.5)</h3>
           <p class="card-text">
-            <code>sync push</code> vytvoří issues s custom fields, nastaví
-            assignees podle <code>github:</code> mapping v people.yaml.
-            <code>sync pull</code> mirror UI změn zpět do YAMLu.
-            <code>--strategy last-write-wins</code> auto-resolve konfliktů.
+            Stories v iteraci, které se ještě nedotáhly do Done, dostanou
+            credit dle yaml_edit aktivity v okně (refinement, AC, DoD).
+            <code>story_activity_events[]</code> v <code>edpa_results.json</code>
+            ukazuje které Story dostaly credit a s jakým <code>credit_factor</code>.
           </p>
         </div>
         <div class="card yellow">
           <h3 class="card-heading">Production ready</h3>
           <p class="card-text">
-            127 unit testů, 6 E2E proti reálnému GitHubu, 100 Monte Carlo runs
+            541 unit testů, 6 E2E proti reálnému GitHubu, 100 Monte Carlo runs
             (avg MAD 7.8 % vs ground truth, spread 0.35 pp pod ±20 %
             perturbací). Plný operační runbook v
             <code>docs/RUNBOOK.md</code>.
@@ -137,10 +139,10 @@ Garance: Σ DerivedHours = Capacity per osobě a Σ cw = 1.0 per položce — v�
       <div class="grid grid-3 layers-grid">
         <div class="card accent">
           <h3 class="card-heading">Operational Metadata</h3>
-          <p class="layer-source">GitHub Issues + Projects</p>
+          <p class="layer-source">.edpa/backlog/ YAML &middot; Git</p>
           <p class="card-text">
-            Živá delivery data. Hierarchie, status, Job Size, WSJF.
-            Vše co tým již denně používá.
+            Hierarchie, status, Job Size, WSJF jako YAML frontmatter v repo.
+            Volitelný sync do GitHub Projects pro PM/BO UI.
           </p>
         </div>
         <div class="card cyan">
@@ -167,11 +169,16 @@ Garance: Σ DerivedHours = Capacity per osobě a Σ cw = 1.0 per položce — v�
   <section class="section" id="evidence">
     <div class="container">
       <p class="tag">Detekce evidence</p>
-      <h2 class="section-title">Signály z GitHubu</h2>
+      <h2 class="section-title">Signály z gitu (a volitelně GitHubu)</h2>
       <p class="desc">
-        EDPA detekuje příspěvky z GitHub aktivit napříč všemi úrovněmi (Story, Feature, Epic, Initiative).
-        Každý signál přidává váhu do <code>contribution_score</code> per (osoba, item).
-        Výsledné CW je pak per-item normalizovaný podíl: <code>cw = score / Σ_persons score</code> (Σ na položce = 1.0).
+        EDPA v2.1 čte evidence <strong>primárně z lokálního gitu</strong>:
+        post-commit hook zapisuje <code>commit_author</code> a <code>manual:commit_message</code>
+        do <code>evidence[]</code> v YAMLu; engine přímo čte <code>yaml_edit</code>
+        signály z <code>git log</code> v okně iterace a syntetizuje
+        <code>gate_events</code> ze status přechodů. Volitelný CI workflow může
+        navíc emitovat <code>pr_reviewer</code> a <code>issue_comment</code> z GitHubu.
+        Každý signál přidává váhu do <code>contribution_score</code> per (osoba, item);
+        výsledné CW = <code>score / Σ_persons score</code> (Σ na položce = 1.0).
       </p>
       <div class="table-wrap">
         <table>
@@ -179,46 +186,59 @@ Garance: Σ DerivedHours = Capacity per osobě a Σ cw = 1.0 per položce — v�
             <tr>
               <th>Signál</th>
               <th>Váha</th>
+              <th>Zdroj</th>
               <th>Popis</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><code>assignee</code></td>
-              <td class="td-cw">4.0</td>
-              <td>GitHub issue assignee</td>
-            </tr>
-            <tr>
-              <td><code>pr_author</code></td>
-              <td class="td-cw">3.4</td>
-              <td>Autor PR referencujícího item</td>
-            </tr>
-            <tr>
               <td><code>commit_author</code></td>
               <td class="td-cw">2.78</td>
-              <td>Commit s S-XXX/F-XXX/E-XXX/I-XXX v branchi/zprávě</td>
+              <td>local hook</td>
+              <td>Commit s S-XXX/F-XXX/E-XXX/I-XXX — post-commit emit</td>
+            </tr>
+            <tr>
+              <td><code>manual:commit_message</code></td>
+              <td class="td-cw">explicit</td>
+              <td>local hook</td>
+              <td><code>/contribute @osoba weight:X</code> v commit body</td>
+            </tr>
+            <tr>
+              <td><code>yaml_edit:*</code></td>
+              <td class="td-cw">0.3–5.0</td>
+              <td>engine + git log</td>
+              <td>block_add, list_grow, scalar_change, create — structural backlog edits</td>
+            </tr>
+            <tr>
+              <td><code>gate_event</code></td>
+              <td class="td-cw">js × weight</td>
+              <td>engine + git log</td>
+              <td>F/E/I status přechod (LBC → design → refinement → Done)</td>
+            </tr>
+            <tr>
+              <td><code>story_activity</code></td>
+              <td class="td-cw">js × 0.40</td>
+              <td>engine (C7.5)</td>
+              <td>In-flight Story s yaml_edit signály v okně</td>
             </tr>
             <tr>
               <td><code>pr_reviewer</code></td>
               <td class="td-cw">2.25</td>
-              <td>Schválený PR review</td>
+              <td>optional CI</td>
+              <td>Schválený PR review (volitelný GitHub Actions workflow)</td>
             </tr>
             <tr>
               <td><code>issue_comment</code></td>
               <td class="td-cw">1.14</td>
-              <td>Komentář na issue/PR (boti vyloučeni)</td>
-            </tr>
-            <tr>
-              <td><code>/contribute @osoba weight:X</code></td>
-              <td class="td-cw">explicit</td>
-              <td>Manuální additivní signál — váha <code>X</code> z direktivy</td>
+              <td>optional CI</td>
+              <td>Komentář na issue/PR (volitelný workflow, boti vyloučeni)</td>
             </tr>
           </tbody>
         </table>
       </div>
       <p class="desc" style="margin-top:16px;font-size:13px;color:var(--t3);">
         Signály se <strong>sčítají additivně</strong>; není „highest wins". Default váhy nahoře jsou kalibrované Monte Carlo simulací (1000 syntetických scénářů).
-        <code>/contribute</code> je rovnocenný signál — jeho explicit váhu detect_contributors.py přidá do součtu, nepřepisuje.
+        V2.1 hard cut: lokální git hook + engine pokrývají běžný delivery flow; CI workflow je čistě <em>opt-in</em> doplněk, ne závislost.
       </p>
     </div>
   </section>
@@ -297,10 +317,11 @@ Garance: Σ podílů = 100%</div>
           </p>
         </div>
         <div class="card green">
-          <h3 class="card-heading">GitHub-native</h3>
+          <h3 class="card-heading">Git-native, GitHub-friendly</h3>
           <p class="card-text">
-            GitHub Actions, branch naming conventions, issue tracking.
-            Žádné externí nástroje.
+            Evidence z lokálního gitu (žádný cloud lock-in). Volitelná
+            integrace s GitHub Projects + Actions pro týmy, které
+            chtějí PM UI a CI signály navíc.
           </p>
         </div>
       </div>
