@@ -1,0 +1,1322 @@
+# EDPA V2 end-to-end test — work simulation plan.
+#
+# Declarative per-iteration work plan consumed by the Wave B drivers
+# (Phase 07 commit synthesizer, Phase 08 PR/review/comment synthesizer).
+# Each iteration lists which backlog items (#N refs to backlog_plan.yaml)
+# are worked on, who commits, who reviews, who comments, and exact day
+# offsets / wall times so the resulting git+GitHub state is reproducible.
+#
+# Reference scheme
+# ----------------
+# Item refs use the #N token that points to the 1-indexed position in
+# fixtures/backlog_plan.yaml. Wave B resolves the token to the real
+# EDPA item id (S-1, S-2, ...) allocated at create-time and substitutes
+# the placeholder in commit messages and PR titles. Until substitution,
+# commit messages and PR titles use the position-based pseudo-id
+# `<item_id>` as a literal placeholder — Wave B MUST replace it before
+# pushing.
+#
+# Day offset semantics
+# --------------------
+#   day_offset 0 == iteration.start_date (Monday)
+#   day_offset 1 == Tuesday
+#   day_offset 2 == Wednesday
+#   day_offset 3 == Thursday
+#   day_offset 4 == Friday
+#   day_offset 5 == Saturday
+#   day_offset 6 == Sunday (iteration.end_date)
+# Wave B adds day_offset to start_date and combines with `time` (UTC).
+#
+# Item distribution
+# -----------------
+# Aligned with the `target_iteration` field already declared on each
+# Story / Defect in backlog_plan.yaml. Coverage:
+#   PI-2026-1.1 .. 1.4   8 delivery iters → 22 Stories+Defects total
+#   PI-2026-1.5, 2.5     IP iters         → 1 Event each (light load)
+#   PI-2026-2.1 .. 2.4   delivery iters   → continued from above
+#
+# Total simulated items across all iterations: 24
+#   = 20 Stories (#8..#27 every Story in the backlog)
+#   + 2  Defects  (#28 = D1 mid PI-1, #29 = D2 mid PI-2)
+#   + 2  Events   (#30 = EV1 retro in PI-1 IP, #31 = EV2 compliance in PI-2 IP)
+#
+# Reviewer pool: alice, bob-arch, carol, dave (minus the assignee).
+# bob-pm rarely reviews (PM role) — instead carries the role of
+# tracking commenter on most PRs.
+#
+# Loadable via yaml.safe_load (YAML 1.2, 2-space indent).
+iterations:
+  # ─── PI-2026-1.1  delivery ────────────────────────────────────────────────
+  - id: PI-2026-1.1
+    items:
+      - item: "#8"   # Story S1 — Wire calibration runner into pytest fixtures
+        assignee: alice
+        commits:
+          - day_offset: 0  # Monday
+            time: "09:15:00"
+            message: "<item_id>: scaffold pytest fixture for calibration runner"
+            file_changes:
+              - path: src/calibration/runner_fixture.py
+                content_hint: "module skeleton + docstring referencing item id"
+          - day_offset: 1
+            time: "11:40:00"
+            message: "<item_id>: wire MAD result yield into fixture"
+            file_changes:
+              - path: src/calibration/runner_fixture.py
+                content_hint: "yield mad result; teardown"
+          - day_offset: 2
+            time: "15:20:00"
+            message: "<item_id>: smoke test asserting MAD computed on synthetic corpus"
+            file_changes:
+              - path: tests/test_runner_fixture.py
+                content_hint: "pytest case + minimal corpus"
+        pr:
+          title: "<item_id>: pytest fixture for calibration runner"
+          body: |
+            Implements <item_id>: pytest fixture spinning up the calibration
+            runner against the synthetic corpus and yielding the MAD result.
+
+            Test plan:
+            - smoke test asserts non-null MAD
+            - teardown removes scratch dir
+          reviewers:
+            - person: bob-arch
+              day_offset: 3
+              time: "10:30:00"
+              comment: "Looks good. Could you also assert MAD type is float?"
+              action: approve
+            - person: carol
+              day_offset: 3
+              time: "13:45:00"
+              comment: "Nice fixture. Edge case: empty corpus → 0.0?"
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 3
+              time: "16:00:00"
+              body: "Tracking under F1 — gate item for the CI MAD guard."
+          merge:
+            day_offset: 4
+            time: "11:00:00"
+            method: squash
+        final_status: Done
+
+      - item: "#13"  # Story S — Exponential backoff for GitHub REST calls
+        assignee: dave
+        commits:
+          - day_offset: 0
+            time: "10:00:00"
+            message: "<item_id>: introduce gh_client retry decorator"
+            file_changes:
+              - path: src/gh_client/retry.py
+                content_hint: "decorator scaffold + types"
+          - day_offset: 1
+            time: "14:25:00"
+            message: "<item_id>: honour X-RateLimit-Reset header"
+            file_changes:
+              - path: src/gh_client/retry.py
+                content_hint: "parse reset header + sleep until"
+          - day_offset: 2
+            time: "16:50:00"
+            message: "<item_id>: tests for backoff on 5xx + 403 secondary limit"
+            file_changes:
+              - path: tests/test_retry.py
+                content_hint: "responses-mock based tests"
+        pr:
+          title: "<item_id>: exponential backoff for GitHub REST calls"
+          body: |
+            Implements <item_id>: gh_client now wraps every call with a
+            retry decorator that honours X-RateLimit-Reset and falls back
+            to capped exponential backoff on 5xx.
+
+            Test plan:
+            - 403 secondary limit → sleep + retry
+            - 503 → backoff doubles up to cap
+          reviewers:
+            - person: alice
+              day_offset: 3
+              time: "09:50:00"
+              comment: "Consider exposing the cap via env var."
+              action: approve
+            - person: bob-arch
+              day_offset: 3
+              time: "12:15:00"
+              comment: "Backoff cap default reasonable. Approving."
+              action: approve
+          comments:
+            - person: bob-pm
+              day_offset: 3
+              time: "15:00:00"
+              body: "Resolves the residual exposure tracked under R-1."
+          merge:
+            day_offset: 4
+            time: "13:30:00"
+            method: squash
+        final_status: Done
+
+      - item: "#18"  # Story S — Schema for PI rollup sheet
+        assignee: alice
+        commits:
+          - day_offset: 1
+            time: "09:30:00"
+            message: "<item_id>: define column layout for PI rollup sheet"
+            file_changes:
+              - path: src/reports/pi_rollup_schema.py
+                content_hint: "dataclass with column names + order"
+          - day_offset: 2
+            time: "13:10:00"
+            message: "<item_id>: lock sheet names + add schema docstring"
+            file_changes:
+              - path: src/reports/pi_rollup_schema.py
+                content_hint: "freeze sheet identifiers"
+        pr:
+          title: "<item_id>: PI rollup .xlsx schema"
+          body: |
+            Implements <item_id>: deterministic column/sheet layout for
+            the PI summary rollup workbook.
+
+            Test plan:
+            - column order asserted in tests
+          reviewers:
+            - person: carol
+              day_offset: 3
+              time: "10:15:00"
+              comment: "Sheet naming convention LGTM."
+              action: approve
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "09:00:00"
+              body: "Schema becomes downstream contract — please tag a freeze date."
+          merge:
+            day_offset: 4
+            time: "14:00:00"
+            method: squash
+        final_status: Done
+
+  # ─── PI-2026-1.2  delivery ────────────────────────────────────────────────
+  - id: PI-2026-1.2
+    items:
+      - item: "#9"   # Story S — Record MAD baseline + tolerance config
+        assignee: alice
+        commits:
+          - day_offset: 0
+            time: "10:15:00"
+            message: "<item_id>: add baseline persistence in .edpa/engine/config"
+            file_changes:
+              - path: src/calibration/baseline.py
+                content_hint: "read/write baseline json"
+          - day_offset: 1
+            time: "13:40:00"
+            message: "<item_id>: tolerance band knob (default 1.5x)"
+            file_changes:
+              - path: src/calibration/baseline.py
+                content_hint: "tolerance config dataclass"
+          - day_offset: 2
+            time: "15:55:00"
+            message: "<item_id>: tests for baseline round-trip + tolerance bounds"
+            file_changes:
+              - path: tests/test_baseline.py
+                content_hint: "round-trip + edge cases"
+        pr:
+          title: "<item_id>: MAD baseline + tolerance config"
+          body: |
+            Implements <item_id>: persists the current MAD baseline and
+            adds a configurable tolerance band consumed by the CI guard.
+
+            Test plan:
+            - baseline round-trip
+            - tolerance bounds (negative rejected)
+          reviewers:
+            - person: bob-arch
+              day_offset: 3
+              time: "11:00:00"
+              comment: "Tolerance default of 1.5x seems liberal — leave a note in docs."
+              action: approve
+            - person: dave
+              day_offset: 3
+              time: "14:30:00"
+              comment: "Schema is forward-compatible — good."
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "10:00:00"
+              body: "Required for F1 exit gate; thanks."
+          merge:
+            day_offset: 4
+            time: "15:45:00"
+            method: squash
+        final_status: Done
+
+      - item: "#14"  # Story S — Lock contention metrics on id_counter
+        assignee: dave
+        commits:
+          - day_offset: 0
+            time: "11:20:00"
+            message: "<item_id>: instrument id_counter wait time logging"
+            file_changes:
+              - path: src/id_counter/instrumentation.py
+                content_hint: "wrap next_id with timing"
+          - day_offset: 1
+            time: "14:55:00"
+            message: "<item_id>: structured log line schema (wait_ms, holder_pid, retries)"
+            file_changes:
+              - path: src/id_counter/instrumentation.py
+                content_hint: "json log emission"
+          - day_offset: 3
+            time: "10:10:00"
+            message: "<item_id>: threshold at 100ms; tests with fake lock"
+            file_changes:
+              - path: tests/test_id_counter_metrics.py
+                content_hint: "concurrent fake lock contention"
+        pr:
+          title: "<item_id>: lock contention metrics on id_counter"
+          body: |
+            Implements <item_id>: emits a structured log line whenever
+            id_counter.next_id() blocks past 100ms, with wait time,
+            holder pid, and retry count.
+
+            Test plan:
+            - synthetic contention → log emitted
+            - <100ms → log suppressed
+          reviewers:
+            - person: alice
+              day_offset: 3
+              time: "15:20:00"
+              comment: "Threshold should probably be configurable later."
+              action: approve
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "11:30:00"
+              body: "Helpful — pilots have been asking for this."
+          merge:
+            day_offset: 4
+            time: "16:00:00"
+            method: squash
+        final_status: Done
+
+      - item: "#19"  # Story S — Aggregator: per-person hours across 5 iterations
+        assignee: alice
+        commits:
+          - day_offset: 1
+            time: "09:25:00"
+            message: "<item_id>: scaffold aggregator joining iteration JSONs"
+            file_changes:
+              - path: src/reports/pi_aggregator.py
+                content_hint: "iterate PI dir + load json"
+          - day_offset: 2
+            time: "11:50:00"
+            message: "<item_id>: sum derived hours grouped by person + role"
+            file_changes:
+              - path: src/reports/pi_aggregator.py
+                content_hint: "groupby + sum"
+          - day_offset: 3
+            time: "14:05:00"
+            message: "<item_id>: tests with fixture from 5 dummy iterations"
+            file_changes:
+              - path: tests/test_pi_aggregator.py
+                content_hint: "load 5 fake iter results + assert sums"
+        pr:
+          title: "<item_id>: PI rollup aggregator"
+          body: |
+            Implements <item_id>: aggregator that joins iteration JSONs
+            across a PI directory and sums derived hours by (person, role).
+
+            Test plan:
+            - 5-iteration fixture → totals match per-iter sums
+          reviewers:
+            - person: carol
+              day_offset: 4
+              time: "10:00:00"
+              comment: "Multi-role split looks correct."
+              action: approve
+            - person: dave
+              day_offset: 4
+              time: "12:20:00"
+              comment: "Performance fine for ≤10 iters; flag for larger."
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "14:45:00"
+              body: "Unblocks F3 — keep momentum."
+          merge:
+            day_offset: 5
+            time: "10:30:00"
+            method: squash
+        final_status: Done
+
+  # ─── PI-2026-1.3  delivery ────────────────────────────────────────────────
+  - id: PI-2026-1.3
+    items:
+      - item: "#10"  # Story S — GitHub Action gate on MAD regression
+        assignee: bob-arch
+        commits:
+          - day_offset: 0
+            time: "09:45:00"
+            message: "<item_id>: new GH Action job for calibration MAD check"
+            file_changes:
+              - path: .github/workflows/calibration-mad.yml
+                content_hint: "job triggers on PRs touching cw_heuristics.yaml.tmpl"
+          - day_offset: 1
+            time: "13:25:00"
+            message: "<item_id>: post PR comment with MAD delta on regression"
+            file_changes:
+              - path: .github/workflows/calibration-mad.yml
+                content_hint: "if regression -> gh pr comment"
+          - day_offset: 2
+            time: "15:40:00"
+            message: "<item_id>: integration test via act + recorded fixtures"
+            file_changes:
+              - path: tests/test_calibration_action.py
+                content_hint: "act-based runner test"
+        pr:
+          title: "<item_id>: CI gate on MAD regression"
+          body: |
+            Implements <item_id>: GH Action that runs the calibration
+            check on every PR touching cw_heuristics.yaml.tmpl and posts
+            a comment with the MAD delta whenever it regresses.
+
+            Test plan:
+            - PR touching template → action runs
+            - regression → comment + non-zero exit
+          reviewers:
+            - person: alice
+              day_offset: 3
+              time: "10:50:00"
+              comment: "Make the comment idempotent (edit existing instead of duplicate)."
+              action: approve
+            - person: dave
+              day_offset: 3
+              time: "13:15:00"
+              comment: "Token scope check looks fine."
+              action: approve
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "09:30:00"
+              body: "F1 close-out story — please tag once merged."
+          merge:
+            day_offset: 4
+            time: "15:30:00"
+            method: squash
+        final_status: Done
+
+      - item: "#15"  # Story S — Surface actionable error on lock timeout
+        assignee: alice
+        commits:
+          - day_offset: 0
+            time: "11:05:00"
+            message: "<item_id>: catch FileLockTimeout and rewrap with hint"
+            file_changes:
+              - path: src/id_counter/__init__.py
+                content_hint: "try/except FileLockTimeout"
+          - day_offset: 1
+            time: "14:35:00"
+            message: "<item_id>: tests for hint payload (stale lock, parallel install)"
+            file_changes:
+              - path: tests/test_lock_hint.py
+                content_hint: "expect specific message tokens"
+        pr:
+          title: "<item_id>: actionable error on lock timeout"
+          body: |
+            Implements <item_id>: replaces the bare FileLockTimeout
+            traceback with a hint pointing at the likely culprit.
+
+            Test plan:
+            - stale .lock file → hint mentions stale
+            - concurrent install → hint mentions parallel install.sh
+          reviewers:
+            - person: dave
+              day_offset: 2
+              time: "10:25:00"
+              comment: "Wording is good."
+              action: approve
+            - person: bob-arch
+              day_offset: 2
+              time: "13:50:00"
+              comment: "Tests cover both common cases."
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 3
+              time: "11:00:00"
+              body: "Reduces support burden — appreciated."
+          merge:
+            day_offset: 3
+            time: "16:10:00"
+            method: squash
+        final_status: Done
+
+      - item: "#20"  # Story S — Per-item cost allocation column
+        assignee: carol
+        commits:
+          - day_offset: 1
+            time: "10:10:00"
+            message: "<item_id>: compute cost from person hourly rate × derived hours"
+            file_changes:
+              - path: src/reports/cost_allocation.py
+                content_hint: "load rates from people.yaml"
+          - day_offset: 2
+            time: "13:30:00"
+            message: "<item_id>: add column to PI rollup writer"
+            file_changes:
+              - path: src/reports/pi_rollup_writer.py
+                content_hint: "extend column set"
+          - day_offset: 3
+            time: "15:00:00"
+            message: "<item_id>: tests for cost rollup over 3 people"
+            file_changes:
+              - path: tests/test_cost_allocation.py
+                content_hint: "fixture with rates + hours"
+        pr:
+          title: "<item_id>: per-item cost allocation column"
+          body: |
+            Implements <item_id>: adds a per-item cost column computed
+            as sum(person_hourly_rate * derived_hours) across the PI.
+
+            Test plan:
+            - 3 people fixture → cost matches manual calc
+          reviewers:
+            - person: alice
+              day_offset: 4
+              time: "11:25:00"
+              comment: "Make sure missing rate falls back to 0 not error."
+              action: approve
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "14:00:00"
+              body: "Pilots will love this column."
+          merge:
+            day_offset: 5
+            time: "09:30:00"
+            method: squash
+        final_status: Done
+
+  # ─── PI-2026-1.4  delivery ────────────────────────────────────────────────
+  - id: PI-2026-1.4
+    items:
+      - item: "#11"  # Story S — Synthetic corpus expansion (industries, role mixes)
+        assignee: carol
+        commits:
+          - day_offset: 0
+            time: "09:30:00"
+            message: "<item_id>: split corpus into industry profiles dir"
+            file_changes:
+              - path: src/calibration/corpora/__init__.py
+                content_hint: "factory loading profile by name"
+          - day_offset: 1
+            time: "11:15:00"
+            message: "<item_id>: add fintech + e-commerce + gov profiles"
+            file_changes:
+              - path: src/calibration/corpora/profiles.py
+                content_hint: "three new profile dicts"
+          - day_offset: 2
+            time: "14:40:00"
+            message: "<item_id>: regenerate baseline against expanded corpus"
+            file_changes:
+              - path: src/calibration/baseline.json
+                content_hint: "new baseline mad values"
+        pr:
+          title: "<item_id>: expand synthetic calibration corpus"
+          body: |
+            Implements <item_id>: grows the corpus from a single profile
+            to four (med-platform, fintech, e-commerce, gov) so MAD
+            reflects a realistic industry spread.
+
+            Test plan:
+            - all four profiles load
+            - baseline updated, regression guard re-runs clean
+          reviewers:
+            - person: bob-arch
+              day_offset: 3
+              time: "10:45:00"
+              comment: "Industry mix looks balanced. Approving."
+              action: approve
+            - person: alice
+              day_offset: 3
+              time: "13:20:00"
+              comment: "Baseline diff documented?"
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "09:15:00"
+              body: "F1 polish — last story before exit gate."
+          merge:
+            day_offset: 4
+            time: "12:00:00"
+            method: squash
+        final_status: Done
+
+      - item: "#16"  # Story S — Empty-iteration custom-calendar regression test
+        assignee: carol
+        commits:
+          - day_offset: 0
+            time: "10:50:00"
+            message: "<item_id>: regression test for empty iteration custom calendar"
+            file_changes:
+              - path: tests/test_empty_iteration_calendar.py
+                content_hint: "construct calendar with no working days"
+          - day_offset: 1
+            time: "15:30:00"
+            message: "<item_id>: assert engine returns empty allocation not raise"
+            file_changes:
+              - path: tests/test_empty_iteration_calendar.py
+                content_hint: "explicit no-raise assertion"
+        pr:
+          title: "<item_id>: empty-iteration custom-calendar regression test"
+          body: |
+            Implements <item_id>: deterministic test covering the
+            scenario discovered by D-1 (calendar with no working days).
+
+            Test plan:
+            - calendar with 0 working days → empty allocation
+            - no ZeroDivisionError
+          reviewers:
+            - person: dave
+              day_offset: 2
+              time: "11:30:00"
+              comment: "Good companion to the D-1 fix."
+              action: approve
+            - person: alice
+              day_offset: 2
+              time: "14:00:00"
+              comment: "Could you also pin a calendar fixture?"
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 3
+              time: "10:00:00"
+              body: "Closes the loop on the kashealth bug — thanks Carol."
+          merge:
+            day_offset: 3
+            time: "16:00:00"
+            method: squash
+        final_status: Done
+
+      - item: "#21"  # Story S — Burndown chart embed
+        assignee: alice
+        commits:
+          - day_offset: 1
+            time: "09:40:00"
+            message: "<item_id>: render line chart of remaining JS per iter"
+            file_changes:
+              - path: src/reports/burndown_chart.py
+                content_hint: "openpyxl line chart"
+          - day_offset: 2
+            time: "13:55:00"
+            message: "<item_id>: embed chart on rollup sheet under summary"
+            file_changes:
+              - path: src/reports/pi_rollup_writer.py
+                content_hint: "anchor chart at row N"
+        pr:
+          title: "<item_id>: burndown chart embed in rollup sheet"
+          body: |
+            Implements <item_id>: small native Excel line chart of
+            remaining JS per iteration on the rollup sheet.
+
+            Test plan:
+            - workbook opens in libreoffice + excel
+            - chart data range matches table
+          reviewers:
+            - person: carol
+              day_offset: 3
+              time: "10:25:00"
+              comment: "Nice. Could chart title carry the PI id?"
+              action: approve
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "11:30:00"
+              body: "Visual polish — pilots will appreciate."
+          merge:
+            day_offset: 4
+            time: "14:30:00"
+            method: squash
+        final_status: Done
+
+      - item: "#28"  # Defect D1 — Engine fails on empty iteration with custom calendar
+        assignee: dave
+        commits:
+          - day_offset: 0
+            time: "13:00:00"
+            message: "<item_id>: guard against zero working days (empty allocation)"
+            file_changes:
+              - path: src/engine/allocator.py
+                content_hint: "early-return empty result"
+          - day_offset: 1
+            time: "10:25:00"
+            message: "<item_id>: unit test reproducing the ZeroDivisionError"
+            file_changes:
+              - path: tests/test_allocator_zero_days.py
+                content_hint: "synthetic 0-day calendar"
+        pr:
+          title: "<item_id>: fix engine on empty iteration with custom calendar"
+          body: |
+            Fixes <item_id>: engine raised ZeroDivisionError when an
+            iteration window contains zero working days under a custom
+            calendar. Now returns an empty allocation cleanly.
+
+            Test plan:
+            - reproduction test goes red→green
+            - cross-checked with S-9 regression test (S-16 in fixture)
+          reviewers:
+            - person: bob-arch
+              day_offset: 1
+              time: "15:15:00"
+              comment: "Clean fix. Approving so we can close the kashealth ticket."
+              action: approve
+            - person: carol
+              day_offset: 2
+              time: "09:55:00"
+              comment: "Test couples nicely with the F-2 regression test."
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 2
+              time: "11:20:00"
+              body: "Hot-fix priority — keep on the merge train."
+          merge:
+            day_offset: 2
+            time: "16:30:00"
+            method: squash
+        final_status: Done
+
+  # ─── PI-2026-1.5  IP (light load: PI-1 retro session event) ───────────────
+  - id: PI-2026-1.5
+    items:
+      - item: "#30"  # Event EV1 — PI-1 retro session
+        assignee: bob-pm
+        commits:
+          - day_offset: 1
+            time: "10:00:00"
+            message: "<item_id>: schedule PI-1 retro + agenda notes"
+            file_changes:
+              - path: docs/retro/pi-2026-1.md
+                content_hint: "agenda + attendee list"
+          - day_offset: 2
+            time: "14:30:00"
+            message: "<item_id>: capture retro outcomes + action items"
+            file_changes:
+              - path: docs/retro/pi-2026-1.md
+                content_hint: "outcomes section"
+        pr:
+          title: "<item_id>: PI-1 retro session record"
+          body: |
+            Records <item_id>: end-of-PI retrospective for PI-2026-1.
+            Outputs feed PI-2026-2 capacity plan and the next backlog
+            refinement session.
+          reviewers:
+            - person: alice
+              day_offset: 3
+              time: "09:30:00"
+              comment: "Action items mapped to next-PI stories — good."
+              action: approve
+          comments:
+            - person: bob-arch
+              day_offset: 3
+              time: "11:15:00"
+              body: "Adds context for the F-3/F-4 staffing decisions next PI."
+          merge:
+            day_offset: 3
+            time: "15:00:00"
+            method: squash
+        final_status: Done
+
+  # ─── PI-2026-2.1  delivery ────────────────────────────────────────────────
+  - id: PI-2026-2.1
+    items:
+      - item: "#12"  # Story S — Document calibration runbook update
+        assignee: alice
+        commits:
+          - day_offset: 0
+            time: "10:00:00"
+            message: "<item_id>: refresh auto-calibration runbook with CI gate"
+            file_changes:
+              - path: docs/auto-calibration.md
+                content_hint: "new CI gate section"
+          - day_offset: 1
+            time: "14:20:00"
+            message: "<item_id>: document tolerance knob + corpus expansion"
+            file_changes:
+              - path: docs/auto-calibration.md
+                content_hint: "tolerance + corpora subsections"
+        pr:
+          title: "<item_id>: calibration runbook refresh"
+          body: |
+            Documents <item_id>: updates docs/auto-calibration.md with
+            the new CI gate, the tolerance knob, and the corpus expansion
+            procedure landed in PI-1.
+
+            Test plan:
+            - docs build clean
+          reviewers:
+            - person: carol
+              day_offset: 2
+              time: "10:30:00"
+              comment: "Clear write-up. Approving."
+              action: approve
+            - person: bob-arch
+              day_offset: 2
+              time: "13:00:00"
+              comment: "Linkage to F-1 is explicit — good."
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 3
+              time: "09:45:00"
+              body: "Helpful for the upcoming pilot rollouts."
+          merge:
+            day_offset: 3
+            time: "11:30:00"
+            method: squash
+        final_status: Done
+
+      - item: "#17"  # Story S — Structured diagnostics propagated through MCP
+        assignee: bob-arch
+        commits:
+          - day_offset: 0
+            time: "11:30:00"
+            message: "<item_id>: extend MCP error envelope with diagnostic fields"
+            file_changes:
+              - path: src/mcp_server/errors.py
+                content_hint: "add diagnostics field"
+          - day_offset: 1
+            time: "15:10:00"
+            message: "<item_id>: thread id_counter metrics into MCP errors"
+            file_changes:
+              - path: src/mcp_server/handlers.py
+                content_hint: "catch + propagate"
+          - day_offset: 3
+            time: "10:25:00"
+            message: "<item_id>: tests asserting envelope shape across handlers"
+            file_changes:
+              - path: tests/test_mcp_error_envelope.py
+                content_hint: "round-trip diagnostics"
+        pr:
+          title: "<item_id>: structured diagnostics through MCP"
+          body: |
+            Implements <item_id>: routes the new diagnostic fields up
+            to the MCP error envelope so callers (Skills, CLI) can
+            render them consistently.
+
+            Test plan:
+            - envelope schema asserted
+            - diagnostics preserved through async path
+          reviewers:
+            - person: dave
+              day_offset: 4
+              time: "10:00:00"
+              comment: "Envelope shape is stable — good."
+              action: approve
+            - person: alice
+              day_offset: 4
+              time: "13:35:00"
+              comment: "Could the skills consume this opportunistically?"
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "15:50:00"
+              body: "F-2 close-out — please tag once green."
+          merge:
+            day_offset: 5
+            time: "10:15:00"
+            method: squash
+        final_status: Done
+
+      - item: "#22"  # Story S — Snapshot tests for rollup .xlsx
+        assignee: alice
+        commits:
+          - day_offset: 0
+            time: "09:00:00"
+            message: "<item_id>: golden-file fixture for rollup .xlsx"
+            file_changes:
+              - path: tests/fixtures/rollup_golden.xlsx
+                content_hint: "binary golden file"
+          - day_offset: 1
+            time: "12:45:00"
+            message: "<item_id>: diff normaliser + snapshot test"
+            file_changes:
+              - path: tests/test_rollup_snapshot.py
+                content_hint: "normalise then diff"
+          - day_offset: 2
+            time: "14:30:00"
+            message: "<item_id>: docs on regenerating the golden file"
+            file_changes:
+              - path: docs/reports.md
+                content_hint: "regen procedure"
+        pr:
+          title: "<item_id>: snapshot tests for rollup .xlsx"
+          body: |
+            Implements <item_id>: golden-file tests that diff the
+            produced .xlsx (post normalization) against a checked-in
+            expected fixture.
+
+            Test plan:
+            - intentional change → diff fails
+            - regen script updates fixture cleanly
+          reviewers:
+            - person: carol
+              day_offset: 3
+              time: "11:00:00"
+              comment: "Normaliser handles timestamps + uuids?"
+              action: approve
+            - person: dave
+              day_offset: 3
+              time: "14:15:00"
+              comment: "Nice. Approving."
+              action: approve
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "09:30:00"
+              body: "Solid coverage — F-3 in good shape."
+          merge:
+            day_offset: 4
+            time: "12:30:00"
+            method: squash
+        final_status: Done
+
+  # ─── PI-2026-2.2  delivery ────────────────────────────────────────────────
+  - id: PI-2026-2.2
+    items:
+      - item: "#23"  # Story S — RFC 4180 writer with stable column order
+        assignee: alice
+        commits:
+          - day_offset: 0
+            time: "10:20:00"
+            message: "<item_id>: scaffold RFC4180 CSV writer with locked column order"
+            file_changes:
+              - path: src/reports/csv_writer.py
+                content_hint: "writer class skeleton"
+          - day_offset: 1
+            time: "13:15:00"
+            message: "<item_id>: escape CRLF + double-quote per RFC4180"
+            file_changes:
+              - path: src/reports/csv_writer.py
+                content_hint: "quoting logic"
+          - day_offset: 2
+            time: "15:40:00"
+            message: "<item_id>: parametric tests for quoting edge cases"
+            file_changes:
+              - path: tests/test_csv_writer.py
+                content_hint: "rfc4180 sample rows"
+        pr:
+          title: "<item_id>: RFC 4180 CSV writer"
+          body: |
+            Implements <item_id>: CSV writer that emits a deterministic
+            column order and escapes CRLF/quotes per RFC 4180.
+
+            Test plan:
+            - quoting test matrix
+            - byte-stable output across runs
+          reviewers:
+            - person: bob-arch
+              day_offset: 3
+              time: "10:30:00"
+              comment: "Quoting matches the spec. Approving."
+              action: approve
+            - person: carol
+              day_offset: 3
+              time: "13:50:00"
+              comment: "Could you confirm the line terminator (CRLF) handling?"
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "10:00:00"
+              body: "Payroll team confirmed they require RFC4180 — good alignment."
+          merge:
+            day_offset: 4
+            time: "13:30:00"
+            method: squash
+        final_status: Done
+
+      - item: "#24"  # Story S — Payroll fixture import round-trip
+        assignee: alice
+        commits:
+          - day_offset: 0
+            time: "11:45:00"
+            message: "<item_id>: vendor kashealth payroll fixture under tests/fixtures"
+            file_changes:
+              - path: tests/fixtures/payroll_sample.csv
+                content_hint: "redacted sample csv"
+          - day_offset: 2
+            time: "14:55:00"
+            message: "<item_id>: round-trip test asserting no rejected rows"
+            file_changes:
+              - path: tests/test_payroll_round_trip.py
+                content_hint: "generate + reimport assertion"
+          - day_offset: 3
+            time: "09:30:00"
+            message: "<item_id>: docs note about payroll integrator workflow"
+            file_changes:
+              - path: docs/reports.md
+                content_hint: "payroll workflow paragraph"
+        pr:
+          title: "<item_id>: payroll fixture round-trip"
+          body: |
+            Implements <item_id>: feeds the produced CSV into the
+            kashealth payroll sample importer and asserts no rows are
+            rejected.
+
+            Test plan:
+            - generated CSV → importer accepts all rows
+          reviewers:
+            - person: dave
+              day_offset: 3
+              time: "13:10:00"
+              comment: "Round-trip looks robust."
+              action: approve
+            - person: carol
+              day_offset: 3
+              time: "15:25:00"
+              comment: "Sample data is redacted? Good."
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "11:00:00"
+              body: "Closing the F-4 first stories — momentum building."
+          merge:
+            day_offset: 4
+            time: "14:45:00"
+            method: squash
+        final_status: Done
+
+  # ─── PI-2026-2.3  delivery ────────────────────────────────────────────────
+  - id: PI-2026-2.3
+    items:
+      - item: "#25"  # Story S — Role column normalization across multi-role people
+        assignee: carol
+        commits:
+          - day_offset: 0
+            time: "10:15:00"
+            message: "<item_id>: emit one row per (person, role) pair"
+            file_changes:
+              - path: src/reports/csv_writer.py
+                content_hint: "multi-role expansion"
+          - day_offset: 1
+            time: "14:00:00"
+            message: "<item_id>: regression test for Bob (Arch + PM)"
+            file_changes:
+              - path: tests/test_csv_multi_role.py
+                content_hint: "two contracts → two rows"
+          - day_offset: 3
+            time: "09:50:00"
+            message: "<item_id>: edge case — single-role person stays single row"
+            file_changes:
+              - path: tests/test_csv_multi_role.py
+                content_hint: "negative-case assertion"
+        pr:
+          title: "<item_id>: multi-role split in CSV writer"
+          body: |
+            Implements <item_id>: for people with multiple roles in an
+            iteration, emits one row per (person, role) pair so payroll
+            can split lines correctly.
+
+            Test plan:
+            - Bob Arch + PM → two rows
+            - Alice (single role) → one row
+          reviewers:
+            - person: alice
+              day_offset: 3
+              time: "13:35:00"
+              comment: "Captures the bob-arch / bob-pm case cleanly."
+              action: approve
+            - person: dave
+              day_offset: 4
+              time: "10:10:00"
+              comment: "Approving — matches R-2 mitigation."
+              action: approve
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "12:30:00"
+              body: "This was painful manually before — thanks Carol."
+          merge:
+            day_offset: 4
+            time: "15:50:00"
+            method: squash
+        final_status: Done
+
+      - item: "#26"  # Story S — CLI flag --csv on edpa:edpa-reports
+        assignee: dave
+        commits:
+          - day_offset: 0
+            time: "11:20:00"
+            message: "<item_id>: add --csv flag to edpa-reports skill entry point"
+            file_changes:
+              - path: plugin/edpa/scripts/reports_cli.py
+                content_hint: "argparse flag wiring"
+          - day_offset: 2
+            time: "13:45:00"
+            message: "<item_id>: surface flag in skill SKILL.md examples"
+            file_changes:
+              - path: plugin/skills/edpa-reports/SKILL.md
+                content_hint: "example invocation"
+        pr:
+          title: "<item_id>: --csv flag on edpa-reports skill"
+          body: |
+            Implements <item_id>: exposes the new writer through the
+            reports skill so users can ask for "CSV export" in natural
+            language.
+
+            Test plan:
+            - flag invokes writer
+            - SKILL.md example renders
+          reviewers:
+            - person: alice
+              day_offset: 3
+              time: "11:00:00"
+              comment: "Skill surface is clean."
+              action: approve
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "10:15:00"
+              body: "Last bit of glue before F-4 is shippable."
+          merge:
+            day_offset: 4
+            time: "16:00:00"
+            method: squash
+        final_status: Done
+
+  # ─── PI-2026-2.4  delivery ────────────────────────────────────────────────
+  - id: PI-2026-2.4
+    items:
+      - item: "#27"  # Story S — Docs + sample CSV in docs/examples/
+        assignee: alice
+        commits:
+          - day_offset: 0
+            time: "09:25:00"
+            message: "<item_id>: write CSV layout docs page"
+            file_changes:
+              - path: docs/csv-export.md
+                content_hint: "layout + column descriptions"
+          - day_offset: 1
+            time: "13:50:00"
+            message: "<item_id>: add redacted sample CSV under docs/examples/"
+            file_changes:
+              - path: docs/examples/payroll_sample.csv
+                content_hint: "small redacted sample"
+          - day_offset: 2
+            time: "15:30:00"
+            message: "<item_id>: link from docs/reports.md"
+            file_changes:
+              - path: docs/reports.md
+                content_hint: "cross-reference"
+        pr:
+          title: "<item_id>: CSV export docs + sample"
+          body: |
+            Implements <item_id>: short page describing the CSV layout
+            with a redacted sample so payroll integrators have a
+            concrete reference.
+
+            Test plan:
+            - docs build clean
+            - sample loads in spreadsheets
+          reviewers:
+            - person: carol
+              day_offset: 3
+              time: "10:30:00"
+              comment: "Clear write-up. Approving."
+              action: approve
+            - person: bob-arch
+              day_offset: 3
+              time: "14:20:00"
+              comment: "Cross-linkage from reports.md is helpful."
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "09:30:00"
+              body: "Wraps F-4 docs — onto the defect now."
+          merge:
+            day_offset: 4
+            time: "11:30:00"
+            method: squash
+        final_status: Done
+
+      - item: "#29"  # Defect D2 — XLSX export truncates long item titles
+        assignee: alice
+        commits:
+          - day_offset: 0
+            time: "13:10:00"
+            message: "<item_id>: raise truncation threshold + wrap long titles"
+            file_changes:
+              - path: src/reports/pi_rollup_writer.py
+                content_hint: "wrap_text on long-title cells"
+          - day_offset: 1
+            time: "11:00:00"
+            message: "<item_id>: regression test asserting full title preserved"
+            file_changes:
+              - path: tests/test_rollup_long_title.py
+                content_hint: ">64-char title round-trip"
+        pr:
+          title: "<item_id>: fix XLSX export truncation of long titles"
+          body: |
+            Fixes <item_id>: titles over 64 chars were silently truncated
+            by the rollup sheet writer, breaking the per-item cost view.
+
+            Test plan:
+            - >64-char title preserved
+            - cost view shows full text
+          reviewers:
+            - person: dave
+              day_offset: 1
+              time: "15:40:00"
+              comment: "Clean fix."
+              action: approve
+            - person: carol
+              day_offset: 2
+              time: "10:15:00"
+              comment: "Test pins the threshold — good."
+              action: comment
+          comments:
+            - person: bob-pm
+              day_offset: 2
+              time: "13:25:00"
+              body: "Hot-fix priority — last open defect."
+          merge:
+            day_offset: 2
+            time: "16:30:00"
+            method: squash
+        final_status: Done
+
+  # ─── PI-2026-2.5  IP (light load: compliance review event) ────────────────
+  - id: PI-2026-2.5
+    items:
+      - item: "#31"  # Event EV2 — Compliance review for evidence storage
+        assignee: dave
+        commits:
+          - day_offset: 1
+            time: "10:30:00"
+            message: "<item_id>: capture compliance review minutes (retention)"
+            file_changes:
+              - path: docs/compliance/evidence-review.md
+                content_hint: "retention windows + redaction"
+          - day_offset: 3
+            time: "14:15:00"
+            message: "<item_id>: draft ADR on PR-evidence retention policy"
+            file_changes:
+              - path: docs/adr/0014-evidence-retention.md
+                content_hint: "decision + consequences"
+        pr:
+          title: "<item_id>: compliance review for evidence storage"
+          body: |
+            Records <item_id>: joint legal+security review of how EDPA
+            stores PR-derived evidence (commit shas, comment text).
+            Output: retention windows + ADR on redaction.
+          reviewers:
+            - person: bob-arch
+              day_offset: 4
+              time: "11:00:00"
+              comment: "ADR scope captures the residual risk under R-1."
+              action: approve
+          comments:
+            - person: bob-pm
+              day_offset: 4
+              time: "13:40:00"
+              body: "Closes PI-2 with the compliance artefact recorded."
+          merge:
+            day_offset: 4
+            time: "16:30:00"
+            method: squash
+        final_status: Done
+
+# Gate transitions
+# ----------------
+# Status changes on parent items (Features, Epics, Initiative) emitted
+# by Wave B after the listed iteration closes. Used by reports to show
+# the Active → Validating → Done flow on hierarchical items.
+#
+# `item` refs reuse the `#N` token from backlog_plan.yaml:
+#   #1 = I1 (Initiative)
+#   #2 = E1 (Engine reliability + observability)
+#   #3 = E2 (Reports UX + multi-format export)
+#   #4 = F1 (Calibration MAD regression guard)
+#   #5 = F2 (Engine retry + lock contention diagnostics)
+#   #6 = F3 (PI summary Excel rollup)
+#   #7 = F4 (Per-person timesheet CSV export)
+#
+# The `actor` field names the human pressing the transition button
+# (typically the parent item's assignee or the PM).
+# `day_offset_from_iter_end` is days *after* iteration.end_date (Sunday).
+# Wave B writes the transition. 0 means the same Sunday; 1 the next Monday.
+#
+# Note on timing: Validating fires once the bulk of children are done and
+# the parent is considered ready for stakeholder validation, even when a
+# tail-end docs/runbook story or polish defect still trails into the next
+# PI. This mirrors the realistic SAFe cadence the engine validates and
+# is intentional — not a fixture bug.
+gate_transitions:
+  # Mid PI-1 — F1 (calibration MAD guard) reaches Validating after #8 + #9 land
+  # (runner fixture + baseline). #10..#12 follow but the core mechanism is
+  # ready for validation.
+  - after_iteration: PI-2026-1.2
+    transitions:
+      - item: "#4"   # F1 — Calibration MAD regression guard
+        new_status: Validating
+        actor: bob-arch
+        day_offset_from_iter_end: 0
+
+  # End of PI-1 delivery — F1 declared Done (runbook doc #12 trails into 2.1
+  # as accepted polish work); F2 enters Validating after #13..#16 + D-1 land
+  # (one story #17 trails into 2.1); E1 promoted to Validating now that both
+  # of its features are at least Validating.
+  - after_iteration: PI-2026-1.4
+    transitions:
+      - item: "#4"   # F1 — Done
+        new_status: Done
+        actor: bob-arch
+        day_offset_from_iter_end: 0
+      - item: "#5"   # F2 — Validating
+        new_status: Validating
+        actor: dave
+        day_offset_from_iter_end: 0
+      - item: "#2"   # E1 — Validating
+        new_status: Validating
+        actor: bob-arch
+        day_offset_from_iter_end: 1
+
+  # Mid PI-2 — F3 (PI summary Excel rollup) reaches Validating after #23 + #24
+  # land (CSV writer + payroll round-trip kickstart F4 work) — F3's snapshot
+  # tests (#22) already landed in 2.1, so F3 is feature-complete pre-defect.
+  - after_iteration: PI-2026-2.2
+    transitions:
+      - item: "#6"   # F3 — PI summary Excel rollup → Validating
+        new_status: Validating
+        actor: alice
+        day_offset_from_iter_end: 0
+
+  # End of PI-2 delivery — F2 + F3 declared Done (final stories #17 and the
+  # defect #29 landed); F4 enters Validating after #23..#27 all done;
+  # E2 promoted to Validating; I1 (root initiative) promoted to Validating.
+  - after_iteration: PI-2026-2.4
+    transitions:
+      - item: "#5"   # F2 — Done
+        new_status: Done
+        actor: dave
+        day_offset_from_iter_end: 0
+      - item: "#6"   # F3 — Done (XLSX truncation defect #29 fixed)
+        new_status: Done
+        actor: alice
+        day_offset_from_iter_end: 0
+      - item: "#7"   # F4 — Validating (CSV export shippable)
+        new_status: Validating
+        actor: alice
+        day_offset_from_iter_end: 0
+      - item: "#3"   # E2 — Validating
+        new_status: Validating
+        actor: alice
+        day_offset_from_iter_end: 1
+      - item: "#1"   # I1 — Validating
+        new_status: Validating
+        actor: bob-pm
+        day_offset_from_iter_end: 1
