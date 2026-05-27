@@ -1,5 +1,85 @@
 # Changelog
 
+## 2.1.3 — 2026-05-27 — E2E findings + verify scripts parameterized
+
+Patch release applying the 5 actionable findings surfaced by the V2 full
+end-to-end test, plus a verification run that exercised every fix against
+a fresh GitHub sandbox. The verification itself uncovered 4 more bugs in
+the verify + cleanup scripts (stale hard-coded constants from the previous
+run); those are fixed in the same release.
+
+No engine math or schema changes. Engine behavior is unchanged; only CLI
+surface, close-iteration workflow, fixture, and test-infrastructure tweaks.
+
+### fix(backlog): `backlog add --type` accepts all 7 types
+
+`backlog.py add --type` CLI choices were limited to
+`Initiative|Epic|Feature|Story`, while the MCP `edpa_item_create` handler
+supported all 7 (the missing 3 being Defect, Event, Risk). Users adding
+these types via CLI had to fall back to manual YAML writes + manual
+`id_counters.yaml` bumps. The CLI now mirrors MCP's TYPE_DIRS surface.
+
+### fix(close-iteration): Stage 2b (`detect_contributors.py --all-items`) explicitly mandatory
+
+V1.11+ engine reads per-item `contributors[]` blocks for derived-hours
+allocation. Without them, all derived hours = 0 with no error — a silent
+failure mode. `sync_pr_contributions.py` writes only `evidence[]`;
+`contributors[]` must be materialized by `detect_contributors.py
+--all-items`. The close-iteration command + skill now mark this as a
+REQUIRED Stage 2b (was implicit), with an explicit warning about the
+silent-0h failure mode if skipped.
+
+### fix(e2e fixture): Initiative/Epic gate transitions use portfolio ladder
+
+`tests/e2e_v2_full/fixtures/work_plan.yaml` had Initiative/Epic gate
+transitions hitting `Validating`, which is a delivery-only enum value
+(Feature/Story/Defect). The schema correctly rejected these transitions,
+breaking the E2E run. Fixed: portfolio items now use `Implementing` per
+the portfolio ladder. Added a header comment with both ladders so future
+fixture authors don't repeat the mistake.
+
+### docs(mcp): document single-project scope limitation
+
+The EDPA MCP server resolves `.edpa/` from the calling agent's host
+project root (fixed at session start), NOT from the agent's current
+working directory. Agents invoking `mcp__plugin_edpa_edpa__*` against
+sandbox/temp projects get host-project results. Documented the
+limitation + 3 workarounds (call vendored scripts directly, run a
+separate Claude session per project, run the MCP server from the
+sandbox cwd).
+
+### docs(e2e): Skill-tool subagent gotcha
+
+The `Skill` tool may return doc/instruction text rather than executing.
+Subagents working on E2E phases should use direct `python3
+.edpa/engine/scripts/*.py` invocations as the fallback. Captured as
+limitation #4 in the E2E docs + cross-linked from `09_close_engine_reports.md`.
+
+### test(e2e): hybrid E2E verification run + parameterize verify scripts
+
+Ran the full 2 PI × 5 iter E2E in hybrid mode (PI-1 real CI, PI-2 synthetic)
+against `technomaton/edpa-e2e-20260527-181051-2c56a6a0` (now archived).
+Verified each fix holds end-to-end:
+
+- 14/14 PRs merged + 14/14 CI workflow runs success
+- 10/10 iterations closed with `all_invariants_passed=true` on FIRST
+  engine pass (zero `_rev2` snapshots — previous run had 2)
+- `backlog.py validate` exits 0 (previously 3 errors)
+- All Defect/Event/Risk items created via CLI path (no manual YAML)
+- 33 backlog items in expected end-states; 50 per-person timesheets,
+  10 XLSX, 10 frozen snapshots
+
+The verification exposed 4 stale-constant bugs in `phases/{10,11,12}_*.py`
++ `99_cleanup.sh` (hard-coded paths from previous run, `EXPECTED_MERGED_PRS=24`
+assumed full-real CI, `EXPECTED_COUNTS` predated `3cb8ff1`, wrong YAML key
+for iteration lifecycle status). All four scripts are now parameterized via
+env vars + `/tmp/edpa-e2e-current-run-tag` fallback + `EDPA_E2E_CI_MODE`-aware
+constants (`EXPECTED_MERGED_PRS` returns 24 / 14 / 0 for real / hybrid /
+synthetic).
+
+Phase run logs in `tests/e2e_v2_full/phases/01..12_*.md` refreshed with the
+hybrid-mode results, timestamps, sandbox SHAs, and script-fix findings.
+
 ## 2.1.2 — 2026-05-27 — Docs + web reposition to V2.1 local-first narrative
 
 Patch release that sweeps the customer-facing positioning to match what
