@@ -1,0 +1,74 @@
+# EDPA E2E V2 sandbox people registry.
+# Seeded into .edpa/config/people.yaml by the e2e test harness. Four
+# distinct humans, five entries — Bob carries two contracts (Arch +
+# PM, shared name/email/github) to exercise the multi-role split.
+# Total capacity per iteration must sum to exactly 144 hours, which
+# Wave C asserts as an invariant.
+
+cadence:
+  # Must match the cadence block in edpa.yaml (1-week iters, 5-week PI).
+  iteration_weeks: 1
+  pi_weeks: 5
+  delivery_iterations_per_pi: 4
+  ip_iterations_per_pi: 1
+
+# Single team for the synthetic project; planning_factor 0.8 leaves
+# 20% buffer per the AI-native defaults.
+teams:
+  - id: core
+    planning_factor: 0.8
+
+# Team members — four humans, five contracts. Bob Brown is split
+# across an Arch contract (32h) and a PM contract (8h). Both share
+# name + email + github handle but each has its own id so per-role
+# capacity invariants hold separately.
+people:
+  - id: alice
+    name: "Alice Andersen"
+    role: Dev
+    team: core
+    fte: 1.0
+    capacity_per_iteration: 40
+    email: "alice@e2e.test"
+    github: alice-dev-e2e
+    availability: confirmed
+
+  - id: bob-arch
+    name: "Bob Brown"
+    role: Arch
+    team: core
+    fte: 0.8
+    capacity_per_iteration: 32
+    email: "bob@e2e.test"
+    github: bob-arch-e2e
+    availability: confirmed
+
+  - id: bob-pm
+    name: "Bob Brown"
+    role: PM
+    team: core
+    fte: 0.2
+    capacity_per_iteration: 8
+    email: "bob@e2e.test"
+    github: bob-arch-e2e
+    availability: confirmed
+
+  - id: carol
+    name: "Carol Carter"
+    role: QA
+    team: core
+    fte: 1.0
+    capacity_per_iteration: 40
+    email: "carol@e2e.test"
+    github: carol-qa-e2e
+    availability: confirmed
+
+  - id: dave
+    name: "Dave Davies"
+    role: DevSecOps
+    team: core
+    fte: 0.6
+    capacity_per_iteration: 24
+    email: "dave@e2e.test"
+    github: dave-devsecops-e2e
+    availability: confirmed
