@@ -478,7 +478,7 @@ Annual:
 After Iteration Close: snapshot is created, frozen, evidence is never overwritten in-place, every correction is a new revision. Critical for audit defense.
 
 ### 10.3 Audit Principle
-Auditability rests on: GitHub delivery evidence + capacity registry + frozen snapshot + reproducible calculation + signed output (BankID).
+Auditability rests on: local git delivery evidence (commit_author, yaml_edit, gate_events, story_activity — reproducible from `git log`) + capacity registry + frozen snapshot + reproducible calculation + signed output (BankID).
 
 ---
 

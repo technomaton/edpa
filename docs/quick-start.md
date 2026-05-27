@@ -5,8 +5,8 @@ Get EDPA running in 10 minutes.
 ## Prerequisites
 
 - Python 3.10+ with `pyyaml` (`pip install pyyaml`)
-- GitHub CLI (`gh`) authenticated (`gh auth login`)
-- A GitHub repository for your project
+- A git repository for your project (local is fine; GitHub is only required if you want the optional Projects sync)
+- GitHub CLI (`gh`) authenticated (`gh auth login`) — only if you plan to enable the optional Projects sync
 
 ## Step 1: Install EDPA plugin
 
@@ -26,7 +26,7 @@ curl -fsSL https://edpa.technomaton.com/install.sh | sh
 
 Copy and edit the capacity registry:
 ```bash
-cp .claude/edpa/templates/people.yaml.tmpl .edpa/config/people.yaml
+cp plugin/edpa/templates/people.yaml.tmpl .edpa/config/people.yaml
 ```
 
 Edit `.edpa/config/people.yaml` with your team:
@@ -57,22 +57,26 @@ people:
 
 Copy the heuristics (defaults work fine for most teams):
 ```bash
-cp .claude/edpa/templates/heuristics.yaml.tmpl .edpa/config/heuristics.yaml
-cp .claude/edpa/templates/project.yaml.tmpl .edpa/config/project.yaml
+cp plugin/edpa/templates/cw_heuristics.yaml.tmpl .edpa/config/cw_heuristics.yaml
+cp plugin/edpa/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml
 ```
 
-Edit `.edpa/config/project.yaml` with your project name.
+Edit `.edpa/config/edpa.yaml` with your project name.
 
 ## Step 3: Try the demo
 
 Before using real data, run the built-in demo:
 ```bash
-python .claude/edpa/scripts/engine.py --demo
+python plugin/edpa/scripts/engine.py --demo
 ```
 
 You'll see a complete EDPA calculation with sample data, including per-person breakdown and invariant validation.
 
-## Step 4: Set up GitHub Projects
+## Step 4: (Optional) Set up GitHub Projects sync
+
+V2.1 evidence comes from local git — you can skip this step entirely and the
+engine will still produce a complete derived timesheet. Enable Projects sync
+only when PMs/BOs want a board view of `.edpa/backlog/` items.
 
 Follow [docs/github-setup.md](github-setup.md) to create custom fields (Job Size, Issue Type, etc.) on your GitHub Project.
 
@@ -101,9 +105,9 @@ Close iteration PI-2026-1.1
 
 Or manually:
 ```bash
-python .claude/edpa/scripts/engine.py --iteration PI-2026-1.1 \
-  --capacity .edpa/config/people.yaml \
-  --heuristics .edpa/config/heuristics.yaml
+python plugin/edpa/scripts/engine.py \
+  --edpa-root .edpa \
+  --iteration PI-2026-1.1
 ```
 
 ## Step 7: Review outputs

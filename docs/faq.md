@@ -4,7 +4,7 @@
 
 ### How is EDPA different from Toggl/Harvest/Clockify?
 
-Those tools require **manual time entry**. EDPA derives hours automatically from your GitHub delivery evidence. No one fills timesheets. No one guesses how many hours they spent on what.
+Those tools require **manual time entry**. EDPA derives hours automatically from your local git evidence — commits, yaml edits, status transitions, in-flight Story activity. No one fills timesheets. No one guesses how many hours they spent on what.
 
 | | EDPA | Toggl/Harvest |
 |-|------|---------------|
@@ -20,26 +20,31 @@ Those tools measure **developer productivity metrics** (cycle time, PR throughpu
 ### Does EDPA work without Claude Code?
 
 Yes. EDPA has two interfaces:
-1. **Python CLI** (`.claude/edpa/scripts/engine.py`) — works anywhere with Python 3.10+
+1. **Python CLI** (`plugin/edpa/scripts/engine.py`) — works anywhere with Python 3.10+
 2. **Claude Code skills** — conversational interface for AI-assisted governance
 
 The Python CLI is fully standalone. Claude Code skills provide a more convenient experience.
 
+### Does EDPA work without GitHub?
+
+V2.1 evidence is **local-first**: post-commit hook + engine reads from `git log` are pure git, no GitHub API. You can run EDPA on any git repo (GitLab, Gitea, Bitbucket, plain self-hosted). GitHub Projects sync is an *optional* PM/BO UI layer; the optional CI workflow can add `pr_reviewer` + `issue_comment` signals if you want them, but the system is fully functional without either.
+
 ### Does EDPA work with Jira instead of GitHub?
 
-Not currently. EDPA is GitHub-native — it reads evidence from GitHub Issues, PRs, commits, and reviews. Jira support would require a different evidence detection layer. Contributions welcome!
+The core EDPA engine is git-native — it doesn't talk to either GitHub or Jira directly for evidence. If you want Jira as the PM UI instead of GitHub Projects, you'd swap the `sync` layer (optional anyway). The evidence collection (`commit_author`, `yaml_edit`, `gate_events`, `story_activity`) all runs against `git log` regardless of which UI tracks tickets.
 
 ## Evidence Detection
 
 ### What if someone works on something but doesn't commit?
 
-EDPA detects multiple evidence types beyond commits:
-- **Issue assignee** (strongest signal)
-- **PR author** or **reviewer**
-- **Issue/PR comments** (design discussions count)
-- **Manual `/contribute` command** (explicit override)
+EDPA v2.1 detects multiple evidence types beyond raw commits:
+- **`yaml_edit:*`** — engine reads structural edits to `.edpa/backlog/*.md` directly from `git log` (block adds, list growth, scalar changes, file create — captures refinement, AC, DoD work)
+- **`gate_event`** — F/E/I status transitions parsed from `git log`; each gate (LBC → design → refinement → Done) credits the commit author
+- **`story_activity`** — C7.5 synthesizes in-flight Story credit when yaml_edit signals exist but the Story hasn't reached Done
+- **`manual:commit_message`** — `/contribute @person weight:X` parsed from commit body by post-commit hook (explicit additive signal)
+- **`pr_reviewer`, `issue_comment`** — optional, emitted only if you enable the CI workflow
 
-PMs, architects, and other non-coding roles generate evidence through reviews, comments, and the `/contribute` command.
+PMs, architects, and other non-coding roles generate evidence through yaml edits (writing LBC, AC, DoD), the `/contribute` directive in commit bodies, and (if enabled) GitHub reviews/comments.
 
 ### What if the heuristic assigns wrong weights?
 
@@ -79,7 +84,7 @@ They're excluded with a warning. Job Size is required for EDPA calculation. Set 
 ### Is EDPA accepted by EU grant auditors?
 
 EDPA is designed for EU compliance (OP TAK, Horizon Europe). Its audit trail includes:
-1. GitHub delivery evidence (living data)
+1. Local git delivery evidence (commit_author, yaml_edit, gate_events, story_activity — all reproducible from `git log`)
 2. Capacity registry (versioned in Git)
 3. Frozen snapshots (immutable)
 4. Reproducible calculation (deterministic formula)

@@ -113,14 +113,18 @@ plugin/
 
 ## Skills + commands at a glance
 
+V2.1 is **local-first**: `edpa:engine` runs against `.edpa/backlog/` + `git log`
+alone. Skills marked _(optional GH)_ activate GitHub Projects integration —
+useful for PM/BO board view but not required for derived-hours calculation.
+
 | Skill (slug) | Slash command | What it does |
 |---|---|---|
-| `edpa:setup` | `/edpa setup` | Provision GitHub Projects, custom fields, branch-check, copy CI workflows |
-| `edpa:engine` | `/edpa close-iteration` | Compute hours from evidence + validate invariants |
+| `edpa:setup` | `/edpa setup` | _(optional GH)_ Provision GitHub Projects, custom fields, branch-check, copy CI workflows |
+| `edpa:engine` | `/edpa close-iteration` | Compute hours from local git evidence + validate invariants |
 | `edpa:reports` | `/edpa reports` | Generate per-person timesheets, snapshots, Excel exports |
 | `edpa:autocalib` | `/edpa calibrate` | Auto-calibrate CW heuristics (Monte Carlo + coordinate descent) |
-| `edpa:sync` | `/edpa sync` | Bidirectional GitHub Projects ↔ `.edpa/backlog/` sync |
-| `edpa:sync-people` | _(no slash command)_ | Reconcile `people.yaml` vs GitHub collaborators |
+| `edpa:sync` | `/edpa sync` | _(optional GH)_ Bidirectional GitHub Projects ↔ `.edpa/backlog/` sync |
+| `edpa:sync-people` | _(no slash command)_ | _(optional GH)_ Reconcile `people.yaml` vs GitHub collaborators |
 | _(no skill)_ | `/edpa board` | Generate HTML Kanban snapshot from local backlog |
 
 ## Cross-tool compatibility

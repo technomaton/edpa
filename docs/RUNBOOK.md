@@ -93,10 +93,14 @@ file corruption), run `python3.13 plugin/edpa/scripts/sync.py setup-refresh`.
 
 ---
 
-## 2. `/edpa:sync` — bidirectional sync GitHub ↔ local YAML
+## 2. `/edpa:sync` — bidirectional sync GitHub ↔ local YAML (optional)
 
 **Purpose:** keep local `.edpa/backlog/` and the GitHub Project in agreement.
 Push local changes, pull remote field updates, detect conflicts.
+
+**V2.1 positioning:** sync is *optional*. The engine reads evidence directly
+from `git log`; running EDPA without ever pushing to GitHub Projects is a
+fully supported path. Enable sync only when PMs/BOs want a board view.
 
 **Run options:**
 

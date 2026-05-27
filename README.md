@@ -50,15 +50,16 @@ All invariants passed: YES
 
 ## Key Features
 
-- **Zero manual input** — hours derived from GitHub delivery evidence (commits, PRs, reviews, comments)
+- **Zero manual input** — hours derived from **local git evidence**: post-commit hook emits `commit_author` + `/contribute` signals; engine reads `yaml_edit`, gate-event, and in-flight Story activity directly from `git log`.
 - **Mathematical guarantee** — derived hours always sum to declared capacity
 - **Gates mode (default)** — credits each Initiative/Epic/Feature status transition as a mini-deliverable, so prep work (LBC, decomposition, design) gets credited as it happens, not only at final Done. Validated to ±0.35 pp stability under ±20 % CW perturbation across 100 Monte Carlo runs.
-- **Bidirectional GitHub Projects sync** — `sync push` creates issues with custom fields, `sync pull` mirrors GH UI changes back into local YAML (including `created_at`, `closed_at`, `updated_at` timestamps); conflict auto-resolution with `last-write-wins` / `local-wins` / `remote-wins` strategies; timestamp-based detection of direct GitHub UI edits.
+- **C7.5 in-flight Story credit** — Stories with `yaml_edit` activity in the iteration window receive partial credit (`js × credit_factor`, default 0.40) even before they reach Done; the `story_activity_events[]` audit log in `edpa_results.json` records what was credited and why.
+- **Optional GitHub Projects sync** — `sync push` creates issues with custom fields, `sync pull` mirrors GH UI changes back into local YAML (including `created_at`, `closed_at`, `updated_at` timestamps); useful when PMs/BOs want a board view, but **not required** — V2.1 produces a complete derived timesheet from local git alone.
 - **Flow metrics** — `edpa_flow_metrics` MCP tool computes cycle time, throughput, and open item age from synced timestamps, filterable by iteration and level.
 - **Dual-view** — per-person timesheets AND per-item cost allocation from the same data
 - **Audit-grade** — frozen snapshots, immutable records, BankID signing support
 - **Self-tuning** — auto-calibrates heuristics using Karpathy's autoresearch loop
-- **GitHub-native** — works with GitHub Issues, Projects, PRs, and Actions (real E2E tested against `technomaton/edpa-e2e-test` sandbox)
+- **Git-native, GitHub-friendly** — works with any git workflow; optional integration with GitHub Issues, Projects, PRs, and Actions (E2E tested against `technomaton/edpa-e2e-test` sandbox)
 
 ## First 5 minutes — guided walkthrough
 

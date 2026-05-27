@@ -520,7 +520,7 @@ python .claude/edpa/scripts/backlog.py validate
 python .claude/edpa/scripts/backlog.py status
 
 # Sync status
-python .claude/edpa/scripts/sync.py status
+python plugin/edpa/scripts/sync.py status
 ```
 
 ### 1.11 Commitnout zakladni konfiguraci
@@ -596,7 +596,9 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
 
 PR review = evidence pro EDPA (reviewer dostane CW dle role).
 
-### 2.3 Sync (automaticky)
+### 2.3 Sync (volitelne)
+
+**V2.1 positioning:** sync je *volitelny*. Engine cte evidence primarne z lokalniho gitu (`commit_author`, `yaml_edit`, `gate_events`, `story_activity`), takze EDPA funguje i bez GitHub Projects. Sync zapina pouze tymy, ktere chteji board view pro PM/BO.
 
 Bidirekcni synchronizace mezi GitHub Projects (UI pro PM/BO) a item files v `.edpa/` (Git-native):
 
@@ -609,29 +611,29 @@ Bidirekcni synchronizace mezi GitHub Projects (UI pro PM/BO) a item files v `.ed
 
 ```bash
 # Pull: GitHub Projects -> item files in .edpa/
-python .claude/edpa/scripts/sync.py pull
+python plugin/edpa/scripts/sync.py pull
 
 # Push: item files in .edpa/ -> GitHub Projects
-python .claude/edpa/scripts/sync.py push
+python plugin/edpa/scripts/sync.py push
 
 # Diff: zobrazit co by se zmenilo
-python .claude/edpa/scripts/sync.py diff
+python plugin/edpa/scripts/sync.py diff
 
 # Changelog
-python .claude/edpa/scripts/sync.py log
+python plugin/edpa/scripts/sync.py log
 
 # Status
-python .claude/edpa/scripts/sync.py status
+python plugin/edpa/scripts/sync.py status
 
 # Konflikty
-python .claude/edpa/scripts/sync.py conflicts
+python plugin/edpa/scripts/sync.py conflicts
 ```
 
 **Testovani syncu (bez GitHub API):**
 
 ```bash
-python .claude/edpa/scripts/sync.py pull --mock
-python .claude/edpa/scripts/sync.py diff --mock
+python plugin/edpa/scripts/sync.py pull --mock
+python plugin/edpa/scripts/sync.py diff --mock
 ```
 
 ### 2.4 Iteration Close
@@ -1206,16 +1208,16 @@ CONFLICT: S-200 modified in both Git and Projects
 
 ```bash
 # Zobrazit konflikty
-python .claude/edpa/scripts/sync.py conflicts
+python plugin/edpa/scripts/sync.py conflicts
 
 # Diff -- co by se zmenilo
-python .claude/edpa/scripts/sync.py diff
+python plugin/edpa/scripts/sync.py diff
 ```
 
 Rucne vyresit v prislusnem item souboru v `.edpa/`, pak:
 
 ```bash
-python .claude/edpa/scripts/sync.py push
+python plugin/edpa/scripts/sync.py push
 ```
 
 ### Sync -- loop prevence
