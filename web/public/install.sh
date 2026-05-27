@@ -183,7 +183,7 @@ if [ ! -f ".edpa/config/edpa.yaml" ] && [ -f "$TARGET/templates/edpa.yaml.tmpl" 
   echo "  Created .edpa/config/edpa.yaml (edit project.name + governance metadata)"
 fi
 
-touch ".edpa/changelog.jsonl" ".edpa/sync_state.json"
+touch ".edpa/sync_state.json"
 
 echo ""
 echo "EDPA $PINNED installed."

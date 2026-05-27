@@ -140,8 +140,7 @@ def seed_configs(root: Path) -> None:
     else:
         info("cw_heuristics.yaml already present — leaving as-is")
 
-    for f in ("changelog.jsonl", "sync_state.json"):
-        (edpa / f).touch()
+    (edpa / "sync_state.json").touch()
 
 
 def seed_id_counters(root: Path) -> None:

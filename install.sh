@@ -206,7 +206,7 @@ if new_text != text:
 PYEOF
 fi
 
-touch ".edpa/changelog.jsonl" ".edpa/sync_state.json"
+touch ".edpa/sync_state.json"
 
 # --- Optional: PI planning server vendoring (--with-server flag) ---
 if [ "$WITH_SERVER" = "1" ]; then

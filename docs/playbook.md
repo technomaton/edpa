@@ -122,7 +122,6 @@ my-project/
       calibration_log.tsv
     reports/             # Generovane reporty per iterace
     snapshots/           # Zmrazene snapshoty iteraci
-    changelog.jsonl      # Changelog syncu
     sync_state.json      # Stav posledni synchronizace
     iterations/          # Plany a vysledky iteraci
   .claude/edpa/
