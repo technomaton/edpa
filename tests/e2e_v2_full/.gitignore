@@ -1,0 +1,4 @@
+.e2e_state.json
+*.log
+__pycache__/
+*.pyc
