@@ -36,10 +36,15 @@ Expected artifacts (from Wave B Unit 10 run log)
 - 2 PI summary dirs under ``.edpa/reports/pi-PI-2026-{1,2}/`` containing
   ``pi_results.json``, ``summary.md`` (from ``pi_close.py``) and
   ``pi-summary-PI-2026-{1,2}.md`` (from ``reports.py --pi``).
-- 12 frozen snapshots under ``.edpa/snapshots/``
-  (10 base + 2 revisions from PI-2026-1.1 discovery).
-- 24 merged PRs on GitHub, 24 ``edpa-contribution-sync.yml`` workflow runs
-  (23 success + 1 acknowledged failure on S-5).
+- >=10 frozen snapshots under ``.edpa/snapshots/`` (10 base; older runs
+  carried ``_rev2`` / ``_rev3`` files for PI-2026-1.1 when the
+  ``contributors[]`` materialisation was missing — fixed in commit
+  ``85cd439`` so this run should produce exactly 10 base snapshots).
+- Merged PR count depends on CI mode:
+    * ``real`` — 24 PRs (14 PI-1 + 10 PI-2)
+    * ``hybrid`` — 14 PRs (PI-1 only; PI-2 uses synthetic injection)
+    * ``synthetic`` — 0 PRs (both PIs inject locally)
+  Configured via ``EDPA_E2E_CI_MODE`` env var (default: hybrid).
 """
 
 from __future__ import annotations
@@ -55,8 +60,25 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
-DEFAULT_SANDBOX = Path("/tmp/edpa-e2e-20260527-142316-c6ac4db8")
-DEFAULT_REPO = "technomaton/edpa-e2e-20260527-142316-c6ac4db8"
+_CURRENT_TAG_FILE = Path("/tmp/edpa-e2e-current-run-tag")
+
+
+def _current_run_tag() -> str | None:
+    if _CURRENT_TAG_FILE.exists():
+        tag = _CURRENT_TAG_FILE.read_text().strip()
+        return tag or None
+    return None
+
+
+_CURRENT_TAG = _current_run_tag()
+DEFAULT_SANDBOX = (
+    Path(f"/tmp/edpa-e2e-{_CURRENT_TAG}") if _CURRENT_TAG
+    else Path("/tmp/edpa-e2e-MISSING-set-EDPA_E2E_SANDBOX_DIR")
+)
+DEFAULT_REPO = (
+    f"technomaton/edpa-e2e-{_CURRENT_TAG}" if _CURRENT_TAG
+    else "MISSING-set-EDPA_E2E_GH_REPO"
+)
 
 # People IDs the engine writes one timesheet per (see Wave B Unit 10 log).
 PEOPLE = ("alice", "bob-arch", "bob-pm", "carol", "dave")
@@ -77,8 +99,25 @@ IP_ITERATIONS = {"PI-2026-1.5", "PI-2026-2.5"}
 TIMESHEET_PREFIXES = ("timesheet-", "vykaz-")
 JSON_SIDECAR_PREFIXES = ("timesheet-", "vykaz-")
 
-EXPECTED_MERGED_PRS = 24       # 14 PI-1 + 10 PI-2
-EXPECTED_CI_RUNS_MIN = 14      # PI-1 minimum (real CI); hybrid may add more
+def _expected_merged_prs() -> int:
+    """PR count depends on CI mode.
+
+    - real: both PIs create PRs → 24 (14 PI-1 + 10 PI-2)
+    - hybrid: only PI-1 creates real PRs → 14
+    - synthetic: no PRs created on GH → 0
+    """
+    mode = os.environ.get("EDPA_E2E_CI_MODE", "hybrid").lower()
+    return {"real": 24, "hybrid": 14, "synthetic": 0}.get(mode, 14)
+
+
+def _expected_ci_runs_min() -> int:
+    """CI workflow run count by mode (same as merged PRs in practice)."""
+    mode = os.environ.get("EDPA_E2E_CI_MODE", "hybrid").lower()
+    return {"real": 24, "hybrid": 14, "synthetic": 0}.get(mode, 14)
+
+
+EXPECTED_MERGED_PRS = _expected_merged_prs()
+EXPECTED_CI_RUNS_MIN = _expected_ci_runs_min()
 
 
 @dataclass

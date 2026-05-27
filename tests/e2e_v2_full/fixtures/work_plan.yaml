@@ -1234,7 +1234,14 @@ iterations:
 # ----------------
 # Status changes on parent items (Features, Epics, Initiative) emitted
 # by Wave B after the listed iteration closes. Used by reports to show
-# the Active → Validating → Done flow on hierarchical items.
+# the Implementing → (Validating →) Done lifecycle.
+#
+# Two distinct ladders per item level (enforced by validate_syntax.py):
+# - Delivery (Feature/Story/Defect): includes a Validating gate after
+#   Implementing — that's the QA/review/accept step before Deploying/Done.
+# - Portfolio (Initiative/Epic): does NOT include Validating. Goes
+#   Ready → Implementing → Done directly. The hypothesis-verified Done
+#   transition implicitly rolls up the delivery-layer Validating events.
 #
 # `item` refs reuse the `#N` token from backlog_plan.yaml:
 #   #1 = I1 (Initiative)
@@ -1250,12 +1257,23 @@ iterations:
 # `day_offset_from_iter_end` is days *after* iteration.end_date (Sunday).
 # Wave B writes the transition. 0 means the same Sunday; 1 the next Monday.
 #
-# Note on timing: Validating fires once the bulk of children are done and
-# the parent is considered ready for stakeholder validation, even when a
-# tail-end docs/runbook story or polish defect still trails into the next
-# PI. This mirrors the realistic SAFe cadence the engine validates and
-# is intentional — not a fixture bug.
+# Note on timing: Validating fires on Features once the bulk of child
+# stories are Done and the feature is ready for stakeholder validation,
+# even when a tail-end docs/runbook story or polish defect still trails
+# into the next PI. This mirrors the realistic SAFe cadence the engine
+# validates and is intentional — not a fixture bug.
 gate_transitions:
+  # Status ladder per item type (per validate_syntax.py + cw_heuristics.yaml.tmpl):
+  #   Feature/Story/Defect (delivery):
+  #     Funnel -> Analyzing -> Backlog -> Implementing -> Validating ->
+  #     Deploying -> Releasing -> Done
+  #   Initiative/Epic (portfolio):
+  #     Funnel -> Reviewing -> Analyzing -> Ready -> Implementing -> Done
+  # Portfolio items do NOT have a Validating gate — they go from
+  # Implementing straight to Done when the MVP is delivered and the
+  # hypothesis is verified. The QA/validate gate lives on the delivery
+  # layer (Feature/Story/Defect) and is rolled up implicitly.
+
   # Mid PI-1 — F1 (calibration MAD guard) reaches Validating after #8 + #9 land
   # (runner fixture + baseline). #10..#12 follow but the core mechanism is
   # ready for validation.
@@ -1268,8 +1286,9 @@ gate_transitions:
 
   # End of PI-1 delivery — F1 declared Done (runbook doc #12 trails into 2.1
   # as accepted polish work); F2 enters Validating after #13..#16 + D-1 land
-  # (one story #17 trails into 2.1); E1 promoted to Validating now that both
-  # of its features are at least Validating.
+  # (one story #17 trails into 2.1); E1 promoted to Implementing now that
+  # both of its features are actively delivering (portfolio gate: Ready ->
+  # Implementing, no Validating step on this level).
   - after_iteration: PI-2026-1.4
     transitions:
       - item: "#4"   # F1 — Done
@@ -1280,8 +1299,8 @@ gate_transitions:
         new_status: Validating
         actor: dave
         day_offset_from_iter_end: 0
-      - item: "#2"   # E1 — Validating
-        new_status: Validating
+      - item: "#2"   # E1 — Implementing (portfolio level, MVP in build)
+        new_status: Implementing
         actor: bob-arch
         day_offset_from_iter_end: 1
 
@@ -1297,7 +1316,11 @@ gate_transitions:
 
   # End of PI-2 delivery — F2 + F3 declared Done (final stories #17 and the
   # defect #29 landed); F4 enters Validating after #23..#27 all done;
-  # E2 promoted to Validating; I1 (root initiative) promoted to Validating.
+  # E2 promoted to Implementing (its features are actively delivering);
+  # I1 (root initiative) promoted to Implementing (both Epics in flight).
+  # Portfolio items stay at Implementing through the rest of the delivery
+  # window — they only move to Done when the hypothesis is verified, which
+  # happens beyond this E2E fixture's horizon.
   - after_iteration: PI-2026-2.4
     transitions:
       - item: "#5"   # F2 — Done
@@ -1312,11 +1335,11 @@ gate_transitions:
         new_status: Validating
         actor: alice
         day_offset_from_iter_end: 0
-      - item: "#3"   # E2 — Validating
-        new_status: Validating
+      - item: "#3"   # E2 — Implementing (portfolio level)
+        new_status: Implementing
         actor: alice
         day_offset_from_iter_end: 1
-      - item: "#1"   # I1 — Validating
-        new_status: Validating
+      - item: "#1"   # I1 — Implementing (portfolio level)
+        new_status: Implementing
         actor: bob-pm
         day_offset_from_iter_end: 1

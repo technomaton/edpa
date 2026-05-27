@@ -9,15 +9,41 @@
 
 set -euo pipefail
 
-SANDBOX_DIR="${EDPA_E2E_SANDBOX_DIR:-/tmp/edpa-e2e-20260527-142316-c6ac4db8}"
+# Default SANDBOX_DIR resolution:
+#   1. EDPA_E2E_SANDBOX_DIR env var (set by run_e2e.sh)
+#   2. /tmp/edpa-e2e-<tag> derived from /tmp/edpa-e2e-current-run-tag
+#      (written by the coordinator pre-flight step)
+if [ -z "${EDPA_E2E_SANDBOX_DIR:-}" ] && [ -f /tmp/edpa-e2e-current-run-tag ]; then
+  TAG="$(cat /tmp/edpa-e2e-current-run-tag)"
+  if [ -n "${TAG}" ]; then
+    EDPA_E2E_SANDBOX_DIR="/tmp/edpa-e2e-${TAG}"
+  fi
+fi
+SANDBOX_DIR="${EDPA_E2E_SANDBOX_DIR:-}"
+
+if [ -z "${SANDBOX_DIR}" ]; then
+  echo "ERROR: cannot resolve sandbox dir."
+  echo "  Set EDPA_E2E_SANDBOX_DIR or write the RUN_TAG to /tmp/edpa-e2e-current-run-tag."
+  exit 1
+fi
 
 if [ ! -f "${SANDBOX_DIR}/.e2e_state.json" ]; then
   echo "ERROR: ${SANDBOX_DIR}/.e2e_state.json not found"
   exit 1
 fi
 
-REPO_FULL=$(python3 -c "import json; print(json.load(open('${SANDBOX_DIR}/.e2e_state.json'))['repo_full_name'])")
+# Accept either historical key name: repo_full_name (legacy) or gh_repo (current).
+REPO_FULL=$(python3 -c "
+import json, sys
+s = json.load(open('${SANDBOX_DIR}/.e2e_state.json'))
+print(s.get('repo_full_name') or s.get('gh_repo') or '')
+")
 RUN_TAG=$(python3 -c "import json; print(json.load(open('${SANDBOX_DIR}/.e2e_state.json'))['run_tag'])")
+
+if [ -z "${REPO_FULL}" ]; then
+  echo "ERROR: .e2e_state.json has neither repo_full_name nor gh_repo"
+  exit 1
+fi
 
 echo "Cleanup for run: ${RUN_TAG}"
 echo "  sandbox dir: ${SANDBOX_DIR}"

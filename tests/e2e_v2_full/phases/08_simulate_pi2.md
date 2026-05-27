@@ -1,193 +1,245 @@
-# Phase 08 — Simulate PI-2 (SYNTHETIC CI) — run log
+# Phase 08 — Simulate PI-2 (SYNTHETIC injection) — run log
 
-Run tag: 20260527-142316-c6ac4db8
-Worker: Wave B Unit 9 (agent-a9af803600e53585c)
+Run tag: 20260527-181051-2c56a6a0
+Worker: Wave B Unit 9 (hybrid-mode fast half)
 PI: PI-2026-2
-Iterations: PI-2026-2.1 .. PI-2026-2.5
-CI mode: synthetic (sync_pr_contributions.py inline, no workflow polling)
-Started: 2026-05-27T15:04:41Z
-Finished: 2026-05-27T15:09:00Z
-Wall time: ~4m19s (260s) for 10 items + 5 iteration headers + 2 gate-transition commits
+Iterations: PI-2026-2.1 .. PI-2026-2.4 (PI-2026-2.5 IP intentionally empty)
+CI mode: synthetic — evidence rows injected directly into frontmatter
+Started: 2026-05-27T18:41:59Z
+Finished: 2026-05-27T18:43:52Z
+Wall time: ~28 s on the second pass (4 items + 5 skips + gate transitions)
+           ~4 s for the first pass (driver bug — see Failures below)
 
 ## Approach
 
-A second Python driver (`.e2e_pi2_driver.py` in sandbox, gitignored)
-processes the PI-2 iterations from `tests/e2e_v2_full/fixtures/work_plan.yaml`
-with one critical change versus the PI-1 driver: after merging each PR,
-instead of polling for the `edpa-contribution-sync.yml` GitHub Action,
-we invoke
+Instead of creating real GitHub PRs and polling
+`edpa-contribution-sync.yml`, the driver
+(`.e2e_pi2_driver.py` in the sandbox, gitignored via `.e2e_*`) builds
+each item's evidence the local way:
 
-```
-python3 .edpa/engine/scripts/sync_pr_contributions.py \
-  --pr <PR_NUM> \
-  --repo technomaton/edpa-e2e-20260527-142316-c6ac4db8 \
-  --skip-commit
-```
+1. Checkout main, branch `feature/<slug>`.
+2. Per `commits[]`, write the file change + `git commit` with per-person
+   `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` / `GIT_AUTHOR_DATE`
+   resolved from `.edpa/config/people.yaml`. The
+   `local_evidence.py` post-commit hook (vendored in
+   `.edpa/engine/scripts/`) fires after every commit, detects the item
+   ID in the commit message, resolves the person via email lookup, and
+   records a `commit_author` evidence row into the item's
+   frontmatter, then emits its own `chore(evidence): <id> from <sha>`
+   commit on the branch. Same path PI-1 used.
+3. `git checkout main && git merge --squash <branch> && git commit`
+   (locally, with assignee env vars). The squash commit touches the
+   item's backlog file, so the post-commit hook fires once more and
+   credits the assignee as `commit_author` for the squash sha too.
+4. Synthetic injection: re-read the item's frontmatter and
+   **append** `pr_author` (1 row, assignee), `pr_reviewer` (1 row per
+   fixture `reviewers[]` entry with `action: approve`), and
+   `issue_comment` (1 row per fixture reviewer + 1 row per
+   `comments[]` entry) directly into the `evidence[]` list. Each row
+   uses the canonical EDPA schema
+   `{type, person, weight, ref, at, source: synthetic}` matching
+   `sync_pr_contributions.py`. `ref` values use
+   `_synthetic_<pr>_<seq>` tokens to keep them dedupe-safe and
+   distinct from real PR comment/review IDs.
+5. Flip `status: Done`, set `closed_at`, write back, commit
+   `no-ticket: synth signals + transition <id> -> Done (synthetic PR#<n>)`
+   with `EDPA_NO_LOCAL_EVIDENCE=1` to silence the hook.
+6. **Push** to `origin/main` immediately (per-item) so the next item's
+   `git reset --hard origin/main` doesn't wipe the new commits.
+7. After the last item of each iteration: apply the fixture's
+   `gate_transitions[]` (commit + push).
 
-locally. This is the same script the CI workflow runs — it queries the
-GitHub API for the merged PR's commits/reviews/comments and writes the
-`evidence:` block into the target backlog YAML. `--skip-commit` keeps
-the driver's own commit boundary clean (the materialized evidence
-lands as part of the per-item `transition <id> -> Done` commit).
-
-Everything else is identical to Unit 8: `#N` → real id resolution,
-clean-main checkout per item, `GIT_AUTHOR_*` env per assignee, PR
-create + reviews + comments, squash merge, frontmatter `status: Done`
-+ push, gate transitions per iteration.
+Synthetic PR numbers start at 100 (offset above PI-1's real PR
+numbers 1..14) and are recorded only inside evidence `ref` strings.
+**No GitHub PRs are created during PI-2.**
 
 ## Per-iteration summary
 
 ### PI-2026-2.1 (2026-02-09 .. 2026-02-15)
-- Items: S-5, S-10, S-15 (count: 3)
-- PRs: #17 (S-5, alice), #18 (S-10, bob-arch), #19 (S-15, alice)
-- Sync exit codes: all 0
+- Items: S-5 (alice, synth PR#100), S-10 (bob-arch, synth PR#101),
+  S-15 (alice, synth PR#102) — count: 3
 - Status transitions: S-5 → Done, S-10 → Done, S-15 → Done
 - Gate transitions after: none
 
 ### PI-2026-2.2 (2026-02-16 .. 2026-02-22)
-- Items: S-16, S-17 (count: 2)
-- PRs: #20 (S-16, alice), #21 (S-17, alice)
-- Sync exit codes: all 0
+- Items: S-16 (alice, synth PR#103), S-17 (alice, synth PR#104) —
+  count: 2
 - Status transitions: S-16 → Done, S-17 → Done
 - Gate transitions after: F-3 → Validating
 
 ### PI-2026-2.3 (2026-02-23 .. 2026-03-01)
-- Items: S-18, S-19 (count: 2)
-- PRs: #22 (S-18, carol), #23 (S-19, dave)
-- Sync exit codes: all 0
+- Items: S-18 (carol, synth PR#105), S-19 (dave, synth PR#106) —
+  count: 2
 - Status transitions: S-18 → Done, S-19 → Done
 - Gate transitions after: none
 
 ### PI-2026-2.4 (2026-03-02 .. 2026-03-08)
-- Items: S-20, D-2 (count: 2)
-- PRs: #24 (S-20, alice), #25 (D-2, alice)
-- Sync exit codes: all 0
+- Items: S-20 (alice, synth PR#107), D-2 (alice, synth PR#108) —
+  count: 2
 - Status transitions: S-20 → Done, D-2 → Done
 - Gate transitions after: F-2 → Done, F-3 → Done, F-4 → Validating,
-  E-2 → Validating, I-1 → Validating
+  E-2 → **Implementing**, I-1 → **Implementing** (portfolio gate
+  ladder per 3cb8ff1 — no `Validating` for Initiative/Epic)
 
 ### PI-2026-2.5 (IP, 2026-03-09 .. 2026-03-15)
-- Items: EV-2 (count: 1)
-- PRs: #26 (EV-2, dave)
-- Sync exit codes: all 0
-- Status transitions: EV-2 → Done
+- Items: **none** — EV-2 is an Event item with no `iteration:` field
+  in its frontmatter and is out of the synthetic story/defect loop
+  per the Wave B Unit 9 brief.
+- Status transitions: none
+- Gate transitions after: none (fixture has no entries after 2.5)
 
-## Synthetic sync results
+Total: 9 items → all Done (8 Stories + 1 Defect).
 
-| PR | item | sync exit | evidence rows added | wall (s) |
-|----|------|-----------|---------------------|----------|
-| #17 | S-5  | 0 | 6 | 0 |
-| #18 | S-10 | 0 | 3 | 0 |
-| #19 | S-15 | 0 | 3 | 0 |
-| #20 | S-16 | 0 | 3 | 1 |
-| #21 | S-17 | 0 | 3 | 0 |
-| #22 | S-18 | 0 | 3 | 0 |
-| #23 | S-19 | 0 | 2 | 0 |
-| #24 | S-20 | 0 | 3 | 0 |
-| #25 | D-2  | 0 | 3 | 0 |
-| #26 | EV-2 | 0 | 2 | 0 |
+## Synthetic evidence summary
 
-Total `--skip-commit` wall time across the 10 PRs: ~1s (sub-second
-each). Compare to PI-1's CI-workflow polling at ~10-35s per PR.
+Per-item evidence shape after the run (read straight from
+`.edpa/backlog/`):
 
-## Gate transitions
+| Item | status | evidence rows | types present |
+|------|--------|---------------|---------------|
+| S-5  | Done   | 8  | commit_author, pr_author, pr_reviewer, issue_comment |
+| S-10 | Done   | 9  | commit_author, pr_author, pr_reviewer, issue_comment |
+| S-15 | Done   | 10 | commit_author, pr_author, pr_reviewer, issue_comment |
+| S-16 | Done   | 12 | commit_author, pr_author, pr_reviewer, issue_comment |
+| S-17 | Done   | 9  | commit_author, pr_author, pr_reviewer, issue_comment |
+| S-18 | Done   | 10 | commit_author, pr_author, pr_reviewer, issue_comment |
+| S-19 | Done   | 7  | commit_author, pr_author, pr_reviewer, issue_comment |
+| S-20 | Done   | 9  | commit_author, pr_author, pr_reviewer, issue_comment |
+| D-2  | Done   | 8  | commit_author, pr_author, pr_reviewer, issue_comment |
 
-| After | Item | New status | Actor (fixture) |
-|-------|------|------------|-----------------|
-| PI-2026-2.2 | F-3 | Validating | alice |
-| PI-2026-2.4 | F-2 | Done       | dave |
-| PI-2026-2.4 | F-3 | Done       | alice |
-| PI-2026-2.4 | F-4 | Validating | alice |
-| PI-2026-2.4 | E-2 | Validating | alice |
-| PI-2026-2.4 | I-1 | Validating | bob-pm |
+The S-16 row count (12) is higher than peers because it inherited
+3 stale `issue_comment` rows from PI-1's D-1 PR — D-1's body
+explicitly mentions S-16 ("cross-checked with S-9 regression test
+(S-16 in fixture)"), so the PI-1 CI workflow picked it up and
+attributed jurby's review/comment threads. The skip heuristic
+(`if any(e.type == "commit_author") for e in evidence`) correctly
+processed S-16 in PI-2 anyway since none of those PI-1 rows are
+`commit_author`.
 
-`actor` is the fixture-declared human pressing the transition; the
-driver applies the status edit directly to YAML and pushes via the
-worktree's gh auth (`jurby`), the same pattern PI-1 used.
+Every item satisfies the brief's recipe row: ≥1 `commit_author`
+row + ≥1 `pr_author` row + reviewer/comment rows per fixture.
 
-## Performance comparison (vs PI-1 real CI)
+## Gate transitions applied (end-of-run snapshot)
 
-| Metric                          | PI-1 (real CI) | PI-2 (synthetic CI) |
-|---------------------------------|----------------|---------------------|
-| Wall time, end-to-end           | ~13 min        | ~4m19s              |
-| Items processed                 | 14             | 10                  |
-| Average per-item turnaround     | ~55s           | ~26s                |
-| CI step turnaround (per PR)     | ~10-35s        | <1s                 |
-| Driver fix-up runs needed       | 2 (Unit 8)     | 1 (clean)           |
+| Item | Status | Notes |
+|------|--------|-------|
+| F-1  | Done           | from PI-1 (Wave B Unit 8) |
+| F-2  | Done           | after PI-2026-2.4 |
+| F-3  | Done           | after PI-2026-2.4 (briefly Validating after 2.2) |
+| F-4  | Validating     | after PI-2026-2.4 |
+| E-1  | Implementing   | from PI-1 (Wave B Unit 8) |
+| E-2  | **Implementing** | after PI-2026-2.4 — portfolio ladder (3cb8ff1) |
+| I-1  | **Implementing** | after PI-2026-2.4 — portfolio ladder (3cb8ff1) |
 
-The synthetic path is roughly **3× faster wall-time and >10× faster on
-the CI-step alone**, while exercising the exact same
-`sync_pr_contributions.py` materialization code path that the GH
-Action workflow invokes in production.
+E-2 and I-1 transition to `Implementing` (not `Validating`) per the
+portfolio gate-ladder fix 3cb8ff1 (`Initiative` / `Epic` types do
+not have a `Validating` step). The fixture already encodes this
+correctly and the driver applies it as-is.
+
+## Performance comparison
+
+| Metric                          | PI-1 (real CI) | PI-2 (synthetic) |
+|---------------------------------|----------------|------------------|
+| Wall time per item              | ~55 s (CI poll) | ~2 s             |
+| GitHub PRs created              | 14             | 0                |
+| `edpa-contribution-sync.yml` runs | 14           | 0 (unchanged)    |
+| Evidence types attributed       | commit_author + issue_comment | commit_author + pr_author + pr_reviewer + issue_comment |
+
+The synthetic path is roughly **25× faster per item** and also
+emits the full evidence set (including `pr_author` and
+`pr_reviewer`), which the CI workflow intentionally skips to avoid
+double-counting `pr_author` against `commit_author` (per the
+`sync_pr_contributions.py` docstring). That's a real shape
+difference — engine-side, expect slightly higher CW shares for
+PI-2 contributors vs PI-1 because of the extra `pr_author`
+(weight 3.4) and `pr_reviewer` (weight 2.25) signals.
 
 ## E2E recipe verification (per brief)
 
-1. **All PI-2 items Done** — PASS. 10 items (S-5, S-10, S-15, S-16,
-   S-17, S-18, S-19, S-20, D-2, EV-2) all have `status: Done` in
-   their frontmatter on origin/main.
-2. **PI-2 PR count >= 24** — PASS. `gh pr list --state merged --limit
-   30 --json number | jq '. | length'` returns **24** (14 from PI-1 +
-   10 from PI-2; no setup PRs in this sandbox — PR #2 / #3 were closed
-   during PI-1 fix-up).
-3. **Evidence materialized** — PASS. Verified S-15 (6 rows,
-   commit_author + issue_comment), S-18 (6 rows, commit_author +
-   issue_comment), D-2 (5 rows, commit_author + issue_comment +
-   pr_reviewer). All Story / Defect items have a populated
-   `evidence:` block.
-4. **Gate transitions applied** — PASS:
-   - F-2: Validating → Done (after PI-2.4)
-   - F-3: Funnel → Validating (after PI-2.2) → Done (after PI-2.4)
-   - F-4: Funnel → Validating (after PI-2.4)
-   - E-2: Funnel → Validating (after PI-2.4)
-   - I-1: Funnel → Validating (after PI-2.4)
-   - F-1 (Done from PI-1), E-1 (Validating from PI-1) — unchanged.
-
-## Known limitations
-
-- **Single-actor PR thread attribution**: same as PI-1 — `gh pr
-  review` / `gh pr comment` calls authenticate as `jurby`, so
-  `pr_reviewer` and `issue_comment` evidence rows are attributed to
-  `jurby` regardless of the fixture's `person:` field. `commit_author`
-  rows are still attributed correctly via `GIT_AUTHOR_EMAIL` →
-  `people.yaml.email`. The `--approve` step also falls back to a
-  comment because `jurby` is the PR author.
-- **`sync_pr_contributions.py` reads main HEAD** — driver explicitly
-  `git pull --rebase origin main` between merge and sync invocation
-  so the script sees the squash-merge commit + PR signals.
-- **No CI workflow runs added for PI-2** by the driver. The
-  `edpa-contribution-sync.yml` workflow *does* fire on push for each
-  PI-2 commit (the workflow is repo-level, not driver-controlled), but
-  its output is functionally a no-op rerun on top of the locally
-  materialized evidence — `sync_pr_contributions.py` is idempotent.
-  Use `gh run list --workflow=edpa-contribution-sync.yml` to inspect
-  if needed.
+1. **All PI-2 items Done** — PASS. 9 items
+   (S-5, S-10, S-15, S-16, S-17, S-18, S-19, S-20, D-2) all show
+   `status: Done` + `closed_at` on origin/main.
+2. **Evidence shape** — PASS. Each item carries
+   ≥1 `commit_author` (from local hook), 1 `pr_author` (synthetic),
+   ≥1 `pr_reviewer` (synthetic), ≥1 `issue_comment` (synthetic).
+3. **Gate transitions** — PASS. F-3 → Done, F-4 → Validating,
+   E-2 → Implementing, I-1 → Implementing. (Brief mentions
+   "F-4 → Done" — the **fixture** says `Validating`, and the brief
+   says "from fixture", so Validating is correct.)
+4. **Sandbox HEAD pushed** — PASS. HEAD =
+   `59c02243280124a39ed1ba4c7a1d8d07f16cc1c6`; `git status`
+   reports clean working tree, up-to-date with origin/main.
+5. **No PI-2 GitHub PRs** — PASS.
+   `gh pr list --state all --json number --jq '[.[] | select(.number > 14) | .number]'`
+   returns `[]`.
+6. **`edpa-contribution-sync.yml` run count unchanged at 14** —
+   PASS. `gh run list --workflow=edpa-contribution-sync.yml --json conclusion --jq '[.[] | .conclusion] | length'`
+   still returns `14` (PI-1 only). The workflow is triggered
+   exclusively by `pull_request: types: [closed]`, and PI-2 creates
+   zero pull requests — so no new runs queue.
 
 ## Failures
 
-None. The driver completed cleanly on its first pass — no retries, no
-catch-up commits, no merge conflicts. All 10 PRs created, reviewed,
-commented, merged, sync'd, transitioned, and pushed on the first try.
+**First-pass driver bug** (recoverable, fully resolved by re-run):
 
-## Sandbox commit head after
+The initial driver pushed only at end-of-iteration. The
+per-item `git reset --hard origin/main` then wiped the previous
+item's commits before they ever reached origin, so only the LAST
+item of each iteration (S-15, S-17, S-19, D-2) survived. The
+first 5 items (S-5, S-10, S-16, S-18, S-20) ended up still at
+`Funnel` status with no evidence.
+
+Fixed by moving the `git push origin main` from
+end-of-iteration to immediately after each item's transition commit.
+The skip heuristic (`if any(e.type == "commit_author") for e in
+evidence`) made the second pass idempotent: items already at Done
+with `commit_author` evidence are short-circuited; items missing
+`commit_author` are re-processed and pushed.
+
+**Cosmetic side-effect of the recovery**: the first-pass
+end-of-iter-2.4 gate-transition commit landed before the second
+pass, then the second pass re-applied F-3 → Validating after iter
+2.2 (because that's what the fixture says) and then F-3 → Done
+again after iter 2.4. The end state is correct (F-3 → Done) but
+F-3's git log shows a Done→Validating→Done flutter mid-history.
+Not a correctness issue — gate ladder is informational metadata,
+not a state machine the engine reads sequentially.
+
+## Sandbox HEAD after the run
 
 ```
-843cdd7 no-ticket: PI-2026-2 simulation complete (Wave B Unit 9)
-3e5a871 no-ticket: transition EV-2 -> Done (PI-2 synthetic CI)
-<gate transitions after PI-2026-2.4>
-<...per-item transition + ci-materialization commits...>
-a67a661 no-ticket: PI-2026-1 simulation complete (Wave B Unit 8)
+59c0224 no-ticket: gate transitions after PI-2026-2.4 (F-3->Done)
+adfde0c no-ticket: synth signals + transition S-20 -> Done (synthetic PR#107)
+1c2eb6b no-ticket: gate transitions after PI-2026-2.2 (F-3->Validating)
+4a4ee0a no-ticket: synth signals + transition S-16 -> Done (synthetic PR#103)
+db89b8c no-ticket: synth signals + transition S-10 -> Done (synthetic PR#101)
+6c0bce8 no-ticket: synth signals + transition S-5 -> Done (synthetic PR#100)
+ebbd734 no-ticket: gate transitions after PI-2026-2.4 (F-2->Done, F-3->Done, F-4->Validating, E-2->Implementing, I-1->Implementing)
+99c7e2f no-ticket: synth signals + transition D-2 -> Done (synthetic PR#108)
+2577681 chore(evidence): D-2,PI-2 from e31f6d5
+e31f6d5 D-2: fix XLSX export truncation of long titles (#108)
+d9d929e no-ticket: synth signals + transition S-19 -> Done (synthetic PR#106)
+…
+d7141ba no-ticket: transition EV-1 -> Done   <-- PI-1 end (Wave B Unit 8)
 ```
 
-Final HEAD on origin/main: `843cdd7aac13b695ce9918d6bb746e774bc812a6`
+Final HEAD on origin/main:
+`59c02243280124a39ed1ba4c7a1d8d07f16cc1c6`
 
 ## Artifacts
 
-- Driver script: `/tmp/edpa-e2e-20260527-142316-c6ac4db8/.e2e_pi2_driver.py`
+- Driver script:
+  `/tmp/edpa-e2e-20260527-181051-2c56a6a0/.e2e_pi2_driver.py`
   (gitignored).
+- Driver run log:
+  `/tmp/edpa-e2e-20260527-181051-2c56a6a0/.e2e_pi2_driver.log`
+  (gitignored, both passes appended).
 - Per-iteration summary JSON:
-  `/tmp/edpa-e2e-20260527-142316-c6ac4db8/.e2e_pi2_summary.json`
-  (gitignored).
-- Driver run log: `/tmp/edpa-e2e-20260527-142316-c6ac4db8/.e2e_pi2_driver.log`
-  (gitignored).
-- 10 squash-merged PRs (#17..#26) on
-  `https://github.com/technomaton/edpa-e2e-20260527-142316-c6ac4db8/pulls?state=closed`.
+  `/tmp/edpa-e2e-20260527-181051-2c56a6a0/.e2e_pi2_summary.json`
+  (gitignored, captures the second pass only — the pass that
+  actually completed without wiping).
+- **Zero** GitHub PRs created on
+  `https://github.com/technomaton/edpa-e2e-20260527-181051-2c56a6a0/`
+  for PI-2.
+- Sandbox HEAD pushed to origin/main —
+  `59c02243280124a39ed1ba4c7a1d8d07f16cc1c6`.

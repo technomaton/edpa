@@ -83,6 +83,45 @@ stdout. Logs go to stderr (see below).
 
 ---
 
+## Known limitation: single-project scope per session
+
+The MCP server is a **persistent process** launched once when the MCP client
+(Claude Code, Cursor, etc.) starts. Its working directory is fixed at startup.
+Subsequent `cd` calls from tool invocations cannot change it — they happen in
+subprocess shells, not in the server process.
+
+Practical consequences:
+
+- `find_edpa_root()` calls `Path.cwd()` per request, but `cwd` reflects the
+  server's launch directory, not whatever the assistant just changed to.
+- All MCP tools (`edpa_status`, `edpa_backlog`, `edpa_item`, …) resolve
+  `.edpa/` from that single, fixed location.
+- If an automation needs to drive EDPA against a different project (sandbox,
+  temp directory, sibling repo), MCP tools will read the **host project**,
+  not the target.
+
+**Workarounds:**
+
+- **Set `EDPA_ROOT` before launching the MCP client.** This pins the server
+  to an explicit project regardless of cwd. Useful for CI jobs and test
+  harnesses.
+- **Restart the MCP client when switching projects.** Closing and reopening
+  Claude Code re-launches the server with the new cwd.
+- **Fall back to direct script invocation** for multi-project automation.
+  `python3 .edpa/engine/scripts/backlog.py …` resolves `.edpa/` from the
+  subprocess's cwd, so `cd target-project && python3 …` works as expected.
+  EDPA's full-flow E2E test (`tests/e2e_v2_full/`) takes this approach
+  because it drives a `/tmp/edpa-e2e-*` sandbox in addition to the host
+  project — see `docs/e2e-v2-full.md` for the pattern.
+
+Multi-project MCP routing (per-call `EDPA_ROOT` argument, separate server
+instance per workspace) is not implemented. The single-project assumption
+matches the typical Claude Code workflow — one repo per session — and
+keeps the server simple. Raise an issue if your workflow requires multi-
+project support.
+
+---
+
 ## Tool reference
 
 ### `edpa_status`

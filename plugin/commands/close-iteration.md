@@ -83,15 +83,25 @@ After Stage 2 completes, decide whether to commit those YAML changes
 
 Skip this stage if `EDPA_NO_GH=1` is set or the workflow file is absent.
 
-### Stage 2b — Refresh contributors[] (V2.1 C7.6)
+### Stage 2b — Refresh contributors[] (REQUIRED — do not skip)
 
 Before invoking the engine, refresh `contributors[]` on **every**
-backlog item that has accumulated `evidence[]` signals since the
-last close. Without this step, Feature/Epic/Initiative gate events
-inherit a stale `contributors[]` snapshot (typically set when the
-LBC was first written) — the engine then credits whoever happened
-to be in that early snapshot, not the people who actually moved
-the item through its lifecycle in this iteration.
+backlog item that has accumulated `evidence[]` signals.
+
+**Why this is mandatory:** the engine reads `contributors[]` (the
+normalized per-item CW map), not `evidence[]` (the raw signal log).
+`sync_pr_contributions.py` and the post-commit hook only write
+`evidence[]`. If you skip Stage 2b, the engine sees empty contributors
+and returns **0h derived** for every item that landed via PR — no
+error, just silent zeroes. This is the single most common
+close-iteration failure mode (see docs/e2e-v2-full.md "CI gap"
+finding from the 2026-05 E2E run).
+
+Without this step, Feature/Epic/Initiative gate events also inherit
+a stale `contributors[]` snapshot (typically set when the LBC was
+first written) — the engine credits whoever was in that early
+snapshot, not the people who actually moved the item through its
+lifecycle this iteration.
 
 ```bash
 python3 .edpa/engine/scripts/detect_contributors.py --all-items
@@ -99,7 +109,7 @@ python3 .edpa/engine/scripts/detect_contributors.py --all-items
 
 Idempotent: items without `evidence[]` are no-ops. Cost is trivial
 (<1s for typical backlogs). Auto-commits as `chore(contributors): …`
-follow-up.
+follow-up. **Always run, never skip.**
 
 ### Stage 2c — Engine + reports
 
