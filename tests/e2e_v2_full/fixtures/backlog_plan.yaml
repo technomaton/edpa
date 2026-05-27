@@ -1,0 +1,494 @@
+# EDPA V2 — E2E full-flow backlog plan fixture
+#
+# Declarative seed data consumed by the Wave B worker to populate the
+# sandbox backlog via `edpa:edpa-add` (preferred) or MCP `edpa_item_create`.
+#
+# Parent reference scheme
+# -----------------------
+# Each item is identified by its 1-indexed position in the `items` list.
+# The `parent` field uses a `#N` token (string) referring to that position.
+# The Wave B worker resolves these tokens to real EDPA IDs (I-1, E-1,
+# F-1, ...) at seed time after each create call returns its allocated ID.
+#
+# Index map for quick reference:
+#   #1                 — Initiative I1 (root)
+#   #2,  #3            — Epics      (E1, E2)        parent: #1
+#   #4,  #5            — Features   (F1, F2)        parent: #2 (E1)
+#   #6,  #7            — Features   (F3, F4)        parent: #3 (E2)
+#   #8..#12            — Stories    (5 under F1)    parent: #4
+#   #13..#17           — Stories    (5 under F2)    parent: #5
+#   #18..#22           — Stories    (5 under F3)    parent: #6
+#   #23..#27           — Stories    (5 under F4)    parent: #7
+#   #28                — Defect D1                  parent: #5 (F2)
+#   #29                — Defect D2                  parent: #6 (F3)
+#   #30, #31           — Events                     parent: #1 (I1)
+#   #32, #33           — Risks                      parent: #2 (E1)
+#
+# Totals: 1 Initiative + 2 Epics + 4 Features + 20 Stories + 2 Defects
+#        + 2 Events + 2 Risks = 33 items.
+#
+# Iteration distribution (delivery iterations only — IP iterations .5 stay empty):
+#   PI-2026-1.1 .. 1.4 and PI-2026-2.1 .. 2.4 (8 delivery iterations).
+#   Stories spread roughly evenly (~2-3 each); defects land mid-PI on .4.
+#
+# Assignees must match people.yaml ids: alice, bob-arch, bob-pm, carol, dave.
+# (bob-arch and bob-pm are the same human "Bob" wearing two roles.)
+items:
+  # ----- #1 Initiative -----------------------------------------------------
+  - type: Initiative
+    title: "EDPA V2 Production Hardening"
+    js: null
+    bv: 13
+    tc: 13
+    rr: 8
+    parent: null
+    assignee: bob-pm
+    description: |
+      Strategic initiative to harden EDPA V2 for production rollout
+      across pilot teams. Covers engine reliability, reports UX, and
+      evidence-storage compliance work that must land before EDPA is
+      promoted from "pilot" to "default" governance layer.
+
+  # ----- #2 Epic — Engine reliability + observability ----------------------
+  - type: Epic
+    title: "Engine reliability + observability"
+    js: null
+    bv: 10
+    tc: 10
+    rr: 5
+    parent: "#1"
+    assignee: bob-arch
+    description: |
+      Make the EDPA engine resilient to GitHub API rate limits,
+      file-lock contention, and partial-iteration failures. Adds the
+      observability needed to debug calibration drift in real pilots.
+
+  # ----- #3 Epic — Reports UX + multi-format export ------------------------
+  - type: Epic
+    title: "Reports UX + multi-format export"
+    js: null
+    bv: 8
+    tc: 6
+    rr: 5
+    parent: "#1"
+    assignee: alice
+    description: |
+      Polish per-person and per-item reports so accountants and PMs can
+      consume them without a Python REPL. Adds PI summary rollup and
+      CSV timesheets for downstream payroll integration.
+
+  # ----- #4 Feature — Calibration MAD regression guard ---------------------
+  - type: Feature
+    title: "Calibration MAD regression guard"
+    js: null
+    bv: 8
+    tc: 8
+    rr: 3
+    parent: "#2"
+    assignee: bob-arch
+    description: |
+      CI check that runs the Monte-Carlo calibration synthetic corpus
+      on every PR touching cw_heuristics.yaml.tmpl and fails if MAD
+      regresses past the recorded baseline.
+
+  # ----- #5 Feature — Engine retry + lock contention diagnostics -----------
+  - type: Feature
+    title: "Engine retry + lock contention diagnostics"
+    js: null
+    bv: 6
+    tc: 5
+    rr: 2
+    parent: "#2"
+    assignee: dave
+    description: |
+      Exponential backoff on GitHub API throttling plus structured
+      diagnostics when id_counter file lock contention exceeds the
+      retry window. Surfaces actionable error messages instead of
+      Python tracebacks.
+
+  # ----- #6 Feature — PI summary Excel rollup ------------------------------
+  - type: Feature
+    title: "PI summary Excel rollup"
+    js: null
+    bv: 7
+    tc: 5
+    rr: 3
+    parent: "#3"
+    assignee: alice
+    description: |
+      Single .xlsx that aggregates all 5 iterations of a PI: per-person
+      delivered hours, per-item cost, capacity vs. derived hours,
+      and rolling burndown. Replaces the manual copy-paste flow that
+      pilots used during V2 beta.
+
+  # ----- #7 Feature — Per-person timesheet CSV export ----------------------
+  - type: Feature
+    title: "Per-person timesheet CSV export"
+    js: null
+    bv: 5
+    tc: 3
+    rr: 2
+    parent: "#3"
+    assignee: alice
+    description: |
+      RFC 4180 CSV with columns the payroll system expects (person,
+      iteration, item, hours, role). Validated by a sample-import
+      test against the kashealth payroll fixture.
+
+  # ----- #8..#12 Stories under F1 (Calibration MAD regression guard) ------
+  - type: Story
+    title: "Wire calibration runner into pytest fixtures"
+    js: 3
+    bv: 5
+    tc: 5
+    rr: 3
+    parent: "#4"
+    assignee: alice
+    target_iteration: PI-2026-1.1
+    description: |
+      Add a pytest fixture that spins up the calibration runner against
+      the synthetic corpus and yields the MAD result for assertions.
+
+  - type: Story
+    title: "Record MAD baseline + tolerance config"
+    js: 5
+    bv: 6
+    tc: 6
+    rr: 4
+    parent: "#4"
+    assignee: alice
+    target_iteration: PI-2026-1.2
+    description: |
+      Persist the current MAD baseline plus a configurable tolerance
+      band in .edpa/engine/config so the CI check has a reference.
+
+  - type: Story
+    title: "GitHub Action gate on MAD regression"
+    js: 8
+    bv: 8
+    tc: 7
+    rr: 5
+    parent: "#4"
+    assignee: bob-arch
+    target_iteration: PI-2026-1.3
+    description: |
+      New job in .github/workflows that runs the calibration check on
+      every PR touching cw_heuristics.yaml.tmpl and posts a comment
+      with the MAD delta when it regresses.
+
+  - type: Story
+    title: "Synthetic corpus expansion (industries, role mixes)"
+    js: 5
+    bv: 5
+    tc: 4
+    rr: 3
+    parent: "#4"
+    assignee: carol
+    target_iteration: PI-2026-1.4
+    description: |
+      Grow the synthetic corpus from a single profile to four
+      (med-platform, fintech, e-commerce, gov) so MAD reflects a
+      realistic industry spread.
+
+  - type: Story
+    title: "Document calibration runbook update"
+    js: 2
+    bv: 3
+    tc: 3
+    rr: 3
+    parent: "#4"
+    assignee: alice
+    target_iteration: PI-2026-2.1
+    description: |
+      Update docs/auto-calibration.md with the new CI gate, the
+      tolerance knob, and the corpus expansion procedure.
+
+  # ----- #13..#17 Stories under F2 (Engine retry + lock diagnostics) ------
+  - type: Story
+    title: "Exponential backoff for GitHub REST calls"
+    js: 8
+    bv: 7
+    tc: 6
+    rr: 4
+    parent: "#5"
+    assignee: dave
+    target_iteration: PI-2026-1.1
+    description: |
+      Wrap the GH client with a retry decorator that honours
+      X-RateLimit-Reset and falls back to capped exponential backoff
+      on 5xx responses.
+
+  - type: Story
+    title: "Lock contention metrics on id_counter"
+    js: 5
+    bv: 5
+    tc: 5
+    rr: 3
+    parent: "#5"
+    assignee: dave
+    target_iteration: PI-2026-1.2
+    description: |
+      Emit a structured log line with wait time, holder pid, and
+      retry count every time id_counter.next_id() blocks past 100 ms.
+
+  - type: Story
+    title: "Surface actionable error on lock timeout"
+    js: 3
+    bv: 4
+    tc: 4
+    rr: 3
+    parent: "#5"
+    assignee: alice
+    target_iteration: PI-2026-1.3
+    description: |
+      Replace the bare FileLockTimeout traceback with a hint that
+      points at the likely culprit (stale lock, parallel install.sh).
+
+  - type: Story
+    title: "Empty-iteration custom-calendar regression test"
+    js: 5
+    bv: 5
+    tc: 6
+    rr: 4
+    parent: "#5"
+    assignee: carol
+    target_iteration: PI-2026-1.4
+    description: |
+      Cover the scenario discovered by D1 — calendar with no work
+      days in the iteration window — with a deterministic test so
+      future regressions fail fast.
+
+  - type: Story
+    title: "Structured diagnostics propagated through MCP"
+    js: 3
+    bv: 4
+    tc: 4
+    rr: 3
+    parent: "#5"
+    assignee: bob-arch
+    target_iteration: PI-2026-2.1
+    description: |
+      Route the new diagnostic fields up to the MCP error envelope
+      so callers (Skills, CLI) can render them consistently.
+
+  # ----- #18..#22 Stories under F3 (PI summary Excel rollup) ---------------
+  - type: Story
+    title: "Schema for PI rollup sheet"
+    js: 5
+    bv: 5
+    tc: 5
+    rr: 3
+    parent: "#6"
+    assignee: alice
+    target_iteration: PI-2026-1.1
+    description: |
+      Lock the column/sheet layout of the PI rollup .xlsx so
+      downstream consumers can rely on it.
+
+  - type: Story
+    title: "Aggregator: per-person hours across 5 iterations"
+    js: 8
+    bv: 7
+    tc: 6
+    rr: 4
+    parent: "#6"
+    assignee: alice
+    target_iteration: PI-2026-1.2
+    description: |
+      New aggregator in reports module that joins iteration JSONs
+      from a PI directory and sums derived hours by person/role.
+
+  - type: Story
+    title: "Per-item cost allocation column"
+    js: 3
+    bv: 5
+    tc: 4
+    rr: 3
+    parent: "#6"
+    assignee: carol
+    target_iteration: PI-2026-1.3
+    description: |
+      Cost per item = sum(person_hourly_rate * derived_hours) across
+      the PI. Source rates from people.yaml.
+
+  - type: Story
+    title: "Burndown chart embed"
+    js: 2
+    bv: 4
+    tc: 3
+    rr: 3
+    parent: "#6"
+    assignee: alice
+    target_iteration: PI-2026-1.4
+    description: |
+      Render a small line chart of remaining JS per iteration as a
+      native Excel chart object on the rollup sheet.
+
+  - type: Story
+    title: "Snapshot tests for rollup .xlsx"
+    js: 5
+    bv: 6
+    tc: 6
+    rr: 4
+    parent: "#6"
+    assignee: alice
+    target_iteration: PI-2026-2.1
+    description: |
+      Golden-file tests that diff the produced .xlsx (post
+      normalization) against a checked-in expected fixture.
+
+  # ----- #23..#27 Stories under F4 (Per-person timesheet CSV) -------------
+  - type: Story
+    title: "RFC 4180 writer with stable column order"
+    js: 3
+    bv: 5
+    tc: 4
+    rr: 3
+    parent: "#7"
+    assignee: alice
+    target_iteration: PI-2026-2.2
+    description: |
+      CSV writer that emits a deterministic column order and
+      escapes CRLF/quotes per RFC 4180.
+
+  - type: Story
+    title: "Payroll fixture import round-trip"
+    js: 5
+    bv: 6
+    tc: 6
+    rr: 4
+    parent: "#7"
+    assignee: alice
+    target_iteration: PI-2026-2.2
+    description: |
+      Feed the produced CSV into the kashealth payroll sample
+      importer and assert no rows are rejected.
+
+  - type: Story
+    title: "Role column normalization across multi-role people"
+    js: 2
+    bv: 4
+    tc: 4
+    rr: 3
+    parent: "#7"
+    assignee: carol
+    target_iteration: PI-2026-2.3
+    description: |
+      For people with multiple roles in an iteration, emit one row
+      per (person, role) pair so payroll can split lines correctly.
+
+  - type: Story
+    title: "CLI flag --csv on edpa:edpa-reports"
+    js: 3
+    bv: 4
+    tc: 3
+    rr: 3
+    parent: "#7"
+    assignee: dave
+    target_iteration: PI-2026-2.3
+    description: |
+      Expose the new writer through the reports skill so users can
+      ask for "CSV export" in natural language.
+
+  - type: Story
+    title: "Docs + sample CSV in docs/examples/"
+    js: 5
+    bv: 5
+    tc: 4
+    rr: 3
+    parent: "#7"
+    assignee: alice
+    target_iteration: PI-2026-2.4
+    description: |
+      Add a short page describing the CSV layout, with a redacted
+      sample so payroll integrators have a concrete reference.
+
+  # ----- #28 Defect D1 -----------------------------------------------------
+  - type: Defect
+    title: "Engine fails on empty iteration with custom calendar"
+    js: 2
+    bv: 8
+    tc: 5
+    rr: 1
+    parent: "#5"
+    assignee: dave
+    target_iteration: PI-2026-1.4
+    description: |
+      Reported in the kashealth pilot: when an iteration window
+      contains zero working days under a custom calendar, the
+      engine raises ZeroDivisionError instead of producing an empty
+      allocation. Mid-PI fix.
+
+  # ----- #29 Defect D2 -----------------------------------------------------
+  - type: Defect
+    title: "XLSX export truncates long item titles"
+    js: 3
+    bv: 5
+    tc: 3
+    rr: 2
+    parent: "#6"
+    assignee: alice
+    target_iteration: PI-2026-2.4
+    description: |
+      Titles over 64 chars are silently truncated by the rollup
+      sheet writer, breaking the per-item cost view. Mid-PI fix.
+
+  # ----- #30 Event EV1 -----------------------------------------------------
+  - type: Event
+    title: "PI-1 retro session"
+    js: null
+    bv: 5
+    tc: 4
+    rr: 3
+    parent: "#1"
+    assignee: bob-pm
+    event_type: ceremony
+    description: |
+      End-of-PI retrospective for PI-2026-1. Attended by all roles;
+      output feeds the PI-2026-2 capacity plan and the next backlog
+      refinement session.
+
+  # ----- #31 Event EV2 -----------------------------------------------------
+  - type: Event
+    title: "Compliance review for evidence storage"
+    js: null
+    bv: 6
+    tc: 5
+    rr: 4
+    parent: "#1"
+    assignee: dave
+    event_type: risk
+    description: |
+      Legal + security joint review of how EDPA stores PR-derived
+      evidence (commit shas, comment text). Output drives ADR
+      decisions on retention windows and redaction.
+
+  # ----- #32 Risk R1 -------------------------------------------------------
+  - type: Risk
+    title: "GitHub API rate limit blocks large iterations"
+    js: null
+    bv: 5
+    tc: 6
+    rr: 5
+    parent: "#2"
+    assignee: dave
+    description: |
+      Teams with >50 PRs per iteration hit the secondary rate limit
+      mid-engine-run. Mitigation tracked under F2 (engine retry);
+      this risk record carries the residual exposure until that
+      feature ships.
+
+  # ----- #33 Risk R2 -------------------------------------------------------
+  - type: Risk
+    title: "Multi-role person attribution edge cases"
+    js: null
+    bv: 4
+    tc: 5
+    rr: 4
+    parent: "#2"
+    assignee: bob-arch
+    description: |
+      People in two roles (e.g. bob-arch + bob-pm) can be
+      double-counted by naive contribution detection. Tracks the
+      residual risk until the new role-aware attribution test suite
+      lands under F1/F2.
