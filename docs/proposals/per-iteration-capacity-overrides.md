@@ -376,7 +376,7 @@ Pokud schváleno:
 1. Implementace dle § 8 (1 dev-day)
 2. Tests dle § 9
 3. CHANGELOG + bump na v1.9.0-beta
-4. Re-run E2E (E2E-REPORT-2026-05-06-v190.md) s capacity_override scénářem
+4. Re-run E2E (per `docs/E2E-TEST-PLAN.md`) s capacity_override scénářem
 5. Tag + push + release
 
 Pokud zamítnuto: aktualizovat `docs/KASHEALTH-PILOT.md` § 14 o postup A
