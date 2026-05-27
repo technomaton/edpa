@@ -675,7 +675,7 @@ AI Snapshot Layer nahrazuje tradiční BI nástroje (Power BI, Grafana). Místo 
 
 Průkaznost stojí na 5 pilířích:
 
-- GitHub delivery evidence (commity, PR, reviews, comments)
+- Lokální git delivery evidence (commit_author, yaml_edit, gate_events, story_activity — reprodukovatelné z `git log`)
 - Capacity registry (YAML config v repo)
 - Frozen snapshot (reprodukovatelný vstup)
 - Reprodukovatelný výpočet (Score = JS × CW × RS)
