@@ -7,9 +7,35 @@
 
 ## Core invariant
 
-**Every commit attributes to an EDPA backlog item.**
+**Every commit attributes to an EDPA backlog item, in [Conventional Commits](https://www.conventionalcommits.org/) format.**
 
 If the work doesn't have a ticket, create one first — then commit.
+
+## Commit message format
+
+EDPA uses Conventional Commits with the **ticket ID as scope**:
+
+```
+<type>(<ticket-id>): <subject>
+
+[optional body]
+[optional footer]
+```
+
+Concrete examples:
+
+```
+feat(S-42): implement OAuth callback handler
+fix(S-215): validate upload file size before parsing
+test(S-201): add unit tests for OMOP CDM parser
+docs(E-10): update epic hypothesis with pilot feedback
+refactor(F-100)!: replace legacy auth shim with new flow
+```
+
+Accepted types (Angular convention): `feat`, `fix`, `docs`, `style`,
+`refactor`, `perf`, `test`, `build`, `ci`, `chore`. Use `!` after the
+scope for breaking changes. The ticket ID in the scope is what the
+commit-msg hook + `local_evidence.py` parse to attribute work.
 
 ## Before making any code change
 
@@ -20,10 +46,9 @@ If the work doesn't have a ticket, create one first — then commit.
    ```
    (Or look directly at `.edpa/backlog/{type}/*.md`.)
 
-2. **If a ticket exists**, use its ID (e.g. `S-42`, `F-100`) in your
-   commit subject:
+2. **If a ticket exists**, put its ID in the CC scope:
    ```
-   git commit -m "S-42: implement OAuth callback"
+   git commit -m "feat(S-42): implement OAuth callback"
    ```
 
 3. **If no ticket exists**, create one first via the MCP write tool:
@@ -33,19 +58,29 @@ If the work doesn't have a ticket, create one first — then commit.
    Note the assigned ID from the output, then commit referencing it.
 
 4. **If the work is genuinely out-of-scope** (typo fix in a comment,
-   doc reformat, build config bump), use the `no-ticket:` prefix —
-   the commit-msg hook accepts it and the reason stays in the commit
-   log as audit trail:
+   doc reformat, build config bump), use the `no-ticket:` escape
+   prefix — the commit-msg hook accepts it and the reason stays in the
+   commit log as audit trail:
    ```
    git commit -m "no-ticket: fix typo in README"
    ```
+   (Escape prefixes intentionally bypass CC scope to make opt-outs
+   visible in `git log --oneline`.)
 
 ## What gets blocked (and why)
 
 The `commit-msg-ticket-attached` hook fails commits that:
 - modify non-operational code paths AND
-- have no EDPA item ID in the subject/body AND
-- don't use an escape prefix (`no-ticket:`, `WIP:`, `[no-ticket]`)
+- have no EDPA item ID anywhere in the subject/body AND
+- don't use an escape prefix (`no-ticket:`, `WIP:`, `[no-ticket]`) AND
+- don't use an auto-prefix (`chore(evidence):`, `chore(ci-materialization):`, `Merge`, `Revert`, `Initial commit`, `fixup!`, `squash!`)
+
+The CC scope (`feat(S-42):`) is the canonical way to satisfy the
+ticket-ID requirement, but the hook is format-tolerant: any `S-42`
+anywhere in the subject or body counts. Stick with CC for consistency
+across human and agent commits — `local_evidence.py` also walks the
+body looking for `/contribute @login weight:N` directives, so a clean
+CC subject keeps the audit trail readable.
 
 This catches the "did real work but forgot to attribute it" case
 before `local_evidence.py` would silently emit nothing — leaving the

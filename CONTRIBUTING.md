@@ -26,6 +26,28 @@ feature/S-200-new-signal-type
 bugfix/B-15-fix-invariant-check
 ```
 
+### Commit Conventions
+
+EDPA uses [Conventional Commits](https://www.conventionalcommits.org/)
+with the EDPA ticket ID as scope:
+
+```
+feat(S-200): add new signal type for design reviews
+fix(B-15): correct invariant check after gate events
+docs(E-10): clarify CW normalization formula
+refactor(F-100)!: drop legacy auth shim
+chore(release): 2.1.2
+```
+
+Accepted types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`,
+`test`, `build`, `ci`, `chore`. Use `!` after the scope for breaking
+changes. The ticket ID in the scope is what `check_ticket_attached.py`
+(commit-msg hook) and `local_evidence.py` (post-commit hook) parse to
+attribute work. See [`plugin/rules/edpa-work-rules.md`](plugin/rules/edpa-work-rules.md)
+for the full work-attribution rules including escape hatches
+(`no-ticket:`, `WIP:`) and auto-prefixes (`chore(evidence):`,
+`Merge`, `Revert`).
+
 ### Code Style
 
 - Python: Follow PEP 8

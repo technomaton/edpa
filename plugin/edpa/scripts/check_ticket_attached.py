@@ -6,8 +6,14 @@ to a tracked piece of work in `.edpa/backlog/`. This hook enforces it
 at commit time, before the post-commit ``local_evidence.py`` would
 silently emit nothing.
 
+Recommended format: Conventional Commits with ticket ID as scope —
+``feat(S-42): subject`` / ``fix(F-100): subject`` etc. See
+``plugin/rules/edpa-work-rules.md`` for the full convention.
+
 Pass conditions (any one is enough):
   1. Subject or body contains an EDPA item ID (regex ``[A-Z]{1,3}-\\d+``).
+     The CC scope ``(S-42)`` satisfies this; a footer ``Refs: S-42`` also
+     works.
   2. Subject starts with an explicit escape hatch:
        ``no-ticket:`` / ``[no-ticket]`` / ``WIP:`` / ``wip:``
      (The escape stays in the commit msg as audit trail in git log.)
@@ -24,7 +30,7 @@ Pass conditions (any one is enough):
        - ``.github/`` configuration
 
 Fail otherwise. The user can:
-  - rewrite the message with an item ID (`git commit --amend`)
+  - rewrite the message with the ticket in the CC scope (``git commit --amend``)
   - opt out explicitly with the ``no-ticket:`` prefix
   - or, if truly orphan work, create a ticket first via /edpa:add
 
@@ -165,12 +171,13 @@ def main() -> int:
           file=sys.stderr)
     print("", file=sys.stderr)
     print("  Fix options:", file=sys.stderr)
-    print("    1. Reference an existing item (recommended):", file=sys.stderr)
-    print("         git commit --amend -m 'S-5: implement login flow'",
+    print("    1. Reference an existing item via Conventional Commits scope (recommended):",
+          file=sys.stderr)
+    print("         git commit --amend -m 'feat(S-5): implement login flow'",
           file=sys.stderr)
     print("    2. Create a new item first, then reference it:", file=sys.stderr)
     print("         /edpa:add Story 'Login flow' --parent F-1", file=sys.stderr)
-    print("         git commit --amend  # then add 'S-N: …' to the msg",
+    print("         git commit --amend  # then put '(S-N)' in the CC scope",
           file=sys.stderr)
     print("    3. Explicit opt-out (logged in commit msg as audit trail):",
           file=sys.stderr)

@@ -54,7 +54,7 @@ cd ~/projects/kas-platform-v1
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
 cp ~/projects/edpa/docs/kashealth-pilot/people.yaml.example .edpa/config/people.yaml
 $EDITOR .edpa/config/people.yaml          # FTE, capacity, email per člena
-git add .edpa/config/ && git commit -m "EDPA pilot: seed configs"
+git add .edpa/config/ && git commit -m "chore(edpa): seed configs for pilot"
 
 # 3. Setup (Stage 0 preflight + provisioning):
 python3 .claude/edpa/scripts/project_setup.py \
