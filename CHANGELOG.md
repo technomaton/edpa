@@ -1,5 +1,72 @@
 # Changelog
 
+## 2.1.2 — 2026-05-27 — Docs + web reposition to V2.1 local-first narrative
+
+Patch release that sweeps the customer-facing positioning to match what
+V2.0/V2.1 actually do. The engine has been local-first since the
+`feat(v2)!: V2 local-first hard cut, GH only via CI` commit, but the
+web hero, README, and several docs still described EDPA as a
+GitHub-coupled system with "bidirectional sync" as the headline value
+prop. No engine behavior changed.
+
+### fix(web): reposition V2.1 narrative — local-first evidence, GH optional
+
+- Hero copy: "GitHub delivery evidence" → "lokální git evidence (commity,
+  yaml edits, status přechody)"; "Bidirectional sync mezi GitHub Projects
+  a lokálními YAMLy" → soft note that sync is an optional PM/BO UI.
+- "Sync: Bidirectional" stat card → "Evidence: Local-first".
+- What's-new "GitHub Projects sync" card → "In-flight Story credit (C7.5)".
+- Signály z gitu table: added `yaml_edit:*`, `gate_event`, `story_activity`
+  rows and a `Zdroj` column distinguishing `local hook` / `engine + git log`
+  / `optional CI`.
+- Solution layer source: `GitHub Issues + Projects` → `.edpa/backlog/ YAML · Git`.
+- "GitHub-native" feature card → "Git-native, GitHub-friendly".
+- Test count 127 → 541 (was stale).
+- methodology.astro audit pillars + EDPA vs alternatives.
+- journey.astro Slide 6 SoT clarification.
+
+### docs: reposition V2.1 narrative — local-first evidence, GH optional
+
+- README.md Key Features bullets (zero-input source, in-flight Story
+  credit, sync now "Optional", "Git-native, GitHub-friendly").
+- plugin/README.md skills table positioning note + per-row `(optional GH)`.
+- docs/faq.md — Toggl comparison, Jira/no-GitHub Q rewritten as
+  git-native; evidence detection section rewritten for yaml_edit /
+  gate_event / story_activity sources; audit pillar updated.
+- docs/methodology.md § 10.3 audit pillar → git-native.
+- docs/RUNBOOK.md `/edpa:sync` section + V2.1 note that sync is optional.
+- docs/playbook.md § 2.3 + Architektura ASCII diagram (.edpa/ as SoT,
+  GH Projects as optional sync); path fix `.claude/edpa → plugin/edpa`.
+- docs/quick-start.md — prereqs (gh CLI now conditional), Step 4 reframed
+  as optional, Step 6 V2.1 engine signature, template names updated
+  (`heuristics → cw_heuristics`, `project → edpa`).
+- docs/github-setup.md — V2.1 banner clarifying entire guide is optional;
+  path fix `.claude/edpa → plugin/edpa`.
+- Removed 6 historical E2E run reports (`E2E-REPORT-2026-05-06*`,
+  `-05-07-v1100-beta-full-pilot`, `-05-08-v1100-rc1-real-evidence`)
+  — snapshots of one-time test sessions, recoverable from git history.
+  Kept the two living docs: `E2E-TEST-PLAN.md`, `E2E-SKILLS-TEST-PLAN.md`.
+
+### docs: standardize on Conventional Commits across all guidance
+
+- `plugin/rules/edpa-work-rules.md` — added explicit "Commit message
+  format" section specifying CC + ticket-id scope (`feat(S-42): subject`);
+  all examples rewritten to CC; clarified that the commit-msg hook stays
+  format-tolerant but CC is the recommended path. Escape prefixes
+  (`no-ticket:`, `WIP:`) remain as intentional CC bypass so opt-outs
+  stay visible in `git log --oneline`.
+- `plugin/edpa/scripts/check_ticket_attached.py` — module docstring +
+  user-facing error message both show the `feat(S-5):` form as the
+  recommended fix.
+- `docs/kashealth-pilot/KASHEALTH-PILOT.md` — single non-CC commit
+  example converted (`EDPA pilot: …` → `chore(edpa): …`).
+- `CONTRIBUTING.md` — new "Commit Conventions" section linking to the
+  rules file with the full type palette + examples.
+
+Hook behavior is unchanged — it still accepts any subject containing
+an EDPA item ID, plus escape and auto prefixes — so projects that
+don't yet use CC keep working.
+
 ## 2.1.1 — 2026-05-27 — Expose story_activity audit in results JSON
 
 Patch release follow-up to C7.5. `load_story_activity_events()` already
