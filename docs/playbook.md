@@ -1069,14 +1069,19 @@ python .claude/edpa/scripts/backlog.py status
 
 ## Architektura
 
+V2.1: `.edpa/` + git log jsou source of truth, GitHub Projects je volitelne PM/BO UI.
+
 ```
-GitHub Projects (UI)  <-->  .edpa/ item files (Git)
-       |                          |
-  PM/BO pracuji            Verzovane, auditovatelne
-       |                          |
-  Issue Types (org)        EDPA engine (vypocet)
-       |                          |
-  Custom fields            Reports + Snapshots
+                       .edpa/ item files (Git)       <-- Source of truth
+                                |
+              +-----------------+-----------------+
+              |                 |                 |
+        EDPA engine     Reports + Snapshots   (optional sync)
+        (vypocet)                                  |
+                                                   v
+                                       GitHub Projects (UI)
+                                       PM/BO board view
+                                       Issue Types (org), Custom fields
 ```
 
 ### Tok dat

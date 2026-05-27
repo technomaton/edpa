@@ -1,8 +1,16 @@
 # GitHub Projects Setup Guide
 
+> **V2.1 positioning:** This setup is **optional**. EDPA's evidence
+> collection runs against `git log` alone — you can produce derived
+> timesheets, reports, and snapshots without ever touching GitHub
+> Projects. Follow this guide only when PMs/BOs want a board view
+> of `.edpa/backlog/` items, or when you want the optional CI workflow
+> to add `pr_reviewer` / `issue_comment` signals on top of the local-first
+> evidence.
+
 ## Native Issue Types (org-level)
 
-Issue Types are a native GitHub feature, managed at the organization level (not per-project custom fields). Create them via `.claude/edpa/scripts/issue_types.py setup`:
+Issue Types are a native GitHub feature, managed at the organization level (not per-project custom fields). Create them via `plugin/edpa/scripts/issue_types.py setup`:
 
 | Issue Type | Description |
 |------------|-------------|
