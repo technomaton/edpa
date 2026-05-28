@@ -270,8 +270,9 @@ def cmd_pre_push(args: argparse.Namespace) -> int:
         if local_sha == _ZERO_SHA:
             continue  # branch deletion, not relevant
 
-        # Determine the comparison base: remote tip if it exists, otherwise
-        # the merge-base with the default branch on remote.
+        # Determine the comparison base for "what's added on this push":
+        # remote tip of this branch if it exists, otherwise the merge-base
+        # with the default branch on remote.
         if remote_sha != _ZERO_SHA:
             base = remote_sha
         else:
@@ -286,19 +287,29 @@ def cmd_pre_push(args: argparse.Namespace) -> int:
             ["diff", "--name-only", "--diff-filter=A", base, local_sha],
             cwd=repo_root,
         )
+
+        # Compare added IDs against the integration target (remote default
+        # branch tip), NOT against `base` — `base` is the merge-base which is
+        # typically older than the current main HEAD, missing items merged
+        # since the branch forked.
+        # Resolve the integration target ref: refs/remotes/<remote>/HEAD →
+        # typically refs/remotes/origin/main. Falls back to remote/main.
+        head_ref = _git(["symbolic-ref", f"refs/remotes/{remote}/HEAD"], cwd=repo_root)
+        target_ref = head_ref.strip() if head_ref else f"refs/remotes/{remote}/main"
+        up_files = _list_tree(repo_root, target_ref, ".edpa/backlog")
+
         for line in (added or "").splitlines():
             parsed = _parse_backlog_path(line)
             if not parsed:
                 continue
             _dir, item_id, _type = parsed
             # Check whether the SAME ID exists upstream under any directory.
-            up_files = _list_tree(repo_root, base, ".edpa/backlog")
             for up_path in up_files:
                 up_parsed = _parse_backlog_path(up_path)
                 if up_parsed and up_parsed[1] == item_id and up_path != line:
                     errors.append(
-                        f"{line}: ID {item_id} already exists upstream as "
-                        f"{up_path} (at {base[:8]})"
+                        f"{line}: ID {item_id} already exists on {target_ref} as "
+                        f"{up_path}"
                     )
 
     if errors:

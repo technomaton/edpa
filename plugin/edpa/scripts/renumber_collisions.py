@@ -111,23 +111,52 @@ def _local_items(repo_root: Path) -> list[tuple[Path, str, str]]:
     return result
 
 
-def find_collisions(repo_root: Path, remote: str = "origin") -> list[dict]:
-    """Return collisions: files ADDED on the local branch whose IDs already exist upstream.
+def _resolve_target_branch(repo_root: Path, remote: str) -> str:
+    """Resolve the integration target branch name (remote's default branch).
 
-    Local-only files (added since merge-base with upstream) are the only
+    Reads ``refs/remotes/<remote>/HEAD`` symbolic ref; falls back to "main".
+    """
+    head_ref = _git(
+        ["symbolic-ref", f"refs/remotes/{remote}/HEAD"], cwd=repo_root,
+    )
+    if head_ref:
+        return head_ref.strip().rsplit("/", 1)[-1]
+    return "main"
+
+
+def find_collisions(
+    repo_root: Path,
+    remote: str = "origin",
+    target_branch: str | None = None,
+) -> list[dict]:
+    """Return collisions: files ADDED on the local branch whose IDs already exist on the integration target branch.
+
+    The collision check ALWAYS compares against the integration target (typically
+    ``origin/main``), NOT against the matching remote branch. This is the correct
+    semantic for feature-branch + PR workflow: when you're on ``feature/foo`` and
+    open a PR against main, collisions are with what's already on main.
+
+    Local-only files (added since merge-base with the target) are the only
     renumber candidates — modifications of existing items must be resolved
     via merge, not renumbering.
 
+    Args:
+        repo_root: Path to the git repo root.
+        remote: Remote name (default ``"origin"``).
+        target_branch: Branch to compare against. ``None`` (default) auto-detects
+            the remote's default branch via ``refs/remotes/<remote>/HEAD``.
+            Pass an explicit name (e.g. ``"develop"``) for Git Flow projects.
+
     Returns ``[{old_id, new_id, file, type, upstream_path}]``.
     """
-    branch_out = _git(["symbolic-ref", "--short", "HEAD"], cwd=repo_root)
-    branch = (branch_out or "main").strip() or "main"
-
     _git(["fetch", "--quiet", remote], cwd=repo_root)
-    ref = f"{remote}/{branch}"
-    # If branch isn't on remote yet, fall back to remote default ref.
+
+    if target_branch is None:
+        target_branch = _resolve_target_branch(repo_root, remote)
+    ref = f"{remote}/{target_branch}"
+
     if not _git(["rev-parse", "--verify", ref], cwd=repo_root):
-        ref = f"{remote}/HEAD"
+        return []  # target branch doesn't exist on remote — nothing to collide with
 
     base_out = _git(["merge-base", "HEAD", ref], cwd=repo_root)
     base = (base_out or "").strip()
@@ -247,8 +276,14 @@ def main() -> int:
         description="Resolve EDPA ID collisions between local and remote.",
     )
     parser.add_argument("--remote", default="origin")
+    parser.add_argument("--target", default=None,
+                        help="Integration target branch (default: remote's default branch, typically main). "
+                             "Override for Git Flow projects, e.g. --target develop.")
     parser.add_argument("--apply", action="store_true",
                         help="Skip the interactive prompt and apply changes.")
+    parser.add_argument("--check", action="store_true",
+                        help="CI mode — detect + report only, never modify. "
+                             "Exit 0 if no collisions, 1 if collisions found. No prompt.")
     args = parser.parse_args()
 
     repo_root = _find_repo_root()
@@ -256,8 +291,9 @@ def main() -> int:
         print("ERROR: not in a git repo", file=sys.stderr)
         return 2
 
-    print(f"Fetching {args.remote}...")
-    collisions = find_collisions(repo_root, args.remote)
+    target = args.target or _resolve_target_branch(repo_root, args.remote)
+    print(f"Fetching {args.remote} (target: {target})...")
+    collisions = find_collisions(repo_root, args.remote, args.target)
     if not collisions:
         print("No collisions detected.")
         return 0
@@ -268,6 +304,10 @@ def main() -> int:
         print(f"    Local:    {c['file'].relative_to(repo_root)}")
         print(f"    Upstream: {c['upstream_path']}")
     print()
+
+    if args.check:
+        # CI mode — detected, exit non-zero, do nothing
+        return 1
 
     if not args.apply:
         try:

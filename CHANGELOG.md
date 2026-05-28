@@ -1,5 +1,77 @@
 # Changelog
 
+## 2.1.5 — 2026-05-28 — Collision detection fix + CI workflow + dev docs
+
+Bug fixes + new layer of collision prevention. The previous releases of
+`renumber_collisions.py` and `validate_ids.py --pre-push` both compared local
+backlog state against the **matching remote branch** instead of the
+**integration target** (`origin/main`). This meant that in the standard
+feature-branch + PR workflow — once you push your branch — the collision
+detector saw no diff (`origin/<your-branch>` matches `HEAD`) and returned
+zero collisions, even when your local IDs genuinely clashed with `main`.
+
+The end-to-end test scenario (`tests/e2e_collision/scenario_a.sh`) reproduces
+the issue against a real GitHub sandbox: two devs both allocate `S-5` on
+parallel feature branches; previously, after Alice's PR merged, Bob's
+collision was undetected by the tooling. Post-fix, `renumber_collisions.py`
+correctly identifies `S-5` as colliding with `main` and renumbers Bob's to
+`S-6`.
+
+### fix(renumber_collisions): compare against integration target, not matching remote branch
+
+- `find_collisions(repo_root, remote, target_branch=None)` — new `target_branch`
+  arg. `None` (default) auto-detects the remote's default branch via
+  `refs/remotes/<remote>/HEAD`; defaults to `main` if symbolic ref is missing.
+- New CLI flag `--target <branch>` — override for Git Flow projects integrating
+  to `develop` etc.
+- New CLI flag `--check` — CI mode, detects + reports without prompting or
+  modifying. Exit 0 if no collisions, exit 1 if collisions found.
+
+### fix(validate_ids --pre-push): same semantics
+
+`cmd_pre_push` now lists upstream items at the integration target tip
+(`refs/remotes/<remote>/HEAD`), not at the merge-base. Previously, items
+added to `main` after your branch forked were invisible to the check.
+
+### test(renumber): three new unit tests + one regression test
+
+- `test_multi_collision_both_renumbered_sequentially` — two Story collisions
+  get sequential IDs (`S-5` + `S-6`), no duplicates.
+- `test_parent_chain_renumber_propagates_to_children_only` — `F-3 → F-4`
+  updates direct children's `parent:` refs; grandchildren (parent chain via
+  another item) untouched.
+- `test_three_dev_cascading_collisions` — Dev A merges S-2, Dev B (collision)
+  renumbers to S-3 and merges, Dev C (had S-2 AND S-3) faces 2 collisions
+  → S-4 + S-5.
+- `test_collision_detected_when_on_feature_branch_against_main` — regression
+  test for the `--target` fix; would fail with the pre-fix logic.
+- `test_collision_target_branch_arg_overrides_default` — verifies explicit
+  `--target develop` works for Git Flow projects.
+
+### test(e2e_collision): real GitHub sandbox test
+
+New `tests/e2e_collision/scenario_a.sh` — executable script that creates a
+throwaway sandbox repo under `technomaton/`, simulates two devs both creating
+`S-5`, walks through the recovery workflow (Alice merges → Bob's PR conflict
+→ Bob runs `renumber_collisions.py --apply` → Bob merges main → Bob's PR
+mergeable → squash merge), and verifies the final state on main has both
+`S-5` and `S-6`. Cleans up GH repo (archive) and `/tmp` sandbox on success.
+
+### feat(workflow): edpa-collision-check.yml CI template
+
+New `plugin/edpa/templates/github-workflows/edpa-collision-check.yml`. Runs
+on every PR touching `.edpa/backlog/` or `id_counters.yaml`. Detects
+collisions via `renumber_collisions.py --check`; on detection, posts a
+comment on the PR with the detected collisions + fix instructions, and
+fails the check (so the PR's merge button stays disabled).
+
+### docs(dev-collisions): full developer guide
+
+New `docs/dev-collisions.md` — describes the three defense layers
+(pre-commit, pre-push, CI workflow), the manual recovery workflow with
+exact commands, common collision shapes (single / multi / parent-chain /
+cascading), and the `id_counters.yaml` merge-resolution trick (take max).
+
 ## 2.1.4 — 2026-05-27 — V2.1 local-first narrative parity in plugin metadata
 
 Patch release sweeping the last customer-facing texts still describing EDPA
