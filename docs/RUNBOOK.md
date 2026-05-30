@@ -322,6 +322,51 @@ If all five pass, the toolchain is ready for a real PI close.
 
 ---
 
+## ID collision handling
+
+When two developers parallel-allocate the same backlog item ID (both add `S-5` on different branches before either merges), EDPA detects and recovers via four defense layers — full documentation in [`docs/dev-collisions.md`](dev-collisions.md).
+
+**Quick reference for operators:**
+
+| Layer | Where | What it does |
+|---|---|---|
+| Pre-commit hook | local | blocks commit on staged-set inconsistencies |
+| Pre-push hook | local | blocks push if local ID exists upstream |
+| CI workflow | server | comments on PR + fails check on collision |
+| Manual recovery | local | `renumber_collisions.py --apply` renames + updates parents + bumps counter |
+
+**Standard recovery flow** (when a PR shows a conflict in `.edpa/backlog/` or `id_counters.yaml`):
+
+```bash
+git fetch origin
+python3 .edpa/engine/scripts/renumber_collisions.py --apply
+git add . && git commit -m "renumber: collision with main"
+git merge origin/main   # resolve id_counters.yaml conflict by taking MAX value
+git push
+```
+
+**Setup checklist for a new project** (do once):
+
+```bash
+# 1. Install local hooks (pre-commit + pre-push)
+python3 .edpa/engine/scripts/project_setup.py --with-hooks
+
+# 2. Copy CI workflow template into project's workflows dir
+cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
+   .github/workflows/edpa-collision-check.yml
+git add .github/workflows/edpa-collision-check.yml
+git commit -m "ci: add EDPA collision check"
+```
+
+Verify hooks are installed:
+```bash
+ls -la .git/hooks/pre-commit .git/hooks/pre-push   # must be -rwxr-xr-x
+```
+
+See [`docs/dev-collisions.md`](dev-collisions.md) for decision tree, common collision shapes (single / multi / parent-chain / cascading), troubleshooting, and the `--target develop` flag for Git Flow projects.
+
+---
+
 ## Known limitations (as of 2026-05-04)
 
 1. **Gates mode under-allocates without commit-recorded status changes.** Real

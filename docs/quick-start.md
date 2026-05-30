@@ -125,3 +125,30 @@ Check the frozen snapshot in `.edpa/snapshots/PI-2026-1.1.json`.
 - Explore [dual-view](dual-view.md) for per-item cost analysis
 - Use the `edpa_flow_metrics` MCP tool for cycle time, throughput, and item age analytics (requires synced timestamp fields -- see [MCP docs](mcp.md))
 - Set up the full [TECHNOMATON Hub](https://github.com/technomaton/technomaton-hub) for additional capabilities
+
+## Multi-developer setup — ID collision handling
+
+If your team has more than one person creating backlog items in parallel, you'll occasionally hit ID collisions (two devs both allocate `S-5` before either's PR merges). EDPA ships four defense layers and a semi-automatic recovery tool — see [`docs/dev-collisions.md`](dev-collisions.md) for the full guide.
+
+**Setup** (one-time per project):
+
+```bash
+# 1. Install pre-commit + pre-push hooks
+python3 .edpa/engine/scripts/project_setup.py --with-hooks
+
+# 2. Copy CI workflow template
+cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
+   .github/workflows/edpa-collision-check.yml
+git add .github/workflows/edpa-collision-check.yml
+git commit -m "ci: add EDPA collision check"
+```
+
+**Recovery** (when a PR shows a conflict in `.edpa/backlog/`):
+
+```bash
+git fetch origin
+python3 .edpa/engine/scripts/renumber_collisions.py --apply
+git add . && git commit -m "renumber: collision with main"
+git merge origin/main   # take MAX for id_counters.yaml conflict
+git push
+```

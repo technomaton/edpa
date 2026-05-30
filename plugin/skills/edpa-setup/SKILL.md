@@ -54,12 +54,19 @@ Resulting layout:
   flow regardless via `--with-hooks`.
 - `--with-hooks` — install the full git-hook stack into `.git/hooks/`:
   - **pre-commit**: ID-safety validator (filename≡frontmatter id,
-    counter monotonicity, HEAD collisions)
+    counter monotonicity, HEAD collisions) — Layer 5 of collision defense
   - **commit-msg**: require EDPA item reference in commit subject/body
     (or `no-ticket:` escape) — catches "did work, forgot to attribute"
   - **post-commit**: `local_evidence.py` emits commit_author and
     `/contribute` signals into the referenced item's `evidence[]`
-  - **pre-push**: upstream ID collision check
+  - **pre-push**: upstream ID collision check (`validate_ids.py
+    --pre-push`) — Layer 6 of collision defense; blocks push when local
+    ID already exists on `origin/main`. Recover via `renumber_collisions.py
+    --apply`. Full guide: [`docs/dev-collisions.md`](../../../docs/dev-collisions.md).
+  - **NOTE**: Layer 7 (CI workflow `edpa-collision-check.yml`) is a
+    separate manual step — copy from
+    `.edpa/engine/templates/github-workflows/` to `.github/workflows/`
+    after running setup.
 - `--with-rules` — copy `plugin/rules/*.md` to `.claude/rules/`.
   Claude Code auto-loads these into every agent session, so
   AI assistants in this repo follow the same ticket-first workflow

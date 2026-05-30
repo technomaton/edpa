@@ -26,6 +26,7 @@ import { VERSION } from '../../lib/version';
       <li><a href="#cadence" class="toc-link" data-section="cadence">Cadence</a></li>
       <li><a href="#learning-loop" class="toc-link" data-section="learning-loop">Learning loop</a></li>
       <li><a href="#github-implementation" class="toc-link" data-section="github-implementation">GitHub implementation</a></li>
+      <li><a href="#id-collisions" class="toc-link" data-section="id-collisions">ID collisions and renumbering</a></li>
       <li><a href="#reports" class="toc-link" data-section="reports">Reports and audit</a></li>
       <li><a href="#assumptions" class="toc-link" data-section="assumptions">Assumptions and risks</a></li>
       <li><a href="#comparison" class="toc-link" data-section="comparison">Comparison</a></li>
@@ -422,6 +423,64 @@ Accuracy = Actual / Planned &times; 100 %</div>
 defect/D-215-upload-validation
 feature/F-102-anon-engine</div>
     <p>CI check blocks PRs without reference to an issue (<code>S-XXX</code>, <code>F-XXX</code>, <code>E-XXX</code>). DoR: Issue Type, Parent, Job Size, BV+TC+RR&amp;OE, Owner.</p>
+  </section>
+
+  <!-- 9b. ID collisions and renumbering -->
+  <section id="id-collisions">
+    <h2>9b. ID collisions and renumbering (multi-developer setup)</h2>
+
+    <p>EDPA allocates IDs locally (no central coordinator) — if two developers concurrently create a backlog item from the same starting state of <code>main</code>, both get the same ID (e.g. both <code>S-5</code>). The collision surfaces at merge time of the second PR.</p>
+
+    <p><strong>Four defense layers</strong> detect the collision as early as possible, plus a semi-automatic recovery tool:</p>
+
+    <table class="comparison-table">
+      <thead>
+        <tr><th>Layer</th><th>When</th><th>Tool</th><th>What it does</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>5</strong></td>
+          <td>local <code>git commit</code></td>
+          <td><code>validate_ids.py --staged</code> (pre-commit hook)</td>
+          <td>Blocks commit if staged backlog has ID inconsistencies (filename ≢ id, missing fields, duplicates)</td>
+        </tr>
+        <tr>
+          <td><strong>6</strong></td>
+          <td>local <code>git push</code></td>
+          <td><code>validate_ids.py --pre-push</code> (pre-push hook)</td>
+          <td>Fetch origin, compare local-added IDs against <code>origin/main</code>. Blocks push if ID already exists upstream</td>
+        </tr>
+        <tr>
+          <td><strong>7</strong></td>
+          <td>PR open/sync (server-side)</td>
+          <td><code>.github/workflows/edpa-collision-check.yml</code></td>
+          <td>Runs <code>renumber_collisions.py --check</code>. On collision: posts a PR comment with fix instructions + fails the check (PR's merge button stays disabled)</td>
+        </tr>
+        <tr>
+          <td><strong>Recovery</strong></td>
+          <td>after conflict</td>
+          <td><code>renumber_collisions.py --apply</code></td>
+          <td>Renames the local file (<code>S-5.md → S-6.md</code>), rewrites <code>id:</code>, updates <code>parent:</code> refs in dependent items, bumps counter</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Standard recovery flow</h3>
+
+    <div class="code-block">git fetch origin
+python3 .edpa/engine/scripts/renumber_collisions.py --apply
+# Detected 1 collision: S-5 → S-6
+git add . &amp;&amp; git commit -m "renumber(S-5→S-6): collision with main"
+git merge origin/main   # resolve id_counters.yaml conflict (take MAX value)
+git push</div>
+
+    <p><strong>Setup for a new project</strong> (one-time):</p>
+
+    <div class="code-block">python3 .edpa/engine/scripts/project_setup.py --with-hooks
+cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
+   .github/workflows/</div>
+
+    <p>Full guide with decision tree and common collision shapes (single / multi / parent-chain / cascading): <a href="https://github.com/technomaton/edpa/blob/main/docs/dev-collisions.md" target="_blank"><code>docs/dev-collisions.md</code></a>.</p>
   </section>
 
   <!-- 10. Reports and audit -->

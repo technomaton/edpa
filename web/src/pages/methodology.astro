@@ -26,6 +26,7 @@ import { VERSION } from '../lib/version';
       <li><a href="#kadence" class="toc-link" data-section="kadence">Kadence</a></li>
       <li><a href="#ucici-smycka" class="toc-link" data-section="ucici-smycka">Učící smyčka</a></li>
       <li><a href="#github-implementace" class="toc-link" data-section="github-implementace">GitHub implementace</a></li>
+      <li><a href="#kolize-id" class="toc-link" data-section="kolize-id">ID kolize a renumbering</a></li>
       <li><a href="#vykazy" class="toc-link" data-section="vykazy">Výkazy a audit</a></li>
       <li><a href="#predpoklady" class="toc-link" data-section="predpoklady">Předpoklady a rizika</a></li>
       <li><a href="#srovnani" class="toc-link" data-section="srovnani">Srovnání</a></li>
@@ -420,6 +421,64 @@ Accuracy = Actual / Planned &times; 100 %</div>
 defect/D-215-upload-validation
 feature/F-102-anon-engine</div>
     <p>CI check blokuje PR bez reference na issue (<code>S-XXX</code>, <code>F-XXX</code>, <code>E-XXX</code>). DoR: Issue Type, Parent, Job Size, BV+TC+RR&amp;OE, Owner.</p>
+  </section>
+
+  <!-- 9b. Kolize ID a renumbering -->
+  <section id="kolize-id">
+    <h2>9b. ID kolize a renumbering (multi-developer setup)</h2>
+
+    <p>EDPA alokuje ID lokálně (žádný centrální koordinátor) — pokud dva vývojáři současně vytvoří backlog item ze stejného počátečního stavu mainu, oba dostanou stejné ID (např. oba <code>S-5</code>). Kolize se projeví až při merge druhého PR.</p>
+
+    <p><strong>4 vrstvy obrany</strong> detekují kolizi co nejdřív + poloautomatický recovery tool:</p>
+
+    <table class="comparison-table">
+      <thead>
+        <tr><th>Vrstva</th><th>Kdy</th><th>Tool</th><th>Co dělá</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>5</strong></td>
+          <td>local <code>git commit</code></td>
+          <td><code>validate_ids.py --staged</code> (pre-commit hook)</td>
+          <td>Blokuje commit pokud staged backlog má ID nekonzistence (filename ≢ id, missing fields, duplicity)</td>
+        </tr>
+        <tr>
+          <td><strong>6</strong></td>
+          <td>local <code>git push</code></td>
+          <td><code>validate_ids.py --pre-push</code> (pre-push hook)</td>
+          <td>Fetch origin, porovná lokálně přidané ID proti <code>origin/main</code>. Pokud ID už existuje na mainu → push BLOKOVÁN</td>
+        </tr>
+        <tr>
+          <td><strong>7</strong></td>
+          <td>PR open/sync (server-side)</td>
+          <td><code>.github/workflows/edpa-collision-check.yml</code></td>
+          <td>Spustí <code>renumber_collisions.py --check</code>. Při kolizi: comment na PR s instrukcemi + fail check (PR's merge button disabled)</td>
+        </tr>
+        <tr>
+          <td><strong>Recovery</strong></td>
+          <td>po conflictu</td>
+          <td><code>renumber_collisions.py --apply</code></td>
+          <td>Přejmenuje lokální file (<code>S-5.md → S-6.md</code>), přepíše <code>id:</code>, updatuje <code>parent:</code> reference v dependent items, bumpne counter</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Standardní recovery flow</h3>
+
+    <div class="code-block">git fetch origin
+python3 .edpa/engine/scripts/renumber_collisions.py --apply
+# Detected 1 collision: S-5 → S-6
+git add . &amp;&amp; git commit -m "renumber(S-5→S-6): collision with main"
+git merge origin/main   # resolve id_counters.yaml conflict (vezmi MAX hodnotu)
+git push</div>
+
+    <p><strong>Setup pro nový projekt</strong> (jednou):</p>
+
+    <div class="code-block">python3 .edpa/engine/scripts/project_setup.py --with-hooks
+cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
+   .github/workflows/</div>
+
+    <p>Plný guide s rozhodovacím stromem a běžnými typy kolizí (single / multi / parent-chain / cascading): <a href="https://github.com/technomaton/edpa/blob/main/docs/dev-collisions.md" target="_blank"><code>docs/dev-collisions.md</code></a>.</p>
   </section>
 
   <!-- 10. Vykazy a audit -->

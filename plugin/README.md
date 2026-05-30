@@ -127,6 +127,30 @@ useful for PM/BO board view but not required for derived-hours calculation.
 | `edpa:sync-people` | _(no slash command)_ | _(optional GH)_ Reconcile `people.yaml` vs GitHub collaborators |
 | _(no skill)_ | `/edpa board` | Generate HTML Kanban snapshot from local backlog |
 
+## Multi-developer setup — ID collision handling
+
+When teams have multiple devs creating backlog items in parallel branches, ID collisions are possible (both allocate `S-5` before either's PR merges). EDPA ships **four defense layers** plus a semi-automatic recovery tool:
+
+| Layer | Where | Trigger | Tool |
+|---|---|---|---|
+| 5 — pre-commit hook | local | `git commit` | `validate_ids.py --staged` (blocks commit on inconsistencies) |
+| 6 — pre-push hook | local | `git push` | `validate_ids.py --pre-push` (blocks push if ID exists upstream) |
+| 7 — CI workflow | server | PR open/sync | `edpa-collision-check.yml` (comments on PR + fails check) |
+| Recovery | local | after conflict | `renumber_collisions.py --apply` (renames + updates parents + bumps counter) |
+
+**Quick setup** (one-time per project):
+
+```bash
+# Local hooks
+python3 .edpa/engine/scripts/project_setup.py --with-hooks
+
+# CI workflow
+cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
+   .github/workflows/edpa-collision-check.yml
+```
+
+Full guide with decision tree, common collision shapes (single / multi / parent-chain / cascading), recovery flow, and troubleshooting: [`docs/dev-collisions.md`](../docs/dev-collisions.md).
+
 ## Cross-tool compatibility
 
 The plugin ships standard `SKILL.md` files (Claude Code Agent Skill frontmatter — portable Markdown + YAML), so the markdown payload is consumable beyond Claude Code:

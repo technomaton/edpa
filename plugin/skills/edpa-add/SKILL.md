@@ -33,6 +33,27 @@ asynchronously via the CI workflow at
 `.github/workflows/edpa-contribution-sync.yml` — see
 `/edpa:setup --with-ci` and `docs/v2/decisions.md` ADR-012.
 
+## Parallel ID allocation — collision handling
+
+ID allocation is **local-first** (no central coordinator). If two devs both
+pull `main` when last Story is `S-4` and both run `/edpa:add Story`, both
+will get `S-5` locally — the collision surfaces at PR merge time.
+
+EDPA detects + resolves this via four defense layers:
+- **Pre-commit hook** (`validate_ids.py --staged`) — local staged consistency
+- **Pre-push hook** (`validate_ids.py --pre-push`) — blocks push if local ID
+  already exists on `origin/main`
+- **CI workflow** (`edpa-collision-check.yml`) — comments on PR + fails check
+  when collision detected
+- **Manual recovery** (`renumber_collisions.py --apply`) — renames local
+  file, rewrites `id:` field, updates `parent:` refs in dependent items,
+  bumps `id_counters.yaml`. Then dev: `git add . && git commit && git merge
+  main && git push` (resolve `id_counters.yaml` merge conflict by taking the
+  MAX value).
+
+Full guide with decision tree + common shapes:
+[`docs/dev-collisions.md`](../../../docs/dev-collisions.md).
+
 ## Arguments
 
 `$ARGUMENTS` — natural language description. Examples:

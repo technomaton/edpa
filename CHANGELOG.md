@@ -1,5 +1,65 @@
 # Changelog
 
+## 2.1.6 — 2026-05-30 — Full collision documentation + methodology page section
+
+Documentation release. Following user feedback, expanded the collision
+documentation across all developer-facing surfaces. No code changes.
+
+### docs(collisions): expand dev-collisions.md to comprehensive guide
+
+`docs/dev-collisions.md` grew from 108 to ~290 lines with:
+- ASCII timeline diagram showing how a collision happens (T+0 → T+5)
+- ASCII flow diagram of the four defense layers (cumulative)
+- Decision tree — "I got a conflict, what do I do?"
+- Recovery flow with annotated comments for each step
+- Common collision shapes (single, multi, parent chain, cross-type, cascading)
+- Installation section for hooks + CI workflow
+- Troubleshooting section (3 common gotchas)
+- Bypass disclaimer
+
+### docs(integration): collision section in RUNBOOK + quick-start
+
+- `docs/RUNBOOK.md` — new "## ID collision handling" section with operator
+  reference table + setup checklist + recovery commands.
+- `docs/quick-start.md` — new "Multi-developer setup" section as part of
+  "What's Next?" — covers setup + recovery in ~20 lines, links to full guide.
+- `docs/github-setup.md` — fixed outdated claim "IDs are immutable — never
+  renumber after creation" (replaced with stable-after-merge framing +
+  link to dev-collisions.md).
+
+### docs(plugin): collision section in plugin README + skill docs
+
+- `plugin/README.md` — new "Multi-developer setup" section between
+  installation and cross-tool compat. Table of 4 layers + quick setup.
+- `plugin/skills/edpa-add/SKILL.md` — new "Parallel ID allocation" section
+  explaining what happens when two devs `/edpa:add Story` from same main.
+- `plugin/skills/edpa-setup/SKILL.md` — `--with-hooks` description now
+  cross-references layer numbers + explicit note that Layer 7 (CI workflow)
+  is a separate manual copy step.
+
+### docs(web): methodology page — section 9b on both CZ + EN
+
+- `web/src/pages/methodology.astro` — new section 9b "ID kolize a
+  renumbering (multi-developer setup)" with 4-layer table + recovery flow
+  + setup commands + link to GitHub guide.
+- `web/src/pages/en/methodology.astro` — same as 9b "ID collisions and
+  renumbering" in English.
+- TOC updated on both pages.
+
+### feat(dashboard): effective capacity bar
+
+`/tmp/edpa-e2e-recovered/dashboard.html` regenerator now computes
+**effective capacity** per iteration (sum of capacities of people with
+derived > 0) and displays it as a third bar in the per-iteration chart.
+Reveals the planning-vs-actual gap explicitly:
+- Blue = planning capacity (deklarovaná — always 144h for the E2E test)
+- Yellow = effective capacity (only active people)
+- Green = derived (signal-based allocation)
+
+Tooltip now shows utilization % (vs both planning and effective) and
+"X/Y active people" count. Resolves user feedback that the previous
+"Capacity vs Derived" view was confusing when some people were idle.
+
 ## 2.1.5 — 2026-05-28 — Collision detection fix + CI workflow + dev docs
 
 Bug fixes + new layer of collision prevention. The previous releases of

@@ -77,7 +77,7 @@ Each work item has a unique ID with a type prefix and sequential number, startin
 
 - IDs are sequential per type (not globally unique across types)
 - The prefix makes IDs globally unique: `S-1` and `F-1` are different items
-- IDs are immutable — never renumber after creation
+- IDs are **stable once merged to main** — parallel-branch collisions are resolved automatically by `renumber_collisions.py` before merge (see [dev-collisions.md](dev-collisions.md))
 - YAML filename matches the ID: `.edpa/backlog/stories/S-1.yaml`
 - Branch naming uses the ID: `feature/S-1-login-endpoint`
 - Commit messages reference the ID: `feat(S-1): implement login`
