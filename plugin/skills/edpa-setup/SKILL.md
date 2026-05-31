@@ -83,8 +83,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py \
   --with-ci --with-hooks --with-rules
 ```
 
-The script is idempotent — safe to re-run when adding hooks/CI after
-the initial setup.
+The script first **vendors the engine** (`scripts` + `schemas` +
+`templates` + `VERSION`) into `.edpa/engine/` from
+`${CLAUDE_PLUGIN_ROOT}`, then seeds the configs + `id_counters.yaml`. It
+is idempotent — safe to re-run when adding hooks/CI after the initial
+setup.
 
 ### 2. Edit the seeded configs
 

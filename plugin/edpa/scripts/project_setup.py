@@ -4,14 +4,19 @@
 Initializes ``.edpa/`` for a new project. Idempotent: safe to re-run.
 
 What it does:
-  1. Create directory tree (config, backlog/*, iterations, reports, …).
-  2. Seed ``.edpa/config/people.yaml`` + ``.edpa/config/edpa.yaml`` from
+  1. Vendor the engine (scripts + schemas + templates + VERSION) into
+     ``.edpa/engine/`` from the plugin, so CI workflows, the documented
+     ``.edpa/engine/scripts/*.py`` CLI, and non-Claude-Code tools all
+     resolve. Mirrors ``install.sh``; no-op when already running from the
+     vendored copy.
+  2. Create directory tree (config, backlog/*, iterations, reports, …).
+  3. Seed ``.edpa/config/people.yaml`` + ``.edpa/config/edpa.yaml`` from
      ``plugin/edpa/templates/*.tmpl`` if missing (idempotent).
-  3. Seed ``.edpa/config/id_counters.yaml`` from existing file IDs.
-  4. Optionally copy the CI workflow template (``--with-ci``) to
+  4. Seed ``.edpa/config/id_counters.yaml`` from existing file IDs.
+  5. Optionally copy the CI workflow template (``--with-ci``) to
      ``.github/workflows/edpa-contribution-sync.yml`` so the engine
      can read PR signals materialized from PR events.
-  5. Optionally install git hooks (``--with-hooks``) — pre-commit +
+  6. Optionally install git hooks (``--with-hooks``) — pre-commit +
      pre-push ID safety validators.
 
 What it does NOT do (V2.0 hard cut from V1):
@@ -29,6 +34,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -83,6 +90,60 @@ def find_repo_root(start: Path) -> Path:
     return start.resolve()
 
 
+def _plugin_version(plugin_edpa: Path) -> str | None:
+    """Pinned plugin version from <PLUGIN_ROOT>/.claude-plugin/plugin.json."""
+    pj = plugin_edpa.parent / ".claude-plugin" / "plugin.json"
+    if pj.exists():
+        try:
+            return json.loads(pj.read_text())["version"]
+        except (ValueError, KeyError):
+            return None
+    return None
+
+
+def vendor_engine(root: Path) -> bool:
+    """Copy the plugin engine into ``.edpa/engine/`` so CI workflows, the
+    documented ``.edpa/engine/scripts/*.py`` CLI, and non-Claude-Code tools
+    all resolve. Mirrors install.sh's vendor step for the ``/edpa:setup``
+    path — restores vendoring the CC path lost when the engine moved from
+    ``.claude/edpa/`` to ``.edpa/engine/`` (only install.sh was rewired).
+
+    No-op when project_setup.py is already running from the vendored copy
+    (``HERE`` == ``<root>/.edpa/engine/scripts``) — nothing to copy.
+    """
+    src = HERE.parent                    # plugin's edpa/ dir (scripts/schemas/templates)
+    target = root / ".edpa" / "engine"
+    if src.resolve() == target.resolve():
+        info("Engine already vendored (running from .edpa/engine/) — skipping")
+        return False
+    if not (src / "scripts").exists():
+        warn(f"Engine source not found at {src} — skipping vendor")
+        return False
+    target.mkdir(parents=True, exist_ok=True)
+    for sub in ("scripts", "schemas", "templates"):
+        s = src / sub
+        if s.exists():
+            shutil.copytree(s, target / sub, dirs_exist_ok=True)
+    # Plugin rules live at plugin/rules (one level above edpa/), NOT
+    # edpa/rules — mirror install.sh's "$PLUGIN_SRC/rules" source. Getting
+    # this wrong silently skips rules so --with-rules later fails.
+    rules_src = src.parent / "rules"
+    if rules_src.exists():
+        shutil.copytree(rules_src, target / "rules", dirs_exist_ok=True)
+    version = _plugin_version(src)
+    if version:
+        (target / "VERSION").write_text(version + "\n")
+    hooks_dir = target / "scripts" / "hooks"
+    if hooks_dir.is_dir():
+        for f in hooks_dir.iterdir():
+            if f.is_file():
+                f.chmod(0o755)
+    n = len(list((target / "scripts").glob("*.py")))
+    ver = f", VERSION {version}" if version else ""
+    ok(f"Vendored engine → .edpa/engine/ ({n} scripts{ver})")
+    return True
+
+
 def create_directory_tree(root: Path) -> None:
     edpa = root / ".edpa"
     for d in ("config", "iterations", "reports", "snapshots",
@@ -116,6 +177,20 @@ def _find_templates_dir(root: Path) -> Path:
     return candidates[0]
 
 
+def _stamp_methodology(edpa_yaml: Path) -> None:
+    """Rewrite governance.methodology to the live plugin version so a freshly
+    seeded edpa.yaml never carries the template's frozen version string
+    (mirrors install.sh's stamp step)."""
+    version = _plugin_version(HERE.parent)
+    if not version or not edpa_yaml.exists():
+        return
+    text = edpa_yaml.read_text()
+    new = re.sub(r'(methodology:\s*"?EDPA )[^"\n]+("?)', rf"\g<1>{version}\2", text)
+    if new != text:
+        edpa_yaml.write_text(new)
+        ok(f"Stamped governance.methodology → EDPA {version}")
+
+
 def seed_configs(root: Path) -> None:
     templates = _find_templates_dir(root)
     edpa = root / ".edpa"
@@ -129,6 +204,7 @@ def seed_configs(root: Path) -> None:
         ok("Seeded .edpa/config/edpa.yaml (edit project.name)")
     else:
         info("edpa.yaml already present — leaving as-is")
+    _stamp_methodology(edpa / "config" / "edpa.yaml")
 
     # V2.1 C7: seed cw_heuristics.yaml so engine reads the documented
     # defaults (signal weights, gate transitions, yaml_edit weights)
@@ -277,16 +353,19 @@ def main() -> int:
     print(f"{C.BOLD}EDPA V2 project bootstrap{C.RESET}")
     print(f"Root: {root}")
 
-    step(1, "Directory tree")
+    step(1, "Vendor engine")
+    vendor_engine(root)
+
+    step(2, "Directory tree")
     create_directory_tree(root)
 
-    step(2, "Config templates")
+    step(3, "Config templates")
     seed_configs(root)
 
-    step(3, "ID counter")
+    step(4, "ID counter")
     seed_id_counters(root)
 
-    next_step = 4
+    next_step = 5
     if args.with_ci:
         step(next_step, "CI workflow (--with-ci)")
         install_ci_workflow(root)
