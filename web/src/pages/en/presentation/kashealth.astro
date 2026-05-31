@@ -55,7 +55,7 @@ const S=[
 <div class="s-h1 fade d1">What we present today</div>
 <div class="s-sub fade d2">Complete governance solution for the project — from tooling through methodology to automation. All local in git, no GitHub Project.</div>
 <div class="sg sg5 fade d3">
-<div class="sc a" style="min-height:140px"><div class="sc-i">&#x1F4AC;</div><div class="sc-t">1. Tooling</div><div class="sc-l">Teams + GitHub<br>~1,520 CZK/month<br>15 people, 0 Jira</div></div>
+<div class="sc a" style="min-height:140px"><div class="sc-i">&#x1F4AC;</div><div class="sc-t">1. Tooling</div><div class="sc-l">Teams + GitHub (optional)<br>~1,520 CZK/month<br>EDPA adds only git</div></div>
 <div class="sc c" style="min-height:140px"><div class="sc-i">&#x1F511;</div><div class="sc-t">2. Identity</div><div class="sc-l">kashealth.cz<br>5 members + guests<br>Hybrid model</div></div>
 <div class="sc g" style="min-height:140px"><div class="sc-i">&#x26A1;</div><div class="sc-t">3. EDPA</div><div class="sc-l">No timesheets<br>Dual-view CW<br>BankID audit</div></div>
 <div class="sc y" style="min-height:140px"><div class="sc-i">&#x1F916;</div><div class="sc-t">4. AI Skills</div><div class="sc-l">4 composable<br>26+ platforms<br>Auto-calibration</div></div>
@@ -71,11 +71,11 @@ const S=[
 <div class="sc o"><div class="sc-i">&#x1F4DD;</div><div class="sc-l"><b>Manual timesheets</b><br>Subjective, administratively demanding, unauditable, nobody likes them.</div></div>
 <div class="sc o"><div class="sc-i">&#x1F504;</div><div class="sc-l"><b>Migration risk</b><br>During spin-off everything must be moved. The later, the more expensive.</div></div>
 </div>
-<div class="qt fade d3">Goal: Central stack owned by the project from day 1. Automated reporting. No future migration.</div>`,
+<div class="qt fade d3">Goal: Local-first governance in git from day 1 &mdash; <code>.edpa/</code> is the single source of truth. Automated reporting. Tooling stays the team's choice, GitHub optional.</div>`,
 
 // 3: TOOLING
 `<div class="s-tag fade">Tooling stack</div>
-<div class="s-h1 fade d1">Teams + GitHub = complete stack</div>
+<div class="s-h1 fade d1">EDPA = governance in git &middot; tooling is the team's choice</div>
 <div class="cols fade d2">
 <div class="col">
 <table>
@@ -87,11 +87,11 @@ const S=[
 <tr style="background:rgba(99,102,241,.05)"><td><b>TOTAL</b></td><td><b>15 people</b></td><td style="color:var(--gn)"><b>~566 $</b></td></tr>
 </tbody>
 </table>
-<div style="margin-top:8px;font-size:11px;color:var(--t3)">~1,520 CZK/month &middot; 100 CZK/person</div>
+<div style="margin-top:8px;font-size:11px;color:var(--t3)">~1,520 CZK/month &middot; 100 CZK/person &middot; optional team collaboration</div>
 </div>
 <div class="col">
-<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>EDPA + GitHub replace:</b><br>Jira &#x2192; <code>.edpa/backlog/</code> (YAML in git)<br>Confluence &#x2192; Wiki + Pages<br>Tempo &#x2192; EDPA (derived hours)<br>Roadmaps &#x2192; <code>/edpa:board</code><br>Automation &#x2192; git hooks + optional CI</div></div>
-<div class="s-note"><b>0 Jira, 0 Confluence.</b> Backlog is local <code>.edpa/backlog/</code> in git — the single source of truth. No GitHub required.</div>
+<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>EDPA governance replaces:</b><br>Jira &#x2192; <code>.edpa/backlog/</code> (YAML in git)<br>Timesheets / Tempo &#x2192; EDPA derived hours<br>Roadmaps &#x2192; <code>/edpa:board</code> (local)<br>Automation &#x2192; git hooks (+ optional <code>--with-ci</code>)</div></div>
+<div class="s-note"><b>No separate PM/timesheet tooling &mdash; governance lives in git.</b> EDPA needs only <b>git locally</b>; Teams + GitHub are a separate, optional team choice. GitHub optional.</div>
 </div></div>`,
 
 // 4: IDENTITY

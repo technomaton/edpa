@@ -55,7 +55,7 @@ const S=[
 <div class="s-h1 fade d1">Co dnes předkládáme</div>
 <div class="s-sub fade d2">Kompletní governance řešení pro projekt — od toolingu přes metodiku po automatizaci. Vše lokálně v gitu, žádný GitHub Project.</div>
 <div class="sg sg5 fade d3">
-<div class="sc a" style="min-height:140px"><div class="sc-i">&#x1F4AC;</div><div class="sc-t">1. Tooling</div><div class="sc-l">Teams + GitHub<br>~1 520 Kč/měsíc<br>15 lidí, 0 Jira</div></div>
+<div class="sc a" style="min-height:140px"><div class="sc-i">&#x1F4AC;</div><div class="sc-t">1. Tooling</div><div class="sc-l">Teams + GitHub (volitelné)<br>~1 520 Kč/měsíc<br>EDPA navíc jen git</div></div>
 <div class="sc c" style="min-height:140px"><div class="sc-i">&#x1F511;</div><div class="sc-t">2. Identita</div><div class="sc-l">kashealth.cz<br>5 členů + guests<br>Hybridní model</div></div>
 <div class="sc g" style="min-height:140px"><div class="sc-i">&#x26A1;</div><div class="sc-t">3. EDPA</div><div class="sc-l">Bez timesheetů<br>Dual-view CW<br>BankID audit</div></div>
 <div class="sc y" style="min-height:140px"><div class="sc-i">&#x1F916;</div><div class="sc-t">4. AI Skills</div><div class="sc-l">4 composable<br>26+ platforem<br>Auto-kalibrace</div></div>
@@ -71,11 +71,11 @@ const S=[
 <div class="sc o"><div class="sc-i">&#x1F4DD;</div><div class="sc-l"><b>Ruční timesheets</b><br>Subjektivní, administrativně náročné, neauditovatelné, nikdo je nemá rád.</div></div>
 <div class="sc o"><div class="sc-i">&#x1F504;</div><div class="sc-l"><b>Riziko migrace</b><br>Při spin-offu bude nutné vše přesunout. Čím později, tím dražší.</div></div>
 </div>
-<div class="qt fade d3">Cíl: Centrální stack vlastněný projektem od dne 1. Automatizované vykazování. Žádná budoucí migrace.</div>`,
+<div class="qt fade d3">Cíl: Local-first governance v gitu od dne 1 &mdash; <code>.edpa/</code> je jediný zdroj pravdy. Automatizované vykazování. Tooling zůstává volbou týmu, GitHub volitelný.</div>`,
 
 // 3: TOOLING
 `<div class="s-tag fade">Tooling stack</div>
-<div class="s-h1 fade d1">Teams + GitHub = kompletní stack</div>
+<div class="s-h1 fade d1">EDPA = governance v gitu &middot; tooling je volba týmu</div>
 <div class="cols fade d2">
 <div class="col">
 <table>
@@ -87,11 +87,11 @@ const S=[
 <tr style="background:rgba(99,102,241,.05)"><td><b>CELKEM</b></td><td><b>15 lidí</b></td><td style="color:var(--gn)"><b>~566 $</b></td></tr>
 </tbody>
 </table>
-<div style="margin-top:8px;font-size:11px;color:var(--t3)">~1 520 Kč/měs &middot; 100 Kč/osobu</div>
+<div style="margin-top:8px;font-size:11px;color:var(--t3)">~1 520 Kč/měs &middot; 100 Kč/osobu &middot; volitelná kolaborace týmu</div>
 </div>
 <div class="col">
-<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>EDPA + GitHub nahrazují:</b><br>Jira &#x2192; <code>.edpa/backlog/</code> (YAML v gitu)<br>Confluence &#x2192; Wiki + Pages<br>Tempo &#x2192; EDPA (odvozené hodiny)<br>Roadmaps &#x2192; <code>/edpa:board</code><br>Automation &#x2192; git hooks + volitelný CI</div></div>
-<div class="s-note"><b>0 Jira, 0 Confluence.</b> Backlog je lokální <code>.edpa/backlog/</code> v gitu — jediný zdroj pravdy. GitHub není potřeba.</div>
+<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>EDPA governance nahrazuje:</b><br>Jira &#x2192; <code>.edpa/backlog/</code> (YAML v gitu)<br>Timesheety / Tempo &#x2192; EDPA odvozené hodiny<br>Roadmaps &#x2192; <code>/edpa:board</code> (lokálně)<br>Automation &#x2192; git hooks (+ volitelný <code>--with-ci</code>)</div></div>
+<div class="s-note"><b>Žádné samostatné PM/timesheet nástroje &mdash; governance žije v gitu.</b> EDPA potřebuje jen <b>git lokálně</b>; Teams + GitHub jsou samostatná, volitelná volba týmu. GitHub volitelný.</div>
 </div></div>`,
 
 // 4: IDENTITY
