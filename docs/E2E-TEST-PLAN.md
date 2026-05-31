@@ -1,42 +1,48 @@
 # EDPA — Kompletní E2E test plán
 
 End-to-end ověření celého EDPA workflow od čisté instalace až po uzavření iterace
-a vygenerování reportů, včetně oboustranného sync s GitHub Projects.
+a vygenerování reportů. EDPA V2 je **local-first**: `.edpa/backlog/**/*.md`
+(YAML frontmatter) je single source of truth, git je audit trail. GitHub je
+**volitelný** — žádný GitHub Project provisioning, žádná oboustranná synchronizace.
 
-**Verze plánu:** 1.1 (2026-05-06)
-**Pokrývaná verze EDPA:** 1.8.0-beta (engine, sync push/pull, gates default,
-sync setup-refresh, idempotent project_setup, contributors `as:` schema, `--check-readiness`,
-batch `reports.py`, sub-issue idempotence, schema validation v `validate_syntax.py`)
-**Cílový stav po projití:** plugin nainstalovaný, GitHub Project naplněný, jeden uzavřený PI s reporty.
+**Verze plánu:** 2.1.x (2026-05-31)
+**Pokrývaná verze EDPA:** 2.1.x (vendored engine v `.edpa/engine/`, local-first backlog v `.md`,
+evidence-driven engine, git hooks pro evidence, volitelný contribution-sync workflow)
+**Cílový stav po projití:** plugin nainstalovaný, engine vendorovaný do `.edpa/engine/`,
+lokální backlog naplněný, jeden uzavřený PI s reporty + frozen snapshotem.
 
-**Co se změnilo proti 1.0:** všechny předchozí E2E nálezy z 2026-05-06 jsou opravené
-(viz `docs/E2E-REPORT-2026-05-06.md` pro 18-bodovou matici). Schema backlogu má
-**breaking** rename `contributors[].role` → `contributors[].as` a `weight` → `cw`;
-legacy YAML migrate jednorázově `python3 .claude/edpa/scripts/migrate_contributors.py`.
-Tento test ověřuje, že čistý onboarding (install → setup → engine → reports) projde
-**bez ručních zásahů** — engine vrátí non-zero alokaci na první spuštění.
+**Co se změnilo proti V1:** kompletní přechod na local-first architekturu (2.0.0+).
+**Odstraněno** (a tedy i z tohoto plánu): GitHub Project provisioning
+(`project_setup.py --org/--repo/--project-title`), `issue_types.py`,
+`project_views.py`, oboustranný `sync.py` (push/pull/diff/conflicts/setup-refresh),
+`issue_map.yaml`, GH sync workflows (`edpa-sync-*.yml`, `edpa-branch-check.yml`,
+`edpa-iteration-close.yml`), engine `--mode simple|full`, `evaluate_cw.py`
+a `.yaml` backlog soubory. V2 `project_setup.py` pouze **vendoruje engine**
+a seeduje `.edpa/`; jediný GH workflow je volitelný `edpa-contribution-sync.yml`.
+Tento test ověřuje, že čistý onboarding (install/setup → backlog add → engine →
+reports) projde **bez ručních zásahů** a **bez GitHubu** — engine vrátí non-zero
+alokaci na první spuštění z lokální evidence.
 
 ---
 
 ## 0. Co tento plán pokrývá
 
-| Fáze | Co se ověřuje                                              | Kritická? |
-|------|------------------------------------------------------------|-----------|
-| 1    | Instalace pluginu (curl/local), žádná root pollution       | ✅        |
-| 2    | `/edpa:setup` — vytvoření GitHub Project, fields, issue_map | ✅        |
-| 3    | Backlog (Initiative→Epic→Feature→Story), schémata, hooks    | ✅        |
-| 4    | Branche, commity, PR, GitHub Action `branch-check`          | ✅        |
-| 5    | `sync push` — vytvoření issues, link parent/child, fields  | ✅        |
-| 6    | `sync pull --commit` — typed Status fields, git transitions| ✅        |
-| 7    | Konflikty (`sync conflicts`, `sync diff`)                  | ✅        |
-| 8    | Recovery (`sync setup-refresh`, ztráta `field_ids`)         | ⚠️        |
-| 9    | `/edpa:close-iteration` — engine `--mode gates`             | ✅        |
-| 10   | `/edpa:reports` — timesheets, item-costs, XLSX, snapshot    | ✅        |
-| 11   | `/edpa:calibrate` readiness (≥ 20 ground-truth)            | ⚠️        |
-| 12   | 5-min smoke test (po fresh checkout)                        | ✅        |
-| 13   | `kashealth` deployment dry-run                              | ⚠️        |
+| Fáze | Co se ověřuje                                                       | Kritická? |
+|------|--------------------------------------------------------------------|-----------|
+| 1    | Instalace pluginu (curl/local), vendoring `.edpa/engine/`, žádná root pollution | ✅ |
+| 2    | `/edpa:setup` / `project_setup.py` — vendoring + seed configů, `id_counters.yaml` | ✅ |
+| 3    | Backlog (Initiative→Epic→Feature→Story) přes `backlog.py add`, schémata, hooks | ✅ |
+| 4    | Branche, commity, commit-msg/post-commit hooks → `evidence[]`      | ✅        |
+| 5    | Iterace (`.edpa/iterations/*.yaml`), `backlog.py status`/`wsjf`    | ✅        |
+| 6    | `detect_contributors.py` — normalizace `evidence[]` → `contributors[]` | ✅     |
+| 7    | `engine.py` — derived hours, frozen snapshot, XLSX, invariants     | ✅        |
+| 8    | `/edpa:reports` — timesheety, item-costs XLSX, snapshot            | ✅        |
+| 9    | `/edpa:calibrate` readiness (≥ 20 ground-truth)                    | ⚠️        |
+| 10   | (Volitelně) GitHub `--with-ci` contribution-sync workflow         | ⚠️        |
+| 11   | 5-min smoke test (po fresh checkout)                               | ✅        |
+| 12   | Reálné nasazení dry-run                                            | ⚠️        |
 
-**Délka plné pasáže fází 1–10:** ~3–4 hodiny manuálně, ~25 minut automatizovanou částí (`pytest`).
+**Délka plné pasáže fází 1–8:** ~1–2 hodiny manuálně, ~10 minut automatizovanou částí (`pytest`).
 
 ---
 
@@ -46,20 +52,18 @@ Tento test ověřuje, že čistý onboarding (install → setup → engine → r
 # Toolchain
 python3 --version          # ≥ 3.10
 git --version              # ≥ 2.30
-gh --version               # ≥ 2.40
-gh auth status             # OK; scope: repo, project, admin:org
 
 # Python knihovny
 python3 -m pip install pyyaml openpyxl
 
-# GitHub sandbox repo + org
-#   sandbox repo musí být PRÁZDNÝ — push test maže issues
-#   org-level Issue Types: Initiative, Epic, Feature, Story
-export EDPA_E2E_REPO="technomaton/edpa-e2e-test"
-python3 plugin/edpa/scripts/issue_types.py setup --org technomaton
+# GitHub CLI je VOLITELNÝ — jen pro fázi 10 (contribution-sync workflow).
+# Local-first flow (fáze 1–9) běží zcela bez GitHubu.
+gh --version               # volitelně, ≥ 2.40
+gh auth status             # volitelně; scope: repo (žádný project/admin:org)
 ```
 
-**Pass:** všechny příkazy bez chyby, `gh auth status` ukazuje `repo + project + admin:org`.
+**Pass:** `python3`, `git` a `pyyaml`/`openpyxl` bez chyby. GitHub není pro
+základní pasáž potřeba — žádný org provisioning, žádné Issue Types.
 
 ---
 
@@ -67,17 +71,17 @@ python3 plugin/edpa/scripts/issue_types.py setup --org technomaton
 
 Plán používá tři úrovně testovacích vstupů — od nejmenšího po realistický:
 
-| Sada       | Použití                              | Kde leží                           |
-|------------|--------------------------------------|------------------------------------|
-| **smoke**  | minimální (1×I, 1×E, 1×F, 1×S)       | `tests/test_e2e_install.py` zdroje |
-| **sandbox**| 6 itemů, real GH API                 | `tests/test_e2e_sync.py` fixtures  |
-| **kashealth-like** | 4 lidé, 8 stories, 2 týdenní PI | připravit ručně dle § 13           |
+| Sada       | Použití                              | Kde leží                              |
+|------------|--------------------------------------|---------------------------------------|
+| **smoke**  | minimální (1×I, 1×E, 1×F, 1×S)       | `tests/test_e2e_install.py` zdroje    |
+| **sandbox**| plný local-first cyklus              | `tests/e2e_v2_full/` fixtures         |
+| **realistic** | 4 lidé, 8 stories, 2týdenní PI    | připravit ručně dle § 12              |
 
 ---
 
 ## Fáze 1 — Instalace pluginu
 
-**Cíl:** ověřit, že `install.sh` nainstaluje plugin do `.claude/edpa/`, vytvoří
+**Cíl:** ověřit, že `install.sh` vendoruje engine do `.edpa/engine/`, založí
 `.edpa/` strom a NEZAPLNÍ root cílového projektu (žádné `scripts/`, `config/`,
 `reports/` v root).
 
@@ -94,622 +98,452 @@ sh /Users/jurby/projects/edpa/install.sh
 ```
 
 **Očekávaný výstup:**
-- `Python 3.X ✓`, `PyYAML ✓`, `git ✓`, `GitHub CLI ✓`
-- `Downloading EDPA plugin...` → `Installation complete`
-- `.claude/edpa/scripts/engine.py` existuje
-- `.claude/.claude-plugin/plugin.json` existuje
+- `Python 3.X ✓`
+- vendoring engine → `.edpa/engine/` → `Installation complete`
+- `.edpa/engine/scripts/engine.py` existuje
+- `.edpa/engine/scripts/backlog.py` existuje
+- `.edpa/engine/VERSION` obsahuje pinnutou verzi (matchuje `plugin.json`)
 
 **Pass kritéria:**
 ```bash
 ls "$TARGET" | sort
-# Musí obsahovat ≤ {.claude, .edpa, .git, README.md} — žádné jiné položky
-[ -f "$TARGET/.claude/edpa/scripts/engine.py" ] && echo "engine OK"
-[ -f "$TARGET/.claude/edpa/scripts/sync.py" ] && echo "sync OK"
-[ -f "$TARGET/.edpa/config" ] || mkdir -p "$TARGET/.edpa/config"
+# Root smí obsahovat ≤ {.edpa, .git, README.md} — žádné jiné položky
+[ -f "$TARGET/.edpa/engine/scripts/engine.py" ]  && echo "engine OK"
+[ -f "$TARGET/.edpa/engine/scripts/backlog.py" ] && echo "backlog OK"
+[ -s "$TARGET/.edpa/engine/VERSION" ]            && echo "VERSION pinned: $(cat "$TARGET/.edpa/engine/VERSION")"
 ```
 
 **Fail patterns:**
 - root obsahuje `scripts/`, `config/`, `reports/` → **POLLUTION** (porušuje
   `feedback_no_root_pollution.md`)
-- `engine.py` chybí → instalace neúplná
+- engine pod `.claude/edpa/scripts/` místo `.edpa/engine/scripts/` → stará
+  V1 cesta, instalace je z předchozí verze
+- `engine.py`/`backlog.py` chybí → vendoring neúplný
 
-### 1.2 Idempotence — opakovaný install
-
-```bash
-echo "n" | sh /Users/jurby/projects/edpa/install.sh
-# Musí ukázat: "Warning: .claude/edpa/ already exists. Overwrite? [y/N]"
-# Při "n": "Aborted."
-
-echo "y" | sh /Users/jurby/projects/edpa/install.sh
-# Musí přepsat bez chyby
-```
-
-**Pass:** plugin se přepíše, `.edpa/` data zůstanou nedotčena.
-
-### 1.3 Plugin manifest a hooks
+### 1.2 Idempotence — opakovaný install / re-vendoring
 
 ```bash
-python3 -c "import json; m=json.load(open('$TARGET/.claude/.claude-plugin/plugin.json')); \
-  assert m['name']=='edpa'; print('plugin.json OK', m['version'])"
-
-# Validace hooks.json schématu
-python3 -c "import json; json.load(open('$TARGET/.claude/hooks/hooks.json'))" \
-  && echo "hooks.json valid JSON"
+sh /Users/jurby/projects/edpa/install.sh
+# Re-vendoring přepíše .edpa/engine/ bez chyby; .edpa/backlog/ + .edpa/config/
+# zůstanou nedotčené (data se nepřepisují, jen engine).
 ```
 
-**Pass:** validní JSON, `version` odpovídá `CHANGELOG.md`.
+**Pass:** engine se přepíše, `.edpa/backlog/` a `.edpa/config/` data zůstanou
+nedotčena, `.edpa/engine/VERSION` se aktualizuje.
+
+### 1.3 Engine VERSION pin
+
+```bash
+EXPECTED=$(python3 -c "import json; print(json.load(open('/Users/jurby/projects/edpa/plugin/.claude-plugin/plugin.json'))['version'])")
+test "$(cat "$TARGET/.edpa/engine/VERSION")" = "$EXPECTED" && echo "VERSION matches plugin.json ($EXPECTED)"
+```
+
+**Pass:** `.edpa/engine/VERSION` odpovídá `plugin/.claude-plugin/plugin.json`
+(single source of truth verze).
 
 ### 1.4 Automatizovaný test (pokrytí § 1.1–1.3)
 
 ```bash
 cd /Users/jurby/projects/edpa
-python3 -m pytest tests/test_e2e_install.py -v
+python3 -m pytest tests/test_e2e_install.py tests/test_project_setup_vendor.py -v
 ```
 
-**Pass:** všechny testy zelené, žádné root entries kromě allow-listu.
+**Pass:** všechny testy zelené, žádné root entries kromě allow-listu,
+vendoring + VERSION pin OK.
 
 ---
 
-## Fáze 2 — `/edpa:setup` — inicializace projektu
+## Fáze 2 — `/edpa:setup` — inicializace projektu (local-first)
 
-**Cíl:** vytvořit GitHub Project v2, custom fields, založit issues z lokálního
-backlogu, propojit parent/child přes sub-issues a perzistovat IDs do
-`.edpa/config/edpa.yaml` + `.edpa/config/issue_map.yaml`.
+**Cíl:** vendorovat engine + naseedovat `.edpa/config/{edpa.yaml,people.yaml,
+cw_heuristics.yaml,id_counters.yaml}`. **Žádný GitHub Project, žádné
+custom fields, žádný `issue_map.yaml`.** `project_setup.py` v V2 bere pouze
+`--with-ci/--with-hooks/--with-rules/--root`.
 
-### 2.1 Příprava configu a backlog templates
+### 2.1 Spuštění setupu
 
 ```bash
 cd "$TARGET"
-cp .claude/edpa/templates/project.yaml.tmpl   .edpa/config/edpa.yaml
-cp .claude/edpa/templates/people.yaml.tmpl    .edpa/config/people.yaml
-cp .claude/edpa/templates/cw_heuristics.yaml.tmpl .edpa/config/heuristics.yaml
-
-# Edituj .edpa/config/edpa.yaml — vyplň sync.github_org, sync.github_repo
-$EDITOR .edpa/config/edpa.yaml
-```
-
-**Pass:** `edpa.yaml` má vyplněné `sync.github_org`, `sync.github_repo`,
-sandbox repo souhlasí s `$EDPA_E2E_REPO`.
-
-### 2.2 Naplnit minimální backlog (smoke set)
-
-```bash
-mkdir -p .edpa/backlog/{initiatives,epics,features,stories}
-cat > .edpa/backlog/initiatives/I-1.yaml <<EOF
-id: I-1
-type: Initiative
-title: "E2E test initiative"
-parent: null
-status: Funnel
-EOF
-cat > .edpa/backlog/epics/E-1.yaml <<EOF
-id: E-1
-type: Epic
-title: "E2E test epic"
-parent: I-1
-status: Funnel
-EOF
-cat > .edpa/backlog/features/F-1.yaml <<EOF
-id: F-1
-type: Feature
-title: "E2E test feature"
-parent: E-1
-status: Funnel
-js: 5
-EOF
-cat > .edpa/backlog/stories/S-1.yaml <<EOF
-id: S-1
-type: Story
-title: "E2E test story"
-parent: F-1
-status: Backlog
-js: 3
-iteration: PI-2026-1.1
-EOF
-```
-
-**Pass:** 4 YAML soubory, `git add .edpa/backlog/ && git commit -m "seed"`.
-
-### 2.3 Dry-run setupu
-
-```bash
-python3 .claude/edpa/scripts/project_setup.py \
-  --org "$(yq '.sync.github_org' .edpa/config/edpa.yaml)" \
-  --repo "$(yq '.sync.github_repo' .edpa/config/edpa.yaml)" \
-  --project-title "EDPA-E2E-$(date +%s)" \
-  --dry-run
-```
-
-**Pass:** výstup obsahuje plán bez API volání:
-- `[1] Create project "EDPA-E2E-..."`
-- `[2-7] Create N fields, M options`
-- `[8] Create 4 issues (I-1, E-1, F-1, S-1)`
-- `[9] Persist field_ids → .edpa/config/edpa.yaml`
-
-**Fail:** chybí native Issue Types → spusť
-`python3 .claude/edpa/scripts/issue_types.py setup --org <org>` (viz § 1).
-
-### 2.4 Reálný setup
-
-```bash
-python3 .claude/edpa/scripts/project_setup.py \
-  --org technomaton \
-  --repo edpa-e2e-test \
-  --project-title "EDPA-E2E-$(date +%s)"
+python3 .edpa/engine/scripts/project_setup.py --with-hooks --with-rules
+# Volitelně přidej --with-ci pro contribution-sync workflow (viz § 10).
 ```
 
 **Očekávaný závěr:**
 ```
-══════════════════════════════════════════════════════════════════════
-  Setup complete!
-  Project: https://github.com/orgs/technomaton/projects/N
-  Issues:  4 created
-  Fields:  Y values set
-  Links:   3 sub-issue links
-```
-
-### 2.5 Ověření perzistence
-
-```bash
-yq '.sync.github_project_id' .edpa/config/edpa.yaml      # ne-prázdné
-yq '.sync.field_ids | keys' .edpa/config/edpa.yaml       # alespoň: Job Size, WSJF, Initiative Status, Epic Status, Feature Status, Story Status
-yq '.sync.option_ids | keys' .edpa/config/edpa.yaml      # ne-prázdné
-yq 'keys' .edpa/config/issue_map.yaml                    # I-1, E-1, F-1, S-1
+✓ Vendored engine → .edpa/engine/
+✓ Seeded .edpa/config/edpa.yaml
+✓ Seeded .edpa/config/people.yaml
+✓ Seeded .edpa/config/cw_heuristics.yaml
+✓ Seeded .edpa/config/id_counters.yaml
+✓ Installed git hooks (--with-hooks)
+✓ Copied architectural rules → .claude/rules/ (--with-rules)
 ```
 
 **Pass kritéria:**
-- ✅ `field_ids` obsahuje per-level Status fieldy (Initiative Status, Epic Status, Feature Status, Story Status)
-- ✅ `issue_map.yaml` má pro každý item `issue_number`, `project_item_id`, `node_id`
-- ✅ V GitHub UI je vidět projekt, 4 issues, parent→child sub-issue linky
-
-**Fail:** prázdné `field_ids` = známý bug v < 1.1.0-beta (`gh project item-edit`
-volaný s prázdnými IDs). Pokud nastane → `git pull` čerstvého EDPA, znovu.
-
-### 2.6 Idempotence — druhý setup
-
 ```bash
-python3 .claude/edpa/scripts/project_setup.py \
-  --org technomaton --repo edpa-e2e-test \
-  --project-title "EDPA-E2E-...."   # stejný název
+[ -f .edpa/config/edpa.yaml ]          && echo "edpa.yaml OK"
+[ -f .edpa/config/people.yaml ]        && echo "people.yaml OK"
+[ -f .edpa/config/cw_heuristics.yaml ] && echo "cw_heuristics.yaml OK"
+[ -f .edpa/config/id_counters.yaml ]   && echo "id_counters.yaml OK"
+# Git hooks nainstalované (--with-hooks):
+[ -f .git/hooks/commit-msg ]  && echo "commit-msg hook OK"
+[ -f .git/hooks/post-commit ] && echo "post-commit hook OK"
 ```
 
-**Pass:** `Project might already exist — reusing #N`. Žádné duplicitní issues.
+**Fail:** soubory `.edpa/config/*.yaml` chybí → setup neúplný. Pozn.: V2
+configy se jmenují `edpa.yaml` (ne `project.yaml`) a `cw_heuristics.yaml`
+(ne `heuristics.yaml`).
+
+### 2.2 Editace people.yaml a edpa.yaml
+
+```bash
+# Vyplň reálný tým: people[].{id,name,role,team,fte,capacity_per_iteration,email,github}
+$EDITOR .edpa/config/people.yaml
+
+# Vyplň project.name (jediné povinné pole, čte engine); funding/organizations volitelně
+$EDITOR .edpa/config/edpa.yaml
+
+git add .edpa/config/ && git commit -m "no-ticket: configure team + project"
+```
+
+**Pass:** `people.yaml` má alespoň 1–2 osoby s vyplněným `email`
+(klíčové — post-commit hook atribuuje evidence jen podle emailů v people.yaml)
+a `capacity_per_iteration`. `edpa.yaml` má vyplněný `project.name`.
+
+### 2.3 Ověření id_counters seedu
+
+```bash
+python3 -c "import yaml; c=yaml.safe_load(open('.edpa/config/id_counters.yaml')); print(c)"
+```
+
+**Pass:** `id_counters.yaml` existuje a obsahuje čítače per typ (Initiative,
+Epic, Feature, Story, …) naseedované z existujících file IDs (po čisté
+instalaci typicky 0). `backlog.py add` z těchto čítačů alokuje další ID.
 
 ---
 
-## Fáze 3 — Backlog hygiena (schémata, hooks)
+## Fáze 3 — Backlog (`backlog.py add`, schémata, hooks)
 
-**Cíl:** ověřit, že úprava YAML přes Edit/Write spustí `validate_on_save.sh`,
-že rozbité YAML neprojde a že `validate-item` workflow funguje.
+**Cíl:** vytvořit hierarchii Initiative→Epic→Feature→Story přes `backlog.py add`
+(lokálně, auto-commit `feat(<ID>): …`, ID z `id_counters.yaml`), ověřit
+validaci YAML frontmatteru a parent-hierarchii.
 
-### 3.1 Schema validation — broken YAML
+### 3.1 Naplnit minimální backlog (smoke set)
 
 ```bash
 cd "$TARGET"
-echo "id: BAD\nbad indent" > .edpa/backlog/stories/S-broken.yaml
-git add .edpa/backlog/stories/S-broken.yaml
-git commit -m "test broken yaml"
+
+# Initiative (bez parenta)
+python3 .edpa/engine/scripts/backlog.py add \
+  --type Initiative --title "E2E test initiative"
+
+# Epic → Initiative (předpokládáme I-1)
+python3 .edpa/engine/scripts/backlog.py add \
+  --type Epic --parent I-1 --title "E2E test epic"
+
+# Feature → Epic
+python3 .edpa/engine/scripts/backlog.py add \
+  --type Feature --parent E-1 --title "E2E test feature" --js 5
+
+# Story → Feature
+python3 .edpa/engine/scripts/backlog.py add \
+  --type Story --parent F-1 --title "E2E test story" \
+  --js 3 --iteration PI-2026-1.1 --status Backlog
 ```
 
-**Pass:** pre-commit hook (instalovaný přes `git config core.hooksPath`)
-zablokuje commit s message o invalid YAML.
+**Pass kritéria:**
+- ✅ Vzniknou `.md` soubory (YAML frontmatter) pod `.edpa/backlog/{initiatives,epics,features,stories}/`
+- ✅ ID alokovaná z `id_counters.yaml` (I-1, E-1, F-1, S-1), čítače inkrementované
+- ✅ Každé `add` auto-commitne `feat(<ID>): …` (žádný ruční `git add`)
+- ✅ Parent hierarchie validovaná (Epic→Initiative, Feature→Epic, Story→Feature);
+  pokus o nevalidní parent skončí non-zero exit
 
 ```bash
-# Pokud hooks nejsou aktivované:
-sh .claude/edpa/scripts/hooks/install.sh
+python3 .edpa/engine/scripts/backlog.py tree     # zobrazí hierarchii I-1 → E-1 → F-1 → S-1
+git log --oneline -4                              # 4× feat(<ID>): commit
 ```
 
-### 3.2 Schema validation — chybějící povinný field
+### 3.2 Schema validation — broken frontmatter
 
 ```bash
-echo "id: S-2\ntype: Story" > .edpa/backlog/stories/S-2.yaml
-# chybí title, parent, js, status, iteration
-python3 .claude/edpa/scripts/validate_syntax.py .edpa/backlog/stories/S-2.yaml
+printf 'id: BAD\nbad indent\n' > .edpa/backlog/stories/S-broken.md
+python3 .edpa/engine/scripts/validate_syntax.py .edpa/backlog/stories/S-broken.md
+echo "exit code: $?"   # nenulový
 ```
 
-**Pass:** non-zero exit code, message identifikující chybějící pole.
+**Pass:** non-zero exit code, message o invalid YAML / chybějícím povinném poli.
 
-### 3.3 Hooks — Edit/Write trigger
+```bash
+# Commit s rozbitým YAML musí pre-commit hook zablokovat (pokud --with-hooks):
+git add .edpa/backlog/stories/S-broken.md
+git commit -m "feat(S-broken): test"
+# → pre-commit zablokuje (invalid YAML); jinak install hooks:
+#   sh .edpa/engine/scripts/hooks/install.sh
+rm -f .edpa/backlog/stories/S-broken.md
+```
+
+### 3.3 Strict schema validation celého backlogu
+
+```bash
+python3 .edpa/engine/scripts/validate_syntax.py --strict .edpa/backlog/
+python3 .edpa/engine/scripts/backlog.py validate
+```
+
+**Pass:** oba projdou (po smazání `S-broken.md`); `backlog validate` ověří
+integritu hierarchie (žádní visící parenti, žádné kolize ID).
+
+### 3.4 Hooks — Edit/Write trigger (v Claude Code)
 
 V Claude Code:
 ```
-Edit .edpa/backlog/stories/S-1.yaml — změň status na "Implementing"
+Edit .edpa/backlog/stories/S-1.md — změň status na "Implementing"
 ```
 
 **Pass:** v Claude Code transcriptu vidět `Validating syntax...` (statusMessage
-z `hooks.json`), žádný error.
-
-**Fail:** validační hook se nespustil → `.claude/hooks/hooks.json` chybí, nebo
-`CLAUDE_PLUGIN_ROOT` není nastaven → ověř, že `.claude/edpa/` je symlink/copy
-ne ze starší verze.
-
-### 3.4 Branch naming hook (lokálně)
-
-```bash
-git checkout -b "wrong-name"
-# Pre-commit hook by měl varovat (warning, ne block)
-git checkout -b "feature/S-1-test-story"
-# OK
-```
+z `hooks.json`), žádný error. Pokud se hook nespustí → ověř, že `.claude/hooks/
+hooks.json` existuje a `CLAUDE_PLUGIN_ROOT` je nastaven.
 
 ---
 
-## Fáze 4 — Branche, commity, PR
+## Fáze 4 — Branche, commity, git hooks → evidence
 
-**Cíl:** ověřit GitHub Action `edpa-branch-check.yml`, že odmítá PR s nestandardním
-názvem branche, a že commit s referencí na item ID se zaznamená v evidence.
+**Cíl:** ověřit, že commit-msg hook vyžaduje referenci na item (nebo `no-ticket:`),
+a že post-commit hook emituje `evidence[]` (`chore(evidence): …`) pro autory,
+jejichž commit email je v `people.yaml`.
 
-### 4.1 Špatný branch name → PR fail
+### 4.1 Commit bez reference na item → block
 
 ```bash
 cd "$TARGET"
-git checkout -b "junk-branch"
+git checkout -b "feature/S-1-add-readme-section"
 echo "// junk" >> README.md
-git add . && git commit -m "junk"
-git push -u origin junk-branch
-gh pr create --title "Junk" --body "test" --base main
+git add README.md
+git commit -m "random change"
+# → commit-msg hook zablokuje: chybí EDPA item ref a chybí no-ticket: escape
 ```
 
-**Pass:** GitHub Action `branch-check` skončí ❌, PR má failing check.
+**Pass:** commit-msg hook (`check_ticket_attached.py`) skončí non-zero,
+zpráva zůstane v bufferu. Rozpoznané escape prefixy: `no-ticket:`,
+`[no-ticket]`, `WIP:`, `Merge …`, `chore(evidence):`, `chore(ci-materialization):`.
 
-### 4.2 Správný branch — `feature/S-1-...`
+### 4.2 Správný commit — reference na S-1
 
 ```bash
-git checkout main
-git checkout -b "feature/S-1-add-readme-section"
 echo "## E2E section" >> README.md
 git add README.md
 git commit -m "feat(S-1): add E2E section"
-git push -u origin feature/S-1-add-readme-section
-gh pr create --title "feat(S-1): add E2E section" --body "Implements S-1" --base main
 ```
 
 **Pass:**
-- `branch-check` ✅
-- `validate-item` workflow zkontroluje, že S-1 existuje v `.edpa/backlog/`
-- PR je merge-able
-
-### 4.3 Merge a evidence detection
+- ✅ commit-msg hook propustí (obsahuje `S-1`)
+- ✅ post-commit hook (`local_evidence.py`) detekuje `S-1`, emituje
+  `commit_author` + `manual:commit_message` signály do `.edpa/backlog/stories/S-1.md`
+  → `evidence[]`, a vytvoří follow-up commit `chore(evidence): …`
+- ✅ Atribuce proběhne **jen** když commit email ∈ `people.yaml`
+  (jinak signál není přiřazen žádné osobě)
 
 ```bash
-gh pr merge --squash --auto
-# Po merge:
-python3 .claude/edpa/scripts/detect_contributors.py --item S-1 --since 7days
+git log --oneline -3                                    # feat(S-1) + chore(evidence)
+python3 .edpa/engine/scripts/backlog.py show S-1        # vidět evidence[] blok
 ```
 
-**Pass:** výstup obsahuje autora commitu + reviewera (pokud byl), s rolemi
-`owner` / `key_contributor` / `reviewer`.
+### 4.3 Evidence při neznámém emailu
+
+```bash
+git -c user.email="stranger@nowhere.invalid" commit --allow-empty -m "feat(S-1): foreign commit"
+python3 .edpa/engine/scripts/backlog.py show S-1
+```
+
+**Pass:** post-commit hook proběhne (fire-and-forget, neblokuje), ale signál
+z `stranger@…` se nepřiřadí žádné osobě — evidence atribuovaná pouze pro emaily
+přítomné v `people.yaml`. (Gotcha k ověření.)
 
 ---
 
-## Fáze 5 — `sync push`
+## Fáze 5 — Iterace a backlog status
 
-**Cíl:** ověřit, že lokální změny (nový item, změněný field) se promítnou do
-GitHub Projectu.
+**Cíl:** založit iteraci v `.edpa/iterations/`, jejíž datové okno pokrývá
+commity z fáze 4, a ověřit `backlog.py status`/`wsjf`.
 
-### 5.1 Status overview
-
-```bash
-python3 .claude/edpa/scripts/sync.py status
-```
-
-**Pass:** sekce `GitHub State`, `Local Backlog`, `Issue Map`, všechny řádky
-pokud existují.
-
-### 5.2 Diff (dry-run)
+### 5.1 Iterační YAML
 
 ```bash
-# Přidej nový lokální story (mimo issue_map)
-cat > .edpa/backlog/stories/S-2.yaml <<EOF
-id: S-2
-type: Story
-title: "Sync push test story"
-parent: F-1
-status: Backlog
-js: 2
-iteration: PI-2026-1.1
+cd "$TARGET"
+mkdir -p .edpa/iterations
+cat > .edpa/iterations/PI-2026-1.1.yaml <<EOF
+id: PI-2026-1.1
+start_date: 2026-05-25
+end_date: 2026-05-31
 EOF
-
-python3 .claude/edpa/scripts/sync.py diff
+git add .edpa/iterations/ && git commit -m "no-ticket: open iteration PI-2026-1.1"
 ```
 
-**Pass:** výstup ukáže `+ S-2` (would create) a žádné jiné neočekávané změny.
+**Pass:** soubor `.edpa/iterations/PI-2026-1.1.yaml` má ISO `start_date`/
+`end_date` a okno **pokrývá** timestampy commitů z fáze 4 (engine váží evidenci
+podle git timestampů uvnitř okna iterace).
 
-### 5.3 Skutečný push
+### 5.2 Validace iterací a status
 
 ```bash
-python3 .claude/edpa/scripts/sync.py push
+python3 .edpa/engine/scripts/validate_iterations.py     # start_date ≤ end_date, atd.
+python3 .edpa/engine/scripts/backlog.py status          # přehled položek per iterace
+python3 .edpa/engine/scripts/backlog.py wsjf            # WSJF ranking backlogu
+```
+
+**Pass:** `validate_iterations.py` projde, `status` ukáže S-1 v PI-2026-1.1,
+`wsjf` seřadí položky podle WSJF (JS/BV/TC/RR-OE).
+
+### 5.3 Označit položky Done
+
+```bash
+# Po dokončení práce nastav status: Done (Edit/Write nebo přímá editace frontmatteru)
+# Engine kredituje práci z evidence; status: Done ohraničuje, co spadá do iterace.
+$EDITOR .edpa/backlog/stories/S-1.md     # status: Done
+git add .edpa/backlog/stories/S-1.md && git commit -m "feat(S-1): mark done"
+```
+
+**Pass:** `backlog.py show S-1` ukazuje `status: Done` a neprázdné `evidence[]`.
+
+---
+
+## Fáze 6 — `detect_contributors.py` — normalizace evidence → contributors
+
+**Cíl:** ověřit, že `detect_contributors.py` přečte `evidence[]` a zapíše
+normalizovaný `contributors[]` (per-item CW mapa), který čte engine.
+**Toto je povinný krok před enginem** — engine čte `contributors[]`,
+ne `evidence[]`; bez normalizace vrátí 0 h.
+
+### 6.1 Refresh contributors[] pro všechny položky
+
+```bash
+cd "$TARGET"
+python3 .edpa/engine/scripts/detect_contributors.py --all-items
 ```
 
 **Pass kritéria:**
-- ✅ S-2 dostane `issue_number` (záznam v `.edpa/config/issue_map.yaml`)
-- ✅ V GitHub UI: nové issue přidané do projektu, parent S-2 ↔ F-1 přes sub-issue
-- ✅ Field `Story Status = Backlog`, `Job Size = 2`
-
-### 5.4 Push změny statusu (lokální → GH)
-
-```bash
-# Změň S-1 status z Backlog → Implementing
-yq -i '.status = "Implementing"' .edpa/backlog/stories/S-1.yaml
-git add . && git commit -m "S-1: start implementing"
-
-python3 .claude/edpa/scripts/sync.py push
-```
-
-**Pass:** v GitHub Projectu se field `Story Status` změní na "Implementing".
-Issue zůstává otevřené.
-
-### 5.5 Push → Done = close issue
+- ✅ Pro každou položku s `evidence[]` se zapíše `contributors[]` se `cw`
+  (Σ napříč osobami = 1.0) + `contribution_score` (raw sum signal weights)
+- ✅ Položky bez `evidence[]` jsou no-op (idempotentní)
+- ✅ Auto-commit `chore(contributors): …`
+- ✅ Role-váhy: owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15,
+  evidence_threshold 1.0
 
 ```bash
-yq -i '.status = "Done"' .edpa/backlog/stories/S-1.yaml
-git add . && git commit -m "S-1: done"
-
-python3 .claude/edpa/scripts/sync.py push
+python3 .edpa/engine/scripts/backlog.py show S-1     # vidět contributors[] s cw
 ```
 
-**Pass:** GitHub issue je `closed`, `Story Status = Done`. Při revertu zpět
-na `Implementing` → issue se reopen-ne.
-
-### 5.6 Edge case — push bez setup state
-
-```bash
-mv .edpa/config/edpa.yaml .edpa/config/edpa.yaml.bak
-python3 .claude/edpa/scripts/sync.py push
-```
-
-**Pass:** `Push aborted: GitHub setup state missing or incomplete`.
-**Recovery:** `mv .edpa/config/edpa.yaml.bak .edpa/config/edpa.yaml`.
+**Fail:** prázdný `contributors[]` po běhu → buď žádná evidence v okně,
+nebo commit emaily nejsou v `people.yaml` (viz § 4.3).
 
 ---
 
-## Fáze 6 — `sync pull --commit`
+## Fáze 7 — `engine.py` — výpočet, snapshot, invariants
 
-**Cíl:** změny v GitHub UI (status, fields) se promítnou do lokálních YAML
-+ commit, který `transitions.py` umí přečíst pro `--mode gates`.
+**Cíl:** spustit engine na iteraci PI-2026-1.1, vyrobit `edpa_results.json`,
+frozen snapshot a XLSX, validovat invariants (Σ hours == capacity per osoba).
+Engine je **evidence-driven** a má **jednu výpočtovou cestu** (žádný `--mode`).
 
-### 6.1 Manuální změna v GitHub UI
-
-V prohlížeči otevři Project → vyber S-2 → změň `Story Status` z `Backlog`
-na `Analyzing`. **Nepoužívej CLI** — testujeme reálný UI flow.
-
-### 6.2 Pull bez commitu (preview)
-
-```bash
-python3 .claude/edpa/scripts/sync.py pull
-```
-
-**Pass:** výstup ukáže `S-2: status Backlog → Analyzing`, lokální YAML se
-změní, ale není committed.
-
-### 6.3 Pull s commitem
-
-```bash
-git checkout -b "sync/pull-$(date +%s)"
-yq -i '.status = "Backlog"' .edpa/backlog/stories/S-2.yaml  # reset
-git add . && git commit -m "reset S-2"
-
-python3 .claude/edpa/scripts/sync.py pull --commit
-```
-
-**Pass:**
-- ✅ `.edpa/backlog/stories/S-2.yaml` má `status: Analyzing`
-- ✅ Vznikl commit s message `sync: GitHub Projects -> .edpa/backlog/`
-  obsahující change na `S-2`
-- ✅ `git log -p --all -- .edpa/backlog/stories/S-2.yaml` ukazuje diff řádku
-  `-status: Backlog` / `+status: Analyzing`
-
-### 6.4 Per-level Status fields
-
-```bash
-# V GH UI: Initiative I-1 → změnit "Initiative Status" z Funnel na Reviewing
-# (typed field, ne default Status!)
-python3 .claude/edpa/scripts/sync.py pull
-```
-
-**Pass:** lokální `.edpa/backlog/initiatives/I-1.yaml` má `status: Reviewing`.
-
-**Fail:** sync čte default `Status` field místo `Initiative Status` → známý
-bug v < 1.1.0-beta. Pokud nastane: zkontroluj `.edpa/config/edpa.yaml`,
-že `field_ids` obsahuje `Initiative Status`, `Epic Status`, atd.
-
-### 6.5 Transitions extracted from git
-
-```bash
-python3 .claude/edpa/scripts/transitions.py --since 1day --format json
-```
-
-**Pass:** JSON obsahuje záznamy pro každý status change z fáze 6.3 a 6.4
-s `commit_sha`, `timestamp`, `from_status`, `to_status`, `item_id`.
-
----
-
-## Fáze 7 — Konflikty
-
-**Cíl:** detekce, kdy se item změnil současně lokálně i na GitHubu.
-
-### 7.1 Vytvoř konflikt
-
-```bash
-# Na GitHubu (UI): F-1 → Feature Status = Implementing
-# Lokálně:
-yq -i '.status = "Reviewing"' .edpa/backlog/features/F-1.yaml
-git add . && git commit -m "F-1: reviewing locally"
-```
-
-### 7.2 Detekce
-
-```bash
-python3 .claude/edpa/scripts/sync.py conflicts
-```
-
-**Pass:** výstup obsahuje `F-1: local=Reviewing, remote=Implementing`.
-
-### 7.3 Diff
-
-```bash
-python3 .claude/edpa/scripts/sync.py diff
-```
-
-**Pass:** označí F-1 jako konfliktní, neaplikuje žádnou změnu.
-
-### 7.4 Manuální resolution (local wins)
-
-```bash
-# Předpokládejme, že lokální verze je správná
-python3 .claude/edpa/scripts/sync.py push
-```
-
-**Pass:** GitHub `Feature Status` = `Reviewing`, `sync conflicts` je čistý.
-
----
-
-## Fáze 8 — Recovery (`setup-refresh`)
-
-**Cíl:** ověřit, že po ztrátě `field_ids` / `issue_map.yaml` se stav rekonstruuje
-z existujícího GitHub Projectu.
-
-### 8.1 Simulace ztráty
-
-```bash
-cp .edpa/config/edpa.yaml         /tmp/edpa.yaml.bak
-cp .edpa/config/issue_map.yaml    /tmp/issue_map.yaml.bak
-
-# Smaž field_ids a option_ids
-yq -i 'del(.sync.field_ids, .sync.option_ids)' .edpa/config/edpa.yaml
-rm .edpa/config/issue_map.yaml
-```
-
-### 8.2 Refresh
-
-```bash
-python3 .claude/edpa/scripts/sync.py setup-refresh
-```
-
-**Pass kritéria:**
-- ✅ `.edpa/config/edpa.yaml` má znovu `sync.field_ids` (Initiative Status,
-  Epic Status, Feature Status, Story Status, Job Size, WSJF, ...)
-- ✅ `.edpa/config/issue_map.yaml` má všechny existující GH issues
-  (I-1, E-1, F-1, S-1, S-2)
-- ✅ Diff vůči `/tmp/*.bak` je prázdný (až na pořadí klíčů)
-
-### 8.3 Push po refresh
-
-```bash
-python3 .claude/edpa/scripts/sync.py push
-```
-
-**Pass:** žádné nové issues vytvořeny, fields souhlasí.
-
----
-
-## Fáze 9 — `/edpa:close-iteration`
-
-**Cíl:** spustit engine na uzavřené iteraci, validovat invariants.
-
-### 9.1 Příprava — close all stories in PI-2026-1.1
-
-```bash
-# Označ S-1, S-2 jako Done přes sync push
-yq -i '.status = "Done"' .edpa/backlog/stories/S-1.yaml
-yq -i '.status = "Done"' .edpa/backlog/stories/S-2.yaml
-git add . && git commit -m "PI-2026-1.1 close: stories Done"
-python3 .claude/edpa/scripts/sync.py push
-
-# Také status transitions na F-1, E-1 (gates evidence)
-yq -i '.status = "Done"' .edpa/backlog/features/F-1.yaml
-yq -i '.status = "Done"' .edpa/backlog/epics/E-1.yaml
-git add . && git commit -m "PI-2026-1.1 close: parents Done"
-python3 .claude/edpa/scripts/sync.py push
-```
-
-### 9.2 Engine `--mode gates` (default)
+### 7.1 Spuštění engine
 
 ```bash
 mkdir -p .edpa/reports/iteration-PI-2026-1.1
-python3 .claude/edpa/scripts/engine.py \
+# Engine rozliší .edpa/ chůzí nahoru z CWD (nebo přes EDPA_ROOT / --edpa-root) —
+# spouštěj z rootu projektu.
+python3 .edpa/engine/scripts/engine.py \
   --edpa-root .edpa \
   --iteration PI-2026-1.1 \
-  --mode gates \
   --output .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
 ```
 
 **Pass kritéria:**
-- ✅ `edpa_results.json` existuje
-- ✅ Sekce `per_person`: pro každou osobu z `people.yaml` má `derived_hours`
-- ✅ Sekce `audit_trail`: každý gate transition zaznamenaný se `commit_sha`
-- ✅ Žádný warning `transitions.py: no commits` (znamenalo by, že pull --commit
-  v § 6.3 nezaznamenal nic)
+- ✅ `edpa_results.json` existuje; top-level `people[]`, každá osoba má
+  `total_derived`, `items[]`, `invariant_ok`, `capacity`
+- ✅ Frozen snapshot `.edpa/snapshots/PI-2026-1.1.json` (klíče
+  `snapshot_version`, `methodology`, `capacity_registry`, `derived_reports`,
+  `items[]`, `invariants.all_passed`, `frozen_at`)
+- ✅ `edpa-results.xlsx` v report adresáři (taby `Team Summary` + `Item Costs`)
+- ✅ Žádný `WARN: … Σ contributors[].cw …` (signalizoval by nenormalizovaný
+  contributors blok — viz fáze 6)
+- ✅ Per osobu z `people.yaml` s evidencí: `total_derived` > 0
 
-### 9.3 Engine `--mode simple` srovnání
-
-```bash
-python3 .claude/edpa/scripts/engine.py \
-  --edpa-root .edpa \
-  --iteration PI-2026-1.1 \
-  --mode simple \
-  --output /tmp/edpa_simple.json
-```
-
-**Pass:** `derived_hours` se liší od `gates` (gates kreditují prep work, simple
-jen Done). Pokud `simple == gates` → buď není dostatek transitions, nebo všechny
-transitions padly v rámci posledního Done.
-
-### 9.4 Invariants
+### 7.2 Invariants
 
 ```bash
 cd /Users/jurby/projects/edpa
 python3 -m pytest tests/test_invariants.py tests/test_gate_allocation.py -v
 ```
 
-**Pass:** všechny testy zelené, score formule, capacity invariant a ratio sums
-platí.
+**Pass:** všechny testy zelené — score formule, capacity invariant
+(Σ DerivedHours per osoba == její `capacity_per_iteration`) a ratio sums platí.
+
+```bash
+# Ad-hoc kontrola na reálném výstupu:
+python3 -c "
+import json
+r=json.load(open('$TARGET/.edpa/reports/iteration-PI-2026-1.1/edpa_results.json'))
+assert r['all_invariants_passed'], 'invariants failed'
+for p in r['people']:
+    print(f\"{p['id']:18} derived={p['total_derived']:6.1f}  cap={p['capacity']:5}  ok={p['invariant_ok']}\")
+"
+```
+
+### 7.3 Idempotence snapshotu
+
+```bash
+# Druhý běh nad identickými vstupy nesmí vyrobit nový _revN snapshot
+python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1 \
+  --output .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
+ls .edpa/snapshots/
+```
+
+**Pass:** stále jen `PI-2026-1.1.json` (případně refresh `frozen_at`), žádný
+`PI-2026-1.1_rev1.json` — payload hash je stabilní mimo timestampy.
 
 ---
 
-## Fáze 10 — `/edpa:reports`
+## Fáze 8 — `/edpa:reports`
 
-**Cíl:** ze `edpa_results.json` vygenerovat per-person timesheety, item-costs
-XLSX, snapshot.
+**Cíl:** ze `edpa_results.json` vygenerovat per-person timesheety + team rollup.
 
-### 10.1 Spuštění reports skill (přes Claude Code)
+### 8.1 Spuštění reports (přes Claude Code nebo CLI)
 
-V Claude Code napsat:
+V Claude Code:
 ```
 /edpa:reports PI-2026-1.1
 ```
 
-(Nebo manuálně dle `docs/RUNBOOK.md` § 4.)
+Nebo manuálně:
+```bash
+cd "$TARGET"
+python3 .edpa/engine/scripts/reports.py PI-2026-1.1 --edpa-root .edpa
+```
 
-### 10.2 Ověření výstupů
+### 8.2 Ověření výstupů
 
 ```bash
 ls -la .edpa/reports/iteration-PI-2026-1.1/
 # Musí obsahovat:
-#   timesheet-<person1>.md  (jeden na osobu z people.yaml s derived_hours > 0)
-#   timesheet-<person2>.md
-#   ...
-#   edpa-results.xlsx       (Team Summary + Item Costs tabs)
-#   edpa_results.json (z fáze 9)
+#   timesheet-<person_id>.md   (jeden na osobu s derived > 0)
+#   timesheet-team.md          (agregovaný team rollup)
+#   edpa-results.xlsx          (Team Summary + Item Costs, z fáze 7)
+#   edpa_results.json          (z fáze 7)
 
-ls -la .edpa/snapshots/
-# Musí obsahovat: PI-2026-1.1.json
+ls -la .edpa/snapshots/         # PI-2026-1.1.json (frozen)
 ```
 
 **Pass kritéria:**
-- ✅ Pro každou osobu: timesheet-<id>.md s breakdown
-  (item → role → CW → DerivedHours → Cost)
-- ✅ Per-osobu součet `DerivedHours` ≤ `capacity_per_iteration` (z `people.yaml`)
-- ✅ Suma všech `DerivedHours` v iteraci ≈ suma všech `cw * effort_units`
-  (capacity invariant)
-- ✅ Snapshot má `methodology_version`, `engine_mode`, `frozen_at`
+- ✅ Pro každou osobu s derived > 0: `timesheet-<id>.md` s breakdown
+  (item → CW → Score → Ratio → DerivedHours; role odvozená v display time)
+- ✅ Per-osobu řádek `Total: Xh / Yh capacity` (Σ DerivedHours ≤ `capacity`)
+- ✅ `timesheet-team.md` agreguje všechny osoby
+- ✅ Snapshot má `snapshot_version`, `methodology`, `frozen_at`
 
-### 10.3 edpa-results XLSX (two tabs)
+### 8.3 edpa-results XLSX (two tabs)
 
 ```bash
 python3 -c "
 import openpyxl
-wb = openpyxl.load_workbook('.edpa/reports/iteration-PI-2026-1.1/edpa-results.xlsx')
+wb = openpyxl.load_workbook('$TARGET/.edpa/reports/iteration-PI-2026-1.1/edpa-results.xlsx')
 assert wb.sheetnames == ['Team Summary', 'Item Costs'], wb.sheetnames
 ws = wb['Item Costs']
 for row in ws.iter_rows(values_only=True, max_row=10):
@@ -717,156 +551,198 @@ for row in ws.iter_rows(values_only=True, max_row=10):
 "
 ```
 
-**Pass:** sloupce `Item, Level, JS, Person, CW, Score, Ratio, Hours`,
-součet sloupce `Hours` per osobu odpovídá `capacity` z people.yaml +
-případnému iteration override. Sazby/cost EDPA dnes neprodukuje —
+**Pass:** taby `Team Summary` + `Item Costs`, sloupce `Item, Level, JS, Person,
+CW, Score, Ratio, Hours`; součet `Hours` per osobu odpovídá `capacity`
+z people.yaml + případnému iteration override. Sazby/cost EDPA dnes neprodukuje —
 náklady aplikuje separátní (privátní) cost registry mimo repo.
 
-### 10.4 PI summary (volitelné)
+### 8.4 PI summary (volitelné)
 
 ```bash
-# Pokud máš více iterací v PI-2026-1, lze vygenerovat PI-summary
-# (skill podporuje --pi)
+# Pokud máš více iterací v PI-2026-1, agreguj přes --pi:
+python3 .edpa/engine/scripts/reports.py --pi PI-2026-1 --edpa-root .edpa
+# → pi-summary-PI-2026-1.md
 ```
 
 ---
 
-## Fáze 11 — Calibration readiness
+## Fáze 9 — Calibration readiness
 
-**Cíl:** ověřit, že `edpa-autocalib` skill správně odmítne běh před prvním PI.
+**Cíl:** ověřit, že `edpa-autocalib` / `/edpa:calibrate` správně odmítne běh
+před prvním PI s dostatkem ground truth.
 
-### 11.1 Před prvním PI
+### 9.1 Před prvním PI
 
 ```bash
-python3 .claude/edpa/scripts/evaluate_cw.py --auto-calibrate
+python3 .edpa/engine/scripts/calibrate_signals.py --auto-calibrate
 ```
 
-**Pass:** skill vypíše warning: `Insufficient ground truth (< 20 records).
-Skip until first PI is closed and reviewed.` Žádný `heuristics.yaml` zápis.
+**Pass:** vypíše warning typu `Insufficient ground truth (< 20 records).
+Skip until first PI is closed and reviewed.` Žádný zápis do
+`cw_heuristics.yaml`.
 
-### 11.2 Po vytvoření ground truth
+### 9.2 Po vytvoření ground truth
 
 (Tento krok dělej až po skutečném PI s manuálním auditem.)
 
 ```bash
-# Vyplň .edpa/data/ground_truth.yaml — alespoň 20 records s
+# Vyplň ground-truth korpus — alespoň 20 records s
 # {item_id, person, role, manual_cw, auto_cw, source: pi_review}
-ls .edpa/data/ground_truth.yaml
+python3 .edpa/engine/scripts/calibrate_signals.py --auto-calibrate
 ```
 
-**Acceptance:** auto-calib loop najde alespoň 5% MAD reduction → `heuristics.yaml`
-přepsán s commit message `calibrate: MAD reduction X%`.
+**Acceptance:** auto-calib loop (Monte Carlo + coordinate descent na MAD)
+najde alespoň 5 % MAD reduction → `cw_heuristics.yaml` přepsán s commit message
+`calibrate: MAD reduction X%`.
 
 ---
 
-## Fáze 12 — 5-min smoke test
+## Fáze 10 — (Volitelně) GitHub contribution-sync workflow
 
-Po každém zásahu do source repo (změna engine/sync/scripts) běž tento set:
+**Cíl:** ověřit, že volitelný `--with-ci` workflow materializuje PR-thread
+evidenci (review/comment), která **neexistuje v git historii**. Local-first
+flow (fáze 1–9) ji nepotřebuje — primární atribuce běží přes post-commit hook.
+
+### 10.1 Instalace workflow
+
+```bash
+cd "$TARGET"
+python3 .edpa/engine/scripts/project_setup.py --with-ci
+# → zkopíruje .github/workflows/edpa-contribution-sync.yml
+[ -f .github/workflows/edpa-contribution-sync.yml ] && echo "CI workflow OK"
+```
+
+**Pass:** existuje **jen** `edpa-contribution-sync.yml` (jediný V2 GH workflow).
+Žádné `edpa-sync-*.yml`, `edpa-branch-check.yml` ani `edpa-iteration-close.yml`.
+
+### 10.2 Sekret a trigger
+
+```bash
+# Workflow běží v default merge-only módu: trigger pull_request: closed (merged==true).
+# Pro cross-repo / PAT materializaci nastav sekret EDPA_TOKEN v repo settings
+# (jinak používá GITHUB_TOKEN). Po merge PR spustí sync_pr_contributions.py,
+# který zapíše pr_reviewer + issue_comment signály do evidence[].
+gh secret set EDPA_TOKEN     # volitelně, jen pokud GITHUB_TOKEN nestačí
+```
+
+**Pass:** po merge PR (který referuje item) workflow proběhne a vytvoří commit
+`chore(ci-materialization): …` s PR-thread evidencí. Při uzavírání iterace
+lze **otevřené** PR doplnit lokálně:
+```bash
+python3 .edpa/engine/scripts/sync_pr_contributions.py --pr <N> --rebuild --skip-commit
+```
+
+### 10.3 Automatizovaný CI-materialization test
+
+```bash
+cd /Users/jurby/projects/edpa
+python3 -m pytest tests/test_e2e_v2_ci_materialization.py -v
+```
+
+**Pass:** testy materializace PR-thread evidence zelené.
+
+---
+
+## Fáze 11 — 5-min smoke test
+
+Po každém zásahu do source repo (změna engine/scripts) běž tento set:
 
 ```bash
 cd /Users/jurby/projects/edpa
 
-# 1. Unit + integration suite (cca 10s)
+# 1. Unit + integration suite (cca 10s, offline, local-first)
 python3 -m pytest tests/ -v -m "not e2e"
 
 # 2. Engine smoke
 python3 plugin/edpa/scripts/engine.py --status
 python3 plugin/edpa/scripts/engine.py --demo
 
-# 3. Sync smoke (proti reálnému GH sandboxu)
-python3 plugin/edpa/scripts/sync.py status
+# 3. Backlog smoke
+python3 plugin/edpa/scripts/backlog.py --help
 
 # 4. Board smoke
 python3 plugin/edpa/scripts/board.py --output /tmp/edpa-board.html
 test -s /tmp/edpa-board.html && echo "board OK"
 
 # 5. Hooks (validate_syntax na známém invalid YAML)
-echo "id: BAD: bad" | python3 plugin/edpa/scripts/validate_syntax.py /dev/stdin
+printf 'id: BAD: bad\n' | python3 plugin/edpa/scripts/validate_syntax.py - --kind yaml
 echo "exit code: $?"   # nenulový
 ```
 
-**Pass:** všech 5 kroků projde bez chyby.
+**Pass:** všech 5 kroků projde bez chyby (krok 5 vrátí nenulový exit u invalid YAML).
 
-### 12.1 Plně automatizovaný E2E (volitelné)
+### 11.1 Plně automatizovaný E2E (volitelné)
 
 ```bash
-EDPA_E2E_REPO=technomaton/edpa-e2e-test \
-  python3 -m pytest tests/test_e2e_sync.py -m e2e -v
+cd /Users/jurby/projects/edpa
+python3 -m pytest tests/test_e2e_v2_ci_materialization.py -m e2e -v
+# Plus end-to-end fixtures v tests/e2e_v2_full/ (lokální cyklus, bez GH).
 ```
 
-**Trvání:** 5–6 minut (real GH API). Maže issues a project ve sandboxu —
-nikdy neukazovat na repo s reálnými daty!
+**Trvání:** ~1–2 minuty. Local-first E2E nepotřebuje žádný sandbox repo
+ani destruktivní GH operace.
 
 ---
 
-## Fáze 13 — Kashealth deployment dry-run
+## Fáze 12 — Reálné nasazení dry-run
 
-**Cíl:** připravit a ověřit reálné nasazení do `kashealth.cz` repo, než tam
+**Cíl:** připravit a ověřit reálné nasazení do produkčního repo, než tam
 proteče první commit.
 
-### 13.1 Příprava
+### 12.1 Příprava
 
 ```bash
-# 1. V kashealth orgu vytvoř Issue Types (Initiative, Epic, Feature, Story)
-python3 plugin/edpa/scripts/issue_types.py setup --org kashealth
+cd <project-repo>
+
+# 1. Vendoring engine + seed configů + hooks
+python3 /path/to/.edpa/engine/scripts/project_setup.py --with-hooks --with-rules
+# (nebo: curl -fsSL https://edpa.technomaton.com/install.sh | sh)
 
 # 2. Naplň .edpa/config/people.yaml reálným týmem (4–6 lidí, role, FTE,
-#    capacity_per_iteration). Sazby (hourly_rate) NEDÁVAT do EDPA configu —
-#    drží privátní cost registry mimo repo.
+#    capacity_per_iteration, email, github). Sazby (hourly_rate) NEDÁVAT —
+#    drží privátní cost registry mimo repo. EMAIL je klíčový pro atribuci.
 $EDITOR .edpa/config/people.yaml
 
-# 3. Naplň .edpa/config/edpa.yaml: sync.github_org=kashealth, sync.github_repo=…
+# 3. Naplň .edpa/config/edpa.yaml: project.name (+ funding/organizations volitelně)
 $EDITOR .edpa/config/edpa.yaml
 ```
 
-### 13.2 Suchý setup
+### 12.2 Validace před prvním commitem
 
 ```bash
-python3 .claude/edpa/scripts/project_setup.py \
-  --org kashealth --repo <repo> \
-  --project-title "Kashealth-PI-2026-1" \
-  --dry-run
+python3 .edpa/engine/scripts/validate_syntax.py --strict .edpa/backlog/
+python3 .edpa/engine/scripts/backlog.py validate
+python3 .edpa/engine/scripts/validate_iterations.py
+python3 .edpa/engine/scripts/engine.py --status
 ```
 
-**Pass:** plán je rozumný, žádné API změny.
+**Pass:** vše projde, engine vidí `.edpa/` (chůze nahoru z CWD), žádné chyby
+schématu.
 
-### 13.3 Reálný setup
+### 12.3 První PI dry-run
 
-Až po explicitní user confirmation:
-
-```bash
-python3 .claude/edpa/scripts/project_setup.py \
-  --org kashealth --repo <repo> \
-  --project-title "Kashealth-PI-2026-1"
-```
-
-### 13.4 První PI parallel A/B
-
-První iteraci paralelně počítej `--mode simple` (audit conservative) i `--mode gates`:
+Až po explicitní user confirmation, založ první iteraci, naplň backlog přes
+`backlog.py add`, odpracuj na branchích s commity referujícími položky, pak:
 
 ```bash
-python3 .claude/edpa/scripts/engine.py --iteration PI-2026-1.1 --mode simple \
-  --output .edpa/reports/iteration-PI-2026-1.1/edpa_results_simple.json
-python3 .claude/edpa/scripts/engine.py --iteration PI-2026-1.1 --mode gates \
-  --output .edpa/reports/iteration-PI-2026-1.1/edpa_results_gates.json
+# Stage 1 (volitelně): capacity overrides (PTO/sick/overtime)
+python3 .edpa/engine/scripts/capacity_override.py PI-2026-1.1 --list
 
-# Diff per-osobu DerivedHours
-python3 -c "
-import json
-s=json.load(open('.edpa/reports/iteration-PI-2026-1.1/edpa_results_simple.json'))
-g=json.load(open('.edpa/reports/iteration-PI-2026-1.1/edpa_results_gates.json'))
-for p in s['per_person']:
-    sh=s['per_person'][p]['derived_hours']
-    gh_=g['per_person'][p]['derived_hours']
-    delta=gh_-sh
-    print(f'{p:20} simple={sh:6.1f}  gates={gh_:6.1f}  Δ={delta:+6.1f}')
-"
+# Stage 2b: POVINNÉ — normalizace evidence → contributors
+python3 .edpa/engine/scripts/detect_contributors.py --all-items
+
+# Stage 2c: engine + reports
+python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1 \
+  --output .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
+python3 .edpa/engine/scripts/reports.py PI-2026-1.1 --edpa-root .edpa
 ```
 
 **Acceptance:**
-- ✅ Žádná osoba nemá `gates` < `simple` (gates může jen přidat prep credit)
-- ✅ MAD vůči manuálnímu odhadu PM-a ≤ 15 % (1. PI tolerance)
-- ✅ Po review: rozhodnutí, jestli přepnout default na `gates`
+- ✅ Engine vrátí non-zero derived hours pro osoby s evidencí
+- ✅ Σ DerivedHours per osoba == `capacity_per_iteration` (invariant_ok)
+- ✅ Frozen snapshot v `.edpa/snapshots/`
+- ✅ MAD vůči manuálnímu odhadu PM-a ≤ 15 % (1. PI tolerance) → vstup pro
+  `/edpa:calibrate` po review
 
 ---
 
@@ -874,107 +750,121 @@ for p in s['per_person']:
 
 Plán je úspěšně provedený, pokud:
 
-| # | Kritérium                                                              | Status |
-|---|------------------------------------------------------------------------|--------|
-| 1 | `install.sh` proběhne čistě, žádná root pollution                     | ☐      |
-| 2 | `project_setup.py` vytvoří GH Project a perzistuje field_ids + issue_map | ☐      |
-| 3 | Hooks (`validate_on_save.sh`, pre-commit) blokují broken YAML         | ☐      |
-| 4 | `branch-check` workflow odmítne `junk-branch`, akceptuje `feature/S-*`| ☐      |
-| 5 | `sync push` vytvoří GH issue z lokálního itemu, nastaví fields, linkne parent | ☐      |
-| 6 | `sync pull --commit` přečte typed Status fields (Initiative/Epic/Feature/Story Status) | ☐      |
-| 7 | `transitions.py` najde gate transitions ze sync commitů              | ☐      |
-| 8 | `sync conflicts` detekuje souběžnou změnu lokál+GH                    | ☐      |
-| 9 | `sync setup-refresh` rekonstruuje `field_ids` a `issue_map.yaml`     | ☐      |
-| 10| `engine.py --mode gates` projde bez warning a vyrobí audit trail     | ☐      |
-| 11| Reports skill vyrobí timesheety + edpa-results.xlsx + snapshot       | ☐      |
-| 12| `pytest tests/` (118 testů) je 100% zelený                           | ☐      |
-| 13| `pytest -m e2e` proti sandboxu projde (5 testů v `test_e2e_sync.py`) | ☐      |
-| 14| Kashealth dry-run (§ 13) ukáže rozumný plán bez API zápisu           | ☐      |
+| # | Kritérium                                                                  | Status |
+|---|----------------------------------------------------------------------------|--------|
+| 1 | `install.sh` proběhne čistě, vendoruje `.edpa/engine/`, žádná root pollution | ☐    |
+| 2 | `project_setup.py` naseeduje `.edpa/config/*` + `id_counters.yaml` (žádný GH Project) | ☐ |
+| 3 | `backlog.py add` založí I/E/F/S `.md`, alokuje ID, auto-commitne `feat(<ID>):` | ☐ |
+| 4 | Schema validation (`validate_syntax.py`, `backlog validate`) blokuje broken YAML | ☐ |
+| 5 | commit-msg hook vyžaduje item ref / `no-ticket:`; post-commit emituje `evidence[]` | ☐ |
+| 6 | Evidence atribuovaná jen pro emaily ∈ `people.yaml`                        | ☐      |
+| 7 | `detect_contributors.py --all-items` normalizuje `evidence[]` → `contributors[]` | ☐ |
+| 8 | `engine.py` vyrobí `edpa_results.json` + frozen snapshot + XLSX bez warningu | ☐    |
+| 9 | Invariants: Σ DerivedHours per osoba == capacity (`invariant_ok`)          | ☐      |
+| 10| Reports skill vyrobí timesheety + `timesheet-team.md`                      | ☐      |
+| 11| `pytest tests/ -m "not e2e"` (~565 testů) je 100% zelený                   | ☐      |
+| 12| (Volitelně) `--with-ci` nainstaluje **jen** `edpa-contribution-sync.yml`   | ☐      |
+| 13| Reálné nasazení dry-run (§ 12) ukáže rozumný výpočet bez ručních zásahů    | ☐      |
 
 ---
 
 ## Příloha A — Klíčové soubory a co dělají
 
-| Soubor                                          | Role                                  |
-|-------------------------------------------------|---------------------------------------|
-| `install.sh`                                    | shell installer pluginu               |
-| `plugin/edpa/scripts/engine.py`                 | hlavní výpočet derived hours          |
-| `plugin/edpa/scripts/sync.py`                   | bidirectional sync GH ↔ .edpa/        |
-| `plugin/edpa/scripts/project_setup.py`          | bootstrap GitHub Project              |
-| `plugin/edpa/scripts/transitions.py`            | extract status changes z git logu     |
-| `plugin/edpa/scripts/validate_syntax.py`        | YAML schema validation                |
-| `plugin/edpa/scripts/issue_types.py`            | org-level Issue Type setup            |
-| `plugin/edpa/workflows/edpa-branch-check.yml`        | GH Action — branch naming             |
-| `plugin/edpa/workflows/edpa-sync-projects-to-git.yml`| GH Action — periodický pull           |
-| `plugin/edpa/workflows/edpa-sync-git-to-projects.yml`| GH Action — periodický push           |
-| `plugin/edpa/workflows/edpa-iteration-close.yml`     | GH Action — automatický close         |
-| `plugin/hooks/hooks.json`                       | Claude Code hooks (validate, commit info) |
-| `plugin/edpa/scripts/hooks/validate_on_save.sh` | post-Edit/Write validátor             |
-| `plugin/edpa/scripts/hooks/edpa_post_commit.sh` | post-Bash commit info                 |
-| `plugin/.claude-plugin/plugin.json`             | plugin manifest                       |
-| `tests/test_e2e_install.py`                     | automatizace § 1                      |
-| `tests/test_e2e_sync.py`                        | automatizace § 5–7 (opt-in `-m e2e`)  |
-| `tests/test_invariants.py`                      | automatizace § 9.4                    |
-| `tests/test_gate_allocation.py`                 | automatizace § 9.4 pro gates mode     |
-| `tests/test_hooks.py`                           | automatizace § 3                      |
+| Soubor                                              | Role                                       |
+|-----------------------------------------------------|--------------------------------------------|
+| `install.sh`                                        | shell installer — vendoruje engine do `.edpa/engine/` |
+| `.edpa/engine/scripts/engine.py`                    | hlavní výpočet derived hours + snapshot + XLSX |
+| `.edpa/engine/scripts/backlog.py`                   | git-native backlog CLI (`add`/`tree`/`status`/`wsjf`/`validate`) |
+| `.edpa/engine/scripts/project_setup.py`             | V2 bootstrap — vendoring + seed configů (local-only) |
+| `.edpa/engine/scripts/detect_contributors.py`       | normalizace `evidence[]` → `contributors[]` |
+| `.edpa/engine/scripts/local_evidence.py`            | post-commit emitter (`commit_author` signály) |
+| `.edpa/engine/scripts/sync_pr_contributions.py`     | (volitelně) materializace PR-thread evidence |
+| `.edpa/engine/scripts/reports.py`                   | per-person timesheety + team/PI summary    |
+| `.edpa/engine/scripts/board.py`                     | HTML Kanban snapshot                       |
+| `.edpa/engine/scripts/validate_syntax.py`           | YAML frontmatter schema validation         |
+| `.edpa/engine/scripts/calibrate_signals.py`         | auto-kalibrace CW vah (Monte Carlo + coord descent) |
+| `.edpa/engine/scripts/hooks/commit-msg-ticket-attached` | commit-msg hook — vyžaduje item ref / escape |
+| `.edpa/engine/scripts/hooks/post-commit-evidence`   | post-commit hook — emituje evidence        |
+| `.edpa/engine/scripts/hooks/pre-commit`             | pre-commit hook — schema + ID safety       |
+| `plugin/edpa/templates/github-workflows/edpa-contribution-sync.yml` | (volitelně) jediný V2 GH Action |
+| `plugin/hooks/hooks.json`                           | Claude Code hooks (validate, commit info)  |
+| `plugin/.claude-plugin/plugin.json`                 | plugin manifest (single source of truth verze) |
+| `tests/test_e2e_install.py`                         | automatizace § 1                           |
+| `tests/test_project_setup_vendor.py`                | automatizace vendoring (§ 1–2)             |
+| `tests/test_backlog_add.py`                         | automatizace § 3                           |
+| `tests/test_local_evidence.py`                      | automatizace § 4 (evidence hook)           |
+| `tests/test_invariants.py`                          | automatizace § 7.2                         |
+| `tests/test_gate_allocation.py`                     | automatizace § 7.2 (alokace)               |
+| `tests/test_e2e_v2_ci_materialization.py`           | automatizace § 10 (opt-in `-m e2e`)        |
+| `tests/e2e_v2_full/`                                | end-to-end local-first fixtures            |
 
 ---
 
 ## Příloha B — Známá omezení a workaround tipy
 
-1. **Gates mode pod-přiděluje bez sync commitů.**
-   `transitions.py` čte jen status změny zaznamenané v git logu se zprávou
-   rozpoznanou `transitions.py`. Manuální `yq -i .status=...` bez commitu
-   nebo s nestandardní commit message nebude započítán. **Workaround:**
-   vždy používej `sync pull --commit` nebo manuální commit s message
-   `sync: ... -> ...`.
+1. **Engine čte `contributors[]`, ne `evidence[]`.** Pokud vynecháš Stage 2b
+   (`detect_contributors.py --all-items`), engine vidí prázdné `contributors[]`
+   a vrátí **0 h derived** pro každou položku, která přišla přes PR/commit —
+   bez chyby, jen tichá nula. **Workaround:** vždy spusť
+   `detect_contributors.py --all-items` před enginem.
 
-2. **Statický seznam contributorů.** Engine používá jeden contributor list
-   per parent item pro VŠECHNY gates. Highly-specialized role (Architekt
-   jen u LBC) → over-attribution. **Workaround:** rekalibrace heuristik nebo
-   úprava contributor listu v daném itemu.
+2. **Evidence jen pro emaily v `people.yaml`.** Post-commit hook atribuuje
+   `commit_author` jen když commit email ∈ `people.yaml[].email`. Cizí emaily
+   se nezapočítají. **Workaround:** udržuj `email:` u každé osoby aktuální;
+   pro multi-contract lidi viz multi-role sekce v `people.yaml`.
 
-3. **`field_ids` nelze založit přes UI** — pokud setup.py selhal mezi krokem
-   2 a 7, projekt existuje ale fields chybí. **Recovery:**
-   - smaž project v GH UI
-   - vyčisti `.edpa/config/edpa.yaml` (sekce `sync.field_ids`, `option_ids`)
-   - znovu `project_setup.py`
+3. **Datové okno iterace musí pokrýt commity.** Engine váží evidenci podle git
+   timestampů uvnitř `start_date`/`end_date` iterace. Commity mimo okno se
+   nezapočítají. **Workaround:** ověř `validate_iterations.py` a okno před enginem.
 
-4. **Sandbox repo je destruktivní.** `tests/test_e2e_sync.py` maže issues a
-   project v `EDPA_E2E_REPO` mezi runy. Nikdy nepoukazuj na produkční repo!
+4. **Engine resolvuje `.edpa/` chůzí nahoru z CWD** (nebo přes `EDPA_ROOT` /
+   `--edpa-root`). Spouštěj z rootu projektu, jinak `.edpa/ not found`.
 
-5. **Schema strictness vs. legacy projects.** Nové itemy musí mít všechny
-   povinné fieldy. Migrace ze starší struktury → ručně doplnit. Viz
-   `docs/migration-v2.md`.
+5. **Otevřené PR při close.** `edpa-contribution-sync.yml` v default módu
+   commitne až na `pull_request: closed`. Otevřené PR doplň před enginem:
+   `sync_pr_contributions.py --pr <N> --rebuild --skip-commit`.
+
+6. **Schema strictness.** Nové položky musí mít validní YAML frontmatter
+   (povinné fieldy). Legacy V1 `.yaml` backlog migruj jednorázově
+   `migrate_backlog_yaml_to_md.py`; V1→V2 celkově `migrate_v1_to_v2.py`.
 
 ---
 
 ## Příloha C — Rychlé reference příkazy
 
 ```bash
-# Instalace
+# Instalace (vendoruje engine do .edpa/engine/)
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
 
-# Setup
-python3 .claude/edpa/scripts/project_setup.py --org X --repo Y --project-title "..."
+# Setup (local-only: vendoring + seed configů; --with-ci/--with-hooks/--with-rules)
+python3 .edpa/engine/scripts/project_setup.py --with-hooks --with-rules
 
-# Sync
-python3 .claude/edpa/scripts/sync.py status
-python3 .claude/edpa/scripts/sync.py diff
-python3 .claude/edpa/scripts/sync.py push
-python3 .claude/edpa/scripts/sync.py pull --commit
-python3 .claude/edpa/scripts/sync.py conflicts
-python3 .claude/edpa/scripts/sync.py setup-refresh
+# Backlog (local-first, auto-commit feat(<ID>):)
+python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 --title "..." --js 3 --iteration PI-2026-1.1
+python3 .edpa/engine/scripts/backlog.py tree
+python3 .edpa/engine/scripts/backlog.py status
+python3 .edpa/engine/scripts/backlog.py wsjf
+python3 .edpa/engine/scripts/backlog.py validate
 
-# Engine
-python3 .claude/edpa/scripts/engine.py --status
-python3 .claude/edpa/scripts/engine.py --demo
-python3 .claude/edpa/scripts/engine.py --iteration PI-... --mode gates --output ...
+# Evidence → contributors (POVINNÉ před enginem)
+python3 .edpa/engine/scripts/detect_contributors.py --all-items
+
+# Engine (jedna výpočtová cesta; píše JSON + snapshot + XLSX)
+python3 .edpa/engine/scripts/engine.py --status
+python3 .edpa/engine/scripts/engine.py --demo
+python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1 --output .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
+
+# Reports
+python3 .edpa/engine/scripts/reports.py PI-2026-1.1 --edpa-root .edpa
+python3 .edpa/engine/scripts/reports.py --pi PI-2026-1 --edpa-root .edpa
 
 # Board
-python3 .claude/edpa/scripts/board.py --open
+python3 .edpa/engine/scripts/board.py --open
+
+# Calibrate
+python3 .edpa/engine/scripts/calibrate_signals.py --auto-calibrate
 
 # Tests
-python3 -m pytest tests/                       # offline, 118 testů
-EDPA_E2E_REPO=... python3 -m pytest tests/test_e2e_sync.py -m e2e -v   # online
+python3 -m pytest tests/ -m "not e2e"                                  # offline, ~565 testů
+python3 -m pytest tests/test_e2e_v2_ci_materialization.py -m e2e -v    # opt-in CI materialization
 ```
