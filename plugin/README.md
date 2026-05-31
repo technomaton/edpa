@@ -45,7 +45,7 @@ pip3 install -r .claude/requirements.txt
 python3 .claude/edpa/scripts/preflight.py --org <your-org>
 ```
 
-Then either invoke skills manually (Cursor/Codex pick them up from `.claude/skills/`) or run `python3 .claude/edpa/scripts/project_setup.py` to provision GitHub Projects + workflows directly.
+Then either invoke skills manually (Cursor/Codex pick them up from `.claude/skills/`) or run `python3 .edpa/engine/scripts/project_setup.py --with-ci --with-hooks --with-rules` to provision the local `.edpa/` governance (config, id_counters, CI workflow, git hooks) directly.
 
 ## Structure
 
@@ -191,8 +191,8 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 └── edpa/                             # Python engine, schemas, templates, workflows
 
 .edpa/                                # Project data (created by install.sh / /edpa:setup)
-├── config/                           # people.yaml, heuristics.yaml, edpa.yaml
-├── backlog/                          # Work items YAML per level (initiatives/, epics/, features/, stories/)
+├── config/                           # people.yaml, cw_heuristics.yaml, edpa.yaml, id_counters.yaml
+├── backlog/                          # Work items (.md frontmatter) per level (initiatives/, epics/, features/, stories/, defects/, …)
 ├── iterations/                       # Iteration & PI definitions
 ├── reports/                          # Per-iteration timesheets + edpa_results.json
 ├── snapshots/                        # Frozen iteration snapshots
