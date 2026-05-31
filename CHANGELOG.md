@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.1.8 — 2026-05-31 — Fresh-install onboarding fixes (engine vendoring on /edpa:setup)
+## 2.1.8 — 2026-05-31 — Fresh-install onboarding fixes (engine vendoring on /edpa:setup) + V1→V2 docs/website sweep
 
 Three fresh-install friction points on the Claude-Code-only path (install the
 plugin, run `/edpa:setup` on a bare repo), found via a new deterministic E2E
@@ -27,6 +27,21 @@ version (was frozen at the template's `EDPA 1.22.1`).
 ### Tests
 - New `tests/onboarding/` harness (pexpect + tmux) + `test_project_setup_vendor.py`
   + `test_install_sh_hygiene.py`. Full suite 553 → 564 (+11); 0 failures.
+
+### docs: V1→V2 sweep of user-facing docs + website (PR #52)
+Swept the documentation and marketing site of the removed V1 GitHub-Project flow
+(`project_setup.py --org/--repo/--project-title`, org Issue Types, `project_views.py`,
+bidirectional `sync.py`, `issue_map.yaml`, `.claude/edpa/` paths, `project.yaml`/
+`heuristics.yaml`, `.yaml` backlog). Everything now reads V2 local-first: `/edpa:setup`
+vendors the engine, items are local `.edpa/backlog/**/*.md` via `backlog.py add`, the
+only optional GitHub integration is the `--with-ci` contribution-sync workflow, and the
+calibration loop is `calibrate_signals.py` (Monte Carlo). Covers **31 files** — repo docs
+(`RUNBOOK`, `playbook`, `E2E-TEST-PLAN`, `E2E-SKILLS-TEST-PLAN`, `github-setup`,
+`edpa-token-setup`, `kashealth-pilot/*`, `methodology`, `auto-calibration`, `mcp`,
+`org-lookup`) + the Astro website (playbook/methodology/guide/setup CZ+EN, tutorial, docs
+pages, landing + pitch decks reframed to "EDPA needs only git, GitHub optional").
+`astro build` green (28 pages). Historical design records (`docs/v2/*`, `docs/proposals/*`)
+left as-is.
 
 ## 2.1.7 — 2026-05-31 — E2E findings: cross-layer fixes + /contribute @id + /edpa:capacity
 
