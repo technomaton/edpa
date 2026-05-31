@@ -76,11 +76,11 @@ plugin/
     │   ├── mcp_server.py            # MCP server for /edpa:status, /edpa:backlog, /edpa:iterations, /edpa:flow_metrics
     │   ├── calibrate_signals.py     # CW signal-weights calibrator (Monte Carlo + coordinate descent)
     │   ├── backlog.py               # Git-native backlog CLI
-    │   ├── sync.py                  # GitHub Projects ↔ Git bidirectional sync (optional UI)
-    │   ├── sync_collaborators.py    # Collaborator reconciliation (drives /edpa:sync-people)
-    │   ├── project_setup.py         # GitHub Project initialization (Stage 0 preflight + provisioning)
-    │   ├── project_views.py + create_project_views.py
-    │   ├── issue_types.py           # GitHub Issue Types management
+    │   ├── detect_contributors.py   # evidence[] → contributors[] (CW shares); /contribute resolution
+    │   ├── local_evidence.py        # post-commit: commit_author + /contribute signals → evidence[]
+    │   ├── sync_pr_contributions.py # CI: PR review/comment signals (edpa-contribution-sync)
+    │   ├── capacity_override.py     # per-iteration capacity overrides (/edpa:capacity)
+    │   ├── project_setup.py         # provision .edpa/ governance (config, id_counters, --with-ci/hooks/rules)
     │   ├── traceability.py          # Parent-chain validation
     │   ├── pi_close.py + velocity.py + transitions.py
     │   └── hooks/                   # Shell hook scripts referenced by hooks.json
@@ -92,10 +92,11 @@ plugin/
     ├── schemas/
     │   └── edpa_commit_info.schema.json
     ├── templates/
-    │   ├── people.yaml.tmpl         # → .edpa/config/people.yaml (FTE, capacity, github logins)
-    │   ├── cw_heuristics.yaml.tmpl  # → .edpa/config/heuristics.yaml
-    │   └── project.yaml.tmpl        # → .edpa/config/edpa.yaml
-    └── workflows/                   # 11 GitHub Actions, copied to .github/workflows/ by /edpa:setup
+    │   ├── people.yaml.tmpl         # → .edpa/config/people.yaml (FTE, capacity_per_iteration, github)
+    │   ├── edpa.yaml.tmpl           # → .edpa/config/edpa.yaml (project, cadence, naming)
+    │   ├── cw_heuristics.yaml.tmpl  # → .edpa/config/cw_heuristics.yaml (signal + gate weights)
+    │   └── github-workflows/        # edpa-contribution-sync.yml (installed by --with-ci) + edpa-collision-check.yml
+    └── workflows/                   # V1 GH-Projects-era Actions (vestigial); V2 install ships only templates/github-workflows/ above
         ├── edpa-branch-check.yml          # PR branch naming enforcement
         ├── edpa-iteration-close.yml       # Iteration close automation
         ├── edpa-pi-close.yml              # PI close + report generation
@@ -111,19 +112,21 @@ plugin/
 
 ## Skills + commands at a glance
 
-V2.1 is **local-first**: `edpa:engine` runs against `.edpa/backlog/` + `git log`
-alone. Skills marked _(optional GH)_ activate GitHub Projects integration —
-useful for PM/BO board view but not required for derived-hours calculation.
+V2.1 is **local-first**: everything runs against `.edpa/backlog/` + `git log`.
+PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
+`edpa-contribution-sync` GitHub Action; nothing requires GitHub Projects.
 
-| Skill (slug) | Slash command | What it does |
+| Skill / command | Invocation | What it does |
 |---|---|---|
-| `edpa:setup` | `/edpa setup` | _(optional GH)_ Provision GitHub Projects, custom fields, branch-check, copy CI workflows |
-| `edpa:engine` | `/edpa close-iteration` | Compute hours from local git evidence + validate invariants |
-| `edpa:reports` | `/edpa reports` | Generate per-person timesheets, snapshots, Excel exports |
-| `edpa:autocalib` | `/edpa calibrate` | Auto-calibrate CW heuristics (Monte Carlo + coordinate descent) |
-| `edpa:sync` | `/edpa sync` | _(optional GH)_ Bidirectional GitHub Projects ↔ `.edpa/backlog/` sync |
-| `edpa:sync-people` | _(no slash command)_ | _(optional GH)_ Reconcile `people.yaml` vs GitHub collaborators |
-| _(no skill)_ | `/edpa board` | Generate HTML Kanban snapshot from local backlog |
+| `edpa:setup` | `/edpa:setup` | Provision `.edpa/` governance (engine, config, id_counters, hooks, CI) |
+| `edpa:add` | `/edpa:add` | Create a backlog item (local-first; ID from id_counters) |
+| `edpa:engine` | `/edpa:engine` | Compute hours from local git evidence + validate invariants |
+| `edpa:reports` | `/edpa:reports` | Per-person timesheets, per-item cost, snapshots, Excel |
+| `edpa:autocalib` | `/edpa:autocalib` | Auto-calibrate CW heuristics (Monte Carlo + coordinate descent) |
+| `edpa:server` | `/edpa:server` | Optional PI-planning HTTP server (experimental) |
+| `/edpa:close-iteration` | command | Capacity prep + engine + reports for an iteration |
+| `/edpa:capacity` | command | Per-iteration per-person capacity overrides (PTO, overtime) |
+| `/edpa:board` | command | HTML Kanban snapshot from local backlog |
 
 ## Multi-developer setup — ID collision handling
 
