@@ -45,7 +45,7 @@ const S=[
 <div class="sc a" style="text-align:center;padding:12px"><div class="sc-t">Tooling</div><div style="font-size:12px;color:var(--ac2)">Teams + GitHub</div></div>
 <div class="sc c" style="text-align:center;padding:12px"><div class="sc-t">Metodika</div><div style="font-size:12px;color:var(--cy)">EDPA v${VERSION}</div></div>
 <div class="sc g" style="text-align:center;padding:12px"><div class="sc-t">Skills</div><div style="font-size:12px;color:var(--gn)">4 composable</div></div>
-<div class="sc y" style="text-align:center;padding:12px"><div class="sc-t">Template</div><div style="font-size:12px;color:var(--yl)">GitHub repo</div></div>
+<div class="sc y" style="text-align:center;padding:12px"><div class="sc-t">Engine</div><div style="font-size:12px;color:var(--yl)">.edpa/ (local-first)</div></div>
 </div>
 <div class="fade d5" style="margin-top:20px;font-size:12px;color:var(--t3)">Jaroslav Urbanek &middot; Lead Architect &middot; Březen 2026<br>CVUT FBMI + Partner s.r.o.</div>
 </div>`,
@@ -53,13 +53,13 @@ const S=[
 // 1: WHAT WE DELIVER
 `<div class="s-tag fade">Obsah prezentace</div>
 <div class="s-h1 fade d1">Co dnes předkládáme</div>
-<div class="s-sub fade d2">Kompletní governance řešení pro projekt — od toolingu přes metodiku po automatizaci. Vše v jednom GitHub repo template.</div>
+<div class="s-sub fade d2">Kompletní governance řešení pro projekt — od toolingu přes metodiku po automatizaci. Vše lokálně v gitu, žádný GitHub Project.</div>
 <div class="sg sg5 fade d3">
 <div class="sc a" style="min-height:140px"><div class="sc-i">&#x1F4AC;</div><div class="sc-t">1. Tooling</div><div class="sc-l">Teams + GitHub<br>~1 520 Kč/měsíc<br>15 lidí, 0 Jira</div></div>
 <div class="sc c" style="min-height:140px"><div class="sc-i">&#x1F511;</div><div class="sc-t">2. Identita</div><div class="sc-l">kashealth.cz<br>5 členů + guests<br>Hybridní model</div></div>
 <div class="sc g" style="min-height:140px"><div class="sc-i">&#x26A1;</div><div class="sc-t">3. EDPA</div><div class="sc-l">Bez timesheetů<br>Dual-view CW<br>BankID audit</div></div>
 <div class="sc y" style="min-height:140px"><div class="sc-i">&#x1F916;</div><div class="sc-t">4. AI Skills</div><div class="sc-l">4 composable<br>26+ platforem<br>Auto-kalibrace</div></div>
-<div class="sc o" style="min-height:140px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">5. Template</div><div class="sc-l">GitHub repo<br>30 souborů, 24KB<br>Okamžitě použitelné</div></div>
+<div class="sc o" style="min-height:140px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">5. Engine</div><div class="sc-l">Vendored .edpa/engine/<br>Lokální, v gitu<br>Okamžitě použitelné</div></div>
 </div>`,
 
 // 2: PROBLEM
@@ -90,8 +90,8 @@ const S=[
 <div style="margin-top:8px;font-size:11px;color:var(--t3)">~1 520 Kč/měs &middot; 100 Kč/osobu</div>
 </div>
 <div class="col">
-<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>GitHub nahrazuje:</b><br>Jira &#x2192; Issues + Projects<br>Confluence &#x2192; Wiki + Pages<br>Tempo &#x2192; EDPA (odvozené hodiny)<br>Roadmaps &#x2192; Projects Roadmap<br>Automation &#x2192; GitHub Actions</div></div>
-<div class="s-note"><b>0 Jira, 0 Confluence.</b> GitHub-only governance s sub-issues (8 úrovní), issue types, custom fields.</div>
+<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>EDPA + GitHub nahrazují:</b><br>Jira &#x2192; <code>.edpa/backlog/</code> (YAML v gitu)<br>Confluence &#x2192; Wiki + Pages<br>Tempo &#x2192; EDPA (odvozené hodiny)<br>Roadmaps &#x2192; <code>/edpa:board</code><br>Automation &#x2192; git hooks + volitelný CI</div></div>
+<div class="s-note"><b>0 Jira, 0 Confluence.</b> Backlog je lokální <code>.edpa/backlog/</code> v gitu — jediný zdroj pravdy. GitHub není potřeba.</div>
 </div></div>`,
 
 // 4: IDENTITY
@@ -134,7 +134,7 @@ Vždy. Bez výjimky.</div>
 </div>
 <div class="col">
 <div class="sc g" style="margin-bottom:8px"><div class="sc-l"><b>Nikdo neloguje hodiny.</b> Výkaz je vedlejší produkt dodávky.</div></div>
-<div class="sc c" style="margin-bottom:8px"><div class="sc-l"><b>Evidence z GitHubu.</b> Commity, PR, reviews, comments &#x2192; auto-detekce.</div></div>
+<div class="sc c" style="margin-bottom:8px"><div class="sc-l"><b>Evidence z lokálního gitu.</b> Commity &#x2192; auto-detekce. PR signály volitelně přes CI.</div></div>
 <div class="sc a"><div class="sc-l"><b>BankID podpis.</b> Frozen snapshot + BankID = právně silnější než papír.</div></div>
 </div></div>`,
 
@@ -159,15 +159,15 @@ Garance: &#x2211; podilu = 100%</div>
 `<div class="s-tag fade">Architektura</div>
 <div class="s-h1 fade d1">Tři oddělené vrstvy</div>
 <div class="sg sg3 fade d2" style="margin-top:16px">
-<div class="sc a" style="min-height:170px"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">Operational Metadata</div><div class="sc-v" style="color:var(--ac2);font-size:14px">GitHub Issues + Projects</div><div class="sc-l" style="margin-top:6px">Živá delivery data &middot; Hierarchie &middot; Status &middot; Job Size &middot; WSJF</div></div>
-<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">Capacity Registry</div><div class="sc-v" style="color:var(--cy);font-size:14px">YAML config v repo</div><div class="sc-l" style="margin-top:6px">Kapacita &middot; Role &middot; FTE &middot; Potvrzeno pri Iteration Planning</div></div>
+<div class="sc a" style="min-height:170px"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">Operational Metadata</div><div class="sc-v" style="color:var(--ac2);font-size:14px">.edpa/backlog/ (YAML v gitu)</div><div class="sc-l" style="margin-top:6px">Živá delivery data &middot; Hierarchie &middot; Status &middot; Job Size &middot; WSJF</div></div>
+<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">Capacity Registry</div><div class="sc-v" style="color:var(--cy);font-size:14px">.edpa/config/ (YAML v repo)</div><div class="sc-l" style="margin-top:6px">Kapacita &middot; Role &middot; FTE &middot; Potvrzeno pri Iteration Planning</div></div>
 <div class="sc g" style="min-height:170px"><div class="sc-i">&#x1F512;</div><div class="sc-t">Evidence &amp; Reporting</div><div class="sc-v" style="color:var(--gn);font-size:14px">/snapshots &middot; /reports &middot; /signed</div><div class="sc-l" style="margin-top:6px">Frozen snapshoty &middot; Výkazy &middot; BankID &middot; Immutable</div></div>
 </div>
-<div class="fade d3" style="margin-top:12px;text-align:center;font-size:12px;color:var(--t3)">GitHub <b>není</b> source of truth pro: kapacitu, FTE, derived hours, podpisy &#x2192; ty žijí v evidence vrstvě.</div>`,
+<div class="fade d3" style="margin-top:12px;text-align:center;font-size:12px;color:var(--t3)">Vše žije v gitu &#x2192; <code>.edpa/</code> je jediný zdroj pravdy pro backlog, kapacitu, FTE, derived hours i podpisy. GitHub volitelný.</div>`,
 
 // 8: HIERARCHY
 `<div class="s-tag fade">Hierarchie</div>
-<div class="s-h1 fade d1">SAFe-like hierarchie v GitHubu</div>
+<div class="s-h1 fade d1">SAFe-like hierarchie v .edpa/backlog/</div>
 <div class="cols fade d2">
 <div class="col">
 <div class="fm" style="font-size:13px;line-height:2;border-left-color:var(--ac)"><span style="color:var(--pk)">Initiative</span> (celý projekt)
@@ -180,15 +180,15 @@ Garance: &#x2211; podilu = 100%</div>
 <div class="s-p">Naming: <code>PI-2026-1.3</code> = 3. iterace v 1. PI roku 2026.</div>
 </div>
 <div class="col">
-<table><thead><tr><th>Uroven</th><th>Job Size</th><th>GitHub</th></tr></thead><tbody>
-<tr><td style="color:var(--pk)"><b>Initiative</b></td><td>1&ndash;100</td><td>Top-level issue</td></tr>
-<tr><td style="color:var(--ac2)"><b>Epic</b></td><td>1&ndash;100</td><td>Sub-issue</td></tr>
-<tr><td style="color:var(--cy)"><b>Feature</b></td><td>1&ndash;100</td><td>Sub-issue</td></tr>
-<tr><td style="color:var(--or)"><b>Story</b></td><td>1&ndash;100</td><td>Sub-issue</td></tr>
-<tr><td style="color:var(--rd)"><b>Defect</b></td><td>1&ndash;100</td><td>Sub-issue</td></tr>
+<table><thead><tr><th>Uroven</th><th>Job Size</th><th>Soubor</th></tr></thead><tbody>
+<tr><td style="color:var(--pk)"><b>Initiative</b></td><td>1&ndash;100</td><td>initiatives/I-XXX.yaml</td></tr>
+<tr><td style="color:var(--ac2)"><b>Epic</b></td><td>1&ndash;100</td><td>epics/E-XXX.yaml</td></tr>
+<tr><td style="color:var(--cy)"><b>Feature</b></td><td>1&ndash;100</td><td>features/F-XXX.yaml</td></tr>
+<tr><td style="color:var(--or)"><b>Story</b></td><td>1&ndash;100</td><td>stories/S-XXX.yaml</td></tr>
+<tr><td style="color:var(--rd)"><b>Defect</b></td><td>1&ndash;100</td><td>defects/D-XXX.yaml</td></tr>
 <tr><td style="color:var(--yl)"><b>Task</b></td><td>&#x2014;</td><td>Checklist</td></tr>
 </tbody></table>
-<div class="s-note" style="margin-top:8px">GitHub sub-issues (GA 04/2025): 8 úrovní, issue types, custom fields.</div>
+<div class="s-note" style="margin-top:8px">YAML soubory v gitu: <code>parent</code> reference tvoří hierarchii, validuje MCP <code>edpa_item_create</code>.</div>
 </div></div>`,
 
 // 9: EVIDENCE
@@ -218,7 +218,7 @@ Garance: &#x2211; podilu = 100%</div>
 <div class="s-h1 fade d1">4 composable EDPA skills</div>
 <div class="s-sub fade d2">Claude Code skills = automatizace governance. Agent v terminálu rozumí EDPA a provádí ho za vás.</div>
 <div class="sg sg2 fade d3">
-<div class="sc a" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F3D7;&#xFE0F;</div><div><div style="font-weight:600">edpa-setup</div><div class="sc-l">~450 tokenu &middot; "Set up governance for my project"<br>GitHub Projects, capacity registry, CW heuristics, branch naming</div></div></div>
+<div class="sc a" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F3D7;&#xFE0F;</div><div><div style="font-weight:600">edpa-setup</div><div class="sc-l">~450 tokenu &middot; "Set up governance for my project"<br>Vendoruje engine do <code>.edpa/engine/</code>, seeduje <code>.edpa/config/</code>, instaluje git hooks</div></div></div>
 <div class="sc c" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x26A1;</div><div><div style="font-weight:600">edpa-engine</div><div class="sc-l">~760 tokenu &middot; "Close iteration PI-2026-1.3"<br>Evidence gathering, EDPA výpočet, invariant validace</div></div></div>
 <div class="sc g" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F4C4;</div><div><div style="font-weight:600">edpa-reports</div><div class="sc-l">~505 tokenu &middot; "Generate reports"<br>MD/JSON/XLSX výkazy, frozen snapshots, per-item alokace</div></div></div>
 <div class="sc o" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F52C;</div><div><div style="font-weight:600">edpa-autocalib</div><div class="sc-l">~625 tokenu &middot; "Calibrate CW heuristics"<br>Karpathy autoresearch: 50 experimentů overnight, MAD optimalizace</div></div></div>
@@ -230,51 +230,48 @@ Garance: &#x2211; podilu = 100%</div>
 <div class="s-h1 fade d1">Denní workflow s EDPA skills</div>
 <div class="sg fade d2" style="gap:8px">
 <div class="sc g" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:30px">1</div><div><div style="font-weight:500">Tým pracuje normálně</div><div class="sc-l">Kódují na <code>feature/S-200-omop-parser</code> branchích. PR, review, merge. Nic navíc.</div></div></div>
-<div class="sc c" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:30px">2</div><div><div style="font-weight:500">CI sbírá evidence automaticky</div><div class="sc-l">Branch naming check &#x2192; evidence detection &#x2192; contributor metadata na issues. Žádný ruční zásah.</div></div></div>
-<div class="sc a" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:30px">3</div><div><div style="font-weight:500">Konec iterace: "Close iteration PI-2026-1.3"</div><div class="sc-l">Claude Code spusti <b>edpa-engine</b> &#x2192; stáhne evidence &#x2192; spočítá Score &#x2192; odvodí hodiny &#x2192; zvaliduje invarianty.</div></div></div>
+<div class="sc c" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:30px">2</div><div><div style="font-weight:500">Git hooks hlídají evidence lokálně</div><div class="sc-l">Pre-commit hook ověří <code>S-/F-/E-XXX</code> referenci &#x2192; evidence žije v git historii. Žádný ruční zásah.</div></div></div>
+<div class="sc a" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:30px">3</div><div><div style="font-weight:500">Konec iterace: "Close iteration PI-2026-1.3"</div><div class="sc-l">Claude Code spusti <b>edpa-engine</b> &#x2192; načte lokální git evidence &#x2192; spočítá Score &#x2192; odvodí hodiny &#x2192; zvaliduje invarianty.</div></div></div>
 <div class="sc y" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:30px">4</div><div><div style="font-weight:500">"Generate reports"</div><div class="sc-l"><b>edpa-reports</b> &#x2192; MD/JSON výkazy per osoba + per-item alokace + frozen snapshot + Excel. 30 sekund.</div></div></div>
 <div class="sc o" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--or);width:30px">5</div><div><div style="font-weight:500">BankID podpis</div><div class="sc-l">Člen zkontroluje výkaz &#x2192; podepíše BankID &#x2192; uloženo v <code>/signed/</code>. Právně silnější než papír.</div></div></div>
 </div>`,
 
 // 12: REPO TEMPLATE
-`<div class="s-tag fade">GitHub Template</div>
-<div class="s-h1 fade d1">Plugin + GitHub Actions, okamžitě použitelné</div>
+`<div class="s-tag fade">Vendored engine</div>
+<div class="s-h1 fade d1">Vše lokálně v .edpa/, okamžitě použitelné</div>
 <div class="cols fade d2">
 <div class="col">
-<div class="fm" style="font-size:10px;line-height:1.7;border-left-color:var(--ac)"><b>.claude/edpa/</b> (instalováno z plugin/)
-&#x251C;&#x2500;&#x2500; commands/edpa/ (6 slash commands)
-&#x2502;    &#x2514;&#x2500;&#x2500; setup, sync, calibrate, board, reports, close-iteration
-&#x251C;&#x2500;&#x2500; skills/ (6 SKILL.md)
-&#x2502;    &#x2514;&#x2500;&#x2500; edpa-setup, -engine, -reports, -autocalib, -sync, -sync-people
-&#x251C;&#x2500;&#x2500; edpa/scripts/ (engine.py, sync.py, detect_contributors.py, &hellip;)
-&#x251C;&#x2500;&#x2500; edpa/templates/ (cw_heuristics, project, people, &hellip;)
-&#x251C;&#x2500;&#x2500; edpa/schemas/, hooks/
-&#x2514;&#x2500;&#x2500; .claude-plugin/plugin.json
+<div class="fm" style="font-size:10px;line-height:1.7;border-left-color:var(--ac)"><b>.edpa/engine/</b> (vendoruje /edpa:setup)
+&#x251C;&#x2500;&#x2500; scripts/ (31 Python modulu)
+&#x2502;    &#x251C;&#x2500;&#x2500; engine.py, mcp_server.py, backlog.py
+&#x2502;    &#x251C;&#x2500;&#x2500; local_evidence.py, detect_contributors.py
+&#x2502;    &#x251C;&#x2500;&#x2500; reports.py, board.py, calibrate_signals.py
+&#x2502;    &#x2514;&#x2500;&#x2500; hooks/ (pre-commit, post-commit, validate)
+&#x251C;&#x2500;&#x2500; templates/ (cw_heuristics, edpa, people)
+&#x2514;&#x2500;&#x2500; schemas/
 
-<b>.github/workflows/</b> (11 GitHub Actions)
-&#x251C;&#x2500;&#x2500; branch-check, validate-item, traceability-check
-&#x251C;&#x2500;&#x2500; sync-git-to-projects, sync-projects-to-git
-&#x251C;&#x2500;&#x2500; iteration-close, pi-close, velocity-track
-&#x251C;&#x2500;&#x2500; wsjf-calculate, contributor-detect
-&#x2514;&#x2500;&#x2500; collaborators-sync
+<b>.edpa/config/</b> (seeduje /edpa:setup)
+&#x2514;&#x2500;&#x2500; edpa.yaml, people.yaml, cw_heuristics.yaml, id_counters.yaml
 
-<b>.edpa/</b> (vytvoří install.sh ve va&scaron;em projektu)
-&#x251C;&#x2500;&#x2500; config/ (heuristics.yaml, edpa.yaml, people.yaml)
-&#x251C;&#x2500;&#x2500; backlog/ (initiatives, epics, features, stories)
-&#x2514;&#x2500;&#x2500; iterations/, reports/, snapshots/, data/</div>
+<b>.edpa/backlog/</b> (jediný zdroj pravdy, v gitu)
+&#x251C;&#x2500;&#x2500; initiatives/, epics/, features/
+&#x2514;&#x2500;&#x2500; stories/, defects/ &middot; iterations/, reports/, snapshots/
+
+<b>.github/workflows/</b> (volitelně, jen --with-ci)
+&#x2514;&#x2500;&#x2500; edpa-contribution-sync.yml (PR signály &#x2192; evidence[])</div>
 </div>
 <div class="col">
 <div class="sc g" style="margin-bottom:8px"><div class="sc-t">Pro kashealth.cz</div><div class="sc-l">
 <code>cd medical-platform</code><br>
 <code>curl -fsSL edpa.technomaton.com/install.sh | sh</code><br>
 <code>/edpa:setup "Medical Platform"</code><br><br>
-Plugin + setup &#x2192; hotovo.
+Engine vendored, configy seedovány, git hooks &#x2192; hotovo za minuty. Žádný GitHub Project.
 </div></div>
 <div class="sc c" style="margin-bottom:8px"><div class="sc-t">Migrace existuj&iacute;c&iacute;ho repa</div><div class="sc-l">
 Stejn&yacute; <code>install.sh</code> &mdash; idempotentn&iacute;, p&aacute;ruje se s aktu&aacute;ln&iacute;m <code>.edpa/</code>.<br>
-v1.14 &rarr; v1.15: <code>tools/migrate_rr_to_rr_oe.py</code>
+V1 &rarr; V2: <code>migrate_v1_to_v2.py</code>
 </div></div>
-<div class="sc a"><div class="sc-t">Obsah</div><div class="sc-l">6 skills + 6 slash commands + 11 GitHub Actions + engine + sync + auto-kalibrace + metodika</div></div>
+<div class="sc a"><div class="sc-t">Obsah</div><div class="sc-l">6 skills + 4 slash commands + MCP server + engine + auto-kalibrace + metodika &middot; volitelný PR-signal CI</div></div>
 </div></div>`,
 
 // 13: AUTO-CALIBRATION
@@ -352,14 +349,14 @@ Loop:
 
 // 16: GITHUB ACTIONS
 `<div class="s-tag fade">Automatizace</div>
-<div class="s-h1 fade d1">6 GitHub Actions</div>
+<div class="s-h1 fade d1">Lokální git hooks + volitelný CI</div>
 <div class="sg fade d2" style="gap:6px">
-<div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F9EE;</div><div><div style="font-weight:500;font-size:12px">1. WSJF Calculator</div><div class="sc-l">Field change &#x2192; auto WSJF score</div></div></div>
-<div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F50D;</div><div><div style="font-weight:500;font-size:12px">2. Contributor Detector</div><div class="sc-l">PR merge &#x2192; kontributor evidence + CW</div></div></div>
-<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4F8;</div><div><div style="font-weight:500;font-size:12px">3. Iteration Close</div><div class="sc-l">Dispatch &#x2192; frozen snapshot + výkazy</div></div></div>
-<div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4CA;</div><div><div style="font-weight:500;font-size:12px">4. PI Close</div><div class="sc-l">Dispatch &#x2192; PI agregace + trend metriky</div></div></div>
-<div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4C8;</div><div><div style="font-weight:500;font-size:12px">5. Velocity Tracker</div><div class="sc-l">Iter/PI close &#x2192; velocity JSON + dashboard</div></div></div>
-<div class="sc p" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x2705;</div><div><div style="font-weight:500;font-size:12px">6. Branch Naming Check</div><div class="sc-l">PR &#x2192; blokuje bez S-/F-/E-XXX reference</div></div></div>
+<div class="sc p" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x2705;</div><div><div style="font-weight:500;font-size:12px">1. Pre-commit hook (lokálně)</div><div class="sc-l">Blokuje commit bez S-/F-/E-XXX reference</div></div></div>
+<div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F50D;</div><div><div style="font-weight:500;font-size:12px">2. Post-commit hook (lokálně)</div><div class="sc-l"><code>local_evidence.py</code> &#x2192; commit + /contribute signály do evidence[]</div></div></div>
+<div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F9EE;</div><div><div style="font-weight:500;font-size:12px">3. EDPA engine (lokálně)</div><div class="sc-l"><code>/edpa:close-iteration</code> &#x2192; Score, derived hours, invarianty</div></div></div>
+<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4F8;</div><div><div style="font-weight:500;font-size:12px">4. Reports + snapshots (lokálně)</div><div class="sc-l"><code>reports.py</code> &#x2192; frozen snapshot + výkazy + velocity</div></div></div>
+<div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4CA;</div><div><div style="font-weight:500;font-size:12px">5. Board (lokálně)</div><div class="sc-l"><code>/edpa:board</code> &#x2192; HTML Kanban z .edpa/backlog/</div></div></div>
+<div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F517;</div><div><div style="font-weight:500;font-size:12px">6. Contribution-sync (volitelný CI)</div><div class="sc-l">Jediná GitHub Action: PR review/comment signály &#x2192; evidence[]</div></div></div>
 </div>`,
 
 // 17: RISKS
@@ -379,10 +376,10 @@ Loop:
 `<div class="s-tag fade">Implementace</div>
 <div class="s-h1 fade d1">Plán nasazení</div>
 <div class="sg fade d2" style="gap:6px">
-<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:32px;text-align:center">D1</div><div><div style="font-weight:500">Domena + M365 + GitHub org</div><div class="sc-l">kashealth.cz &middot; 5 licence &middot; GitHub Team &middot; Repo z template &middot; 6h</div></div></div>
-<div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:32px;text-align:center">D2</div><div><div style="font-weight:500">GitHub Projects + custom fields</div><div class="sc-l">Issue types, hierarchie, views, iterations, DoR &middot; 4h</div></div></div>
-<div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:32px;text-align:center">T1</div><div><div style="font-weight:500">Actions 1-3</div><div class="sc-l">WSJF Calculator + Contributor Detector + Branch Check &middot; 3 dny</div></div></div>
-<div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:32px;text-align:center">T2</div><div><div style="font-weight:500">Actions 4-6 + EDPA skills</div><div class="sc-l">Iteration Close + PI Close + Velocity + skill bundle deployment &middot; 2 dny</div></div></div>
+<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:32px;text-align:center">D1</div><div><div style="font-weight:500">Domena + M365 + git repo</div><div class="sc-l">kashealth.cz &middot; 5 licence &middot; git repo (GitHub volitelně) &middot; 6h</div></div></div>
+<div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:32px;text-align:center">D2</div><div><div style="font-weight:500"><code>/edpa:setup</code> &#x2014; lokální governance</div><div class="sc-l">Vendoruje engine, seeduje .edpa/config/, instaluje git hooks &middot; minuty (žádný GitHub Project)</div></div></div>
+<div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:32px;text-align:center">T1</div><div><div style="font-weight:500">Backlog + hierarchie</div><div class="sc-l">Iniciativy, epiky, features, stories přes <code>/edpa:edpa-add</code> &middot; 3 dny</div></div></div>
+<div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:32px;text-align:center">T2</div><div><div style="font-weight:500">Volitelný PR-signal CI</div><div class="sc-l"><code>--with-ci</code> contribution-sync workflow + onboarding týmu &middot; 2 dny</div></div></div>
 <div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--or);width:32px;text-align:center">I1</div><div><div style="font-weight:500">Pilotní iterace + kalibrace</div><div class="sc-l">První EDPA výkazy &middot; CW kalibrace &middot; End-to-end test &middot; 2 týdny</div></div></div>
 <div class="sc p" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--pk);width:32px;text-align:center">R1</div><div><div style="font-weight:500">Retro po 1. PI &#x2192; auto-kalibrace</div><div class="sc-l">Kadence 1/5 vs 2/10 &middot; CW accuracy &middot; Karpathy loop &middot; 1 den</div></div></div>
 </div>`,
@@ -395,7 +392,7 @@ Loop:
 <div class="sc g" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--gn)">1 520</div><div class="sc-l">Kč/měsíc<br>15 lidí</div></div>
 <div class="sc a" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--ac2)">EDPA</div><div class="sc-l">Bez timesheetů<br>Dual-view</div></div>
 <div class="sc c" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--cy)">4 Skills</div><div class="sc-l">26+ platforem<br>Composable</div></div>
-<div class="sc y" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--yl)">30</div><div class="sc-l">souborů v template<br>Okamžitě</div></div>
+<div class="sc y" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--yl)">.edpa/</div><div class="sc-l">vše v gitu<br>Okamžitě</div></div>
 </div>
 <div class="qt fade d3" style="margin-top:20px;text-align:left">Člověk deklaruje kapacitu.<br>Systém identifikuje work items z delivery evidence.<br>Kapacita se rozpadne poměrně. Bez timesheetů. Bez Jiry.<br>Agent to celé automatizuje.</div>
 <div class="fade d4" style="margin-top:20px">

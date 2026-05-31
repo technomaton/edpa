@@ -3,7 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import { VERSION } from '../../lib/version';
 ---
 
-<Layout title="Evidence-Driven Proportional Allocation" description={`EDPA v${VERSION} — automatic working hour derivation from GitHub delivery evidence. Zero timesheets, mathematical guarantee.`} lang="en">
+<Layout title="Evidence-Driven Proportional Allocation" description={`EDPA v${VERSION} — automatic working hour derivation from local git evidence (commits, yaml edits, status transitions). The .edpa/backlog/ YAML in git is the single source of truth — no GitHub required. Optional GitHub integration: PR-signal contribution-sync (PR review / comments → evidence[]); for a board use the local /edpa:board. Zero timesheets, mathematical guarantee.`} lang="en">
 
   <!-- Hero Section -->
   <section class="hero section">
@@ -12,7 +12,10 @@ import { VERSION } from '../../lib/version';
       <h1 class="hero-headline">Time is not measured — it is derived</h1>
       <p class="hero-subtitle">
         EDPA v{VERSION} replaces manual timesheets with automatic hour derivation
-        from GitHub delivery evidence. Mathematical guarantee, zero administration.
+        from <strong>local git evidence</strong> — commits, yaml edits, status
+        transitions. The <code>.edpa/backlog/</code> YAML in git is the single
+        source of truth; git is the audit trail. <strong>No GitHub required.</strong>
+        Mathematical guarantee, zero administration.
       </p>
       <div class="grid grid-4 hero-stats">
         <div class="card accent">
@@ -98,10 +101,10 @@ Guarantee: Σ DerivedHours = Capacity per person AND Σ cw = 1.0 per item — al
       <div class="grid grid-3 layers-grid">
         <div class="card accent">
           <h3 class="card-heading">Operational Metadata</h3>
-          <p class="layer-source">GitHub Issues + Projects</p>
+          <p class="layer-source">.edpa/backlog/ YAML &middot; Git</p>
           <p class="card-text">
-            Live delivery data. Hierarchy, status, Job Size, WSJF.
-            Everything the team already uses daily.
+            Hierarchy, status, Job Size, WSJF as YAML frontmatter in the repo —
+            the single source of truth. Git is the audit trail; no GitHub required.
           </p>
         </div>
         <div class="card cyan">
@@ -128,11 +131,15 @@ Guarantee: Σ DerivedHours = Capacity per person AND Σ cw = 1.0 per item — al
   <section class="section" id="evidence">
     <div class="container">
       <p class="tag">Evidence detection</p>
-      <h2 class="section-title">Signals from GitHub</h2>
+      <h2 class="section-title">Signals from git (and optionally GitHub)</h2>
       <p class="desc">
-        EDPA detects contributions from GitHub activity across all levels (Story, Feature, Epic, Initiative).
-        Each signal adds weight to <code>contribution_score</code> per (person, item).
-        The resulting CW is a per-item normalized share: <code>cw = score / Σ_persons score</code> (Σ per item = 1.0).
+        EDPA reads evidence <strong>primarily from local git</strong>: a post-commit hook writes
+        <code>commit_author</code> and <code>manual:commit_message</code> into <code>evidence[]</code>
+        in the YAML; the engine reads <code>yaml_edit</code> signals straight from <code>git log</code>
+        within the iteration window and synthesizes <code>gate_events</code> from status transitions.
+        An optional CI workflow can additionally emit <code>pr_reviewer</code> and <code>issue_comment</code>
+        from GitHub. Each signal adds weight to <code>contribution_score</code> per (person, item);
+        the resulting CW is a per-item normalized share: <code>cw = score / Σ_persons score</code> (Σ per item = 1.0).
       </p>
       <div class="table-wrap">
         <table>
@@ -140,46 +147,59 @@ Guarantee: Σ DerivedHours = Capacity per person AND Σ cw = 1.0 per item — al
             <tr>
               <th>Signal</th>
               <th>Weight</th>
+              <th>Source</th>
               <th>Description</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><code>assignee</code></td>
-              <td class="td-cw">4.0</td>
-              <td>GitHub issue assignee</td>
-            </tr>
-            <tr>
-              <td><code>pr_author</code></td>
-              <td class="td-cw">3.4</td>
-              <td>PR author referencing the item</td>
-            </tr>
-            <tr>
               <td><code>commit_author</code></td>
               <td class="td-cw">2.78</td>
-              <td>Commit with S-XXX/F-XXX/E-XXX/I-XXX in branch/message</td>
+              <td>local hook</td>
+              <td>Commit with S-XXX/F-XXX/E-XXX/I-XXX — post-commit emit</td>
+            </tr>
+            <tr>
+              <td><code>manual:commit_message</code></td>
+              <td class="td-cw">explicit</td>
+              <td>local hook</td>
+              <td><code>/contribute @person weight:X</code> in commit body</td>
+            </tr>
+            <tr>
+              <td><code>yaml_edit:*</code></td>
+              <td class="td-cw">0.3–5.0</td>
+              <td>engine + git log</td>
+              <td>block_add, list_grow, scalar_change, create — structural backlog edits</td>
+            </tr>
+            <tr>
+              <td><code>gate_event</code></td>
+              <td class="td-cw">js × weight</td>
+              <td>engine + git log</td>
+              <td>F/E/I status transition (LBC → design → refinement → Done)</td>
+            </tr>
+            <tr>
+              <td><code>story_activity</code></td>
+              <td class="td-cw">js × 0.40</td>
+              <td>engine</td>
+              <td>In-flight Story with yaml_edit signals in the window</td>
             </tr>
             <tr>
               <td><code>pr_reviewer</code></td>
               <td class="td-cw">2.25</td>
-              <td>Submitted PR review</td>
+              <td>optional CI</td>
+              <td>Approved PR review (optional GitHub Actions workflow)</td>
             </tr>
             <tr>
               <td><code>issue_comment</code></td>
               <td class="td-cw">1.14</td>
-              <td>Comment on issue/PR (bots excluded)</td>
-            </tr>
-            <tr>
-              <td><code>/contribute @person weight:X</code></td>
-              <td class="td-cw">explicit</td>
-              <td>Manual additive signal — weight <code>X</code> from the directive</td>
+              <td>optional CI</td>
+              <td>Comment on issue/PR (optional workflow, bots excluded)</td>
             </tr>
           </tbody>
         </table>
       </div>
       <p class="desc" style="margin-top:16px;font-size:13px;color:var(--t3);">
         Signals <strong>aggregate additively</strong>; there is no "highest wins". Default weights above are calibrated by Monte Carlo simulation (1000 synthetic scenarios).
-        <code>/contribute</code> is a peer signal — detect_contributors.py adds its explicit weight to the sum, it does not override.
+        The local git hook + engine cover the normal delivery flow; the CI workflow is a purely <em>opt-in</em> add-on, not a dependency.
       </p>
     </div>
   </section>
@@ -261,9 +281,11 @@ Guarantee: Σ shares = 100%</div>
         <div class="card green">
           <h3 class="card-heading">Git-native, GitHub-friendly</h3>
           <p class="card-text">
-            Evidence from local git (no cloud lock-in). Optional
-            GitHub Projects + Actions integration for teams that
-            want a PM UI and CI signals on top.
+            Evidence from local git (no cloud lock-in). GitHub is
+            optional: the only integration is PR-signal contribution-sync
+            (<code>--with-ci</code>), which materializes PR reviews and comments
+            into <code>evidence[]</code>. For a board, use the local
+            <code>/edpa:board</code> HTML — no Projects sync.
           </p>
         </div>
       </div>

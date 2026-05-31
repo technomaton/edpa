@@ -45,7 +45,7 @@ const S=[
 <div class="sc a" style="text-align:center;padding:12px"><div class="sc-t">Tooling</div><div style="font-size:12px;color:var(--ac2)">Teams + GitHub</div></div>
 <div class="sc c" style="text-align:center;padding:12px"><div class="sc-t">Methodology</div><div style="font-size:12px;color:var(--cy)">EDPA v${VERSION}</div></div>
 <div class="sc g" style="text-align:center;padding:12px"><div class="sc-t">Skills</div><div style="font-size:12px;color:var(--gn)">4 composable</div></div>
-<div class="sc y" style="text-align:center;padding:12px"><div class="sc-t">Template</div><div style="font-size:12px;color:var(--yl)">GitHub repo</div></div>
+<div class="sc y" style="text-align:center;padding:12px"><div class="sc-t">Engine</div><div style="font-size:12px;color:var(--yl)">.edpa/ (local-first)</div></div>
 </div>
 <div class="fade d5" style="margin-top:20px;font-size:12px;color:var(--t3)">Jaroslav Urbanek &middot; Lead Architect &middot; March 2026<br>CVUT FBMI + Partner s.r.o.</div>
 </div>`,
@@ -53,13 +53,13 @@ const S=[
 // 1: WHAT WE DELIVER
 `<div class="s-tag fade">Presentation contents</div>
 <div class="s-h1 fade d1">What we present today</div>
-<div class="s-sub fade d2">Complete governance solution for the project — from tooling through methodology to automation. All in one GitHub repo template.</div>
+<div class="s-sub fade d2">Complete governance solution for the project — from tooling through methodology to automation. All local in git, no GitHub Project.</div>
 <div class="sg sg5 fade d3">
 <div class="sc a" style="min-height:140px"><div class="sc-i">&#x1F4AC;</div><div class="sc-t">1. Tooling</div><div class="sc-l">Teams + GitHub<br>~1,520 CZK/month<br>15 people, 0 Jira</div></div>
 <div class="sc c" style="min-height:140px"><div class="sc-i">&#x1F511;</div><div class="sc-t">2. Identity</div><div class="sc-l">kashealth.cz<br>5 members + guests<br>Hybrid model</div></div>
 <div class="sc g" style="min-height:140px"><div class="sc-i">&#x26A1;</div><div class="sc-t">3. EDPA</div><div class="sc-l">No timesheets<br>Dual-view CW<br>BankID audit</div></div>
 <div class="sc y" style="min-height:140px"><div class="sc-i">&#x1F916;</div><div class="sc-t">4. AI Skills</div><div class="sc-l">4 composable<br>26+ platforms<br>Auto-calibration</div></div>
-<div class="sc o" style="min-height:140px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">5. Template</div><div class="sc-l">GitHub repo<br>30 files, 24KB<br>Ready to use</div></div>
+<div class="sc o" style="min-height:140px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">5. Engine</div><div class="sc-l">Vendored .edpa/engine/<br>Local, in git<br>Ready to use</div></div>
 </div>`,
 
 // 2: PROBLEM
@@ -90,8 +90,8 @@ const S=[
 <div style="margin-top:8px;font-size:11px;color:var(--t3)">~1,520 CZK/month &middot; 100 CZK/person</div>
 </div>
 <div class="col">
-<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>GitHub replaces:</b><br>Jira &#x2192; Issues + Projects<br>Confluence &#x2192; Wiki + Pages<br>Tempo &#x2192; EDPA (derived hours)<br>Roadmaps &#x2192; Projects Roadmap<br>Automation &#x2192; GitHub Actions</div></div>
-<div class="s-note"><b>0 Jira, 0 Confluence.</b> GitHub-only governance with sub-issues (8 levels), issue types, custom fields.</div>
+<div class="sc a" style="margin-bottom:8px;padding:10px"><div class="sc-l"><b>EDPA + GitHub replace:</b><br>Jira &#x2192; <code>.edpa/backlog/</code> (YAML in git)<br>Confluence &#x2192; Wiki + Pages<br>Tempo &#x2192; EDPA (derived hours)<br>Roadmaps &#x2192; <code>/edpa:board</code><br>Automation &#x2192; git hooks + optional CI</div></div>
+<div class="s-note"><b>0 Jira, 0 Confluence.</b> Backlog is local <code>.edpa/backlog/</code> in git — the single source of truth. No GitHub required.</div>
 </div></div>`,
 
 // 4: IDENTITY
@@ -134,7 +134,7 @@ Always. No exceptions.</div>
 </div>
 <div class="col">
 <div class="sc g" style="margin-bottom:8px"><div class="sc-l"><b>Nobody logs hours.</b> The report is a byproduct of delivery.</div></div>
-<div class="sc c" style="margin-bottom:8px"><div class="sc-l"><b>Evidence from GitHub.</b> Commits, PRs, reviews, comments &#x2192; auto-detection.</div></div>
+<div class="sc c" style="margin-bottom:8px"><div class="sc-l"><b>Evidence from local git.</b> Commits &#x2192; auto-detection. PR signals optionally via CI.</div></div>
 <div class="sc a"><div class="sc-l"><b>BankID signature.</b> Frozen snapshot + BankID = legally stronger than paper.</div></div>
 </div></div>`,
 
@@ -159,15 +159,15 @@ Guarantee: &#x2211; shares = 100%</div>
 `<div class="s-tag fade">Architecture</div>
 <div class="s-h1 fade d1">Three separate layers</div>
 <div class="sg sg3 fade d2" style="margin-top:16px">
-<div class="sc a" style="min-height:170px"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">Operational Metadata</div><div class="sc-v" style="color:var(--ac2);font-size:14px">GitHub Issues + Projects</div><div class="sc-l" style="margin-top:6px">Live delivery data &middot; Hierarchy &middot; Status &middot; Job Size &middot; WSJF</div></div>
-<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">Capacity Registry</div><div class="sc-v" style="color:var(--cy);font-size:14px">YAML config in repo</div><div class="sc-l" style="margin-top:6px">Capacity &middot; Roles &middot; FTE &middot; Confirmed at Iteration Planning</div></div>
+<div class="sc a" style="min-height:170px"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">Operational Metadata</div><div class="sc-v" style="color:var(--ac2);font-size:14px">.edpa/backlog/ (YAML in git)</div><div class="sc-l" style="margin-top:6px">Live delivery data &middot; Hierarchy &middot; Status &middot; Job Size &middot; WSJF</div></div>
+<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">Capacity Registry</div><div class="sc-v" style="color:var(--cy);font-size:14px">.edpa/config/ (YAML in repo)</div><div class="sc-l" style="margin-top:6px">Capacity &middot; Roles &middot; FTE &middot; Confirmed at Iteration Planning</div></div>
 <div class="sc g" style="min-height:170px"><div class="sc-i">&#x1F512;</div><div class="sc-t">Evidence &amp; Reporting</div><div class="sc-v" style="color:var(--gn);font-size:14px">/snapshots &middot; /reports &middot; /signed</div><div class="sc-l" style="margin-top:6px">Frozen snapshots &middot; Reports &middot; BankID &middot; Immutable</div></div>
 </div>
-<div class="fade d3" style="margin-top:12px;text-align:center;font-size:12px;color:var(--t3)">GitHub is <b>not</b> source of truth for: capacity, FTE, derived hours, signatures &#x2192; those live in the evidence layer.</div>`,
+<div class="fade d3" style="margin-top:12px;text-align:center;font-size:12px;color:var(--t3)">Everything lives in git &#x2192; <code>.edpa/</code> is the single source of truth for backlog, capacity, FTE, derived hours and signatures. GitHub optional.</div>`,
 
 // 8: HIERARCHY
 `<div class="s-tag fade">Hierarchy</div>
-<div class="s-h1 fade d1">SAFe-like hierarchy in GitHub</div>
+<div class="s-h1 fade d1">SAFe-like hierarchy in .edpa/backlog/</div>
 <div class="cols fade d2">
 <div class="col">
 <div class="fm" style="font-size:13px;line-height:2;border-left-color:var(--ac)"><span style="color:var(--pk)">Initiative</span> (entire project)
@@ -180,15 +180,15 @@ Guarantee: &#x2211; shares = 100%</div>
 <div class="s-p">Naming: <code>PI-2026-1.3</code> = 3rd iteration in 1st PI of 2026.</div>
 </div>
 <div class="col">
-<table><thead><tr><th>Level</th><th>Job Size</th><th>GitHub</th></tr></thead><tbody>
-<tr><td style="color:var(--pk)"><b>Initiative</b></td><td>1&ndash;100</td><td>Top-level issue</td></tr>
-<tr><td style="color:var(--ac2)"><b>Epic</b></td><td>1&ndash;100</td><td>Sub-issue</td></tr>
-<tr><td style="color:var(--cy)"><b>Feature</b></td><td>1&ndash;100</td><td>Sub-issue</td></tr>
-<tr><td style="color:var(--or)"><b>Story</b></td><td>1&ndash;100</td><td>Sub-issue</td></tr>
-<tr><td style="color:var(--rd)"><b>Defect</b></td><td>1&ndash;100</td><td>Sub-issue</td></tr>
+<table><thead><tr><th>Level</th><th>Job Size</th><th>File</th></tr></thead><tbody>
+<tr><td style="color:var(--pk)"><b>Initiative</b></td><td>1&ndash;100</td><td>initiatives/I-XXX.yaml</td></tr>
+<tr><td style="color:var(--ac2)"><b>Epic</b></td><td>1&ndash;100</td><td>epics/E-XXX.yaml</td></tr>
+<tr><td style="color:var(--cy)"><b>Feature</b></td><td>1&ndash;100</td><td>features/F-XXX.yaml</td></tr>
+<tr><td style="color:var(--or)"><b>Story</b></td><td>1&ndash;100</td><td>stories/S-XXX.yaml</td></tr>
+<tr><td style="color:var(--rd)"><b>Defect</b></td><td>1&ndash;100</td><td>defects/D-XXX.yaml</td></tr>
 <tr><td style="color:var(--yl)"><b>Task</b></td><td>&#x2014;</td><td>Checklist</td></tr>
 </tbody></table>
-<div class="s-note" style="margin-top:8px">GitHub sub-issues (GA 04/2025): 8 levels, issue types, custom fields.</div>
+<div class="s-note" style="margin-top:8px">YAML files in git: <code>parent</code> references form the hierarchy, validated by MCP <code>edpa_item_create</code>.</div>
 </div></div>`,
 
 // 9: EVIDENCE
@@ -217,7 +217,7 @@ Guarantee: &#x2211; shares = 100%</div>
 <div class="s-h1 fade d1">4 composable EDPA skills</div>
 <div class="s-sub fade d2">Claude Code skills = governance automation. Agent in terminal understands EDPA and executes it for you.</div>
 <div class="sg sg2 fade d3">
-<div class="sc a" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F3D7;&#xFE0F;</div><div><div style="font-weight:600">edpa-setup</div><div class="sc-l">~450 tokens &middot; "Set up governance for my project"<br>GitHub Projects, capacity registry, CW heuristics, branch naming</div></div></div>
+<div class="sc a" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F3D7;&#xFE0F;</div><div><div style="font-weight:600">edpa-setup</div><div class="sc-l">~450 tokens &middot; "Set up governance for my project"<br>Vendors the engine into <code>.edpa/engine/</code>, seeds <code>.edpa/config/</code>, installs git hooks</div></div></div>
 <div class="sc c" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x26A1;</div><div><div style="font-weight:600">edpa-engine</div><div class="sc-l">~760 tokens &middot; "Close iteration PI-2026-1.3"<br>Evidence gathering, EDPA calculation, invariant validation</div></div></div>
 <div class="sc g" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F4C4;</div><div><div style="font-weight:600">edpa-reports</div><div class="sc-l">~505 tokens &middot; "Generate reports"<br>MD/JSON/XLSX reports, frozen snapshots, per-item allocation</div></div></div>
 <div class="sc o" style="display:flex;gap:14px;align-items:center"><div style="font-size:28px">&#x1F52C;</div><div><div style="font-weight:600">edpa-autocalib</div><div class="sc-l">~625 tokens &middot; "Calibrate CW heuristics"<br>Karpathy autoresearch: 50 experiments overnight, MAD optimization</div></div></div>
@@ -229,51 +229,48 @@ Guarantee: &#x2211; shares = 100%</div>
 <div class="s-h1 fade d1">Daily workflow with EDPA skills</div>
 <div class="sg fade d2" style="gap:8px">
 <div class="sc g" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:30px">1</div><div><div style="font-weight:500">Team works normally</div><div class="sc-l">Coding on <code>feature/S-200-omop-parser</code> branches. PR, review, merge. Nothing extra.</div></div></div>
-<div class="sc c" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:30px">2</div><div><div style="font-weight:500">CI collects evidence automatically</div><div class="sc-l">Branch naming check &#x2192; evidence detection &#x2192; contributor metadata on issues. No manual intervention.</div></div></div>
-<div class="sc a" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:30px">3</div><div><div style="font-weight:500">End of iteration: "Close iteration PI-2026-1.3"</div><div class="sc-l">Claude Code runs <b>edpa-engine</b> &#x2192; pulls evidence &#x2192; computes Score &#x2192; derives hours &#x2192; validates invariants.</div></div></div>
+<div class="sc c" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:30px">2</div><div><div style="font-weight:500">Git hooks guard evidence locally</div><div class="sc-l">Pre-commit hook checks the <code>S-/F-/E-XXX</code> reference &#x2192; evidence lives in git history. No manual intervention.</div></div></div>
+<div class="sc a" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:30px">3</div><div><div style="font-weight:500">End of iteration: "Close iteration PI-2026-1.3"</div><div class="sc-l">Claude Code runs <b>edpa-engine</b> &#x2192; reads local git evidence &#x2192; computes Score &#x2192; derives hours &#x2192; validates invariants.</div></div></div>
 <div class="sc y" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:30px">4</div><div><div style="font-weight:500">"Generate reports"</div><div class="sc-l"><b>edpa-reports</b> &#x2192; MD/JSON reports per person + per-item allocation + frozen snapshot + Excel. 30 seconds.</div></div></div>
 <div class="sc o" style="display:flex;gap:14px;align-items:center;padding:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--or);width:30px">5</div><div><div style="font-weight:500">BankID signature</div><div class="sc-l">Member reviews report &#x2192; signs with BankID &#x2192; stored in <code>/signed/</code>. Legally stronger than paper.</div></div></div>
 </div>`,
 
 // 12: REPO TEMPLATE
-`<div class="s-tag fade">GitHub Template</div>
-<div class="s-h1 fade d1">Plugin + GitHub Actions, ready to use</div>
+`<div class="s-tag fade">Vendored engine</div>
+<div class="s-h1 fade d1">Everything local in .edpa/, ready to use</div>
 <div class="cols fade d2">
 <div class="col">
-<div class="fm" style="font-size:10px;line-height:1.7;border-left-color:var(--ac)"><b>.claude/edpa/</b> (installed from plugin/)
-&#x251C;&#x2500;&#x2500; commands/edpa/ (6 slash commands)
-&#x2502;    &#x2514;&#x2500;&#x2500; setup, sync, calibrate, board, reports, close-iteration
-&#x251C;&#x2500;&#x2500; skills/ (6 SKILL.md)
-&#x2502;    &#x2514;&#x2500;&#x2500; edpa-setup, -engine, -reports, -autocalib, -sync, -sync-people
-&#x251C;&#x2500;&#x2500; edpa/scripts/ (engine.py, sync.py, detect_contributors.py, &hellip;)
-&#x251C;&#x2500;&#x2500; edpa/templates/ (cw_heuristics, project, people, &hellip;)
-&#x251C;&#x2500;&#x2500; edpa/schemas/, hooks/
-&#x2514;&#x2500;&#x2500; .claude-plugin/plugin.json
+<div class="fm" style="font-size:10px;line-height:1.7;border-left-color:var(--ac)"><b>.edpa/engine/</b> (vendored by /edpa:setup)
+&#x251C;&#x2500;&#x2500; scripts/ (31 Python modules)
+&#x2502;    &#x251C;&#x2500;&#x2500; engine.py, mcp_server.py, backlog.py
+&#x2502;    &#x251C;&#x2500;&#x2500; local_evidence.py, detect_contributors.py
+&#x2502;    &#x251C;&#x2500;&#x2500; reports.py, board.py, calibrate_signals.py
+&#x2502;    &#x2514;&#x2500;&#x2500; hooks/ (pre-commit, post-commit, validate)
+&#x251C;&#x2500;&#x2500; templates/ (cw_heuristics, edpa, people)
+&#x2514;&#x2500;&#x2500; schemas/
 
-<b>.github/workflows/</b> (11 GitHub Actions)
-&#x251C;&#x2500;&#x2500; branch-check, validate-item, traceability-check
-&#x251C;&#x2500;&#x2500; sync-git-to-projects, sync-projects-to-git
-&#x251C;&#x2500;&#x2500; iteration-close, pi-close, velocity-track
-&#x251C;&#x2500;&#x2500; wsjf-calculate, contributor-detect
-&#x2514;&#x2500;&#x2500; collaborators-sync
+<b>.edpa/config/</b> (seeded by /edpa:setup)
+&#x2514;&#x2500;&#x2500; edpa.yaml, people.yaml, cw_heuristics.yaml, id_counters.yaml
 
-<b>.edpa/</b> (created by install.sh in your project)
-&#x251C;&#x2500;&#x2500; config/ (heuristics.yaml, edpa.yaml, people.yaml)
-&#x251C;&#x2500;&#x2500; backlog/ (initiatives, epics, features, stories)
-&#x2514;&#x2500;&#x2500; iterations/, reports/, snapshots/, data/</div>
+<b>.edpa/backlog/</b> (single source of truth, in git)
+&#x251C;&#x2500;&#x2500; initiatives/, epics/, features/
+&#x2514;&#x2500;&#x2500; stories/, defects/ &middot; iterations/, reports/, snapshots/
+
+<b>.github/workflows/</b> (optional, --with-ci only)
+&#x2514;&#x2500;&#x2500; edpa-contribution-sync.yml (PR signals &#x2192; evidence[])</div>
 </div>
 <div class="col">
 <div class="sc g" style="margin-bottom:8px"><div class="sc-t">For kashealth.cz</div><div class="sc-l">
 <code>cd medical-platform</code><br>
 <code>curl -fsSL edpa.technomaton.com/install.sh | sh</code><br>
 <code>/edpa:setup "Medical Platform"</code><br><br>
-Plugin + setup &#x2192; done.
+Engine vendored, configs seeded, git hooks &#x2192; done in minutes. No GitHub Project.
 </div></div>
 <div class="sc c" style="margin-bottom:8px"><div class="sc-t">Migrating an existing repo</div><div class="sc-l">
 Same <code>install.sh</code> &mdash; idempotent, pairs with the existing <code>.edpa/</code>.<br>
-v1.14 &rarr; v1.15: <code>tools/migrate_rr_to_rr_oe.py</code>
+V1 &rarr; V2: <code>migrate_v1_to_v2.py</code>
 </div></div>
-<div class="sc a"><div class="sc-t">Contents</div><div class="sc-l">6 skills + 6 slash commands + 11 GitHub Actions + engine + sync + auto-calibration + methodology</div></div>
+<div class="sc a"><div class="sc-t">Contents</div><div class="sc-l">6 skills + 4 slash commands + MCP server + engine + auto-calibration + methodology &middot; optional PR-signal CI</div></div>
 </div></div>`,
 
 // 13: AUTO-CALIBRATION
@@ -351,14 +348,14 @@ Loop:
 
 // 16: GITHUB ACTIONS
 `<div class="s-tag fade">Automation</div>
-<div class="s-h1 fade d1">6 GitHub Actions</div>
+<div class="s-h1 fade d1">Local git hooks + optional CI</div>
 <div class="sg fade d2" style="gap:6px">
-<div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F9EE;</div><div><div style="font-weight:500;font-size:12px">1. WSJF Calculator</div><div class="sc-l">Field change &#x2192; auto WSJF score</div></div></div>
-<div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F50D;</div><div><div style="font-weight:500;font-size:12px">2. Contributor Detector</div><div class="sc-l">PR merge &#x2192; contributor evidence + CW</div></div></div>
-<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4F8;</div><div><div style="font-weight:500;font-size:12px">3. Iteration Close</div><div class="sc-l">Dispatch &#x2192; frozen snapshot + reports</div></div></div>
-<div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4CA;</div><div><div style="font-weight:500;font-size:12px">4. PI Close</div><div class="sc-l">Dispatch &#x2192; PI aggregation + trend metrics</div></div></div>
-<div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4C8;</div><div><div style="font-weight:500;font-size:12px">5. Velocity Tracker</div><div class="sc-l">Iter/PI close &#x2192; velocity JSON + dashboard</div></div></div>
-<div class="sc p" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x2705;</div><div><div style="font-weight:500;font-size:12px">6. Branch Naming Check</div><div class="sc-l">PR &#x2192; blocks without S-/F-/E-XXX reference</div></div></div>
+<div class="sc p" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x2705;</div><div><div style="font-weight:500;font-size:12px">1. Pre-commit hook (local)</div><div class="sc-l">Blocks commit without S-/F-/E-XXX reference</div></div></div>
+<div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F50D;</div><div><div style="font-weight:500;font-size:12px">2. Post-commit hook (local)</div><div class="sc-l"><code>local_evidence.py</code> &#x2192; commit + /contribute signals into evidence[]</div></div></div>
+<div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F9EE;</div><div><div style="font-weight:500;font-size:12px">3. EDPA engine (local)</div><div class="sc-l"><code>/edpa:close-iteration</code> &#x2192; Score, derived hours, invariants</div></div></div>
+<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4F8;</div><div><div style="font-weight:500;font-size:12px">4. Reports + snapshots (local)</div><div class="sc-l"><code>reports.py</code> &#x2192; frozen snapshot + reports + velocity</div></div></div>
+<div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F4CA;</div><div><div style="font-weight:500;font-size:12px">5. Board (local)</div><div class="sc-l"><code>/edpa:board</code> &#x2192; HTML Kanban from .edpa/backlog/</div></div></div>
+<div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-size:22px;width:32px;text-align:center">&#x1F517;</div><div><div style="font-weight:500;font-size:12px">6. Contribution-sync (optional CI)</div><div class="sc-l">The only GitHub Action: PR review/comment signals &#x2192; evidence[]</div></div></div>
 </div>`,
 
 // 17: RISKS
@@ -378,10 +375,10 @@ Loop:
 `<div class="s-tag fade">Implementation</div>
 <div class="s-h1 fade d1">Deployment plan</div>
 <div class="sg fade d2" style="gap:6px">
-<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:32px;text-align:center">D1</div><div><div style="font-weight:500">Domain + M365 + GitHub org</div><div class="sc-l">kashealth.cz &middot; 5 licenses &middot; GitHub Team &middot; Repo from template &middot; 6h</div></div></div>
-<div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:32px;text-align:center">D2</div><div><div style="font-weight:500">GitHub Projects + custom fields</div><div class="sc-l">Issue types, hierarchy, views, iterations, DoR &middot; 4h</div></div></div>
-<div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:32px;text-align:center">T1</div><div><div style="font-weight:500">Actions 1-3</div><div class="sc-l">WSJF Calculator + Contributor Detector + Branch Check &middot; 3 days</div></div></div>
-<div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:32px;text-align:center">T2</div><div><div style="font-weight:500">Actions 4-6 + EDPA skills</div><div class="sc-l">Iteration Close + PI Close + Velocity + skill bundle deployment &middot; 2 days</div></div></div>
+<div class="sc g" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--gn);width:32px;text-align:center">D1</div><div><div style="font-weight:500">Domain + M365 + git repo</div><div class="sc-l">kashealth.cz &middot; 5 licenses &middot; git repo (GitHub optional) &middot; 6h</div></div></div>
+<div class="sc c" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--cy);width:32px;text-align:center">D2</div><div><div style="font-weight:500"><code>/edpa:setup</code> &#x2014; local governance</div><div class="sc-l">Vendors the engine, seeds .edpa/config/, installs git hooks &middot; minutes (no GitHub Project)</div></div></div>
+<div class="sc a" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--ac2);width:32px;text-align:center">T1</div><div><div style="font-weight:500">Backlog + hierarchy</div><div class="sc-l">Initiatives, epics, features, stories via <code>/edpa:edpa-add</code> &middot; 3 days</div></div></div>
+<div class="sc y" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--yl);width:32px;text-align:center">T2</div><div><div style="font-weight:500">Optional PR-signal CI</div><div class="sc-l"><code>--with-ci</code> contribution-sync workflow + team onboarding &middot; 2 days</div></div></div>
 <div class="sc o" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--or);width:32px;text-align:center">I1</div><div><div style="font-weight:500">Pilot iteration + calibration</div><div class="sc-l">First EDPA reports &middot; CW calibration &middot; End-to-end test &middot; 2 weeks</div></div></div>
 <div class="sc p" style="display:flex;gap:12px;align-items:center;padding:10px"><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--pk);width:32px;text-align:center">R1</div><div><div style="font-weight:500">Retro after 1st PI &#x2192; auto-calibration</div><div class="sc-l">Cadence 1/5 vs 2/10 &middot; CW accuracy &middot; Karpathy loop &middot; 1 day</div></div></div>
 </div>`,
@@ -394,7 +391,7 @@ Loop:
 <div class="sc g" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--gn)">1,520</div><div class="sc-l">CZK/month<br>15 people</div></div>
 <div class="sc a" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--ac2)">EDPA</div><div class="sc-l">No timesheets<br>Dual-view</div></div>
 <div class="sc c" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--cy)">4 Skills</div><div class="sc-l">26+ platforms<br>Composable</div></div>
-<div class="sc y" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--yl)">30</div><div class="sc-l">files in template<br>Instant</div></div>
+<div class="sc y" style="text-align:center;padding:16px"><div class="sc-v" style="color:var(--yl)">.edpa/</div><div class="sc-l">all in git<br>Instant</div></div>
 </div>
 <div class="qt fade d3" style="margin-top:20px;text-align:left">A person declares capacity.<br>The system identifies work items from delivery evidence.<br>Capacity is split proportionally. No timesheets. No Jira.<br>The agent automates it all.</div>
 <div class="fade d4" style="margin-top:20px">
