@@ -62,7 +62,7 @@ launched from anywhere in the repo (e.g. `web/`, `tools/pi-planning/`, …).
 For ad-hoc CLI use:
 
 ```bash
-python3 .claude/edpa/scripts/mcp_server.py
+python3 .edpa/engine/scripts/mcp_server.py
 ```
 
 Started by hand, the server reads JSON-RPC on stdin and writes responses on
