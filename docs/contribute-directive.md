@@ -10,9 +10,17 @@ consultants, retroactive credit corrections.
 /contribute @<github-login> weight:<float>
 ```
 
-- `@<github-login>` — GitHub username, must match `github:` field of
+- `@<github-login>` — GitHub username, must match the `github:` field of
   someone in `.edpa/config/people.yaml`. Detect resolves the login to
   the canonical person id.
+- `@<person-id>` — alternatively, the canonical EDPA person id from
+  `people.yaml` (e.g. `@bob-pm`). An id always resolves to itself and takes
+  precedence over a github-handle collision. **Use this for multi-contract
+  people who share a github handle** (e.g. `bob-arch` and `bob-pm` both
+  `github: bob-arch-e2e`): the shared handle is ambiguous and credits only
+  one contract, so address the intended one by id. A token matching neither
+  a github handle nor a person id is credited as-is and earns 0h —
+  `detect_contributors` warns on stderr so typos don't vanish silently.
 - `weight:<float>` — non-negative number; this becomes the signal's
   contribution to that person's `contribution_score` on the item.
   Recommended range: 0.5 to 5.0 (in line with auto-detected signal
