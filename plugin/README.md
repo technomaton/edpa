@@ -42,7 +42,7 @@ The installer downloads the latest `edpa-plugin.tar.gz` release asset, extracts 
 
 ```bash
 pip3 install -r .claude/requirements.txt
-python3 .claude/edpa/scripts/preflight.py --org <your-org>
+python3 .edpa/engine/scripts/preflight.py --org <your-org>
 ```
 
 Then either invoke skills manually (Cursor/Codex pick them up from `.claude/skills/`) or run `python3 .edpa/engine/scripts/project_setup.py --with-ci --with-hooks --with-rules` to provision the local `.edpa/` governance (config, id_counters, CI workflow, git hooks) directly.
@@ -163,7 +163,7 @@ The plugin ships standard `SKILL.md` files (Claude Code Agent Skill frontmatter 
 # Gemini CLI    — cp -r .claude/skills/* ~/.gemini/skills/
 ```
 
-Note: Skills carry the text content (instructions), but Claude Code is the only target that runs `.mcp.json` (MCP servers), `hooks/hooks.json` (PostToolUse + SessionStart), and `${CLAUDE_PLUGIN_ROOT}` script anchoring. On other tools, run the Python CLI scripts manually (`python3 .claude/edpa/scripts/<name>.py`).
+Note: Skills carry the text content (instructions), but Claude Code is the only target that runs `.mcp.json` (MCP servers), `hooks/hooks.json` (PostToolUse + SessionStart), and `${CLAUDE_PLUGIN_ROOT}` script anchoring. On other tools, run the Python CLI scripts manually (`python3 .edpa/engine/scripts/<name>.py`).
 
 ### MCP tools provided by `mcp_server.py`
 
