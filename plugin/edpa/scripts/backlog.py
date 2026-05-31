@@ -93,11 +93,22 @@ class C:
     MUTED    = "\033[38;5;245m"  # Gray
 
 
+def _use_color() -> bool:
+    """Colorize only for interactive terminals. Honor NO_COLOR and non-TTY
+    (piped/captured) output so machine-readable output — e.g. the allocated
+    item ID parsed by tooling/CI — stays free of ANSI escape codes."""
+    return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+
 def color(text, code):
+    if not _use_color():
+        return str(text)
     return f"{code}{text}{C.RESET}"
 
 
 def bold(text):
+    if not _use_color():
+        return str(text)
     return f"{C.BOLD}{text}{C.RESET}"
 
 

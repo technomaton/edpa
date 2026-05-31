@@ -23,6 +23,22 @@ import backlog  # noqa: E402
 import mcp_server  # noqa: E402
 
 
+def test_color_plain_when_no_color(monkeypatch) -> None:
+    """ANSI must be suppressed for machine-readable output (NO_COLOR / non-TTY)
+    so callers can parse the allocated ID. Regression for the ANSI-in-ID bug."""
+    monkeypatch.setenv("NO_COLOR", "1")
+    assert backlog.color("S-1", backlog.C.STORY) == "S-1"
+    assert "\033" not in backlog.color("S-1", backlog.C.STORY)
+    assert backlog.bold("S-1") == "S-1"
+
+
+def test_color_emitted_on_tty(monkeypatch) -> None:
+    """When stdout is a TTY and NO_COLOR is unset, ANSI codes ARE emitted."""
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setattr(backlog.sys.stdout, "isatty", lambda: True)
+    assert "\033" in backlog.color("S-1", backlog.C.STORY)
+
+
 # --- workspace fixture -----------------------------------------------------
 
 def _write_workspace(tmp_path: Path, *, with_sync: bool = False,
