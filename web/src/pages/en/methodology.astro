@@ -198,7 +198,6 @@ Computed per level independently.</div>
       <li>Per-item normalization yields the cw share: <code>cw = contribution_score / Σ_persons contribution_score</code></li>
       <li><code>/contribute</code> is a peer signal — it does not override auto-detection, it adds weight</li>
       <li>Default weights above are calibrated by Monte Carlo simulation (1000 synthetic scenarios)</li>
-      <li>Per-role corrections validated by Monte Carlo simulation (1,000 scenarios)</li>
     </ul>
 
     <div class="note" style="margin-top:12px;border-left:3px solid var(--gn);padding-left:12px"><strong>No per-role corrections.</strong> CW is computed purely via additive signal aggregation and per-item normalization (see § 5.4 below). Strategic-role bias is handled by calibrating signal weights against ground truth — if BO/PM/Arch are under-credited, the calibrator increases <code>issue_comment</code> and <code>pr_reviewer</code> weights. See <a href="https://github.com/technomaton/edpa/blob/main/docs/auto-calibration.md" style="color:var(--ac2)">auto-calibration.md</a>.</div>
@@ -324,7 +323,7 @@ Accuracy = Actual / Planned &times; 100 %</div>
       <div class="card accent">
         <div class="tag" style="color:var(--ac3)">Calibration</div>
         <ul>
-          <li><strong>CW:</strong> After 2&ndash;3 iterations, evaluate the heuristic. PM underestimated? Arch overestimated?</li>
+          <li><strong>CW:</strong> After 2&ndash;3 iterations, evaluate the heuristic. Recalibrate signal weights with the <code>/edpa:calibrate</code> optimizer (Monte Carlo + coordinate descent, synthetic corpus).</li>
           <li><strong>Job Size:</strong> Reference Story &ldquo;3&rdquo; &ne; Feature &ldquo;3&rdquo;. Independent per level.</li>
           <li><strong>AI:</strong> You report time for delivery, not minutes of coding. AI &rarr; velocity, not report.</li>
         </ul>
@@ -337,7 +336,7 @@ Accuracy = Actual / Planned &times; 100 %</div>
     <h2>9. GitHub implementation</h2>
 
     <h3>9.1 Native Issue Types &amp; custom fields</h3>
-    <p>Issue Types are a <strong>native GitHub feature</strong> at the organization level (not labels, not custom fields). Managed via <code>edpa_issue_types.py setup</code>. Filter syntax: <code>type:Epic</code>, <code>type:Story</code> etc.</p>
+    <p>EDPA is <strong>local-first</strong>: the engine reads local git evidence and backlog YAML, and the GitHub layer is optional. If your team uses GitHub, Issue Types are a <strong>native GitHub feature</strong> at the organization level (not labels, not custom fields). Managed via <code>issue_types.py setup --org &lt;org&gt;</code>. Filter syntax: <code>type:Epic</code>, <code>type:Story</code> etc.</p>
     <div class="card">
       <table>
         <thead>
@@ -372,36 +371,37 @@ Accuracy = Actual / Planned &times; 100 %</div>
       <div class="note">What <strong>not to keep</strong> as a GitHub field: Capacity, Derived Hours, FTE, signature state &rarr; belong to the evidence layer.</div>
     </div>
 
-    <h3>9.2 GitHub Actions</h3>
+    <h3>9.2 The engine runs locally; the GitHub layer is optional</h3>
+    <p>V2 has no GitHub Actions pipeline. The engine, WSJF computation, iteration/PI close, and velocity all run <strong>locally</strong> via <code>/edpa:close-iteration</code> and MCP tools. Attribution is handled by a post-commit hook (<code>local_evidence.py</code>) — it emits <code>commit_author</code> for every commit that references an EDPA item, and works offline and on GitLab/Forgejo too.</p>
     <div class="card">
       <table>
         <thead>
-          <tr><th>#</th><th>Action</th><th>Trigger</th><th>Function</th></tr>
+          <tr><th>Layer</th><th>Where it runs</th><th>Function</th></tr>
         </thead>
         <tbody>
-          <tr><td>1</td><td><strong>WSJF Calculator</strong></td><td>Field change</td><td>Auto WSJF calculation</td></tr>
-          <tr><td>2</td><td><strong>Contributor Detector</strong></td><td>PR merge / review</td><td>Contributor detection + evidence</td></tr>
-          <tr><td>3</td><td><strong>Iteration Close</strong></td><td>Manual dispatch</td><td>Snapshot + reports (MD/JSON/XLSX) + per-item</td></tr>
-          <tr><td>4</td><td><strong>PI Close</strong></td><td>Manual dispatch</td><td>Iteration aggregation</td></tr>
-          <tr><td>5</td><td><strong>Velocity Tracker</strong></td><td>Iter/PI close</td><td>Velocity JSON + dashboard</td></tr>
+          <tr><td><strong>Engine + calculation</strong></td><td>Locally (<code>/edpa:close-iteration</code>)</td><td>Score, DerivedHours, snapshot + reports (MD/JSON/XLSX) + per-item</td></tr>
+          <tr><td><strong>Attribution</strong></td><td>Local post-commit hook</td><td><code>commit_author</code> from git history for every item-referencing commit</td></tr>
+          <tr><td><strong>Velocity</strong></td><td>Locally (MCP <code>edpa_flow_metrics</code>)</td><td>Velocity and flow metrics from local data</td></tr>
+          <tr><td><strong>Contribution sync</strong> (optional)</td><td>GitHub Action — <code>--with-ci</code></td><td><code>edpa-contribution-sync.yml</code>: after a PR merge, appends <code>pr_reviewer</code> + <code>issue_comment</code> from the PR thread into <code>evidence[]</code></td></tr>
         </tbody>
       </table>
+      <div class="note" style="margin-top:12px"><strong>When to enable <code>--with-ci</code>:</strong> only when you have signals that don't live in git history (PR reviews, comments) and want them counted. Single-dev / review-light / off-GitHub teams skip the workflow — local evidence is enough.</div>
     </div>
 
-    <h3>9.3 Timestamp fields and conflict detection</h3>
-    <p>During sync from GitHub Projects, three timestamp fields are automatically captured:</p>
+    <h3>9.3 Timestamp fields</h3>
+    <p>Every backlog item carries three timestamp fields (written by the engine on status transitions; populated from the issue if the team uses GitHub):</p>
     <div class="card">
       <table>
         <thead>
           <tr><th>Field</th><th>Source</th><th>Usage</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>created_at</code></td><td>GitHub issue created date</td><td>Cycle time start, item age</td></tr>
-          <tr><td><code>updated_at</code></td><td>GitHub issue last update</td><td>Conflict detection during sync, freshness</td></tr>
-          <tr><td><code>closed_at</code></td><td>GitHub issue closed date</td><td>Cycle time end, throughput</td></tr>
+          <tr><td><code>created_at</code></td><td>Item creation</td><td>Cycle time start, item age</td></tr>
+          <tr><td><code>updated_at</code></td><td>Last item change</td><td>Freshness, ordering</td></tr>
+          <tr><td><code>closed_at</code></td><td>Transition to Done</td><td>Cycle time end, throughput</td></tr>
         </tbody>
       </table>
-      <div class="note" style="margin-top:12px"><strong>Conflict detection:</strong> Sync compares the local YAML <code>updated_at</code> with the GitHub value. If both sides have changed since the last sync, the item is flagged as a conflict and requires manual resolution.</div>
+      <div class="note" style="margin-top:12px">These fields feed the flow metrics (§ 9.4). No bidirectional sync and no conflict resolution — the single source of truth is the local YAML in the repo.</div>
     </div>
 
     <h3>9.4 Flow Metrics MCP tool</h3>
@@ -508,7 +508,7 @@ cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
     <h3>10.3 Audit principle</h3>
     <p>Provability rests on 5 pillars:</p>
     <ol class="audit-pillars">
-      <li>GitHub delivery evidence</li>
+      <li>Local git delivery evidence (commit_author, yaml_edit, gate_events, story_activity)</li>
       <li>Capacity registry (YAML)</li>
       <li>Frozen snapshot (reproducible input)</li>
       <li>Reproducible calculation (Score = JS &times; CW; CW = additive aggregation + per-item normalization)</li>
@@ -559,7 +559,7 @@ cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
       </div>
       <div class="card" style="border-left:3px solid var(--gn)">
         <h3 style="color:var(--gn);margin-bottom:8px">EDPA v{VERSION}</h3>
-        <p style="font-size:14px;color:var(--t2)">Evidence-Driven Proportional Allocation. Hours are derived automatically from GitHub delivery evidence (commits, PRs, reviews). Mathematical guarantee: &Sigma; = Capacity.</p>
+        <p style="font-size:14px;color:var(--t2)">Evidence-Driven Proportional Allocation. Hours are derived automatically from local git evidence (commits, yaml edits, status transitions, in-flight Story activity); GitHub Projects + Actions are an optional add-on. Mathematical guarantee: &Sigma; = Capacity.</p>
       </div>
       <div class="card" style="border-left:3px solid var(--rd)">
         <h3 style="color:var(--rd);margin-bottom:8px">Manual timesheets</h3>
@@ -594,10 +594,10 @@ cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
           <tr><th>Phase</th><th>Time</th><th>Contents</th></tr>
         </thead>
         <tbody>
-          <tr><td style="color:var(--gn)"><strong>Day 1</strong></td><td>6h</td><td>GitHub org, Projects setup, custom fields</td></tr>
-          <tr><td style="color:var(--cy)"><strong>Week 1</strong></td><td>3 days</td><td>Actions 1&ndash;2 (WSJF + Contributor Detector)</td></tr>
-          <tr><td style="color:var(--ac2)"><strong>Week 2</strong></td><td>2 days</td><td>Actions 3&ndash;5 (Iteration Close + PI Close + Velocity)</td></tr>
-          <tr><td style="color:var(--yl)"><strong>Iteration 1</strong></td><td>1&ndash;2w</td><td>Pilot operation, first reports, CW calibration</td></tr>
+          <tr><td style="color:var(--gn)"><strong>Day 1</strong></td><td>1h</td><td><code>/edpa:setup</code> — vendor the engine into <code>.edpa/engine/</code>, config (<code>edpa.yaml</code>, <code>people.yaml</code>), seed the backlog</td></tr>
+          <tr><td style="color:var(--cy)"><strong>Day 1 (optional)</strong></td><td>30 min</td><td><code>--with-hooks</code> (git hooks), <code>--with-ci</code> (contribution-sync workflow), <code>--with-rules</code></td></tr>
+          <tr><td style="color:var(--ac2)"><strong>Iteration 1</strong></td><td>1&ndash;2w</td><td>Pilot operation, first reports from <code>/edpa:close-iteration</code></td></tr>
+          <tr><td style="color:var(--yl)"><strong>Calibration</strong></td><td>10 min</td><td><code>/edpa:calibrate</code> — recalibrate signal weights after the first iterations</td></tr>
           <tr><td style="color:var(--or)"><strong>Retro PI 1</strong></td><td>1 day</td><td>Cadence, CW accuracy, velocity, dual-view validation</td></tr>
         </tbody>
       </table>

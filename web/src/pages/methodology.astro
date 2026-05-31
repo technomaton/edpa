@@ -322,7 +322,7 @@ Accuracy = Actual / Planned &times; 100 %</div>
       <div class="card accent">
         <div class="tag" style="color:var(--ac3)">Kalibrace</div>
         <ul>
-          <li><strong>CW:</strong> Po 2&ndash;3 iteracích vyhodnotit heuristiku. Monte Carlo validace per-role korekcí (viz 5.3.1).</li>
+          <li><strong>CW:</strong> Po 2&ndash;3 iteracích vyhodnotit heuristiku. Rekalibrace signálových vah optimizérem <code>/edpa:calibrate</code> (Monte Carlo + coordinate descent, syntetický korpus).</li>
           <li><strong>Job Size:</strong> Referenční Story &ldquo;3&rdquo; &ne; Feature &ldquo;3&rdquo;. Per úroveň nezávisle.</li>
           <li><strong>AI:</strong> Vykazuješ čas na dodání, ne minuty kódu. AI &rarr; velocity, ne výkaz.</li>
         </ul>
@@ -335,7 +335,7 @@ Accuracy = Actual / Planned &times; 100 %</div>
     <h2>9. Implementace v GitHub</h2>
 
     <h3>9.1 Native Issue Types &amp; custom fields</h3>
-    <p>Issue Types jsou <strong>nativní funkce GitHubu</strong> na úrovni organizace (ne labels, ne custom fields). Spravují se přes <code>edpa_issue_types.py setup</code>. Filtrování: <code>type:Epic</code>, <code>type:Story</code> atd.</p>
+    <p>EDPA je <strong>local-first</strong>: engine čte lokální git evidence a backlog YAML, GitHub vrstva je volitelná. Pokud tým GitHub používá, Issue Types jsou <strong>nativní funkce GitHubu</strong> na úrovni organizace (ne labels, ne custom fields). Spravují se přes <code>issue_types.py setup --org &lt;org&gt;</code>. Filtrování: <code>type:Epic</code>, <code>type:Story</code> atd.</p>
     <div class="card">
       <table>
         <thead>
@@ -370,36 +370,37 @@ Accuracy = Actual / Planned &times; 100 %</div>
       <div class="note">Co <strong>nedržet</strong> jako GitHub field: Capacity, Derived Hours, FTE, podpisový stav &rarr; patří do evidence vrstvy.</div>
     </div>
 
-    <h3>9.2 GitHub Actions</h3>
+    <h3>9.2 Engine běží lokálně, GitHub vrstva je volitelná</h3>
+    <p>V2 nemá pipeline GitHub Actions. Engine, výpočet WSJF, iteration/PI close i velocity běží <strong>lokálně</strong> přes <code>/edpa:close-iteration</code> a MCP nástroje. Atribuci řeší post-commit hook (<code>local_evidence.py</code>) — pro každý commit s referencí na EDPA item emituje <code>commit_author</code>, funguje i offline a na GitLab/Forgejo.</p>
     <div class="card">
       <table>
         <thead>
-          <tr><th>#</th><th>Action</th><th>Trigger</th><th>Funkce</th></tr>
+          <tr><th>Vrstva</th><th>Kde běží</th><th>Funkce</th></tr>
         </thead>
         <tbody>
-          <tr><td>1</td><td><strong>WSJF Calculator</strong></td><td>Field change</td><td>Auto-výpočet WSJF</td></tr>
-          <tr><td>2</td><td><strong>Contributor Detector</strong></td><td>PR merge / review</td><td>Detekce kontributorů + evidence</td></tr>
-          <tr><td>3</td><td><strong>Iteration Close</strong></td><td>Manuální dispatch</td><td>Snapshot + výkazy (MD/JSON/XLSX) + per-item</td></tr>
-          <tr><td>4</td><td><strong>PI Close</strong></td><td>Manuální dispatch</td><td>Agregace iterací</td></tr>
-          <tr><td>5</td><td><strong>Velocity Tracker</strong></td><td>Iter/PI close</td><td>Velocity JSON + dashboard</td></tr>
+          <tr><td><strong>Engine + výpočet</strong></td><td>Lokálně (<code>/edpa:close-iteration</code>)</td><td>Score, DerivedHours, snapshot + výkazy (MD/JSON/XLSX) + per-item</td></tr>
+          <tr><td><strong>Atribuce</strong></td><td>Lokální post-commit hook</td><td><code>commit_author</code> z git historie pro každý item-referencující commit</td></tr>
+          <tr><td><strong>Velocity</strong></td><td>Lokálně (MCP <code>edpa_flow_metrics</code>)</td><td>Velocity a flow metriky z lokálních dat</td></tr>
+          <tr><td><strong>Contribution sync</strong> (volitelné)</td><td>GitHub Action — <code>--with-ci</code></td><td><code>edpa-contribution-sync.yml</code>: po merge PR dopíše <code>pr_reviewer</code> + <code>issue_comment</code> z PR vlákna do <code>evidence[]</code></td></tr>
         </tbody>
       </table>
+      <div class="note" style="margin-top:12px"><strong>Kdy nasadit <code>--with-ci</code>:</strong> jen když máte signály, které nežijí v git historii (PR reviews, komentáře) a chcete je započítat. Single-dev / review-light / off-GitHub týmy workflow přeskočí — local evidence stačí.</div>
     </div>
 
-    <h3>9.3 Timestamp pole a detekce konfliktů</h3>
-    <p>Při sync z GitHub Projects se automaticky zachycují tři timestamp pole:</p>
+    <h3>9.3 Timestamp pole</h3>
+    <p>Každý backlog item nese tři timestamp pole (zapisuje engine při přechodech stavů; pokud tým používá GitHub, naplní se z issue):</p>
     <div class="card">
       <table>
         <thead>
           <tr><th>Pole</th><th>Zdroj</th><th>Využití</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>created_at</code></td><td>GitHub issue created date</td><td>Cycle time start, item age</td></tr>
-          <tr><td><code>updated_at</code></td><td>GitHub issue last update</td><td>Detekce konfliktů při sync, freshness</td></tr>
-          <tr><td><code>closed_at</code></td><td>GitHub issue closed date</td><td>Cycle time end, throughput</td></tr>
+          <tr><td><code>created_at</code></td><td>Vznik položky</td><td>Cycle time start, item age</td></tr>
+          <tr><td><code>updated_at</code></td><td>Poslední změna položky</td><td>Freshness, řazení</td></tr>
+          <tr><td><code>closed_at</code></td><td>Přechod do Done</td><td>Cycle time end, throughput</td></tr>
         </tbody>
       </table>
-      <div class="note" style="margin-top:12px"><strong>Detekce konfliktů:</strong> Sync porovnává <code>updated_at</code> v lokálním YAML s hodnotou na GitHubu. Pokud se obě strany změnily od posledního sync, položka je označena jako konflikt a vyžaduje manuální řešení.</div>
+      <div class="note" style="margin-top:12px">Tato pole jsou vstupem pro flow metriky (§ 9.4). Žádný obousměrný sync ani řešení konfliktů — jediný zdroj pravdy je lokální YAML v repu.</div>
     </div>
 
     <h3>9.4 Flow Metrics MCP tool</h3>
@@ -592,10 +593,10 @@ cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
           <tr><th>Fáze</th><th>Čas</th><th>Obsah</th></tr>
         </thead>
         <tbody>
-          <tr><td style="color:var(--gn)"><strong>Den 1</strong></td><td>6h</td><td>GitHub org, Projects setup, custom fields</td></tr>
-          <tr><td style="color:var(--cy)"><strong>Tyden 1</strong></td><td>3 dny</td><td>Actions 1&ndash;2 (WSJF + Contributor Detector)</td></tr>
-          <tr><td style="color:var(--ac2)"><strong>Tyden 2</strong></td><td>2 dny</td><td>Actions 3&ndash;5 (Iteration Close + PI Close + Velocity)</td></tr>
-          <tr><td style="color:var(--yl)"><strong>Iterace 1</strong></td><td>1&ndash;2t</td><td>Pilotní provoz, první výkazy, kalibrace CW</td></tr>
+          <tr><td style="color:var(--gn)"><strong>Den 1</strong></td><td>1h</td><td><code>/edpa:setup</code> — vendoring enginu do <code>.edpa/engine/</code>, config (<code>edpa.yaml</code>, <code>people.yaml</code>), seed backlogu</td></tr>
+          <tr><td style="color:var(--cy)"><strong>Den 1 (volitelné)</strong></td><td>30 min</td><td><code>--with-hooks</code> (git hooky), <code>--with-ci</code> (contribution-sync workflow), <code>--with-rules</code></td></tr>
+          <tr><td style="color:var(--ac2)"><strong>Iterace 1</strong></td><td>1&ndash;2t</td><td>Pilotní provoz, první výkazy z <code>/edpa:close-iteration</code></td></tr>
+          <tr><td style="color:var(--yl)"><strong>Kalibrace</strong></td><td>10 min</td><td><code>/edpa:calibrate</code> — rekalibrace signálových vah po prvních iteracích</td></tr>
           <tr><td style="color:var(--or)"><strong>Retro PI 1</strong></td><td>1 den</td><td>Kadence, CW accuracy, velocity, dual-view validace</td></tr>
         </tbody>
       </table>
