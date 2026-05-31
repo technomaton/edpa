@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.1.7 — 2026-05-31 — E2E findings: cross-layer fixes + /contribute @id + /edpa:capacity
+
+Fixes and conveniences surfaced by a full real-GitHub end-to-end re-validation
+(2 PIs × 5 iterations, 24 PRs, 24/24 real CI runs, 560h derived, all invariants
+green). See `docs/v2/e2e-real-github-run-2026-05-31.md`.
+
+### fix(engine): iteration close sets the top-level lifecycle status key
+`edpa_iteration_close` wrote only the nested `iteration.status`; `pi_close.py`,
+the board lifecycle view, and the e2e verifier read the top-level `status`. It
+now sets both, so an iteration closed via the MCP tool is seen as closed by all
+consumers.
+
+### fix(backlog): `backlog.py add` is ANSI-safe for non-TTY output
+`color()`/`bold()` honor `NO_COLOR` and non-TTY (piped/captured) output, so the
+allocated item ID parsed by tooling/CI no longer contains escape codes.
+
+### feat(reports): iteration/PI story-point rollup derived from item `js`
+New `_sp_rollup.iteration_sp` derives `planned_sp`/`delivered_sp` from
+Story/Defect `js`; `velocity.py` and `pi_close.py` fall back to it. Velocity and
+PI predictability now populate (were 0 / None).
+
+### feat(contribute): `/contribute @<id>` targets a specific contract (R-2)
+`detect_contributors.load_people_map` maps each person id to itself (id wins over
+github/email/name collisions), so multi-contract people who share a GitHub handle
+are addressable by id. `aggregate_signals` warns on unknown tokens (a typo no
+longer silently earns 0h). Docs: `docs/contribute-directive.md`.
+
+### feat(commands): new `/edpa:capacity` command + capacity-override docs
+First-class `/edpa:capacity` (wraps `capacity_override.py`: `--list`/`--add`/
+`--remove`) for per-iteration per-person capacity overrides. New RUNBOOK §3b plus
+capacity notes in the web playbook + methodology (CZ + EN).
+
+### docs/chore
+- E2E run report (`docs/v2/e2e-real-github-run-2026-05-31.md`) + R-2 attribution
+  proposal (`docs/proposals/v2-multi-contract-id-attribution.md`).
+- `plugin/README.md` skills/commands tree refreshed to the V2 layout.
+
+### Tests
+- Full suite 546 → 553 (+7 regression tests); 0 failures.
+
 ## 2.1.6 — 2026-05-30 — Full collision documentation + methodology page section
 
 Documentation release. Following user feedback, expanded the collision

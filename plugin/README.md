@@ -59,19 +59,17 @@ plugin/
 ├── hooks/
 │   └── hooks.json                   # SessionStart (install_deps) + PostToolUse (validate_on_save, post_commit)
 ├── skills/                          # 6 skills, auto-discovered. Slug = name: field in SKILL.md frontmatter
-│   ├── edpa-setup/SKILL.md          # → /edpa:setup     — provision GitHub Projects + workflows
+│   ├── edpa-setup/SKILL.md          # → /edpa:setup     — provision .edpa/ governance (engine, config, hooks, CI)
+│   ├── edpa-add/SKILL.md            # → /edpa:add       — create a backlog item (local-first, id_counters)
 │   ├── edpa-engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
 │   ├── edpa-reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
-│   ├── edpa-autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Karpathy loop)
-│   ├── edpa-sync/SKILL.md           # → /edpa:sync      — GitHub Projects ↔ Git backlog
-│   └── edpa-sync-people/SKILL.md    # → /edpa:sync-people — reconcile people.yaml vs collaborators
-├── commands/                        # 6 slash commands, flat layout (no edpa/ subdir)
-│   ├── setup.md                     # /edpa setup
-│   ├── close-iteration.md           # /edpa close-iteration
-│   ├── reports.md                   # /edpa reports
-│   ├── calibrate.md                 # /edpa calibrate
-│   ├── sync.md                      # /edpa sync
-│   └── board.md                     # /edpa board
+│   ├── edpa-autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
+│   └── edpa-server/SKILL.md         # → /edpa:server    — optional PI-planning HTTP server (experimental)
+├── commands/                        # 4 slash commands, flat layout (no edpa/ subdir)
+│   ├── close-iteration.md           # → /edpa:close-iteration — capacity prep + engine + reports
+│   ├── board.md                     # → /edpa:board          — HTML Kanban snapshot
+│   ├── capacity.md                  # → /edpa:capacity       — per-iteration capacity overrides
+│   └── server.md                    # → /edpa:server         — start/stop PI-planning server
 └── edpa/
     ├── scripts/                     # 31 Python modules
     │   ├── engine.py                # Core engine (Score, DerivedHours, invariants)
