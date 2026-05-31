@@ -27,6 +27,9 @@ except ImportError:
     print("ERROR: PyYAML required. Install with: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _sp_rollup import iteration_sp  # noqa: E402
+
 
 def iteration_sort_key(it_id: str):
     """Natural sort for PI-YYYY-M.N ids."""
@@ -43,18 +46,22 @@ def load_closed_iterations(edpa_root: Path):
     iter_dir = edpa_root / "iterations"
     if not iter_dir.is_dir():
         return []
+    sp = iteration_sp(edpa_root)  # SP rollup derived from backlog item `js`
     records = []
     for f in iter_dir.glob("*.yaml"):
         data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
         it = data.get("iteration", {})
         if it.get("status") != "closed":
             continue
+        it_id = it.get("id", f.stem)
         planning = data.get("planning", {})
         delivery = data.get("delivery", {})
-        planned = planning.get("planned_sp", 0) or 0
-        delivered = delivery.get("delivered_sp", 0) or 0
+        derived = sp.get(it_id, {})
+        # Prefer explicit iteration SP; fall back to the item-derived rollup.
+        planned = planning.get("planned_sp") or derived.get("planned_sp", 0)
+        delivered = delivery.get("delivered_sp") or derived.get("delivered_sp", 0)
         records.append({
-            "id": it.get("id", f.stem),
+            "id": it_id,
             "pi": it.get("pi"),
             "start_date": str(it["start_date"]) if it.get("start_date") else None,
             "end_date": str(it["end_date"]) if it.get("end_date") else None,

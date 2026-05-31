@@ -477,6 +477,10 @@ def test_iteration_close_sets_status(edpa_root: Path) -> None:
         (edpa_root / "iterations" / "PI-2026-2.1.yaml").read_text()
     )
     assert parsed["iteration"]["status"] == "closed"
+    # Regression: lifecycle "closed" must ALSO be set at the top level, which
+    # pi_close / reports / board / the e2e verifier read (nested iteration.status
+    # is the planning-state key consumed by loader-lifted readers).
+    assert parsed["status"] == "closed"
 
 
 def test_iteration_close_idempotent(edpa_root: Path) -> None:

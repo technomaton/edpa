@@ -29,6 +29,9 @@ except ImportError:
     print("ERROR: PyYAML required. Install with: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _sp_rollup import iteration_sp  # noqa: E402
+
 
 def load_yaml(path: Path):
     """Returns parsed dict for `.yaml`, or frontmatter+body dict for `.md`.
@@ -79,6 +82,10 @@ def aggregate_iterations(iteration_files):
     spillover_ids = []
     unplanned_ids = []
 
+    # SP rollup derived from backlog item `js` (fallback when iteration YAMLs
+    # carry no explicit planning.planned_sp / delivery.delivered_sp).
+    sp = iteration_sp(iteration_files[0].resolve().parent.parent) if iteration_files else {}
+
     for f in iteration_files:
         data = load_yaml(f)
         if not data:
@@ -87,8 +94,9 @@ def aggregate_iterations(iteration_files):
         planning = data.get("planning", {})
         delivery = data.get("delivery", {})
 
-        planned = planning.get("planned_sp", 0) or 0
-        delivered = delivery.get("delivered_sp", 0) or 0
+        derived = sp.get(it.get("id"), {})
+        planned = planning.get("planned_sp") or derived.get("planned_sp", 0)
+        delivered = delivery.get("delivered_sp") or derived.get("delivered_sp", 0)
         capacity = planning.get("capacity", 0) or 0
         predictability = (
             round(100 * delivered / planned, 1) if planned else None

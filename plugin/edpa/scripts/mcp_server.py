@@ -1345,6 +1345,11 @@ def _handle_iteration_close(edpa_root: Path, args: dict) -> list[TextContent]:
         return _ok({"id": safe_id, "status": "closed", "already_closed": True})
     iteration["status"] = "closed"
     data["iteration"] = iteration
+    # Lifecycle "closed" is read from two places by different consumers: the
+    # nested iteration.status (loader-lifted readers, capacity_override) AND the
+    # top-level status (pi_close, reports, board lifecycle view, e2e verifier).
+    # Set both so every consumer agrees the iteration is closed.
+    data["status"] = "closed"
     _write_yaml_atomic(iter_path, data)
 
     logger.info("edpa_iteration_close: id=%s", safe_id)
