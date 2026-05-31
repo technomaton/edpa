@@ -26,6 +26,16 @@ set -e
 
 REPO="technomaton/edpa"
 TARGET=".edpa/engine"
+WITH_SERVER=0
+
+# Parse args (only --with-server supported today; everything else stays
+# legacy for backwards compatibility).
+for arg in "$@"; do
+  case "$arg" in
+    --with-server) WITH_SERVER=1 ;;
+    *) ;;
+  esac
+done
 
 echo "EDPA Installer"
 echo "=============="
@@ -145,6 +155,9 @@ mkdir -p "$TARGET"
 cp -R "$PLUGIN_SRC/edpa/scripts"   "$TARGET/"
 cp -R "$PLUGIN_SRC/edpa/schemas"   "$TARGET/"
 cp -R "$PLUGIN_SRC/edpa/templates" "$TARGET/"
+if [ -d "$PLUGIN_SRC/rules" ]; then
+  cp -R "$PLUGIN_SRC/rules" "$TARGET/"
+fi
 
 # Pin the vendored plugin version so /edpa:setup --update-engine and CI
 # workflows can sanity-check the engine tree.
@@ -182,8 +195,44 @@ if [ ! -f ".edpa/config/edpa.yaml" ] && [ -f "$TARGET/templates/edpa.yaml.tmpl" 
   cp "$TARGET/templates/edpa.yaml.tmpl" ".edpa/config/edpa.yaml"
   echo "  Created .edpa/config/edpa.yaml (edit project.name + governance metadata)"
 fi
+# Stamp the live plugin version into governance.methodology — whether the
+# file was just seeded (the template ships a frozen version) or already
+# existed from a prior install. Without this, a first-time `cp` would leave
+# the template's stale "EDPA <old>" in place.
+if [ -f ".edpa/config/edpa.yaml" ]; then
+  python3 - "$PINNED" ".edpa/config/edpa.yaml" <<'PYEOF'
+import sys, re
+version, path = sys.argv[1], sys.argv[2]
+text = open(path).read()
+new_text = re.sub(r'(methodology:\s*"?EDPA )[^"\n]+("?)', rf'\g<1>{version}\2', text)
+if new_text != text:
+    open(path, "w").write(new_text)
+    print(f"  Updated edpa.yaml governance.methodology → EDPA {version}")
+PYEOF
+fi
 
 touch ".edpa/sync_state.json"
+
+# --- Optional: PI planning server vendoring (--with-server flag) ---
+if [ "$WITH_SERVER" = "1" ]; then
+  SERVER_SRC="$TMPDIR/edpa/plugin/tools/pi-planning"
+  SERVER_DST=".claude/edpa/server"
+  if [ -d "$SERVER_SRC" ]; then
+    echo ""
+    echo "Vendoring PI planning server (--with-server)..."
+    mkdir -p "$SERVER_DST"
+    cp -R "$SERVER_SRC/." "$SERVER_DST/"
+    echo "  Vendored to $SERVER_DST/"
+    echo "  Build deps + dist: cd $SERVER_DST && npm install && npm run build"
+    echo "  Start later: /edpa:server start"
+  else
+    echo ""
+    echo "  --with-server requested but server source not in payload — skipping."
+  fi
+else
+  echo ""
+  echo "  (Optional: re-run with --with-server to vendor the PI planning UI.)"
+fi
 
 echo ""
 echo "EDPA $PINNED installed."
@@ -191,27 +240,25 @@ echo ""
 echo "Next steps:"
 echo ""
 echo "  Claude Code users:"
-echo "    Re-run setup via /edpa:setup to provision GitHub Project + CI workflows."
-echo "    /edpa:setup will overlay the same .edpa/engine/ tree and prompt for"
-echo "    team details, then push to GitHub Projects."
+echo "    Run /edpa:setup — it overlays the same .edpa/engine/ tree, seeds"
+echo "    configs + id_counters, and optionally installs the CI workflow,"
+echo "    git hooks, and agent rules. Local-first: no GitHub provisioning."
 echo ""
 echo "  Other tools (Cursor, Codex CLI, raw):"
 echo "    1. Install Python deps:"
-echo "         pip3 install pyyaml ruamel.yaml openpyxl"
-echo "         (mcp package only needed if you want the MCP server)"
+echo "         pip3 install pyyaml ruamel.yaml openpyxl filelock"
+echo "         (add 'mcp' too if you want the MCP server)"
 echo "    2. Edit team and project metadata:"
-echo "         .edpa/config/people.yaml"
-echo "         .edpa/config/edpa.yaml"
-echo "    3. Run project provisioning manually:"
-echo "         python3 .edpa/engine/scripts/project_setup.py --org <org> --repo <repo> \\"
-echo "           --project-title \"<your-project-name> Governance\""
-echo "    4. Copy CI workflows:"
-echo "         mkdir -p .github/workflows"
-echo "         cp .edpa/engine/templates/../workflows/*.yml .github/workflows/  # if present"
-echo "         # (release tarball doesn't ship workflows separately; pull them"
-echo "         # from the plugin source tree at github.com/$REPO/tree/main/plugin/edpa/workflows)"
+echo "         .edpa/config/people.yaml    # team + capacity"
+echo "         .edpa/config/edpa.yaml      # project.name + governance"
+echo "    3. Provision locally (CI workflow + git hooks + agent rules):"
+echo "         python3 .edpa/engine/scripts/project_setup.py \\"
+echo "           --with-ci --with-hooks --with-rules"
+echo "    4. Create your first item:"
+echo "         python3 .edpa/engine/scripts/backlog.py add \\"
+echo "           --type Initiative --title 'Project Apollo'"
 echo ""
-echo "  CI sync (optional, ~5 min):"
-echo "    Configure the EDPA_TOKEN secret so GH Actions workflows can run."
+echo "  CI sync (optional): if you used --with-ci, set the EDPA_TOKEN secret"
+echo "    so the GitHub Actions PR-signal workflow can write evidence back."
 echo "    https://edpa.technomaton.com/docs/edpa-token-setup"
 echo ""

@@ -30,3 +30,12 @@ def test_uses_v2_project_setup_invocation() -> None:
 def test_lists_filelock_dependency() -> None:
     # id_counter imports filelock; the curl|sh dep hint must include it.
     assert "filelock" in INSTALL_SH
+
+
+def test_web_served_install_sh_in_sync() -> None:
+    """edpa.technomaton.com/install.sh is served from web/public/install.sh;
+    it must stay byte-identical to the canonical root install.sh, else curl|sh
+    users get a stale installer (it silently drifted for months pre-2.1.8)."""
+    root = Path(__file__).resolve().parent.parent
+    served = (root / "web" / "public" / "install.sh").read_text()
+    assert served == INSTALL_SH, "web/public/install.sh out of sync with root install.sh"
