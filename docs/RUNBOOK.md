@@ -216,6 +216,38 @@ score formula, capacity invariant, and ratio sums hold for any output.
 
 ---
 
+## 3b. `/edpa:capacity` — per-iteration capacity overrides
+
+**Purpose:** adjust one person's capacity for a single iteration (PTO, sick
+leave, overtime, onboarding ramp) **without** changing the `people.yaml`
+baseline.
+
+Baseline capacity is `capacity_per_iteration` (fallback `capacity`) in
+`.edpa/config/people.yaml`. An override is stored in the iteration YAML
+`people:` block and applied by the engine — it shows up in
+`edpa_results.json` as `capacity`, `capacity_baseline`, and `capacity_override`.
+
+```bash
+# list current overrides
+python3 .edpa/engine/scripts/capacity_override.py PI-2026-1.4 --list
+
+# set: absolute hours, or +N / -N delta from baseline
+python3 .edpa/engine/scripts/capacity_override.py PI-2026-1.4 --add --person dave  --hours 12 --note "PTO"
+python3 .edpa/engine/scripts/capacity_override.py PI-2026-1.4 --add --person alice --hours +8 --note "release push"
+
+# remove (revert to baseline)
+python3 .edpa/engine/scripts/capacity_override.py PI-2026-1.4 --remove --person dave
+```
+
+- Each change is validated and auto-committed (`--no-commit` to skip the commit).
+- **Closed iterations reject overrides** (audit trail) — set them BEFORE closing.
+  This is also Stage 1 of `/edpa:close-iteration` (`<iter> --prep-only`), so
+  capacity prep can happen during close.
+- A permanent change across all iterations → edit `capacity_per_iteration` in
+  `people.yaml`. Re-run the engine after any change so reports reflect it.
+
+---
+
 ## 4. `/edpa:reports` — generate timesheets and exports
 
 **Purpose:** produce per-person Markdown + JSON reports, per-item cost
