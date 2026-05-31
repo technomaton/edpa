@@ -164,6 +164,7 @@ people:
     email: "bob@example.com"
     availability: confirmed</code></pre>
     <div class="note"><strong>Important:</strong> <code>planning_factor</code> is a planning heuristic (plan to 80%). The EDPA engine always calculates against 100% of capacity — the buffer absorbs unplanned work.</div>
+    <div class="note"><strong>Per-iteration capacity:</strong> the baseline is <code>capacity_per_iteration</code> in <code>people.yaml</code>. To adjust it for a single iteration (PTO, overtime, ramp) use the <code>/edpa:capacity &lt;iteration&gt; --add --person &lt;id&gt; --hours 20|+8|-12 --note "…"</code> command (also <code>--list</code> / <code>--remove</code>). The override is stored in the iteration YAML <code>people:</code> block and shows in the report as <code>capacity</code> / <code>capacity_baseline</code> / <code>capacity_override</code>. Closed iterations reject overrides — set them <em>before</em> closing (Stage 1 of <code>/edpa:close-iteration</code>).</div>
 
     <h3>1.3 Configure the project (project.yaml)</h3>
     <pre><code># /edpa setup generates .edpa/config/project.yaml automatically</code></pre>
