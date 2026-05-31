@@ -392,26 +392,34 @@ Reference Story "3" is different from reference Feature "3". Each level calibrat
 ### 8.4 Role of AI
 AI generates code and documentation. You report time for delivering an item, not minutes writing code. AI shows up in velocity, not in timesheets.
 
-### 8.5 Auto-Calibration of CW Heuristics (after 1st PI)
+### 8.5 Auto-Calibration of CW Heuristics
 
-After the first Planning Interval, sufficient ground truth exists: manually confirmed CW from 4–5 closed iterations. From this point, CW heuristics can be automatically calibrated using an optimization loop inspired by Karpathy's autoresearch pattern.
+CW signal weights are tuned by a self-contained Monte Carlo + coordinate-descent optimizer. It does **not** require a hand-recorded ground-truth file and is runnable at any time — including before the first Planning Interval closes.
 
-Principle: one file, one metric, one loop.
+Principle: one file, one metric, two phases.
 
 ```text
-Target:     .edpa/config/heuristics.yaml
-Metric:     mean_absolute_deviation (auto CW vs ground truth)
+Target:     .edpa/config/cw_heuristics.yaml (signals: section, 5 weights)
+Metric:     mean_absolute_deviation (predicted CW vs synthetic true CW)
 Direction:  lower
-Eval:       python .claude/edpa/scripts/evaluate_cw.py --ground-truth last_pi
-Budget:     50–100 experiments, ~2h overnight
-Memory:     git log on calibration branch
+Optimizer:  .edpa/engine/scripts/calibrate_signals.py (LOCKED)
+Corpus:     1000 synthetic team×iteration scenarios, generated in-process
+Phases:     (1) MC random sampling → (2) coordinate-descent refinement
 ```
 
-Safety constraint: agent must NOT edit .claude/edpa/scripts/evaluate_cw.py (evaluator). Separation of optimizer from objective function prevents gaming.
+The optimizer generates its own ground truth procedurally — no `.edpa/data/ground_truth.yaml` is needed. Each candidate weight vector is scored as MAD over the synthetic corpus; the best vector is written back to `cw_heuristics.yaml.tmpl` when `--apply` is passed.
 
-When to activate: earliest after 1st PI (10 weeks), when >= 20 manually confirmed CW records exist.
+Invoke via the `/edpa:calibrate` skill:
 
-Expected benefit: more accurate CW without manual retrospective discussion, 15–30% deviation reduction vs static heuristic.
+```text
+python3 .edpa/engine/scripts/calibrate_signals.py --scenarios 1000 --seed 42 --apply
+```
+
+Flags: `--scenarios N` (default 1000), `--seed`, `--quick` (smaller MC sample, smoke test), `--apply` (rewrite `cw_heuristics.yaml.tmpl`), `--report PATH` (JSON report).
+
+Safety constraint: agent must NOT edit `calibrate_signals.py`. The synthetic corpus generator and the MAD cost function live inside the locked script intentionally — modifying the generator to favor a weight vector gamifies the metric.
+
+Re-tuning with real data: the synthetic corpus is a prior. Once a closed PI yields team-confirmed CW corrections, a future real-data adapter can replace the synthetic corpus with those records and re-run the same optimizer. Until that adapter ships, the synthetic MC pipeline is the calibration path.
 
 ---
 

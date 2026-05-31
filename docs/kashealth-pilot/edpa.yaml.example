@@ -1,9 +1,11 @@
-# Kashealth pilot — edpa.yaml seed
+# Kashealth pilot — edpa.yaml seed (V2, local-first)
 #
-# Po `cp` do .edpa/config/edpa.yaml stačí 1 edit (project.name).
-# Sekce `sync` je pre-filled na kashealth/kas-platform-v1; sekce
-# `field_ids` / `option_ids` / `github_project_id` se naplní automaticky
-# až `project_setup.py` proběhne (a auto-commit STEP 9b je perzistuje).
+# Po `cp` do .edpa/config/edpa.yaml stačí 1 edit (zkontrolovat
+# project.name). V2 je local-first: `.edpa/backlog/**/*.md` je source
+# of truth, GitHub je volitelný. Žádná sekce `sync:` / `field_ids` /
+# `github_project_id` se NEVYTVÁŘÍ — V2 neprovisuje GitHub Project ani
+# org Issue Types. governance.methodology auto-stampne install.sh /
+# project_setup.py na nainstalovanou verzi pluginu.
 
 project:
   name: "Medical Platform + Datový e-shop"
@@ -48,12 +50,22 @@ project:
         website: "https://medicalc.cz"
 
 governance:
-  methodology: "EDPA 1.14.0"
-  # v1.14: jediná calculation path. Engine kredituje Done Stories
-  # + Feature/Epic/Initiative status transitions z git history.
-  # Pre-v1.14 simple/full/gates mode selector dropnut — gates byl
-  # strict superset simple. audit_mode taky dropnut — snapshots vždy
-  # nesou plný signals[] audit trail.
+  # Auto-stamped na nainstalovanou verzi pluginu install.shem /
+  # project_setup.pym. Single calculation path: engine kredituje Done
+  # Stories + Feature/Epic/Initiative status transitions z git history
+  # + yaml_edit structural signals nad .edpa/backlog/<typ>/<id>.md
+  # v okně iterace. Žádný simple/full/gates mode selector, žádný
+  # audit_mode — snapshoty vždy nesou plný signals[] audit trail.
+  methodology: "EDPA 2.1.8"
+
+# Kadence (AI-native default): 1-week iterace × 5 (4 delivery + 1 IP).
+# Musí zrcadlit `cadence:` blok v people.yaml. Pro classic SAFe nastav
+# iteration_weeks: 2 a pi_weeks: 10.
+cadence:
+  iteration_weeks: 1
+  pi_weeks: 5
+  delivery_iterations_per_pi: 4
+  ip_iterations_per_pi: 1
 
 naming:
   pi_pattern: "PI-{year}-{pi_num}"
@@ -66,9 +78,11 @@ naming:
     story: "S"
     task: "T"
     defect: "D"
+    event: "EV"
 
-# Native GitHub Issue Types (org-level).
-# Pokud chybí v org → `python3 plugin/edpa/scripts/issue_types.py setup --org kashealth`.
+# Issue Types jsou v V2 jen popisná metadata pro dokumenty/board —
+# EDPA je NEPROVISUJE do GitHub org (issue_types.py byl odstraněn).
+# GitHub je volitelný; bez něj má tato sekce čistě dokumentační účel.
 issue_types:
   Initiative: "Strategic business initiative with investment funding"
   Epic: "Large body of work decomposed into features"
@@ -77,12 +91,6 @@ issue_types:
   Defect: "A defect in existing functionality"
   Task: "Technical work without user-facing value"
 
+# Enabler je label klasifikace (Business vs Enabler), ne Issue Type.
 labels:
   Enabler: "Infrastructure, research, technical debt"
-
-sync:
-  github_org: "kashealth"
-  github_repo: "kas-platform-v1"
-  # Vše níže (`github_project_id`, `field_ids`, `option_ids`,
-  # `github_project_number`) se naplní automaticky při project_setup.py.
-  # NEEDITUJTE ručně.

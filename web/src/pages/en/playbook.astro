@@ -9,7 +9,7 @@ import { VERSION } from '../../lib/version';
     <div class="tag">Playbook</div>
     <h1>EDPA Playbook — From zero to first PI</h1>
     <p class="subtitle">Complete guide for deploying the EDPA methodology on a new project</p>
-    <p class="meta">EDPA v{VERSION} &middot; March 2026</p>
+    <p class="meta">EDPA v{VERSION} &middot; May 2026</p>
   </div>
 
   <div class="methodology-layout">
@@ -43,27 +43,27 @@ import { VERSION } from '../../lib/version';
           <tr><th>Tool</th><th>Minimum version</th><th>Check</th></tr>
         </thead>
         <tbody>
-          <tr><td>Python</td><td>3.10+</td><td><code>python --version</code></td></tr>
-          <tr><td>PyYAML</td><td>any</td><td><code>pip install pyyaml</code></td></tr>
-          <tr><td>GitHub CLI (gh)</td><td>2.40+</td><td><code>gh --version</code></td></tr>
+          <tr><td>Python</td><td>3.10+</td><td><code>python3 --version</code></td></tr>
+          <tr><td>pyyaml + openpyxl + ruamel.yaml</td><td>any</td><td><code>pip install pyyaml openpyxl ruamel.yaml</code></td></tr>
           <tr><td>Git</td><td>2.30+</td><td><code>git --version</code></td></tr>
+          <tr><td>GitHub CLI (gh)</td><td>2.40+</td><td><code>gh --version</code> — <strong>optional</strong></td></tr>
         </tbody>
       </table>
     </div>
+    <p>EDPA V2 runs purely locally on top of git. <code>gh</code> is needed <strong>only</strong> if you want the optional PR-signal sync (the <code>edpa-contribution-sync.yml</code> workflow) — see <a href="#faze-2">2.3 Optional GitHub PR-signal sync</a>.</p>
 
-    <h3>GitHub CLI scopes</h3>
-    <pre><code>gh auth login
-gh auth refresh -s repo,project,read:project,admin:org</code></pre>
-    <p>Check:</p>
-    <pre><code>gh auth status
-# Must show scopes: repo, project, admin:org</code></pre>
+    <h3>Optional: GitHub CLI scopes for PR-signal sync</h3>
+    <p>If you enable the optional PR-signal sync, the ordinary <code>repo</code> scope is enough:</p>
+    <pre><code>gh auth login        # ordinary repo scope is enough
+gh auth status</code></pre>
+    <div class="note">Org-level scopes (<code>admin:org</code>, <code>project</code>) from EDPA V1 are <strong>no longer needed</strong> — GitHub Projects and org Issue Types were removed in 2.0.0.</div>
 
-    <h3>Organization and team</h3>
+    <h3>Team and backlog</h3>
     <p>Before you start, you need:</p>
     <ul>
-      <li>A GitHub organization (e.g. <code>my-org</code>)</li>
       <li>A defined team: names, roles (Arch, Dev, DevSecOps, PM, QA, BO), FTE, capacities</li>
       <li>At least a basic backlog (1 Epic, 2-3 Features, 5-10 Stories)</li>
+      <li>A Git repository (a GitHub remote is optional)</li>
     </ul>
 
     <p>
@@ -78,66 +78,74 @@ gh auth refresh -s repo,project,read:project,admin:org</code></pre>
 
   <!-- Phase 1 -->
   <section id="faze-1">
-    <h2>Phase 1: Infrastructure (Day 1, ~4 hours)</h2>
+    <h2>Phase 1: Infrastructure (Day 1, ~1 hour)</h2>
 
     <h3>Path A: Claude Code (recommended)</h3>
     <p>In a terminal with Claude Code installed:</p>
-    <pre><code>/edpa setup</code></pre>
-    <p>Claude Code runs steps 1.1-1.6 automatically — creates the repo, configures the team, sets up Issue Types, and creates the GitHub Project.</p>
+    <pre><code>/edpa:setup --with-ci --with-hooks --with-rules</code></pre>
+    <p>Claude Code (the <code>edpa-setup</code> skill) runs steps 1.1-1.4 automatically — it vendors the engine into <code>.edpa/engine/</code>, seeds the configuration and <code>id_counters.yaml</code>, and optionally installs git hooks, the PR-signal CI workflow, and <code>.claude/rules/</code>. Idempotent — re-running breaks nothing.</p>
 
     <h3>Path B: Manual CLI</h3>
     <p>The steps below describe the manual procedure without Claude Code.</p>
 
-    <h3>1.1 Install the EDPA plugin</h3>
+    <h3>1.1 Install EDPA and vendor the engine</h3>
     <p><strong>Variant A: Shell installer (recommended)</strong></p>
     <pre><code>cd my-project
 curl -fsSL https://edpa.technomaton.com/install.sh | sh</code></pre>
-    <p><strong>Variant B: Manual copy</strong></p>
-    <pre><code>cd my-project
-gh repo clone technomaton/edpa /tmp/edpa
-cp -r /tmp/edpa/plugin/ .claude/
-rm -rf /tmp/edpa</code></pre>
+    <p><strong>Variant B: project_setup.py</strong></p>
+    <p><code>project_setup.py</code> vendors the engine + seeds the configs + <code>id_counters.yaml</code>. Extra flags install git hooks, the contribution-sync CI workflow, and <code>.claude/rules/</code>. No <code>--org</code>/<code>--repo</code> — no GitHub provisioning.</p>
+    <pre><code>python3 .edpa/engine/scripts/project_setup.py --with-ci --with-hooks --with-rules</code></pre>
 
     <p>Resulting structure:</p>
     <pre><code>my-project/
   .edpa/
-    config.yaml          # Main configuration
-    people.yaml          # Team and project
-    initiatives/         # 1 file = 1 initiative
-    epics/               # 1 file = 1 epic
-    features/            # 1 file = 1 feature
-    stories/             # 1 file = 1 story
-    sync_state.json      # Last sync state
-    iterations/          # Iteration plans and results
-  .github/workflows/
-    edpa-branch-check.yml     # CI: branch-naming check
-    edpa-iteration-close.yml  # CI: iteration close (workflow_dispatch)
-    edpa-sync-projects-to-git.yml   # Cron: Projects -&gt; Git (15 min)
-    edpa-sync-git-to-projects.yml   # Push trigger: Git -&gt; Projects
-  .claude/edpa/templates/
-    people.yaml.tmpl   # Capacity-registry template
-    cw_heuristics.yaml.tmpl    # CW heuristics template
-    project.yaml.tmpl    # Project-config template
-  .claude/edpa/scripts/
-    engine.py       # EDPA computational core
-    backlog.py      # Backlog management (tree, show, wsjf, validate)
-    sync.py         # Bidirectional GitHub Projects &lt;-&gt; Git sync
-    issue_types.py  # Issue Types management at org level
-    project_setup.py      # Automated GitHub Project creation
-    project_views.py      # Views setup
-    create_project_views.py    # Playwright views automation (optional)
-    calibrate_signals.py # CW signal-weights calibration (Monte Carlo + MAD)
-  .edpa/data/              # Ground-truth data (post-PI)
-  .edpa/reports/           # Generated per-iteration reports
-  .edpa/snapshots/         # Frozen iteration snapshots
-  docs/                  # Documentation</code></pre>
+    config/
+      edpa.yaml          # Project + governance (source of methodology version)
+      people.yaml        # Team and capacities (cadence, teams, people)
+      cw_heuristics.yaml # CW signal weights
+      id_counters.yaml   # ID counters (S-1, E-1, F-1, ...)
+    backlog/
+      initiatives/       # 1 file = 1 initiative (.md with YAML frontmatter)
+      epics/             # 1 file = 1 epic
+      features/          # 1 file = 1 feature
+      stories/           # 1 file = 1 story
+    iterations/          # PI and iterations (PI-2026-1.yaml, PI-2026-1.1.yaml, ...)
+    reports/             # Generated reports + edpa_results.json per iteration
+    snapshots/           # Frozen iteration snapshots
+    data/                # Ground truth for calibration (post-PI)
+    engine/              # VENDORED engine (installed by project_setup.py)
+      VERSION
+      scripts/
+        engine.py            # EDPA computational core
+        backlog.py           # Backlog management (add, tree, show, wsjf, validate)
+        detect_contributors.py  # evidence[] -&gt; contributors[] (cw)
+        calibrate_signals.py    # Signal-weights calibration (MAD)
+        reports.py           # Timesheets + PI summary + xlsx
+        board.py             # Local HTML Kanban board
+        capacity_override.py # Per-person/iteration capacity override
+        sync_pr_contributions.py  # Materialize PR-thread signals (optional CI)
+        ...                  # other helper scripts + hooks/
+      templates/
+        people.yaml.tmpl
+        cw_heuristics.yaml.tmpl
+        edpa.yaml.tmpl
+  .github/workflows/         # ONLY with --with-ci
+    edpa-contribution-sync.yml  # After PR merge: PR-thread signals -&gt; evidence[]
+  .claude/rules/             # ONLY with --with-rules (architectural rules)
+  docs/                      # Documentation</code></pre>
+    <div class="note"><strong>V2 paths:</strong> the user-facing engine is vendored under <code>.edpa/engine/scripts/*.py</code> (NOT <code>.claude/edpa/scripts/</code>, NOT <code>plugin/edpa/scripts/</code>). Templates live in <code>.edpa/engine/templates/</code>.</div>
 
-    <h3>1.2 Configure the team (people.yaml)</h3>
-    <pre><code># /edpa setup generates .edpa/config/people.yaml automatically</code></pre>
-    <p>Edit <code>.edpa/config/people.yaml</code>:</p>
+    <h3>1.2 Configure the team and capacities (people.yaml)</h3>
+    <p><code>project_setup.py</code> already seeds <code>.edpa/config/people.yaml</code> from the template. Or manually:</p>
+    <pre><code>cp .edpa/engine/templates/people.yaml.tmpl .edpa/config/people.yaml</code></pre>
+    <p>Edit <code>.edpa/config/people.yaml</code>. This is where <strong>cadence + teams + people</strong> live — no separate registry, everything is in one file:</p>
     <pre><code>cadence:
-  iteration_weeks: 2                    # 1 (AI-native) or 2 (classic)
-  pi_weeks: 10                          # 5 or 10
+  # AI-native default: 5-week PI = 4 delivery iterations of 1 week + 1 IP
+  # (a week for debt, prioritization and PI planning — with AI, doable in a day).
+  # Classic SAFe (2-week iterations, 10-week PI) stays supported —
+  # set iteration_weeks: 2 + pi_weeks: 10.
+  iteration_weeks: 1                    # 1 (AI-native, default) or 2 (classic)
+  pi_weeks: 5                           # 5 (AI-native, default) or 10 (classic)
   delivery_iterations_per_pi: 4         # PI minus IP iteration
   ip_iterations_per_pi: 1              # Innovation &amp; Planning
 
@@ -151,52 +159,61 @@ people:
     role: Arch                          # Arch, Dev, DevSecOps, PM, QA, BO
     team: "My Team"
     fte: 0.5
-    capacity_per_iteration: 40          # hours (FTE x 80 for a 2-week iter.)
+    capacity_per_iteration: 20          # hours: FTE x 40 for a 1-week iter.
+                                        # (40 for a 2-week iter.)
     email: "alice@example.com"
-    availability: confirmed
+    availability: confirmed             # confirmed, partial, unavailable
 
   - id: bob
     name: "Bob Johnson"
     role: Dev
     team: "My Team"
     fte: 1.0
-    capacity_per_iteration: 80
+    capacity_per_iteration: 40          # FTE x 40 for a 1-week iter.
     email: "bob@example.com"
-    availability: confirmed</code></pre>
-    <div class="note"><strong>Important:</strong> <code>planning_factor</code> is a planning heuristic (plan to 80%). The EDPA engine always calculates against 100% of capacity — the buffer absorbs unplanned work.</div>
+    availability: confirmed
+
+  # Add more team members...</code></pre>
+    <div class="note"><strong>Important:</strong> <code>planning_factor</code> is a planning heuristic (plan to 80%). The EDPA engine always calculates against 100% of capacity — the buffer absorbs unplanned work. A person's <code>github:</code> field is optional — it is used only by the optional PR-signal sync to map a GH login to <code>people[].id</code>.</div>
+    <div class="note"><strong>V2 note:</strong> there is no separate <code>registry</code>/<code>capacity</code> file. The whole team and its capacities live in <code>people.yaml</code>.</div>
     <div class="note"><strong>Per-iteration capacity:</strong> the baseline is <code>capacity_per_iteration</code> in <code>people.yaml</code>. To adjust it for a single iteration (PTO, overtime, ramp) use the <code>/edpa:capacity &lt;iteration&gt; --add --person &lt;id&gt; --hours 20|+8|-12 --note "…"</code> command (also <code>--list</code> / <code>--remove</code>). The override is stored in the iteration YAML <code>people:</code> block and shows in the report as <code>capacity</code> / <code>capacity_baseline</code> / <code>capacity_override</code>. Closed iterations reject overrides — set them <em>before</em> closing (Stage 1 of <code>/edpa:close-iteration</code>).</div>
 
-    <h3>1.3 Configure the project (project.yaml)</h3>
-    <pre><code># /edpa setup generates .edpa/config/project.yaml automatically</code></pre>
-    <p>Edit <code>.edpa/config/project.yaml</code>:</p>
+    <h3>1.3 Configure the project + governance (edpa.yaml)</h3>
+    <p><code>project_setup.py</code> seeds <code>.edpa/config/edpa.yaml</code> from the template (NOT <code>project.yaml</code> — that does not exist in V2). Or manually:</p>
+    <pre><code>cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml</code></pre>
+    <p>Edit <code>.edpa/config/edpa.yaml</code>:</p>
     <pre><code>project:
-  name: "My Project"
-  registration: ""
-  program: ""
-  organizations:
-    - name: "My Organization"
+  name: "My Project"                    # ← Display name (the only required field)
+  description: ""
   domain: "myproject.com"
+  # Optional: funding (grants) + organizations (for audit/billing)
 
 governance:
+  # Auto-stamped to the plugin version by the installer.
   methodology: "EDPA v{VERSION}"
+  # Single computation path since v1.14 (no simple/full/gates mode selector,
+  # no audit_mode — snapshots always carry the full signals[] audit trail).
 
 naming:
-  pi_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;"
-  iteration_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;.&#123;iter_num&#125;"
-  branch_pattern: "&#123;type&#125;/&#123;item_id&#125;-&#123;description&#125;"
+  pi_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;"                    # PI-2026-1
+  iteration_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;.&#123;iter_num&#125;"  # PI-2026-1.3
+  branch_pattern: "&#123;type&#125;/&#123;item_id&#125;-&#123;description&#125;"    # feature/S-200-omop-parser
   item_prefixes:
     initiative: "I"
     epic: "E"
     feature: "F"
     story: "S"
     task: "T"
-    defect: "D"</code></pre>
+    defect: "D"
+    event: "EV"</code></pre>
+    <div class="note"><strong>Removed in 2.0.0:</strong> the <code>calculation_mode</code> (simple/full) and <code>audit_mode</code> fields. The engine has a single computation path (JS × CW) and snapshots always carry the full audit trail.</div>
 
-    <h3>1.4 Configure CW heuristics</h3>
-    <pre><code># /edpa setup generates .edpa/config/cw_heuristics.yaml automatically</code></pre>
-    <p>Default weights in the <code>cw_heuristics.yaml.tmpl</code> template are calibrated by Monte Carlo simulation (1000 scenarios, 31 041 records, MAD = 0.0805). For most teams the defaults are fine.</p>
+    <h3>1.4 Configure CW signal weights (cw_heuristics.yaml)</h3>
+    <p><code>project_setup.py</code> seeds <code>.edpa/config/cw_heuristics.yaml</code> (NOT <code>heuristics.yaml</code>). Or manually:</p>
+    <pre><code>cp .edpa/engine/templates/cw_heuristics.yaml.tmpl .edpa/config/cw_heuristics.yaml</code></pre>
+    <p>Default weights are calibrated by Monte Carlo simulation. For most teams the defaults are fine to start with. Calibration against your own data is done after the first PI (see <a href="#faze-3">Phase 3</a>).</p>
 
-    <p>The engine consumes five <strong>signal weights</strong> — how much each kind of git evidence contributes to <code>contribution_score</code> on an item:</p>
+    <p>EDPA V2 is <strong>evidence-driven</strong>: <code>cw[person, item] = contribution_score / &Sigma; contribution_score</code>, where <code>contribution_score = &Sigma; signal_weight</code>. The key default signal weights:</p>
 
     <div class="card">
       <table>
@@ -204,260 +221,126 @@ naming:
           <tr><th>Signal</th><th>Weight</th><th>Meaning</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>assignee</code></td><td>4.00</td><td>GitHub issue assignee</td></tr>
+          <tr><td><code>assignee</code></td><td>4.00</td><td>GitHub issue assignee / owner</td></tr>
           <tr><td><code>pr_author</code></td><td>3.40</td><td>PR author referencing the item</td></tr>
-          <tr><td><code>commit_author</code></td><td>2.78</td><td>Commit with S-XXX/F-XXX in branch, title, or message</td></tr>
+          <tr><td><code>commit_author</code></td><td>2.78</td><td>Commit with the ID in branch, title, or message</td></tr>
           <tr><td><code>pr_reviewer</code></td><td>2.25</td><td>PR review submitted (excluding self)</td></tr>
           <tr><td><code>issue_comment</code></td><td>1.14</td><td>Issue/PR comment (excluding bots)</td></tr>
         </tbody>
       </table>
     </div>
 
-    <p>Signals add up into <code>contribution_score</code> per (person, item), then normalize per-item: <code>cw = score / &Sigma;<sub>persons</sub> score</code>. Role labels (owner/key/reviewer/consulted) are derived from the dominant signal at display time only — the engine never stores or uses them for computation.</p>
+    <p>Contributor role weights (<code>--contributor PERSON:ROLE:CW</code>) — owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0. <code>cw_heuristics.yaml</code> additionally carries <code>gate_weights</code> for Feature/Epic/Initiative — a status transition on the parent distributes its Job Size across the lifecycle (sum = 1.0 per type).</p>
 
-    <p>Calibrate via <code>/edpa calibrate</code> — Monte Carlo random sampling + coordinate descent over the 5D signal-weights space against a synthetic corpus. See the <a href="#architektura">Architecture</a> section for details.</p>
-
-    <h3>1.5 Configure .edpa/iterations/ and .edpa/config/edpa.yaml</h3>
-    <p>From v1.5 onward, PI and iteration data live in <code>.edpa/iterations/</code> as separate files. <code>edpa.yaml</code> only carries stable governance / sync config.</p>
+    <h3>1.5 Configure iterations (iterations/)</h3>
+    <p>PI and iterations live in <code>.edpa/iterations/</code> as separate files:</p>
     <pre><code># .edpa/iterations/PI-2026-1.yaml — PI-level metadata
 pi:
   id: PI-2026-1
   status: active
-  iteration_weeks: 2
-  pi_iterations: 5
+  iteration_weeks: 1                      # AI-native default
+  pi_iterations: 5                         # 4 delivery + 1 IP
   start_date: 2026-04-01
-  end_date: 2026-06-09</code></pre>
+  end_date: 2026-05-05</code></pre>
     <pre><code># .edpa/iterations/PI-2026-1.1.yaml — per-iteration data
 iteration:
   id: PI-2026-1.1
   pi: PI-2026-1
   start_date: 2026-04-01
-  end_date: 2026-04-14
-  weeks: 2
+  end_date: 2026-04-07
+  weeks: 1
   status: planned
-# (planning / delivery sections grow as the iteration runs)</code></pre>
-    <p>Create <code>PI-2026-1.2.yaml</code> through <code>PI-2026-1.5.yaml</code> the same way; the last gets <code>type: IP</code>. Continuity is enforced by <code>validate_iterations.py</code> and the PostToolUse hook.</p>
-    <pre><code># .edpa/config/edpa.yaml — sync config
-sync:
-  github_org: "my-org"
-  github_project_number: 1
-  sync_interval: "15m"
-  auto_commit: true</code></pre>
+# planning / delivery / stories_detail follow as the iteration runs</code></pre>
+    <p>Create <code>PI-2026-1.2.yaml</code> through <code>PI-2026-1.5.yaml</code> the same way; the last gets <code>type: IP</code> (Innovation &amp; Planning). Continuity (no gaps / overlaps, <code>weeks</code> × 7 ≈ date span) is enforced by <code>validate_iterations.py</code> and the automatic PostToolUse hook.</p>
+    <div class="note"><strong>Removed in 2.0.0:</strong> the sync block (<code>github_org</code>, <code>github_project_number</code>, <code>sync_interval</code>) — V2 is local-first, no GitHub Project is provisioned.</div>
 
-    <h3>1.6 Set up Issue Types in the organization</h3>
-    <p><strong>Claude Code (recommended):</strong></p>
-    <pre><code>/edpa setup</code></pre>
-    <p>Issue Types are created automatically as part of setup.</p>
-    <p><strong>Manual CLI:</strong></p>
-    <pre><code># Show current types
-python3 .claude/edpa/scripts/issue_types.py list --org my-org
-
-# Create the EDPA Issue Types set
-python3 .claude/edpa/scripts/issue_types.py setup --org my-org
-
-# Dry-run (only shows what would happen)
-python3 .claude/edpa/scripts/issue_types.py setup --org my-org --dry-run</code></pre>
-
-    <p>EDPA creates these Issue Types:</p>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Type</th><th>Color</th><th>Description</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Initiative</td><td style="color:var(--pk)">PINK</td><td>Business case, investment intent</td></tr>
-          <tr><td>Epic</td><td style="color:var(--ac2)">PURPLE</td><td>Strategic goal, 6-9 months</td></tr>
-          <tr><td>Feature</td><td style="color:var(--cy)">BLUE</td><td>Must fit within a Planning Interval</td></tr>
-          <tr><td>Story</td><td style="color:var(--gn)">GREEN</td><td>Delivered within an iteration</td></tr>
-          <tr><td>Defect</td><td style="color:var(--rd)">RED</td><td>Defect in existing functionality</td></tr>
-          <tr><td>Task</td><td style="color:var(--yl)">YELLOW</td><td>Technical work</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="note"><strong>Note:</strong> Enabler is a <strong>label</strong> (Business vs Enabler classification, SAFe), not an Issue Type.</div>
-
-    <h3>1.7 Populate the backlog</h3>
-    <p>EDPA uses a file-per-item structure — every work item is a separate YAML file:</p>
+    <h3>1.6 Populate the backlog</h3>
+    <p>EDPA uses a file-per-item structure — every work item is a separate <strong><code>.md</code> file with YAML frontmatter</strong> (in V2 NOT <code>.yaml</code>):</p>
     <pre><code>.edpa/
-  people.yaml
-  config.yaml
-  initiatives/
-    I-1.yaml         # 1 file = 1 initiative
-  epics/
-    E-1.yaml         # 1 file = 1 epic
-  features/
-    F-1.yaml         # 1 file = 1 feature
-  stories/
-    S-1.yaml         # 1 file = 1 story
+  config/
+    edpa.yaml                    # project + governance
+    people.yaml                  # team and capacities
+    cw_heuristics.yaml           # CW signal weights
+    id_counters.yaml             # ID counters
+  backlog/
+    initiatives/
+      I-1.md                     # 1 file = 1 initiative
+    epics/
+      E-1.md                     # 1 file = 1 epic
+    features/
+      F-1.md                     # 1 file = 1 feature
+    stories/
+      S-1.md                     # 1 file = 1 story
   iterations/
-    PI-2026-1.1.yaml # iteration plan</code></pre>
+    PI-2026-1.1.yaml             # iteration plan</code></pre>
 
-    <p>Example story file (<code>.edpa/backlog/stories/S-1.yaml</code>):</p>
-    <pre><code>id: S-1
+    <p>Example story file (<code>.edpa/backlog/stories/S-1.md</code> — YAML frontmatter + optional body):</p>
+    <pre><code>---
+id: S-1
 type: Story
 title: "Parser implementation"
 status: Backlog
 parent: F-1
 js: 5
-assignee: dev1
-iteration: PI-2026-1.1</code></pre>
+assignee: bob
+iteration: PI-2026-1.1
+---
+Optional description / acceptance criteria in Markdown.</code></pre>
 
-    <p>Adding a new item:</p>
+    <p>Adding a new item (LOCAL — no GitHub calls):</p>
     <pre><code># Claude Code:
-/edpa setup    # interactively adds items
+/edpa:add    # interactively adds one item (Initiative/Epic/Feature/Story/Defect/Event/Risk)
 
 # CLI:
-python3 .claude/edpa/scripts/backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee dev1
-python3 .claude/edpa/scripts/backlog.py add --type Epic --title "..." --js 13 --bv 13 --tc 8 --rr 5</code></pre>
+python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 \
+  --title "..." --js 5 --assignee bob --iteration PI-2026-1.1
+python3 .edpa/engine/scripts/backlog.py add --type Epic --parent I-1 \
+  --title "..." --js 13 --bv 13 --tc 8 --rr-oe 5</code></pre>
+
+    <p><code>backlog.py add</code> is <strong>purely local</strong> in V2 (no <code>gh</code>): the ID is allocated from <code>id_counters.yaml</code> (<code>S-42</code>, <code>E-15</code>, <code>I-3</code>), the parent hierarchy is validated, the YAML is written under <code>.edpa/backlog/</code>, and the change is auto-committed as <code>feat(&lt;ID&gt;):</code>. PR-derived signals arrive later via the optional contribution-sync workflow.</p>
+    <div class="note"><strong>Removed in 2.0.0:</strong> the "GH-first" mode of <code>add</code> (creating a GH issue, sub-issue API, rewriting the title to <code>"&#123;ID&#125;: &#123;title&#125;"</code>). In V2 <code>add</code> is local-only — the V1 "strictly GH-first" claim NO LONGER holds.</div>
+
+    <p>Contributors can be assigned right at creation time (per-item CW share):</p>
+    <pre><code>python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 --title "..." --js 5 \
+  --contributor bob:owner:0.7 --contributor carol:reviewer:0.3
+# Format PERSON:ROLE:CW, ROLE ∈ &#123;owner,key,reviewer,consulted&#125;, CW ∈ [0,1]</code></pre>
 
     <p>Verify integrity:</p>
-    <pre><code>python3 .claude/edpa/scripts/backlog.py validate</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/backlog.py validate</code></pre>
     <p>Show the hierarchy:</p>
-    <pre><code>python3 .claude/edpa/scripts/backlog.py tree
-python3 .claude/edpa/scripts/backlog.py tree --level epic</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/backlog.py tree
+python3 .edpa/engine/scripts/backlog.py tree --level epic</code></pre>
     <p>Show WSJF prioritization:</p>
-    <pre><code>python3 .claude/edpa/scripts/backlog.py wsjf
-python3 .claude/edpa/scripts/backlog.py wsjf --level feature</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/backlog.py wsjf
+python3 .edpa/engine/scripts/backlog.py wsjf --level feature</code></pre>
+    <p>Show item detail:</p>
+    <pre><code>python3 .edpa/engine/scripts/backlog.py show S-1
+python3 .edpa/engine/scripts/backlog.py show E-1</code></pre>
 
-    <h3>1.8 Create the GitHub Project</h3>
-    <p><strong>Claude Code (recommended):</strong></p>
-    <pre><code>/edpa setup</code></pre>
-    <p>The GitHub Project is created automatically as part of setup.</p>
-    <p><strong>Manual CLI:</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/project_setup.py \
-  --org my-org \
-  --repo my-project \
-  --project-title "EDPA -- My Project"</code></pre>
-    <p>The script performs 9 steps:</p>
-    <ol>
-      <li>Creates labels (Enabler)</li>
-      <li>Creates GitHub Project v2 at org level</li>
-      <li>Creates custom fields: Job Size, BV, TC, RR&amp;OE, WSJF Score, Team + 4 Status fields (Initiative/Epic/Feature/Story Status with SAFe workflows)</li>
-      <li>Links project to repository</li>
-      <li>Queries native Issue Types from organization</li>
-      <li>Creates issues from item files in <code>.edpa/</code> with native Issue Types</li>
-      <li>Sets field values on all project items</li>
-      <li>Links sub-issues (parent-child hierarchy Initiative&rarr;Epic&rarr;Feature&rarr;Story)</li>
-      <li>Updates <code>.edpa/config/edpa.yaml</code> with project number</li>
-    </ol>
-
-    <h3>1.9 Set up Project views</h3>
-    <p><strong>Claude Code (recommended):</strong></p>
-    <pre><code>/edpa setup</code></pre>
-    <p>Views are configured automatically as part of setup.</p>
-    <p><strong>Manual CLI:</strong></p>
-    <p><strong>Path A: Manual setup with instructions</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/project_views.py instructions --org my-org --project 1</code></pre>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>View</th><th>Type</th><th>Filter/Sort</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>All Items</td><td>Table</td><td>All items, sorted by WSJF</td></tr>
-          <tr><td>Board</td><td>Board</td><td>Funnel / Analyzing / Backlog / Implementing / Done</td></tr>
-          <tr><td>Epics</td><td>Table</td><td><code>type:Epic</code>, sorted by WSJF</td></tr>
-          <tr><td>Features</td><td>Table</td><td><code>type:Feature</code>, sorted by WSJF</td></tr>
-          <tr><td>WSJF Ranking</td><td>Table</td><td>Grouped by Issue Type, sorted by WSJF</td></tr>
-          <tr><td>Current Iteration</td><td>Board</td><td>Filtered by current iteration, daily standup view</td></tr>
-          <tr><td>My Work</td><td>Table</td><td><code>assignee:@me</code>, personal overview</td></tr>
-          <tr><td>Roadmap</td><td>Roadmap</td><td>Timeline by Planning Interval</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <p><strong>Path B: Mark as template</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/project_views.py template --org my-org --project 1</code></pre>
-    <p><strong>Path C: Create from template</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/project_views.py create-from-template \
-  --org my-org --template 1 --title "New Project"</code></pre>
-    <p><strong>Check:</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/project_views.py verify --org my-org --project 1</code></pre>
-
-    <h3>1.10 Configure Automations and Status Fields</h3>
-    <p><strong>Status fields (4 typed):</strong></p>
-    <p><code>project_setup.py</code> automatically creates 4 status fields on GitHub Projects &mdash; one per work-item level:</p>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Field</th><th>Applies to</th><th>Workflow</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>Initiative Status</strong></td><td>Initiative</td><td>Funnel &rarr; Reviewing &rarr; Analyzing &rarr; Ready &rarr; Implementing &rarr; Done</td></tr>
-          <tr><td><strong>Epic Status</strong></td><td>Epic</td><td>Funnel &rarr; Reviewing &rarr; Analyzing &rarr; Ready &rarr; Implementing &rarr; Done</td></tr>
-          <tr><td><strong>Feature Status</strong></td><td>Feature</td><td>Funnel &rarr; Analyzing &rarr; Backlog &rarr; Implementing &rarr; Validating &rarr; Deploying &rarr; Releasing &rarr; Done</td></tr>
-          <tr><td><strong>Story Status</strong></td><td>Story</td><td>Funnel &rarr; Analyzing &rarr; Backlog &rarr; Implementing &rarr; Validating &rarr; Deploying &rarr; Releasing &rarr; Done</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p><strong>Engine logic:</strong> <code>status == "Done"</code> = finished. Everything else = in-work. No Blocked/Spillover labels.</p>
-
-    <p><strong>GitHub Projects Automations &mdash; what to enable:</strong></p>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Automation</th><th>Recommendation</th><th>Reason</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Item added to project &rarr; Set status "Funnel"</td><td><strong>Enable</strong></td><td>New issues get a default status</td></tr>
-          <tr><td>Auto-add issues from linked repo</td><td><strong>Enable</strong></td><td>Issues from repo automatically in project</td></tr>
-          <tr><td>PR merged &rarr; Set status "Done"</td><td>Do not enable</td><td>Premature &mdash; item may still need QA</td></tr>
-          <tr><td>Item closed &rarr; Auto-archive</td><td><strong style="color: var(--error)">NEVER</strong></td><td>Archived items disappear from API &rarr; sync.py loses them &rarr; EDPA engine loses data</td></tr>
-          <tr><td>Item reopened &rarr; Set status "Implementing"</td><td>Do not enable</td><td>Conflicts with sync &mdash; reopened item may need different status</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p>Configure: project &rarr; <strong>...</strong> menu &rarr; <strong>Workflows</strong> &rarr; enable only recommended ones.</p>
-
-    <p><strong>Granularity</strong> &mdash; all levels share the same modified Fibonacci scale (1, 2, 3, 5, 8, 13, 20, 40, 100) with no fixed per-level cap. Granularity is the team's responsibility during refinement &mdash; if a Story at JS=20+ fits within the iteration, that's fine. AI-assisted work shifts real throughput, and the old human heuristic ("Story max 8") no longer applies.</p>
-
-    <p><strong>Definition of Ready</strong> &mdash; no item enters delivery without:</p>
-    <ul>
-      <li>Issue Type set</li>
-      <li>Parent issue linked (sub-issue)</li>
-      <li>Job Size estimated</li>
-      <li>BV + TC + RR&amp;OE filled</li>
-      <li>Contributors assigned &mdash; <code>contributors[]</code> in YAML
-          (auto-detected from PR/commit evidence, or seeded with <code>person</code> + <code>cw</code> share)</li>
-      <li>Iteration or Planning Interval assigned</li>
-    </ul>
-
-    <p><strong>Recommended Insights charts</strong> (project &rarr; <strong>Insights</strong> tab &rarr; <strong>New chart</strong>):</p>
-    <ul>
-      <li><strong>Burn-down</strong> &mdash; X: time, Y: item count, Group: Status</li>
-      <li><strong>Items by Status</strong> &mdash; bar chart</li>
-      <li><strong>Items by Team</strong> &mdash; workload distribution</li>
-      <li><strong>Items by Issue Type</strong> &mdash; hierarchy balance</li>
-    </ul>
-    <p>Insights = real-time dashboards. EDPA engine = governance-grade calculations (derived hours, CW). They complement each other.</p>
-
-    <h3>1.11 Verify Setup</h3>
-    <p><strong>Claude Code (recommended):</strong></p>
-    <pre><code>/edpa close-iteration    # demo run (no real data)
-/edpa sync status        # check sync</code></pre>
-    <p><strong>Manual CLI:</strong></p>
+    <h3>1.7 Verify setup</h3>
     <pre><code># Demo EDPA engine (no real data)
-python3 .claude/edpa/scripts/engine.py --demo
+python3 .edpa/engine/scripts/engine.py --demo
 
 # Backlog validation
-python3 .claude/edpa/scripts/backlog.py validate
+python3 .edpa/engine/scripts/backlog.py validate
 
 # Project status
-python3 .claude/edpa/scripts/backlog.py status
+python3 .edpa/engine/scripts/backlog.py status
 
-# Sync status
-python3 .claude/edpa/scripts/sync.py status</code></pre>
+# Visual HTML board (local-first replacement for the Projects board)
+python3 .edpa/engine/scripts/board.py --output .edpa/board.html</code></pre>
 
-    <h3>1.12 Commit Initial Configuration</h3>
-    <pre><code>git add .edpa/config/people.yaml .edpa/config/project.yaml .edpa/config/heuristics.yaml
-git add .edpa/
-git commit -m "feat(edpa): initial EDPA setup for my-project"
-git push origin main</code></pre>
+    <h3>1.8 Commit the base configuration</h3>
+    <p><code>backlog.py add</code> commits items automatically. Commit the initial config and the vendored engine:</p>
+    <pre><code>git add .edpa/
+git commit -m "feat(edpa): initial EDPA V2 setup for my-project"
+git push origin main   # optional, if you have a GitHub remote</code></pre>
+    <div class="note"><strong>Removed in 2.0.0:</strong> §1.6 Issue Types (<code>issue_types.py setup --org</code>), §1.8 GitHub Project (<code>project_setup.py --org/--repo/--project-title</code>, custom fields, sub-issues), §1.9 Project views (<code>project_views.py</code>, <code>create_project_views.py</code>, Playwright). V2 replaces the board view with the local <code>board.py</code> / <code>/edpa:board</code>.</div>
   </section>
 
   <!-- Phase 2 -->
   <section id="faze-2">
-    <h2>Phase 2: First iteration (Week 1-2)</h2>
+    <h2>Phase 2: First iteration (Week 1)</h2>
 
     <h3>2.1 Iteration Planning</h3>
     <ol>
@@ -465,32 +348,48 @@ git push origin main</code></pre>
       <li><strong>Story selection</strong> — from the backlog by WSJF order, up to 80% of capacity</li>
     </ol>
     <pre><code># WSJF ranking features
-python3 .claude/edpa/scripts/backlog.py wsjf --level feature
+python3 .edpa/engine/scripts/backlog.py wsjf --level feature
 
 # Tree for a specific iteration
-python3 .claude/edpa/scripts/backlog.py tree --iteration PI-2026-1.1</code></pre>
+python3 .edpa/engine/scripts/backlog.py tree --iteration PI-2026-1.1</code></pre>
     <ol start="3">
       <li><strong>Assignee allocation</strong> — every story must have an assignee</li>
       <li><strong>Backlog update</strong> — <code>iteration: PI-2026-1.1</code> on the selected stories</li>
     </ol>
 
     <h3>2.2 Daily work</h3>
-    <p><strong>Branch naming convention</strong> (CI check in <code>.github/workflows/edpa-branch-check.yml</code>):</p>
+    <p>The branch-naming convention <code>&#123;type&#125;/&#123;ITEM&#125;-&#123;description&#125;</code> is in V2 enforced by <strong>git hooks</strong> (<code>--with-hooks</code>), no longer by CI:</p>
     <pre><code># Format: &#123;type&#125;/&#123;ITEM_ID&#125;-&#123;description&#125;
 git checkout -b feature/S-200-omop-parser
 git checkout -b feature/F-102-anon-engine
-git checkout -b defect/D-215-upload-validation
+git checkout -b bugfix/S-215-upload-validation
 git checkout -b chore/T-050-ci-pipeline</code></pre>
-    <p>Allowed types: <code>feature</code>, <code>defect</code>, <code>hotfix</code>, <code>chore</code></p>
+    <p>Allowed types: <code>feature</code>, <code>bugfix</code>, <code>hotfix</code>, <code>chore</code></p>
+    <p>Allowed prefixes: <code>S</code> (Story), <code>F</code> (Feature), <code>E</code> (Epic), <code>T</code> (Task), <code>D</code> (Defect), <code>I</code> (Initiative), <code>EV</code> (Event)</p>
+
+    <p><strong>Git hooks (<code>--with-hooks</code>)</strong> materialize evidence locally, without GitHub:</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Hook</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>pre-commit</td><td>ID safety — reference check</td></tr>
+          <tr><td>commit-msg</td><td>Requires an item reference or <code>no-ticket:</code></td></tr>
+          <tr><td>post-commit</td><td>Records <code>commit_author</code> evidence</td></tr>
+          <tr><td>pre-push</td><td>Checks for ID collisions</td></tr>
+        </tbody>
+      </table>
+    </div>
 
     <p><strong>Commit convention:</strong></p>
     <pre><code>git commit -m "feat(S-200): implement OMOP CDM parser"
 git commit -m "fix(S-215): validate upload file size"
 git commit -m "test(S-201): add unit tests for parser"
 git commit -m "docs(E-10): update epic hypothesis"</code></pre>
-    <p>The EDPA engine recognizes <code>S-XXX</code>, <code>F-XXX</code>, <code>E-XXX</code> references in commits and PRs as evidence.</p>
+    <p>The EDPA engine recognizes <code>S-XXX</code>, <code>F-XXX</code>, <code>E-XXX</code> references in commits (and optionally in PRs) as evidence.</p>
 
-    <p><strong>Pull Request workflow:</strong></p>
+    <p><strong>Pull Request workflow (optional, only with a GitHub remote):</strong></p>
     <pre><code>git push origin feature/S-200-omop-parser
 gh pr create --title "S-200: OMOP CDM parser implementation" \
   --body "Closes #42
@@ -502,49 +401,33 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
 ## Testing
 - Unit tests: 15 passing
 "</code></pre>
-    <p>PR review = evidence for EDPA (the reviewer receives CW per their signal).</p>
+    <p>PR review = a signal for EDPA. For PR-thread signals (<code>pr_reviewer</code>, <code>issue_comment</code>) to land in <code>evidence[]</code>, the optional contribution-sync workflow is required — see <a href="#faze-2">2.3</a>.</p>
 
-    <h3>2.3 Sync (automatic)</h3>
-    <p>Bidirectional synchronization between GitHub Projects (UI for PM/BO) and item files in <code>.edpa/</code> (Git-native):</p>
-    <p><strong>Automatic via GitHub Actions:</strong></p>
-    <ul>
-      <li><code>edpa-sync-projects-to-git.yml</code> — pulls Projects changes into Git every 15 minutes</li>
-      <li><code>edpa-sync-git-to-projects.yml</code> — on push to <code>main</code> with a <code>.edpa/</code> change, propagates into Projects</li>
-    </ul>
-    <p><strong>Claude Code (recommended):</strong></p>
-    <pre><code>/edpa sync pull      # GitHub Projects → item files in .edpa/
-/edpa sync push      # item files in .edpa/ → GitHub Projects
-/edpa sync diff      # show what would change
-/edpa sync status    # sync state</code></pre>
-    <p><strong>Manual CLI:</strong></p>
-    <pre><code># Pull: GitHub Projects -&gt; item files in .edpa/
-python3 .claude/edpa/scripts/sync.py pull
-
-# Push: item files in .edpa/ -&gt; GitHub Projects
-python3 .claude/edpa/scripts/sync.py push
-
-# Diff: show what would change
-python3 .claude/edpa/scripts/sync.py diff
-
-# Status
-python3 .claude/edpa/scripts/sync.py status</code></pre>
+    <h3>2.3 Optional GitHub PR-signal sync</h3>
+    <p>EDPA V2 works purely locally — the engine reads evidence from git (<code>commit_author</code>) + YAML edits (<code>yaml_edit</code>) + gate transitions. GitHub is <strong>optional</strong> and serves only to materialize PR-thread signals.</p>
+    <p>With <code>--with-ci</code>, the <strong>single</strong> V2 workflow <code>.github/workflows/edpa-contribution-sync.yml</code> is installed. After a PR merge it runs <code>sync_pr_contributions.py</code>, which extracts signals (<code>pr_reviewer</code>, <code>issue_comment</code>) from the PR thread and writes them into the relevant items' <code>evidence[]</code>. It requires the <code>EDPA_TOKEN</code> secret (see <code>docs/edpa-token-setup.md</code>). Flow metrics can be read via the MCP tool <code>edpa_flow_metrics</code>.</p>
+    <div class="note"><strong>Removed in 2.0.0:</strong> bidirectional sync <code>sync.py</code> (pull/push/diff/status/conflicts/<code>--mock</code>) — it <strong>does not exist</strong> in V2. Likewise the <code>edpa-sync-projects-to-git.yml</code> and <code>edpa-sync-git-to-projects.yml</code> workflows. No GitHub Project is propagated. For a board, use the local <code>/edpa:board</code>.</div>
 
     <h3>2.4 Iteration Close</h3>
-    <p>At the end of each iteration (after 2 weeks):</p>
+    <p>At the end of each iteration (1 week AI-native / 2 weeks classic):</p>
     <p><strong>Claude Code (recommended):</strong></p>
-    <pre><code>/edpa close-iteration PI-2026-1.1</code></pre>
+    <pre><code>/edpa:close-iteration PI-2026-1.1</code></pre>
+    <p>Claude Code (the <code>close-iteration</code> skill) prepares capacity, runs the EDPA engine, and generates the reports automatically.</p>
     <p><strong>Manual CLI:</strong></p>
-    <pre><code>python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1
+# optional: --output path/edpa_results.json</code></pre>
 
     <p><strong>Outputs:</strong></p>
     <pre><code>.edpa/reports/iteration-PI-2026-1.1/
-  edpa_results.json      # Complete calculation (JSON)
-  vykaz-alice.md         # Per-person timesheet
-  item-costs.xlsx        # Per-item costs (Excel)
+  edpa_results.json        # Complete calculation (JSON)
+  timesheet-alice.md       # Timesheet per person (DerivedHours &gt; 0)
+  timesheet-team.md        # Aggregated team rollup
+  edpa-results.xlsx        # Team Summary + Item Costs (Excel)
 .edpa/snapshots/
-  PI-2026-1.1.json       # Frozen snapshot</code></pre>
+  PI-2026-1.1.json         # Frozen snapshot (audit trail)</code></pre>
+    <div class="note"><strong>Note:</strong> per-person files are <code>timesheet-&lt;id&gt;.md</code> (in V2 NO LONGER <code>vykaz-*.md</code>).</div>
 
-    <p><strong>Gated calculation:</strong> the engine credits Story <code>Done</code> + Feature/Epic/Initiative gate transitions from git history.</p>
+    <p><strong>Calculation</strong> (the single path since v1.14): <code>score = JS × CW</code>, <code>hours = (score / &Sigma; score) × capacity</code>. No <code>--mode simple|full</code> and no Role Strength.</p>
     <div class="card">
       <pre><code>Score        = JobSize &times; CW
 DerivedHours = (Score / &Sigma;Scores) &times; Capacity</code></pre>
@@ -553,8 +436,8 @@ DerivedHours = (Score / &Sigma;Scores) &times; Capacity</code></pre>
 
     <p><strong>Invariants</strong> (engine checks automatically):</p>
     <ul>
-      <li>Sum of hours per person = their capacity (deviation &lt; 0.01h)</li>
-      <li>Sum of ratios = 1.0 (deviation &lt; 0.001)</li>
+      <li>Sum of a person's <code>DerivedHours</code> == their capacity (exactly)</li>
+      <li>Sum of ratios == 1.0</li>
       <li>No negative hours</li>
       <li>If an invariant fails, the engine reports <code>FAIL</code></li>
     </ul>
@@ -592,9 +475,9 @@ delivery:
     <h2>Phase 3: PI Close (after 4-5 iterations)</h2>
 
     <h3>Path A: Claude Code (recommended)</h3>
-    <pre><code>/edpa calibrate</code></pre>
-    <p>Claude Code runs CW calibration, evaluates MAD, and proposes heuristic adjustments.</p>
-    <pre><code>/edpa reports</code></pre>
+    <pre><code>/edpa:calibrate</code></pre>
+    <p>Claude Code (the <code>edpa-autocalib</code> skill) runs calibration of the signal weights via a Monte Carlo + coordinate-descent optimizer, evaluates MAD, and proposes adjustments to <code>cw_heuristics.yaml</code>. To generate reports:</p>
+    <pre><code>/edpa:reports PI-2026-1</code></pre>
 
     <h3>Path B: Manual CLI</h3>
 
@@ -607,9 +490,9 @@ delivery:
 
     <h3>3.2 Ground truth for calibration (optional)</h3>
     <p>
-      The calibrator runs against a Monte Carlo synthetic corpus (1,000
-      scenarios &times; 31,041 records) and searches for MAD-optimal
-      signal weights in <code>.edpa/config/heuristics.yaml</code>. A
+      The calibrator runs against a Monte Carlo synthetic corpus and
+      searches for MAD-optimal signal weights in
+      <code>.edpa/config/cw_heuristics.yaml</code>. A
       <code>ground_truth.yaml</code> is not required &mdash; you can
       run it anytime, even before the first PI close.
     </p>
@@ -633,24 +516,18 @@ delivery:
 
   # ... at least 20 records for reliable calibration</code></pre>
 
-    <h3>3.3 Calibrating CW heuristics</h3>
+    <h3>3.3 Calibrating CW signals</h3>
     <p><strong>Claude Code (recommended):</strong></p>
-    <pre><code>/edpa calibrate</code></pre>
+    <pre><code>/edpa:calibrate</code></pre>
     <p><strong>Manual CLI:</strong></p>
-    <pre><code># Dry-run &mdash; shows proposed MAD reduction without writing
-python3 .claude/edpa/scripts/calibrate_signals.py
-
-# Apply &mdash; rewrites .edpa/config/heuristics.yaml with new signal weights
-python3 .claude/edpa/scripts/calibrate_signals.py --apply</code></pre>
-    <p>Output:</p>
-    <pre><code>Phase 1 (random sample): 1000 scenarios, MAD baseline = 0.0861
-Phase 2 (coordinate descent): MAD calibrated = 0.0805 (-6.5%)
-Calibrated weights:
-  assignee:       4.00
-  pr_author:      3.40
-  commit_author:  2.78
-  pr_reviewer:    2.25
-  issue_comment:  1.14</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/calibrate_signals.py \
+  --ground-truth .edpa/data/ground_truth.yaml \
+  --heuristics .edpa/config/cw_heuristics.yaml</code></pre>
+    <p><code>calibrate_signals.py</code> (the <code>/edpa:calibrate</code> skill) runs in two phases: a random Monte Carlo sample across the signal weights &rarr; coordinate-descent (Nelder-Mead) refinement around the best candidates. The metric is MAD on a synthetic corpus; lower MAD = better calibration.</p>
+    <p>Output (illustrative):</p>
+    <pre><code>MAD=0.041200
+RECORDS=20
+TOTAL_DEVIATION=0.824000</code></pre>
 
     <p><strong>MAD interpretation (Mean Absolute Deviation):</strong></p>
     <div class="card">
@@ -667,12 +544,22 @@ Calibrated weights:
       </table>
     </div>
 
+    <p><strong>Correcting signal weights:</strong></p>
+    <p>If MAD &gt; 0.06, analyze where the largest deviations are:</p>
+    <ol>
+      <li>Look at records where <code>abs(auto_cw - confirmed_cw)</code> is highest</li>
+      <li>Identify patterns by role (typically BO, PM, Arch — strategic roles are under-credited by git)</li>
+      <li>Adjust the <code>signals:</code> weights in <code>.edpa/config/cw_heuristics.yaml</code></li>
+      <li>Re-run calibration</li>
+    </ol>
+    <div class="note"><strong>Removed in 2.0.0:</strong> <code>evaluate_cw.py</code> (replaced by <code>calibrate_signals.py</code> / <code>/edpa:calibrate</code>) and the <code>heuristics.yaml</code> file (replaced by <code>cw_heuristics.yaml</code>).</div>
+
     <h3>3.4 Planning the next PI</h3>
     <ol>
-      <li><strong>New epics/features</strong> — add as files into <code>.edpa/backlog/epics/</code> and <code>.edpa/backlog/features/</code></li>
-      <li><strong>WSJF prioritization:</strong> <code>python3 .claude/edpa/scripts/backlog.py wsjf</code></li>
-      <li><strong>Capacity planning</strong> — update <code>.edpa/config/people.yaml</code></li>
-      <li><strong>Update <code>.edpa/config/edpa.yaml</code></strong> — new PI, iterations, dates</li>
+      <li><strong>New epics/features</strong> — add via <code>backlog.py add</code> (auto-commit) into <code>.edpa/backlog/</code></li>
+      <li><strong>WSJF prioritization:</strong> <code>python3 .edpa/engine/scripts/backlog.py wsjf</code></li>
+      <li><strong>Capacity planning</strong> — update <code>.edpa/config/people.yaml</code> (FTE changes, availability)</li>
+      <li><strong>Create new iteration files</strong> in <code>.edpa/iterations/</code> for the new PI</li>
     </ol>
   </section>
 
@@ -682,43 +569,52 @@ Calibrated weights:
 
     <h3>With Claude Code (recommended)</h3>
     <p>Every iteration:</p>
-    <pre><code>/edpa close-iteration PI-2026-1.X    # close the iteration
-/edpa reports                         # generate reports</code></pre>
+    <pre><code>/edpa:close-iteration PI-2026-1.X    # close the iteration
+/edpa:reports PI-2026-1.X             # generate reports</code></pre>
     <p>Every PI:</p>
-    <pre><code>/edpa calibrate                       # CW calibration</code></pre>
+    <pre><code>/edpa:calibrate                       # calibrate signal weights</code></pre>
 
-    <h3>Each iteration (every 2 weeks)</h3>
+    <h3>Each iteration (1 week AI-native / 2 weeks classic)</h3>
     <ol>
       <li><strong>Planning</strong> — pick stories, assign assignees</li>
-      <li><strong>Daily work</strong> — branch naming, commits with references, PR review</li>
+      <li><strong>Daily work</strong> — branch naming, commits with references, (optional) PR review</li>
       <li><strong>Iteration Close</strong> — EDPA engine, report generation</li>
-      <li><strong>Sync</strong> — automatically versions changes (GitHub Actions cron 15min)</li>
-      <li><strong>Review</strong> — team checks the timesheets, reports corrections</li>
+      <li><strong>Review</strong> — team checks the timesheets, reports corrections (manual CW override via <code>--contributor</code> / <code>/contribute</code>)</li>
     </ol>
 
-    <h3>Each PI (every 10 weeks)</h3>
+    <h3>Each PI (5 weeks AI-native / 10 weeks classic)</h3>
     <ol>
       <li><strong>Retrospective</strong> — auto-detected CW vs. reality</li>
       <li><strong>Ground truth</strong> — record at least 20 new entries</li>
-      <li><strong>CW calibration</strong> — <code>calibrate_signals.py</code> &mdash; Monte Carlo calibration of signal weights, evaluate MAD</li>
+      <li><strong>CW calibration</strong> — <code>calibrate_signals.py</code>, evaluate MAD</li>
       <li><strong>Velocity trend</strong> — compare delivery across iterations</li>
       <li><strong>Predictability</strong> — (delivered_sp / planned_sp) across iterations</li>
     </ol>
+    <pre><code># Status for a whole iteration
+python3 .edpa/engine/scripts/backlog.py status --iteration PI-2026-1.3
 
-    <h3>Automation via GitHub Actions</h3>
+# Overall project status
+python3 .edpa/engine/scripts/backlog.py status
+
+# Capacity override (e.g. extra hours outside evidence)
+python3 .edpa/engine/scripts/capacity_override.py PI-2026-1.1 --add --person bob --hours 12
+
+# Velocity / flow reports
+python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
+
+    <h3>Optional automation via GitHub Actions</h3>
+    <p>V2 has a <strong>single</strong> optional workflow (only with <code>--with-ci</code>):</p>
     <div class="card">
       <table>
         <thead>
           <tr><th>Workflow</th><th>Trigger</th><th>What it does</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>edpa-branch-check.yml</code></td><td>PR opened/sync</td><td>Checks the branch-naming convention</td></tr>
-          <tr><td><code>edpa-iteration-close.yml</code></td><td>workflow_dispatch</td><td>Runs the EDPA engine, commits results</td></tr>
-          <tr><td><code>edpa-sync-projects-to-git.yml</code></td><td>cron (15min)</td><td>Pull: Projects &rarr; item files</td></tr>
-          <tr><td><code>edpa-sync-git-to-projects.yml</code></td><td>push to .edpa/</td><td>Push: item files &rarr; Projects</td></tr>
+          <tr><td><code>edpa-contribution-sync.yml</code></td><td>after PR merge</td><td><code>sync_pr_contributions.py</code> materializes PR-thread signals (<code>pr_reviewer</code>, <code>issue_comment</code>) into <code>evidence[]</code></td></tr>
         </tbody>
       </table>
     </div>
+    <div class="note"><strong>Removed in 2.0.0:</strong> <code>edpa-branch-check.yml</code>, <code>edpa-iteration-close.yml</code>, <code>edpa-sync-projects-to-git.yml</code>, <code>edpa-sync-git-to-projects.yml</code>. The branch convention is now guarded by a local git hook, iteration close runs locally, and bidirectional sync does not exist.</div>
   </section>
 
   <!-- Checklist -->
@@ -727,58 +623,58 @@ Calibrated weights:
 
     <h3>Day 1</h3>
     <ul class="checklist">
-      <li>Repo created with EDPA structure</li>
-      <li><code>.edpa/config/people.yaml</code> — team with roles, FTE, capacities</li>
-      <li><code>.edpa/config/project.yaml</code> — project name, metadata</li>
-      <li><code>.edpa/config/heuristics.yaml</code> — default heuristics</li>
-      <li><code>.edpa/config/edpa.yaml</code> — PI, iterations, dates, sync</li>
-      <li>Issue Types set up on the organization</li>
-      <li>Backlog populated (at least 1 Epic, 3 Features, 10 Stories)</li>
+      <li>Engine vendored into <code>.edpa/engine/</code> (<code>/edpa:setup</code> or <code>project_setup.py</code>)</li>
+      <li><code>.edpa/config/people.yaml</code> — team with roles, FTE, capacities (cadence + teams + people)</li>
+      <li><code>.edpa/config/edpa.yaml</code> — project name, governance, naming</li>
+      <li><code>.edpa/config/cw_heuristics.yaml</code> — default signal weights (from the template)</li>
+      <li><code>.edpa/config/id_counters.yaml</code> — seeded</li>
+      <li><code>.edpa/iterations/</code> — PI + iterations with dates</li>
+      <li>Backlog populated via <code>backlog.py add</code> (at least 1 Epic, 3 Features, 10 Stories)</li>
       <li><code>backlog.py validate</code> passes without errors</li>
-      <li>GitHub Project created</li>
-      <li>Project views set up</li>
       <li><code>engine.py --demo</code> runs successfully</li>
+      <li>(optional) git hooks installed (<code>--with-hooks</code>), contribution-sync CI (<code>--with-ci</code>)</li>
     </ul>
 
     <h3>Week 1</h3>
     <ul class="checklist">
-      <li>Team works with the branch-naming convention</li>
+      <li>Team works with the branch-naming convention (<code>feature/S-XXX-description</code>)</li>
       <li>Commits reference work items (<code>feat(S-XXX): ...</code>)</li>
-      <li>PR reviews are happening</li>
-      <li>Sync works (<code>sync.py status</code>)</li>
-      <li>Item files in .edpa/ update automatically</li>
+      <li>post-commit hook records <code>commit_author</code> evidence</li>
+      <li>(optional) PR reviews are happening and contribution-sync materializes them</li>
     </ul>
 
     <h3>End of iteration 1</h3>
     <ul class="checklist">
       <li>EDPA engine run for the iteration</li>
-      <li><code>edpa_results.json</code> generated</li>
-      <li>Timesheets generated (per-person)</li>
+      <li><code>edpa_results.json</code> generated in <code>.edpa/reports/iteration-&lt;ID&gt;/</code></li>
+      <li>Timesheets <code>timesheet-&lt;id&gt;.md</code> generated (per-person)</li>
       <li>All invariants passed (<code>all_invariants_passed: true</code>)</li>
+      <li>Snapshot frozen in <code>.edpa/snapshots/</code></li>
       <li>Team reviewed the results</li>
-      <li>Iteration file created in <code>.edpa/iterations/</code></li>
     </ul>
 
     <h3>End of iterations 2-4</h3>
     <ul class="checklist">
       <li>Velocity stable (deviation &lt; 20%)</li>
-      <li>Predictability &gt; 80%</li>
-      <li>No unresolved sync conflicts</li>
+      <li>Predictability &gt; 80% (delivered / planned)</li>
     </ul>
 
     <h3>End of PI 1</h3>
     <ul class="checklist">
       <li>Ground truth recorded (min. 20 entries)</li>
-      <li>CW calibration completed (<code>calibrate_signals.py --apply</code>)</li>
+      <li>CW calibration completed (<code>calibrate_signals.py</code> / <code>/edpa:calibrate</code>)</li>
       <li>MAD evaluated (target: &lt; 0.06)</li>
-      <li>Heuristics adjusted (if MAD &gt; 0.06)</li>
+      <li>Signal weights adjusted in <code>cw_heuristics.yaml</code> (if MAD &gt; 0.06)</li>
       <li>PI 2 planning — new epics, WSJF, capacities</li>
+      <li>New iteration files in <code>.edpa/iterations/</code> for the new PI</li>
     </ul>
   </section>
 
   <!-- CLI Reference -->
   <section id="cli-reference">
     <h2>CLI Reference</h2>
+
+    <div class="note">All scripts run from the vendored engine: <code>python3 .edpa/engine/scripts/&lt;script&gt;.py</code>.</div>
 
     <h3>Claude Code commands (recommended)</h3>
     <div class="card">
@@ -787,10 +683,12 @@ Calibrated weights:
           <tr><th>Command</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>/edpa setup</code></td><td>Initial project setup — repo, team, Issue Types, GitHub Project</td></tr>
-          <tr><td><code>/edpa close-iteration PI-2026-1.X</code></td><td>Close an iteration — pull evidence, run engine, generate reports</td></tr>
-          <tr><td><code>/edpa reports</code></td><td>Generate reports and timesheets</td></tr>
-          <tr><td><code>/edpa calibrate</code></td><td>CW calibration — evaluate MAD, propose heuristic adjustments</td></tr>
+          <tr><td><code>/edpa:setup --with-ci --with-hooks --with-rules</code></td><td>Vendors the engine, seeds configs + id_counters, optional hooks/CI/rules</td></tr>
+          <tr><td><code>/edpa:add</code></td><td>Add a backlog item (local, auto-commit)</td></tr>
+          <tr><td><code>/edpa:close-iteration PI-2026-1.X</code></td><td>Close an iteration — capacity, EDPA engine, reports</td></tr>
+          <tr><td><code>/edpa:reports PI-2026-1.X</code></td><td>Generate timesheets and PI summary</td></tr>
+          <tr><td><code>/edpa:board</code></td><td>Visual HTML Kanban board (local)</td></tr>
+          <tr><td><code>/edpa:calibrate</code></td><td>Calibrate signal weights — MAD, propose <code>cw_heuristics.yaml</code> adjustments</td></tr>
         </tbody>
       </table>
     </div>
@@ -802,9 +700,10 @@ Calibrated weights:
           <tr><th>Command</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>engine.py --edpa-root .edpa --iteration ID</code></td><td>Full EDPA calculation for an iteration (reads from .edpa/backlog/)</td></tr>
           <tr><td><code>engine.py --demo</code></td><td>Demo with built-in sample data</td></tr>
-          <tr><td><code>engine.py --iteration ID --capacity ... --heuristics ...</code></td><td>Legacy mode with explicit files</td></tr>
+          <tr><td><code>engine.py --edpa-root .edpa --iteration PI-2026-1.3</code></td><td>Full EDPA calculation for an iteration (reads backlog/config/heuristics from <code>.edpa</code>)</td></tr>
+          <tr><td><code>engine.py --edpa-root .edpa --iteration ID --output path/edpa_results.json</code></td><td>Custom output path</td></tr>
+          <tr><td><code>engine.py --status</code></td><td>Configuration state</td></tr>
         </tbody>
       </table>
     </div>
@@ -816,166 +715,188 @@ Calibrated weights:
           <tr><th>Command</th><th>Description</th></tr>
         </thead>
         <tbody>
+          <tr><td><code>backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee bob --iteration PI-2026-1.1</code></td><td>Add an item locally (ID from id_counters.yaml, auto-commit <code>feat(&lt;ID&gt;):</code>)</td></tr>
+          <tr><td><code>backlog.py add --type Epic --parent I-1 --title "..." --js 13 --bv 13 --tc 8 --rr-oe 5</code></td><td>Add an Epic with WSJF metrics</td></tr>
+          <tr><td><code>backlog.py add ... --contributor PERSON:ROLE:CW</code></td><td>Add a contributor (owner/key/reviewer/consulted, CW ∈ [0,1])</td></tr>
           <tr><td><code>backlog.py tree</code></td><td>Show the full hierarchy (I &rarr; E &rarr; F &rarr; S)</td></tr>
-          <tr><td><code>backlog.py tree --level epic</code></td><td>Epics only</td></tr>
+          <tr><td><code>backlog.py tree --level epic|feature|story</code></td><td>Filter by level</td></tr>
           <tr><td><code>backlog.py tree --iteration PI-2026-1.1</code></td><td>Filter stories by iteration</td></tr>
-          <tr><td><code>backlog.py show S-200</code></td><td>Item detail</td></tr>
-          <tr><td><code>backlog.py status</code></td><td>Overall project status</td></tr>
-          <tr><td><code>backlog.py wsjf</code></td><td>WSJF prioritization (all levels)</td></tr>
+          <tr><td><code>backlog.py show S-1</code></td><td>Item detail</td></tr>
+          <tr><td><code>backlog.py status [--iteration PI-2026-1.1]</code></td><td>Project / iteration status</td></tr>
+          <tr><td><code>backlog.py wsjf [--level feature]</code></td><td>WSJF prioritization</td></tr>
           <tr><td><code>backlog.py validate</code></td><td>Backlog integrity check</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>sync.py — Bidirectional sync</h3>
+    <h3>reports.py — Timesheets and PI summary</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Command</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>sync.py pull</code></td><td>GitHub Projects &rarr; item files in <code>.edpa/</code></td></tr>
-          <tr><td><code>sync.py push</code></td><td>item files in <code>.edpa/</code> &rarr; GitHub Projects</td></tr>
-          <tr><td><code>sync.py diff</code></td><td>Show diffs (dry-run)</td></tr>
-          <tr><td><code>sync.py status</code></td><td>State of the last sync</td></tr>
-          <tr><td><code>sync.py conflicts</code></td><td>Unresolved conflicts</td></tr>
+          <tr><td><code>reports.py PI-2026-1.1</code></td><td>Per-person <code>timesheet-&lt;id&gt;.md</code> + <code>timesheet-team.md</code> + xlsx</td></tr>
+          <tr><td><code>reports.py --pi PI-2026-1</code></td><td>Aggregate all iterations under a PI</td></tr>
+          <tr><td><code>reports.py PI-2026-1.1 --out path/</code></td><td>Custom output directory</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>issue_types.py — Issue Types (org-level)</h3>
+    <h3>board.py — Local HTML board</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Command</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>issue_types.py list --org ORG</code></td><td>Show current types</td></tr>
-          <tr><td><code>issue_types.py setup --org ORG</code></td><td>Create the EDPA Issue Types set</td></tr>
-          <tr><td><code>issue_types.py setup --org ORG --dry-run</code></td><td>Dry-run setup</td></tr>
-          <tr><td><code>issue_types.py migrate --org ORG --repo REPO</code></td><td>Migrate labels &rarr; Issue Types</td></tr>
+          <tr><td><code>board.py --output .edpa/board.html</code></td><td>Generate a Kanban board from <code>.edpa/backlog/</code></td></tr>
+          <tr><td><code>board.py --iteration PI-2026-1.4 --open</code></td><td>Filter by iteration + open in the browser</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>project_setup.py — GitHub Project initialization</h3>
+    <h3>capacity_override.py — Capacity override</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Command</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>project_setup.py --org ORG --repo REPO</code></td><td>Create a complete Project</td></tr>
-          <tr><td><code>project_setup.py --org ORG --repo REPO --dry-run</code></td><td>Just show what it would do</td></tr>
+          <tr><td><code>capacity_override.py PI-2026-1.1 --list</code></td><td>List existing overrides</td></tr>
+          <tr><td><code>capacity_override.py PI-2026-1.1 --add --person bob --hours 12</code></td><td>Add an override</td></tr>
+          <tr><td><code>capacity_override.py PI-2026-1.1 --remove --person bob</code></td><td>Remove an override</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>calibrate_signals.py — CW Signal-Weight Calibration</h3>
+    <h3>detect_contributors.py / calibrate_signals.py</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Command</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>calibrate_signals.py</code></td><td>Dry-run calibration against the synthetic corpus</td></tr>
+          <tr><td><code>detect_contributors.py</code></td><td>Convert <code>evidence[]</code> &rarr; <code>contributors[]</code> (cw) from real signals</td></tr>
+          <tr><td><code>calibrate_signals.py --ground-truth .edpa/data/ground_truth.yaml --heuristics .edpa/config/cw_heuristics.yaml</code></td><td>Calibrate signal weights (MAD)</td></tr>
         </tbody>
       </table>
     </div>
+
+    <h3>sync_pr_contributions.py (optional, CI)</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>sync_pr_contributions.py</code></td><td>Materializes PR-thread signals (<code>pr_reviewer</code>, <code>issue_comment</code>) into <code>evidence[]</code>. Runs <code>edpa-contribution-sync.yml</code> after a PR merge; requires <code>EDPA_TOKEN</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note"><strong>Removed in 2.0.0:</strong> <code>sync.py</code> (bidirectional sync — does not exist in V2), <code>issue_types.py</code> (org Issue Types), <code>project_setup.py --org/--repo/--project-title</code> (GitHub Project provisioning — in V2 <code>project_setup.py</code> only vendors the engine), <code>project_views.py</code> + <code>create_project_views.py</code> (Project views / Playwright), <code>evaluate_cw.py</code> (replaced by <code>calibrate_signals.py</code>).</div>
   </section>
 
   <!-- Architecture -->
   <section id="architektura">
     <h2>Architecture</h2>
 
-    <pre><code>GitHub Projects (UI)  &lt;--&gt;  .edpa/ item files (Git)
-       |                          |
-  PM/BO operate            Versioned, auditable
-       |                          |
-  Issue Types (org)        EDPA engine (compute)
-       |                          |
-  Custom fields            Reports + Snapshots</code></pre>
+    <p>V2 is <strong>local-first</strong>: <code>.edpa/</code> (backlog in <code>.md</code> + config) is the single source of truth, git is the audit trail. GitHub is optional — the only inbound flow is the one-way materialization of PR-thread signals into <code>evidence[]</code>.</p>
+
+    <pre><code>                  .edpa/  (git) -- SINGLE SOURCE OF TRUTH
+        backlog/**/*.md  +  config/  +  iterations/
+                                |
+              +-----------------+-----------------+
+              |                 |                 |
+        EDPA engine        backlog.py         board.py
+        (compute)          (add/tree/wsjf)    (HTML board)
+              |                                    |
+        +-----+-----+                              v
+        |           |                       .edpa/board.html
+   reports/     snapshots/                  (local)
+   timesheet-*.md  *.json
+   xlsx</code></pre>
 
     <h3>Data flow</h3>
-    <pre><code>                    +---------------------------+
-                    |    GitHub Projects (UI)    |
-                    |  PM/BO manage the backlog  |
-                    +---------------------------+
-                         |              ^
-           sync pull     |              |     sync push
-         (cron 15min)    v              |   (push trigger)
-                    +---------------------------+
-                    |  .edpa/ item files (Git)   |
-                    |  Source of truth           |
-                    +---------------------------+
-                              |
-                    +---------+---------+
-                    |                   |
-              +----------+       +----------+
-              |  Engine  |       |  Backlog |
-              | (compute)|       |  CLI     |
-              +----------+       +----------+
-                    |                   |
-              +----------+       +----------+
-              | Reports  |       |  WSJF    |
-              | Snapshots|       |  Tree    |
-              | Timesheet|       |  Validate|
-              +----------+       +----------+</code></pre>
+    <pre><code>   (optional) GitHub PR thread
+   reviews / comments
+              |
+              |  edpa-contribution-sync.yml (after PR merge)
+              |  sync_pr_contributions.py
+              v  -- ONE-WAY: signals -> evidence[]
+   +-------------------------------------+
+   |  .edpa/  (git) -- SOURCE OF TRUTH   |
+   |  backlog *.md  config  iterations   |
+   |  evidence[] &lt;- git commit_author    |
+   |             &lt;- yaml_edit            |
+   |             &lt;- gate transitions     |
+   +-------------------------------------+
+              |
+        detect_contributors.py
+        evidence[] -> contributors[] (cw)
+              |
+        +-----+-----------------------+
+        |             |               |
+   EDPA engine    reports.py      board.py
+   (JS x CW)      timesheets      HTML board
+        |
+   reports/ + snapshots/ + xlsx</code></pre>
+    <div class="note"><strong>Removed in 2.0.0:</strong> bidirectional GitHub Projects &harr; Git sync, org Issue Types, custom fields. No GitHub Project is provisioned or propagated.</div>
 
     <h3>Evidence detection</h3>
+    <p>EDPA is evidence-driven. <code>cw[person, item] = contribution_score / Σ_persons contribution_score</code>, where <code>contribution_score = Σ signal_weight</code>. Default signal weights (<code>cw_heuristics.yaml</code>):</p>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Signal</th><th style="text-align:right">Weight</th><th>Derived role (display)</th></tr>
+          <tr><th>Signal</th><th style="text-align:right">Weight</th><th>Source</th></tr>
         </thead>
         <tbody>
-          <tr><td>GitHub issue assignee</td><td style="text-align:right">4.00</td><td>owner</td></tr>
-          <tr><td>PR author referencing item</td><td style="text-align:right">3.40</td><td>key</td></tr>
-          <tr><td>Commit author with S-XXX/F-XXX</td><td style="text-align:right">2.78</td><td>reviewer</td></tr>
-          <tr><td>PR reviewer</td><td style="text-align:right">2.25</td><td>reviewer</td></tr>
-          <tr><td>Issue/PR comment</td><td style="text-align:right">1.14</td><td>consulted</td></tr>
-          <tr><td><code>/contribute @person weight:X</code></td><td style="text-align:right">explicit</td><td>key (default)</td></tr>
+          <tr><td><code>assignee</code></td><td style="text-align:right">4.00</td><td>issue assignee</td></tr>
+          <tr><td><code>pr_author</code></td><td style="text-align:right">3.40</td><td>PR author referencing the item</td></tr>
+          <tr><td><code>commit_author</code></td><td style="text-align:right">2.78</td><td>commit with the ID (local git, post-commit hook)</td></tr>
+          <tr><td><code>pr_reviewer</code></td><td style="text-align:right">2.25</td><td>PR review submitted (excluding self)</td></tr>
+          <tr><td><code>issue_comment</code></td><td style="text-align:right">1.14</td><td>issue/PR comment (excluding bots)</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Signals <strong>aggregate additively</strong> into contribution_score per (person, item), then normalize per-item: <code>cw = score / Σ_persons score</code> (Σ across persons = 1.0). Role label is derived from dominant signal type for display only, not stored.</p>
+    <p>Local signals (<code>commit_author</code>, <code>yaml_edit</code>, gate transitions) are read by the engine directly from git/YAML. PR-thread signals (<code>pr_reviewer</code>, <code>issue_comment</code>) arrive only via the optional contribution-sync. A manual <code>/contribute @person weight:X</code> (or <code>--contributor</code>) carries its weight verbatim.</p>
+    <p>Contributor role weights: owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0. Signals <strong>aggregate additively</strong> into contribution_score per (person, item), then normalize per-item: <code>cw = score / Σ_persons score</code> (Σ across persons = 1.0).</p>
 
-    <h3>EDPA calculation — gated</h3>
-    <p>For each person in an iteration:</p>
+    <h3>EDPA calculation</h3>
+    <p>The single computation path since v1.14 (no simple/full/gates mode). For each person in an iteration:</p>
     <ol>
-      <li>Detect evidence signals per (person, item) via <code>detect_contributors.py</code></li>
-      <li>Per-item normalization: <code>cw_i = contribution_score_i / Σ_persons contribution_score</code> (Σ cw per item = 1.0)</li>
-      <li>Stories at <code>status: Done</code> + Feature/Epic/Initiative gate transitions from git history: <code>score = JS × cw</code> (gates: <code>JS × gate_weight × cw</code>)</li>
+      <li>Gather evidence on each item &rarr; <code>contributors[]</code> with <code>cw</code></li>
+      <li>For each (person, item) pair: <code>score = JS × CW</code></li>
       <li>Per person: <code>ratio_i = score_i / Σ scores</code></li>
       <li>Derived hours: <code>hours_i = ratio_i × capacity</code></li>
     </ol>
-    <div class="note"><strong>Invariants:</strong> <code>Σ hours = capacity</code> per person AND <code>Σ cw = 1.0</code> per item — always, by construction.</div>
+    <div class="note"><strong>Invariant:</strong> <code>Σ DerivedHours = capacity</code> per person (exactly, not approximately). Feature/Epic/Initiative status transitions additionally distribute the parent's Job Size via <code>gate_weights</code>.</div>
   </section>
 
   <!-- Troubleshooting -->
   <section id="troubleshooting">
     <h2>Troubleshooting</h2>
 
-    <h3>gh auth — missing scopes</h3>
-    <pre><code>ERROR: insufficient scopes for organization query</code></pre>
-    <p><strong>Fix:</strong></p>
-    <pre><code>gh auth refresh -s repo,project,read:project,admin:org
-gh auth status  # verify</code></pre>
-
-    <h3>Issue Types — "Not Found" during setup</h3>
-    <pre><code>ERROR: Organization not found or insufficient permissions</code></pre>
-    <p><strong>Fix:</strong></p>
-    <ul>
-      <li>Verify you are a member of the organization with admin rights</li>
-      <li>Issue Types require org-level access (not a personal account)</li>
-      <li><code>gh auth refresh -s admin:org</code></li>
-    </ul>
+    <h3>gh auth (only the optional PR-signal sync)</h3>
+    <p>The EDPA V2 core does not need <code>gh</code>. If the optional contribution-sync workflow fails on authentication, add the <code>EDPA_TOKEN</code> secret (see <code>docs/edpa-token-setup.md</code>) or locally:</p>
+    <pre><code>gh auth login        # ordinary repo scope is enough
+gh auth status</code></pre>
+    <div class="note">V2 no longer needs org scopes (<code>admin:org</code>, <code>project</code>) — GitHub Projects and org Issue Types were removed in 2.0.0.</div>
 
     <h3>Backlog validate — errors</h3>
     <pre><code>ERROR: S-200 references non-existent feature F-999</code></pre>
-    <p><strong>Fix:</strong> verify that every <code>feature:</code> reference in stories points to an existing feature.</p>
-    <pre><code>WARNING: S-200 Job Size out of range (JS=120, range=1..100)</code></pre>
-    <p><strong>Fix:</strong> Job Size is outside the modified Fibonacci scale (1, 2, 3, 5, 8, 13, 20, 40, 100). If the item really is that large, consider breaking it down &mdash; but fixed per-level caps no longer apply, granularity is the team's responsibility during refinement.</p>
+    <p><strong>Fix:</strong></p>
+    <ul>
+      <li>Verify that every <code>feature:</code> reference in stories points to an existing feature</li>
+      <li>Every story must have a parent feature</li>
+      <li>Every feature must have a parent epic</li>
+    </ul>
+    <pre><code>WARNING: S-200 Job Size exceeds maximum (JS=13, max=8)</code></pre>
+    <p><strong>Fix:</strong></p>
+    <ul>
+      <li>Story JS max 8 (classic 2/10) or 5 (AI-native 1/5)</li>
+      <li>Split a large story into smaller ones</li>
+    </ul>
 
     <h3>EDPA engine — invariant failure</h3>
     <pre><code>INVARIANT FAILURE -- check results
@@ -983,56 +904,77 @@ All invariants passed: NO</code></pre>
     <p><strong>Possible causes:</strong></p>
     <ul>
       <li>Person has no evidence (not assignee, no commits)</li>
-      <li>All CW values are 0</li>
+      <li>All CW values are 0 (no evidence above the threshold)</li>
       <li>Capacity is 0</li>
     </ul>
-    <p><strong>Fix:</strong> verify every person has at least one assigned work item, commits/PRs reference the correct item IDs, capacities &gt; 0 in <code>.edpa/config/people.yaml</code>.</p>
-
-    <h3>Sync — conflicts</h3>
-    <pre><code>CONFLICT: S-200 modified in both Git and Projects</code></pre>
     <p><strong>Fix:</strong></p>
-    <p><strong>Claude Code (recommended):</strong></p>
-    <pre><code>/edpa sync diff       # show diffs
-/edpa sync push       # after resolving the conflict</code></pre>
-    <p><strong>Manual CLI:</strong></p>
-    <pre><code># Show conflicts
-python3 .claude/edpa/scripts/sync.py conflicts
+    <ul>
+      <li>Verify every person has at least one assigned work item</li>
+      <li>Verify commits/PRs reference the correct item IDs (S-XXX, F-XXX)</li>
+      <li>Verify <code>.edpa/config/people.yaml</code> — capacities &gt; 0</li>
+    </ul>
 
-# Diff
-python3 .claude/edpa/scripts/sync.py diff</code></pre>
-    <p>Resolve manually in the relevant item file in <code>.edpa/</code>, then:</p>
-    <pre><code>python3 .claude/edpa/scripts/sync.py push</code></pre>
-
-    <h3>Sync — loop prevention</h3>
-    <p>The <code>edpa-sync-git-to-projects.yml</code> workflow contains:</p>
-    <pre><code>if: github.actor != 'github-actions[bot]'</code></pre>
-    <p>This prevents an infinite loop: push &rarr; sync &rarr; push &rarr; sync...</p>
-
-    <h3>GitHub Project — missing custom fields</h3>
-    <pre><code>ERROR: Field "Job Size" not found on project</code></pre>
-    <p><strong>Fix:</strong> re-run <code>project_setup.py</code>, or manually: Settings &rarr; Custom fields &rarr; Add field.</p>
-
-    <h3>Branch naming CI failure</h3>
+    <h3>Branch naming — rejected commit/push (git hook)</h3>
     <pre><code>Branch name does not follow EDPA convention.
 Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</code></pre>
-    <p><strong>Fix:</strong> use the format <code>feature/S-200-omop-parser</code>. Types: <code>feature</code>, <code>defect</code>, <code>hotfix</code>, <code>chore</code>. <code>main</code>, <code>develop</code>, <code>release/*</code> are exceptions.</p>
+    <p>In V2 the convention is guarded by a local git hook (<code>--with-hooks</code>), no longer by CI.</p>
+    <p><strong>Fix:</strong></p>
+    <ul>
+      <li>Format: <code>feature/S-200-omop-parser</code>, <code>bugfix/S-215-fix-validation</code></li>
+      <li>Type: <code>feature</code>, <code>bugfix</code>, <code>hotfix</code>, <code>chore</code></li>
+      <li>Prefix: <code>S</code> (Story), <code>F</code> (Feature), <code>E</code> (Epic), <code>T</code> (Task), <code>D</code> (Defect), <code>EV</code> (Event)</li>
+      <li><code>main</code>, <code>develop</code>, <code>release/*</code> are exceptions (pass without checking)</li>
+    </ul>
+
+    <h3>commit-msg hook — missing item reference</h3>
+    <pre><code>commit-msg: no item reference found</code></pre>
+    <p><strong>Fix:</strong></p>
+    <ul>
+      <li>Add an item reference to the message: <code>feat(S-200): ...</code></li>
+      <li>Or, for commits without a ticket, use the <code>no-ticket:</code> prefix</li>
+    </ul>
+
+    <h3>Python — missing dependencies</h3>
+    <pre><code>ERROR: pyyaml required. Install with: pip install pyyaml</code></pre>
+    <p><strong>Fix:</strong></p>
+    <pre><code>pip install pyyaml openpyxl ruamel.yaml</code></pre>
 
     <h3>MAD too high (&gt; 0.10)</h3>
+    <p><strong>Possible causes:</strong></p>
+    <ul>
+      <li>Strategic roles (BO, PM, Arch) have systematically lower auto-CW than reality</li>
+      <li>Git measures only commits/PRs, not decision-making, specification, mentoring</li>
+    </ul>
     <p><strong>Fix:</strong></p>
     <ol>
-      <li>Analyze records with the largest <code>abs(predicted_cw - confirmed_cw)</code> per (person, item)</li>
-      <li>Group by dominant signal type (assignee / pr_author / commit_author / pr_reviewer / issue_comment)</li>
-      <li>If a strategic role (PM / BO / Arch) is systematically under-credited, the calibrator increases <code>signals.issue_comment</code> or <code>signals.pr_reviewer</code> weight</li>
-      <li>Run <code>python3 .claude/edpa/scripts/calibrate_signals.py --apply</code> to re-baseline against current ground truth</li>
-      <li>Re-run engine, verify invariants + new MAD</li>
+      <li>Analyze records with the largest <code>abs(auto_cw - confirmed_cw)</code></li>
+      <li>Group by role</li>
+      <li>Adjust the <code>signals:</code> weights in <code>.edpa/config/cw_heuristics.yaml</code> (raise the weight of the signal that represents that role)</li>
+      <li>Optionally add a manual <code>/contribute @person weight:X</code> on items where strategic work is invisible in git</li>
+      <li>Re-run <code>calibrate_signals.py</code></li>
     </ol>
 
     <h3>Iteration close — "config not found"</h3>
     <pre><code>ERROR: .edpa/config/people.yaml not found. Run EDPA setup first.</code></pre>
     <p><strong>Fix:</strong></p>
-    <pre><code># /edpa setup generates .edpa/config/people.yaml automatically
-# /edpa setup generates .edpa/config/heuristics.yaml automatically
-# /edpa setup generates .edpa/config/project.yaml automatically</code></pre>
+    <p>Run setup (vendors the engine + seeds the configs):</p>
+    <pre><code>/edpa:setup
+# or
+python3 .edpa/engine/scripts/project_setup.py</code></pre>
+    <p>Or copy from the templates in <code>.edpa/engine/templates/*.tmpl</code>:</p>
+    <pre><code>cp .edpa/engine/templates/people.yaml.tmpl .edpa/config/people.yaml
+cp .edpa/engine/templates/cw_heuristics.yaml.tmpl .edpa/config/cw_heuristics.yaml
+cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml</code></pre>
+    <p>The files in <code>.edpa/config/*.yaml</code> (not <code>*.yaml.tmpl</code>) must be committed in the repo.</p>
+
+    <h3>PR-signal sync — missing evidence from a PR</h3>
+    <p>PR-thread signals (<code>pr_reviewer</code>, <code>issue_comment</code>) land in <code>evidence[]</code> only via the optional contribution-sync.</p>
+    <p><strong>Fix:</strong></p>
+    <ul>
+      <li>Verify <code>.github/workflows/edpa-contribution-sync.yml</code> is installed (<code>/edpa:setup --with-ci</code>)</li>
+      <li>Verify the <code>EDPA_TOKEN</code> secret (see <code>docs/edpa-token-setup.md</code>)</li>
+      <li>The workflow runs only <strong>after</strong> a PR merge; before merge, evidence holds only local signals (<code>commit_author</code>, <code>yaml_edit</code>)</li>
+    </ul>
   </section>
 
   <!-- Glossary -->
@@ -1044,18 +986,18 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
           <tr><th>Term</th><th>Meaning</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>PI</strong></td><td>Planning Interval (10 weeks = 4 delivery + 1 IP iteration)</td></tr>
+          <tr><td><strong>PI</strong></td><td>Planning Interval (AI-native 5 weeks = 4 delivery + 1 IP; classic SAFe 10 weeks)</td></tr>
           <tr><td><strong>IP</strong></td><td>Innovation &amp; Planning (the last iteration of a PI)</td></tr>
           <tr><td><strong>JS</strong></td><td>Job Size — relative work size (Fibonacci)</td></tr>
           <tr><td><strong>BV</strong></td><td>Business Value</td></tr>
           <tr><td><strong>TC</strong></td><td>Time Criticality</td></tr>
-          <tr><td><strong>RR&amp;OE</strong></td><td>Risk Reduction &amp; Opportunity Enablement</td></tr>
-          <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR&amp;OE)/JS</td></tr>
-          <tr><td><strong>cw</strong></td><td>Contribution Weight — per-item share (Σ across persons = 1.0)</td></tr>
-          <tr><td><strong>contribution_score</strong></td><td>Raw sum of signal weights (audit input)</td></tr>
-          <tr><td><strong>signals[]</strong></td><td>Audit trail: type/ref/weight/detected_at per signal</td></tr>
-          <tr><td><strong>MAD</strong></td><td>Mean Absolute Deviation</td></tr>
-          <tr><td><strong>Evidence</strong></td><td>Proof of work (commit, PR, assignee, comment)</td></tr>
+          <tr><td><strong>RR-OE</strong></td><td>Risk Reduction &amp; Opportunity Enablement (CLI flag <code>--rr-oe</code>, legacy alias <code>--rr</code>)</td></tr>
+          <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR-OE)/JS</td></tr>
+          <tr><td><strong>CW</strong></td><td>Contribution Weight — per-item share (0.0 - 1.0); per-item <code>Σ cw = 1.0</code></td></tr>
+          <tr><td><strong>Signal</strong></td><td>Proof of contribution from git/PR (assignee, pr_author, commit_author, pr_reviewer, issue_comment) with a weight</td></tr>
+          <tr><td><strong>MAD</strong></td><td>Mean Absolute Deviation (calibration metric)</td></tr>
+          <tr><td><strong>Evidence</strong></td><td><code>evidence[]</code> on an item — aggregated signals; <code>detect_contributors.py</code> computes <code>contributors[]</code> from them</td></tr>
+          <tr><td><strong>Gate</strong></td><td>Status transition on a Feature/Epic/Initiative; distributes the parent JS via <code>gate_weights</code></td></tr>
           <tr><td><strong>Ground truth</strong></td><td>Team-confirmed reality (used for calibration)</td></tr>
         </tbody>
       </table>

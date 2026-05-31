@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: "EDPA_TOKEN — průvodce nastavením"
-description: "Step-by-step guide pro vygenerování GitHub PAT a uložení jako EDPA_TOKEN secret. Bez tohoto tokenu sync workflowy mezi .edpa/backlog/ a GitHub Project tiše no-opují."
+description: "Step-by-step guide pro vygenerování GitHub PAT a uložení jako EDPA_TOKEN secret. Pohání volitelný contribution-sync workflow, který po merge PR materializuje PR-thread signály (pr_reviewer, issue_comment) do evidence[] položky v .edpa/backlog/."
 ---
 
 <!-- Web mirror of docs/edpa-token-setup.md.
@@ -12,26 +12,37 @@ description: "Step-by-step guide pro vygenerování GitHub PAT a uložení jako 
 
 # EDPA_TOKEN — průvodce nastavením
 
-> **Komu je určeno:** každý, kdo nasadil EDPA na repo s **org-scoped
-> GitHub Project v2** a chce, aby sync mezi `.edpa/backlog/*.yaml`
-> a Project boardem běžel automaticky bez manuální obsluhy.
+> **Komu je určeno:** každý, kdo nasadil EDPA na repo a chce, aby
+> **contribution-sync workflow** (`edpa-contribution-sync.yml`) běžel
+> po merge PR automaticky — tedy aby se PR-thread signály
+> (`pr_reviewer`, `issue_comment`) materializovaly zpět do
+> `evidence[]` položky v `.edpa/backlog/**/*.md` bez manuální obsluhy.
 >
 > **Čas:** ~5 minut. **Frekvence:** jednou per repo (nebo jednou per
 > org pokud použiješ organization secret).
 >
-> **Doporučená cesta** — alternativa je `sync.py pull/push` manuálně
-> před každým commitem, což škáluje jen na pár-osobový tým a jednu
-> iteraci, ne na 6-měsíční pilot s týdenním close.
+> **Kdy to vůbec potřebuješ:** jen pokud tým má signály, které
+> nežijí v git historii — reviews a komentáře v PR/issue threadech.
+> Primární atribuce v V2.1+ jde přes lokální post-commit hook
+> (`local_evidence.py`), který emituje `commit_author` offline a
+> žádný token nepotřebuje. Single-dev / review-light / mimo-GitHub
+> týmy tenhle workflow (a tím i `EDPA_TOKEN`) vynechají.
 
 ## 1. Proč to potřebuješ
 
-Dva GitHub Actions workflowy (`edpa-sync-projects-to-git.yml` a
-`edpa-sync-git-to-projects.yml`) volají Projects v2 GraphQL API. Default
-`GITHUB_TOKEN`, který GitHub injektuje do každého workflow runu,
-nemá scope pro Projects v2 (jsou **org-scoped**, ne repo-scoped) —
-GraphQL vrátí 403 nebo prázdné výsledky.
+Po merge PR, který referencuje EDPA položku, naskočí workflow
+`edpa-contribution-sync.yml`. Ten spustí
+`.edpa/engine/scripts/sync_pr_contributions.py`, který přečte review
+a komentáře z PR threadu a zapíše je jako `evidence[]` záznamy do
+příslušného `.edpa/backlog/**/*.md` (commit zpět na base branch).
 
-Řešení: **Personal Access Token (PAT)** se správnými scopes,
+Default `GITHUB_TOKEN`, který GitHub injektuje do každého runu, je
+pro tenhle scénář často nedostatečný — typicky když PR přichází
+z forku, nebo když má org restrikce na default-token write/push.
+V takovém případě má job přiznané `contents: write`, ale push se
+přesto odrazí. Robustní řešení je dát workflowu vlastní token.
+
+Řešení: **Personal Access Token (PAT)** se správnými permissions,
 uložený jako repo nebo org secret pod jménem `EDPA_TOKEN`.
 
 ## 2. Klasický PAT vs. Fine-grained PAT
@@ -48,8 +59,8 @@ classic, na konci je sekce s odlišnostmi.
 
 ## 3. Vytvoření PAT (fine-grained)
 
-1. Přihlas se do GitHubu jako **vlastník repa nebo členem org se
-   project write právy** (typicky pilot lead).
+1. Přihlas se do GitHubu jako **vlastník repa nebo člen org s write
+   přístupem k repu** (typicky pilot lead).
 
 2. **Settings** (avatar vpravo nahoře → Settings) → vlevo dole
    **Developer settings** → **Personal access tokens** →
@@ -60,24 +71,27 @@ classic, na konci je sekce s odlišnostmi.
 
    | Pole | Hodnota |
    |---|---|
-   | **Token name** | `EDPA sync — <org>/<repo>` (např. `EDPA sync — kashealth/kas-platform-v1`) |
+   | **Token name** | `EDPA contribution-sync — <org>/<repo>` (např. `EDPA contribution-sync — kashealth/kas-platform-v1`) |
    | **Expiration** | `1 year` (rotuj kalendářně, viz §6) |
-   | **Description** | "Automated sync between .edpa/backlog YAMLs and GitHub Project v2. Used by .github/workflows/sync-*.yml." |
-   | **Resource owner** | Vyber **org** (např. `kashealth`), ne svůj user account — token bude moci přistupovat k org Projects |
+   | **Description** | "Used by .github/workflows/edpa-contribution-sync.yml to materialize PR-thread signals into .edpa/backlog evidence[]." |
+   | **Resource owner** | Vyber **org** (např. `kashealth`) nebo vlastníka repa — token musí mít přístup k repu, kde EDPA poběží |
    | **Repository access** | `Only select repositories` → vyber `kas-platform-v1` (a další repos kde EDPA poběží) |
 
 4. **Permissions** (důležitá část):
 
    **Repository permissions** (pro tu jednu vybranou repo):
-   - **Contents**: `Read and write` (auto-commit po `sync.py pull --commit` + git push)
-   - **Issues**: `Read and write` (sync vytváří/edituje Issues navázané na Project items)
-   - **Pull requests**: `Read` (engine čte PR metadata pro evidence detection)
+   - **Contents**: `Read and write` ← **critical** — workflow commituje
+     materializaci `evidence[]` zpět do `.edpa/backlog/**/*.md` na base branch
+   - **Pull requests**: `Read` (workflow čte reviews a komentáře z PR threadu)
    - **Metadata**: `Read-only` (automaticky, povinné)
-   - **Workflows**: `Read and write` (pokud chceš povolit `update-template.yml` updateovat workflow soubory)
 
-   **Organization permissions**:
-   - **Projects**: `Read and write` ← **toto je critical, bez něj nic nepojede**
-   - **Members**: `Read-only` (pro `sync_collaborators.py` lookup org membership)
+   To je celý nutný scope. Workflow **nevytváří ani needituje Issues**
+   a v V2 **neexistují žádné GitHub Project items** — žádné Projects /
+   Issues / org permissions tedy nepotřebuješ.
+
+   *(Volitelně:* pokud na repu provozuješ i `edpa-collaborators-sync.yml`,
+   přidej **Organization → Members: `Read-only`** pro lookup členství.
+   Pro samotný contribution-sync to není potřeba.)*
 
 5. **Generate token** → **CRITICAL: token se ukáže JEN JEDNOU.**
    Zkopíruj `ghp_...` string do clipboardu, hned přejdi na krok 4.
@@ -114,35 +128,41 @@ Bonus: rotation pak děláš jen jednou per org místo per-repo.
 
 ## 5. Verifikace
 
-Po uložení secretu udělej jeden test commit:
+Workflow je **merge-triggered** — naskočí, až se mergne PR, který
+referencuje EDPA položku (ID v názvu/popisu PR nebo v commitu).
+Otestuj ho tedy přes malý PR, ne přímým pushem do base branche:
 
 ```bash
 cd ~/projects/<repo>
-echo "" >> .edpa/backlog/initiatives/I-1.yaml   # whitespace change
-git add .edpa/ && git commit -m "test: trigger EDPA sync workflow" && git push
+git checkout -b test/edpa-sync
+# udělej drobnou změnu a odkaž EDPA položku (např. F-1) v commitu
+git commit -am "test: trigger EDPA contribution sync (F-1)"
+git push -u origin test/edpa-sync
+gh pr create --fill        # přidej review/komentář, ať je co materializovat
+gh pr merge --squash       # merge spustí workflow
 ```
 
 Pak otevři `https://github.com/<org>/<repo>/actions` a sleduj:
 
 | Workflow | Očekávaný stav |
 |---|---|
-| `Sync Git -> GitHub Projects` | ✓ Success (běží na push event) |
-| `Sync GitHub Projects -> Git` | nemusí běžet (čeká na další `*/30` cron tick v business hours Po-Pá 8-18, nebo manual dispatch) |
+| `EDPA contribution sync` | ✓ Success (běží po merge PR, `if merged == true`) |
 
-Pro otestování druhého směru otevři `Actions → Sync GitHub Projects -> Git → Run workflow`
-a sleduj, že po cca 20-40 s vznikne commit s tvojí změnou v `.edpa/backlog/<type>/<id>.yaml`.
-Alternativně posuň issue card na Project boardu a počkej na další business-hours cron tick
-(max 30 min latence v pracovní době; mimo ni se sync pozastaví).
+Po doběhnutí (cca 20-40 s) vznikne commit od `edpa-bot` na base
+branchi, který do `.edpa/backlog/<type>/<id>.md` doplní `evidence[]`
+záznamy (`pr_reviewer` / `issue_comment`). Lokálně si to stáhneš
+přes `git pull` — a tyhle obohacené signály pak započítá nejbližší
+`/edpa:close-iteration` (engine čte YAML frontmatter položky).
 
 ### Co když to nefunguje
 
 | Symptom | Příčina | Fix |
 |---|---|---|
 | `::warning::EDPA_TOKEN secret not configured` v logu | Secret se jmenuje špatně | Přejmenuj na přesně `EDPA_TOKEN` |
-| `HTTP 403` na GraphQL mutaci | PAT nemá `project: read+write` | Edit token → přidej Projects org permission |
-| `HTTP 404` na GH Project | PAT nemá repo permission na ten konkrétní repo | Edit token → Repository access → zahrň repo |
-| `Please tell me who you are` při git commit | Workflow nemá git config step (legacy verze) | Updatuj `edpa-sync-projects-to-git.yml` na ≥ v1.17.1 |
-| Workflow naskočí, ale 0 změn pulluje | PAT je z personal accountu, ne z org member | Vytvoř nový s Resource owner = org |
+| Workflow naskočí, ale push na base branch selže (`403`/`protected branch`) | Token nemá `Contents: write`, nebo branch protection blokuje push | Edit token → Contents: Read and write; případně povol pushe od bota přes branch protection |
+| `Failed to push after 3 retries` v logu | Souběžný commit na base branch / race | Re-run workflow; rebase-retry si většinou poradí sám |
+| Workflow naběhl, commit vznikl, ale `evidence[]` prázdné | PR nemá review ani komentář, nebo neodkazuje EDPA ID | Přidej review/komentář; ujisti se, že PR/commit odkazuje existující item ID |
+| `Please tell me who you are` při git commit | Workflow nemá git config step (legacy verze) | Updatuj `edpa-contribution-sync.yml` na aktuální template |
 
 ## 6. Rotace tokenu
 
@@ -162,28 +182,24 @@ workflow začne fail-ovat v den expirace.
 **Tip:** GitHub posílá expirační warning email 7 dní před vypršením.
 Nech si filtr na ten subject, ať ti to nezapadne ve spamu.
 
-## 7. Pokud token nemůžeš nastavit (manuální fallback)
+## 7. Pokud token nemůžeš nastavit (co přijdeš o)
 
-V první iteraci pilotu (a nebo když ti vyprší PAT mezi rotacemi),
-sync můžeš dělat ručně:
+`EDPA_TOKEN` je v V2 čistě volitelný. Když ho nenastavíš (nebo ti
+vyprší mezi rotacemi), **nepřijdeš o jádro atribuce** — to běží lokálně:
 
-```bash
-# Před každým týdenním close:
-python3 .edpa/engine/scripts/sync.py pull --commit
+- Post-commit hook `local_evidence.py` emituje `commit_author` pro
+  každý commit, který odkazuje EDPA položku. Funguje offline, bez
+  GitHubu, bez tokenu.
+- `/edpa:close-iteration` běží **lokálně** a žádný token nepotřebuje.
 
-# Po každé úpravě .edpa/backlog/*.yaml:
-python3 .edpa/engine/scripts/sync.py push
-```
+Co bez tokenu (resp. bez contribution-sync workflowu) nedostaneš:
+- **PR-thread signály** `pr_reviewer` a `issue_comment` se
+  automaticky nematerializují do `evidence[]`. Reviews a komentáře
+  z PR threadů tedy nebudou ve výpočtu zohledněny.
 
-Tahle cesta nevyžaduje secret — používá tvůj lokální `gh auth login`
-token. Funguje, ale:
-- Žádný near-realtime sync z Projectu zpět do gitu (manuální `pull`)
-- Riziko zapomenutí mezi PI close a další iterací
-- Neškáluje na 4+ -člennou pilot tým, protože každý člen by musel
-  spustit `pull` před svojí prací
-
-**Doporučení:** manuální fallback je OK pro první 1-2 iterace pilotu,
-než si nastavíš PAT. Pak přejdi na automated.
+**Doporučení:** pokud je tým single-dev nebo review-light, klidně
+workflow i token vynechej — lokální hook stačí. Jakmile začnou
+záležet code-review signály, nastav `EDPA_TOKEN` a zapni workflow.
 
 ## 8. Classic PAT (legacy varianta)
 
@@ -194,10 +210,8 @@ funguje taky:
 1. *Settings → Developer settings → Personal access tokens → Tokens
    (classic) → Generate new token (classic)*
 2. **Scopes:** zaškrtni:
-   - `repo` (full control of private repositories)
-   - `project` (read+write GitHub Projects)
-   - `read:org` (read org membership)
-   - `workflow` (update workflow files)
+   - `repo` (full control of private repositories — pokrývá Contents
+     write i Pull requests read, které workflow potřebuje)
 3. Generate token → ulož do `EDPA_TOKEN` secret stejně jako v §4
 
 **Rozdíly proti fine-grained:**
@@ -223,14 +237,21 @@ Až EDPA poběží na 10+ repos, refaktoring na GitHub App dává smysl —
 ozvi se a probereme.
 
 **Q: Co se stane když token expiruje uprostřed PI close?**
-A: Workflow začne fail-ovat. PI close manuálně přes `sync.py pull`
-+ `/edpa:close-iteration` (skill běží lokálně, nepotřebuje secret).
-Pak rotace tokenu a re-push.
+A: Na PI close to nemá vliv. `/edpa:close-iteration` běží **lokálně**
+a token nikdy nepotřebuje — token používá jen post-merge
+contribution-sync workflow. Expirovaný token tedy jen znamená, že se
+do nejbližšího close nepřilijí čerstvé `pr_reviewer`/`issue_comment`
+signály z PR threadů. Rotuj token (viz §6) a po zapnutí workflowu se
+dorovnají při dalších merge.
 
 ---
 
 **Související dokumenty:**
 - [Pilot runbook](https://github.com/technomaton/edpa/blob/main/docs/kashealth-pilot/KASHEALTH-PILOT.md)
-- [`edpa-sync-projects-to-git.yml`](https://github.com/technomaton/edpa/blob/main/.github/workflows/edpa-sync-projects-to-git.yml) — event-driven sync (Project → Git)
-- [`edpa-sync-git-to-projects.yml`](https://github.com/technomaton/edpa/blob/main/.github/workflows/edpa-sync-git-to-projects.yml) — push-triggered sync (Git → Project)
+- [`edpa-contribution-sync.yml`](https://github.com/technomaton/edpa/blob/main/plugin/edpa/templates/github-workflows/edpa-contribution-sync.yml) — merge-triggered contribution sync (PR-thread signály → `evidence[]`)
+- [`sync_pr_contributions.py`](https://github.com/technomaton/edpa/blob/main/plugin/edpa/scripts/sync_pr_contributions.py) — skript, který workflow spouští
 - [Step-by-step průvodce v kontextu plné instalace](/guide) — krok 5 z 11
+
+---
+
+*Verze dokumentu: 2.1.8 · 2026-05-31*

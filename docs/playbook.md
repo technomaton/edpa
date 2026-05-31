@@ -1,17 +1,19 @@
 # EDPA Playbook -- Od nuly po prvni PI
 
-Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allocation) na novy projekt. Od prazdneho repozitare po uzavreni prvniho Planning Intervalu a kalibraci heuristik.
+Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allocation) na novy projekt. Od prazdneho repozitare po uzavreni prvniho Planning Intervalu a kalibraci signalu.
 
-**Verze:** EDPA v1.0.0-beta
-**Posledni aktualizace:** 2026-03-28
+EDPA V2 je **local-first**: zdrojem pravdy je `.edpa/backlog/**/*.md` (YAML frontmatter), git je audit trail. GitHub je **volitelny** -- zadny GitHub Project, zadne org Issue Types, zadny obousmerny sync.
+
+**Verze:** EDPA 2.1.8
+**Posledni aktualizace:** 2026-05-31
 
 ---
 
 ## Obsah
 
 1. [Prerekvizity](#prerekvizity)
-2. [Faze 1: Infrastruktura (Den 1)](#faze-1-infrastruktura-den-1--4-hodiny)
-3. [Faze 2: Prvni iterace (Tyden 1-2)](#faze-2-prvni-iterace-tyden-1-2)
+2. [Faze 1: Infrastruktura (Den 1)](#faze-1-infrastruktura-den-1-1-hodina)
+3. [Faze 2: Prvni iterace (Tyden 1)](#faze-2-prvni-iterace-tyden-1)
 4. [Faze 3: PI Close (Po 4-5 iteracich)](#faze-3-pi-close-po-4-5-iteracich)
 5. [Faze 4: Kontinualni provoz](#faze-4-kontinualni-provoz)
 6. [Checklist -- Co mit hotove](#checklist--co-mit-hotove)
@@ -27,32 +29,31 @@ Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allo
 
 | Nastroj | Minimalni verze | Overeni |
 |---------|-----------------|---------|
-| Python | 3.10+ | `python --version` |
-| PyYAML | libovolna | `pip install pyyaml` |
-| GitHub CLI (gh) | 2.40+ | `gh --version` |
+| Python | 3.10+ | `python3 --version` |
+| pyyaml + openpyxl + ruamel.yaml | libovolna | `pip install pyyaml openpyxl ruamel.yaml` |
 | Git | 2.30+ | `git --version` |
+| GitHub CLI (gh) | 2.40+ | `gh --version` -- **volitelne** |
 
-### GitHub CLI scopes
+EDPA V2 bezi cisty lokalne nad gitem. `gh` je potreba **pouze** pokud chcete volitelny PR-signal sync (workflow `edpa-contribution-sync.yml`) -- viz [Volitelny GitHub](#volitelny-github-pr-signal-sync).
 
-```bash
-gh auth login
-gh auth refresh -s repo,project,read:project,admin:org
-```
+### Volitelne: GitHub CLI scopes pro PR-signal sync
 
-Overeni:
+Pokud zapnete volitelny PR-signal sync, staci bezne `repo` scope:
 
 ```bash
+gh auth login        # bezny repo scope staci
 gh auth status
-# Musi ukazovat scopes: repo, project, admin:org
 ```
 
-### Organizace a tym
+> Org-level scopy (`admin:org`, `project`) z EDPA V1 uz **nejsou potreba** -- v 2.0.0 zmizely GitHub Projecty i org Issue Types.
+
+### Tym a backlog
 
 Pred zacatkem je treba mit:
 
-- GitHub organizaci (napr. `my-org`)
 - Definovany tym: jmena, role (Arch, Dev, DevSecOps, PM, QA, BO), FTE, kapacity
 - Alespon zakladni backlog (1 Epic, 2-3 Features, 5-10 Stories)
+- Git repozitar (GitHub remote je volitelny)
 
 ### Role v EDPA
 
@@ -67,23 +68,23 @@ Pred zacatkem je treba mit:
 
 ---
 
-## Faze 1: Infrastruktura (Den 1, ~4 hodiny)
+## Faze 1: Infrastruktura (Den 1, ~1 hodina)
 
 ### Cesta A: Claude Code (doporuceno)
 
 V terminalu s Claude Code nainstalovanym:
 
 ```
-/edpa setup
+/edpa:setup --with-ci --with-hooks --with-rules
 ```
 
-Claude Code provede kroky 1.1-1.6 automaticky -- vytvori repo, nakonfiguruje tym, nastavi Issue Types a vytvori GitHub Project.
+Claude Code (skill `edpa-setup`) provede kroky 1.1-1.4 automaticky -- vendoruje engine do `.edpa/engine/`, naseje konfiguraci a `id_counters.yaml`, a volitelne nainstaluje git hooky, PR-signal CI workflow a `.claude/rules/`. Idempotentni -- opakovane spusteni nic nerozbije.
 
 ### Cesta B: Manualni CLI
 
 Nasledujici kroky popisuji manualni postup bez Claude Code.
 
-### 1.1 Nainstalovat EDPA plugin
+### 1.1 Nainstalovat EDPA a vendorovat engine
 
 **Varianta A: Shell installer (doporuceno)**
 
@@ -92,13 +93,12 @@ cd my-project
 curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```
 
-**Varianta B: Manualni kopie**
+**Varianta B: project_setup.py**
+
+`project_setup.py` vendoruje engine + nasaze configy + `id_counters.yaml`. Flagy navic nainstaluji git hooky, contribution-sync CI workflow a `.claude/rules/`. Bez `--org`/`--repo` -- zadne GitHub provisioning.
 
 ```bash
-cd my-project
-gh repo clone technomaton/edpa /tmp/edpa
-cp -r /tmp/edpa/plugin/ .claude/
-rm -rf /tmp/edpa
+python3 .edpa/engine/scripts/project_setup.py --with-ci --with-hooks --with-rules
 ```
 
 Vysledna struktura:
@@ -107,52 +107,52 @@ Vysledna struktura:
 my-project/
   .edpa/
     config/
-      edpa.yaml          # Hlavni konfigurace
-      people.yaml        # tym a projekt
-      people.yaml      # Kapacitni registr
-      heuristics.yaml    # CW heuristiky
-      project.yaml       # Projektova konfigurace
+      edpa.yaml          # Projekt + governance (zdroj verze metodiky)
+      people.yaml        # Tym a kapacity (cadence, teams, people)
+      cw_heuristics.yaml # CW signalove vahy
+      id_counters.yaml   # Citace ID (S-1, E-1, F-1, ...)
     backlog/
-      initiatives/       # 1 soubor = 1 initiative
+      initiatives/       # 1 soubor = 1 initiative (.md s YAML frontmatter)
       epics/             # 1 soubor = 1 epic
       features/          # 1 soubor = 1 feature
       stories/           # 1 soubor = 1 story
-    data/
-      ground_truth.yaml  # Ground truth (po PI)
-      calibration_log.tsv
-    reports/             # Generovane reporty per iterace
+    iterations/          # PI a iterace (PI-2026-1.yaml, PI-2026-1.1.yaml, ...)
+    reports/             # Generovane reporty + edpa_results.json per iterace
     snapshots/           # Zmrazene snapshoty iteraci
-    sync_state.json      # Stav posledni synchronizace
-    iterations/          # Plany a vysledky iteraci
-  .claude/edpa/
-    scripts/
-      engine.py          # EDPA vypocetni jadro
-      backlog.py         # Sprava backlogu (tree, show, wsjf, validate)
-      sync.py            # Bidirekcni sync GitHub Projects <-> Git
-      issue_types.py     # Sprava Issue Types na org urovni
-      project_setup.py   # Automaticke vytvoreni GitHub Projectu
-      project_views.py   # Views setup (template, instrukce, verifikace)
-      create_project_views.py  # Playwright automatizace views (volitelne)
-      evaluate_cw.py     # CW kalibrace (MAD evaluator)
-    templates/
-      people.yaml.tmpl      # Sablona kapacitniho registru
-      heuristics.yaml.tmpl    # Sablona CW heuristik
-      project.yaml.tmpl       # Sablona projektove konfigurace
-  .github/workflows/
-    edpa-branch-check.yml     # CI: kontrola branch naming
-    edpa-iteration-close.yml  # CI: uzavreni iterace (workflow_dispatch)
-    edpa-sync-projects-to-git.yml   # Cron: Projects -> Git (15 min)
-    edpa-sync-git-to-projects.yml   # Push trigger: Git -> Projects
-  docs/                  # Dokumentace
+    data/                # Ground truth pro kalibraci (po PI)
+    engine/              # VENDOROVANY engine (instaluje project_setup.py)
+      VERSION
+      scripts/
+        engine.py            # EDPA vypocetni jadro
+        backlog.py           # Sprava backlogu (add, tree, show, wsjf, validate)
+        detect_contributors.py  # evidence[] -> contributors[] (cw)
+        calibrate_signals.py    # Kalibrace signalovych vah (MAD)
+        reports.py           # Vykazy + PI summary + xlsx
+        board.py             # Lokalni HTML Kanban board
+        capacity_override.py # Kapacitni override per osoba/iterace
+        sync_pr_contributions.py  # Materializace PR-thread signalu (volitelne CI)
+        ...                  # dalsi pomocne skripty + hooks/
+      templates/
+        people.yaml.tmpl
+        cw_heuristics.yaml.tmpl
+        edpa.yaml.tmpl
+  .github/workflows/         # JEN s --with-ci
+    edpa-contribution-sync.yml  # Po merge PR: PR-thread signaly -> evidence[]
+  .claude/rules/             # JEN s --with-rules (architektonicka pravidla)
+  docs/                      # Dokumentace
 ```
 
-### 1.2 Nakonfigurovat tym (people.yaml)
+> **V2 cesty:** user-facing engine je vendorovany v `.edpa/engine/scripts/*.py` (NE `.claude/edpa/scripts/`, NE `plugin/edpa/scripts/`). Sablony v `.edpa/engine/templates/`.
+
+### 1.2 Nakonfigurovat tym a kapacity (people.yaml)
+
+`project_setup.py` uz `.edpa/config/people.yaml` naseje ze sablony. Pripadne rucne:
 
 ```bash
-cp .claude/edpa/templates/people.yaml.tmpl .edpa/config/people.yaml
+cp .edpa/engine/templates/people.yaml.tmpl .edpa/config/people.yaml
 ```
 
-Upravit `.edpa/config/people.yaml`:
+Upravit `.edpa/config/people.yaml`. Tady zije **cadence + teams + people** -- zadny separatni registr, vse je v jednom souboru:
 
 ```yaml
 cadence:
@@ -192,47 +192,32 @@ people:
   # Pridat dalsi cleny tymu...
 ```
 
-**Dulezite:** `planning_factor` je planovaci heuristika (planujeme na 80%). EDPA engine pocita vzdy se 100% kapacity -- buffer absorbuje neplanovane prace.
+**Dulezite:** `planning_factor` je planovaci heuristika (planujeme na 80%). EDPA engine pocita vzdy se 100% kapacity -- buffer absorbuje neplanovane prace. Pole `github:` u osoby je volitelne -- pouziva ho jen volitelny PR-signal sync k mapovani GH login -> `people[].id`.
 
-Tym a projekt se zaroven konfiguruje v `.edpa/config/people.yaml`:
+> **V2 pozn.:** neexistuje zadny separatni `registry`/`capacity` soubor. Cely tym a kapacity zijou v `people.yaml`. (V1 dokumentace tu omylem uvadela `people.yaml` dvakrat -- opraveno.)
 
-```yaml
-# .edpa/config/people.yaml
-project:
-  name: "Nazev projektu"
-  organization: "Vase org"
+### 1.3 Nakonfigurovat projekt + governance (edpa.yaml)
 
-people:
-  - id: dev1
-    name: "Developer"
-    email: "dev@example.com"
-    role: Dev
-    team: "Core"
-    fte: 1.0
-    capacity: 80
-```
-
-### 1.3 Nakonfigurovat projekt (project.yaml)
+`project_setup.py` naseje `.edpa/config/edpa.yaml` ze sablony (NE `project.yaml` -- ten v V2 neexistuje). Pripadne rucne:
 
 ```bash
-cp .claude/edpa/templates/project.yaml.tmpl .edpa/config/project.yaml
+cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml
 ```
 
-Upravit `.edpa/config/project.yaml`:
+Upravit `.edpa/config/edpa.yaml`:
 
 ```yaml
 project:
-  name: "Muj Projekt"
-  registration: ""                      # Cislo registrace (pokud existuje)
-  program: ""                           # Program financovani
-  organizations:
-    - name: "Moje Organizace"
+  name: "Muj Projekt"                   # ← Display name (jedine povinne pole)
+  description: ""
   domain: "mujprojekt.cz"
+  # Volitelne: funding (granty/dotace) + organizations (pro audit/fakturaci)
 
 governance:
-  methodology: "EDPA v1.0.0-beta"
-  calculation_mode: "simple"            # simple (JS x CW) nebo full (JS x CW x RS)
-  audit_mode: "full"
+  # Auto-razitkovano na verzi pluginu instalatorem.
+  methodology: "EDPA 2.1.8"
+  # Jedina vypocetni cesta od v1.14 (zadny simple/full/gates mode selector,
+  # zadny audit_mode -- snapshoty vzdy nesou plny signals[] audit trail).
 
 naming:
   pi_pattern: "PI-{year}-{pi_num}"                    # PI-2026-1
@@ -244,37 +229,36 @@ naming:
     feature: "F"
     story: "S"
     task: "T"
-    bug: "B"
+    defect: "D"
+    event: "EV"
 ```
 
-### 1.4 Nakonfigurovat CW heuristiky
+> **Odstraneno v 2.0.0:** pole `calculation_mode` (simple/full) a `audit_mode`. Engine ma jedinou vypocetni cestu (JS x CW) a snapshoty vzdy nesou plny audit trail.
+
+### 1.4 Nakonfigurovat CW signalove vahy (cw_heuristics.yaml)
+
+`project_setup.py` naseje `.edpa/config/cw_heuristics.yaml` (NE `heuristics.yaml`). Pripadne rucne:
 
 ```bash
-cp .claude/edpa/templates/heuristics.yaml.tmpl .edpa/config/heuristics.yaml
+cp .edpa/engine/templates/cw_heuristics.yaml.tmpl .edpa/config/cw_heuristics.yaml
 ```
 
-Vychozi hodnoty jsou kalibrovane Monte Carlo simulaci (1000 scenaru, 66 362 zaznamu, p<0.001). Pro zacatek staci bez uprav. Kalibrace na vlastni data se provadi po prvnim PI (viz [Faze 3](#33-kalibrace-cw-heuristik)).
+Vychozi hodnoty jsou kalibrovane Monte Carlo simulaci. Pro zacatek staci bez uprav. Kalibrace na vlastni data se provadi po prvnim PI (viz [Faze 3](#33-kalibrace-cw-signalu)).
 
-Klicove vychozi hodnoty:
+EDPA V2 je **evidence-driven**: `cw[osoba, item] = contribution_score / Σ contribution_score`, kde `contribution_score = Σ signal_weight`. Klicove vychozi signalove vahy:
 
-| Evidence role | CW vaha |
-|---------------|---------|
-| owner (assignee) | 1.00 |
-| key (PR author) | 0.60 |
-| reviewer (commit/PR review) | 0.25 |
-| consulted (komentar) | 0.15 |
+| Signal | Vaha | Popis |
+|--------|------|-------|
+| `assignee` | 4.00 | GitHub issue assignee / owner |
+| `pr_author` | 3.40 | Autor PR referujici item |
+| `commit_author` | 2.78 | Commit s ID v branchi/title/zprave |
+| `pr_reviewer` | 2.25 | Odeslany PR review (mimo self) |
+| `issue_comment` | 1.14 | Komentar na issue/PR (mimo boty) |
 
-Role-specificke korekce (strategicke role jsou Gitem podhodnoceny):
+Rolove vahy prispevatelu (`--contributor PERSON:ROLE:CW`) -- owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; `evidence_threshold` 1.0. `cw_heuristics.yaml` navic obsahuje `gate_weights` pro Feature/Epic/Initiative -- status transition na rodici rozdeluje jeho Job Size napric lifecyclem (souc = 1.0 per typ).
 
-| Role | Korekce | Duvod |
-|------|---------|-------|
-| BO consulted | 0.30 (+0.15) | Rozhodovani neviditelne v Gitu |
-| PM consulted | 0.20 (+0.05) | Specifikace neviditelna v Gitu |
-| Arch reviewer | 0.30 (+0.05) | Design review neviditelny |
+### 1.5 Nakonfigurovat iterace (iterations/)
 
-### 1.5 Nakonfigurovat .edpa/config/edpa.yaml a iterations/
-
-`edpa.yaml` od v1.5.0 obsahuje pouze stabilní governance / sync konfiguraci.
 PI a iterace žijí v `.edpa/iterations/` jako samostatné soubory:
 
 ```yaml
@@ -305,235 +289,128 @@ Vytvoř obdobně `PI-2026-1.{2..5}.yaml`. Poslední iterace dostane
 překryvy, `weeks` × 7 ≈ rozdíl dat) hlídá `validate_iterations.py`
 i automatický PostToolUse hook.
 
-```yaml
-# Sync nastaveni
-sync:
-  github_org: "my-org"                  # <-- Vase organizace
-  github_project_number: 1              # <-- Cislo projektu (az po vytvoreni)
-  sync_interval: "15m"
-  auto_commit: true
-```
+> **Odstraneno v 2.0.0:** sync blok (`github_org`, `github_project_number`, `sync_interval`) -- V2 je local-first, zadny GitHub Project se neprovisionuje.
 
-### 1.6 Nastavit Issue Types na organizaci
+### 1.6 Naplnit backlog
 
-Issue Types jsou nativni GitHub feature na urovni organizace (ne labels, ne custom fields).
-
-```bash
-# Zobrazit aktualni typy
-python .claude/edpa/scripts/issue_types.py list --org my-org
-
-# Vytvorit EDPA sadu Issue Types
-python .claude/edpa/scripts/issue_types.py setup --org my-org
-
-# Dry-run (jen ukaze co by se stalo)
-python .claude/edpa/scripts/issue_types.py setup --org my-org --dry-run
-```
-
-EDPA vytvori tyto Issue Types:
-
-| Typ | Barva | Popis |
-|-----|-------|-------|
-| Initiative | PINK | Business case, investicni zamer |
-| Epic | PURPLE | Strategicky cil, 6-9 mesicu |
-| Feature | BLUE | Musi se vejit do Planning Intervalu |
-| Story | GREEN | Dodavano v iteraci |
-| Defect | RED | Defekt v existujici funkcionalite |
-| Task | YELLOW | Technicka prace |
-
-> **Poznamka:** Enabler je **label** (Business vs Enabler klasifikace, SAFe), ne Issue Type. Epic muze mit label "Enabler" pro oznaceni Enabler Epicu.
-
-### 1.7 Naplnit backlog
-
-EDPA pouziva file-per-item strukturu -- kazdy work item je samostatny YAML soubor:
+EDPA pouziva file-per-item strukturu -- kazdy work item je samostatny **`.md` soubor s YAML frontmatter** (v V2 NE `.yaml`):
 
 ```
 .edpa/
   config/
-    edpa.yaml                    # hlavni konfigurace
-    people.yaml                  # tym a projekt
-    people.yaml                # kapacitni registr
-    heuristics.yaml              # CW heuristiky
-    project.yaml                 # projektova konfigurace
+    edpa.yaml                    # projekt + governance
+    people.yaml                  # tym a kapacity
+    cw_heuristics.yaml           # CW signalove vahy
+    id_counters.yaml             # citace ID
   backlog/
     initiatives/
-      I-1.yaml                   # 1 soubor = 1 initiative
+      I-1.md                     # 1 soubor = 1 initiative
     epics/
-      E-1.yaml                   # 1 soubor = 1 epic
+      E-1.md                     # 1 soubor = 1 epic
     features/
-      F-1.yaml                   # 1 soubor = 1 feature
+      F-1.md                     # 1 soubor = 1 feature
     stories/
-      S-1.yaml                   # 1 soubor = 1 story
+      S-1.md                     # 1 soubor = 1 story
   iterations/
     PI-2026-1.1.yaml             # plan iterace
 ```
 
-Priklad story souboru (`.edpa/backlog/stories/S-1.yaml`):
-```yaml
+Priklad story souboru (`.edpa/backlog/stories/S-1.md` -- YAML frontmatter + volitelne telo):
+```markdown
+---
 id: S-1
 type: Story
 title: "Implementace parseru"
 status: Backlog
 parent: F-1
 js: 5
-assignee: dev1
+assignee: bob
 iteration: PI-2026-1.1
+---
+Volitelny popis / akceptacni kriteria v Markdownu.
 ```
 
-Pridani noveho itemu:
+Pridani noveho itemu (LOKALNE -- zadne GitHub volani):
 ```bash
 # Claude Code:
-/edpa:add    # interaktivne prida jeden item (Initiative/Epic/Feature/Story/Defect/Event)
+/edpa:add    # interaktivne prida jeden item (Initiative/Epic/Feature/Story/Defect/Event/Risk)
 
 # CLI:
-python .claude/edpa/scripts/backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee dev1
-python .claude/edpa/scripts/backlog.py add --type Epic --parent I-1 --title "..." --js 13 --bv 13 --tc 8 --rr 5
+python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 \
+  --title "..." --js 5 --assignee bob --iteration PI-2026-1.1
+python3 .edpa/engine/scripts/backlog.py add --type Epic --parent I-1 \
+  --title "..." --js 13 --bv 13 --tc 8 --rr-oe 5
 ```
 
-`backlog.py add` is **strictly GH-first**: it requires a configured
-GitHub sync block in `.edpa/config/edpa.yaml` and aborts with exit
-code 1 otherwise. The GH issue is created first, its server-assigned
-number becomes the EDPA ID suffix (`S-42`, `E-15`, `I-3`), the GH
-title is rewritten to mirror `"{ID}: {title}"`, and the issue is
-linked under its parent via the GitHub sub-issue API. Only after all
-GH steps succeed does the local `.md` get written. Run `/edpa:setup`
-before the first `add` if sync is not yet configured.
+`backlog.py add` je v V2 **cisty lokalni** (zadne `gh`): ID se prideli z `id_counters.yaml` (`S-42`, `E-15`, `I-3`), hierarchie rodice se zvaliduje, YAML se zapise pod `.edpa/backlog/` a zmena se auto-commitne jako `feat(<ID>):`. PR-odvozene signaly prichazeji az pozdeji pres volitelny contribution-sync workflow.
+
+> **Odstraneno v 2.0.0:** "GH-first" rezim `add` (tvorba GH issue, sub-issue API, prepis title na `"{ID}: {title}"`). V V2 je `add` local-only -- V1 tvrzeni "strictly GH-first" uz NEPLATI.
+
+Pridelovani prispevatelu lze udelat hned pri zalozeni (per-item CW share):
+```bash
+python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 --title "..." --js 5 \
+  --contributor bob:owner:0.7 --contributor carol:reviewer:0.3
+# Format PERSON:ROLE:CW, ROLE ∈ {owner,key,reviewer,consulted}, CW ∈ [0,1]
+```
 
 Overit integritu:
 
 ```bash
-python .claude/edpa/scripts/backlog.py validate
+python3 .edpa/engine/scripts/backlog.py validate
 ```
 
 Zobrazit hierarchii:
 
 ```bash
-python .claude/edpa/scripts/backlog.py tree
-python .claude/edpa/scripts/backlog.py tree --level epic
+python3 .edpa/engine/scripts/backlog.py tree
+python3 .edpa/engine/scripts/backlog.py tree --level epic
 ```
 
 Zobrazit WSJF prioritizaci:
 
 ```bash
-python .claude/edpa/scripts/backlog.py wsjf
-python .claude/edpa/scripts/backlog.py wsjf --level feature
+python3 .edpa/engine/scripts/backlog.py wsjf
+python3 .edpa/engine/scripts/backlog.py wsjf --level feature
 ```
 
 Zobrazit detail polozky:
 
 ```bash
-python .claude/edpa/scripts/backlog.py show S-200
-python .claude/edpa/scripts/backlog.py show E-10
+python3 .edpa/engine/scripts/backlog.py show S-1
+python3 .edpa/engine/scripts/backlog.py show E-1
 ```
 
-### 1.8 Vytvorit GitHub Project
-
-```bash
-python .claude/edpa/scripts/project_setup.py \
-  --org my-org \
-  --repo my-project \
-  --project-title "EDPA -- Muj Projekt"
-```
-
-Dry-run:
-
-```bash
-python .claude/edpa/scripts/project_setup.py \
-  --org my-org \
-  --repo my-project \
-  --dry-run
-```
-
-Skript provede 7 kroku:
-
-1. Overi Issue Types na org (musi byt spusten `issue_types.py setup` predtim)
-2. Vytvori GitHub Project v2 na org urovni
-3. Vytvori custom fields: Job Size, Business Value, Time Criticality, Risk Reduction, WSJF Score (NUMBER), Team (SINGLE_SELECT)
-4. Linkuje projekt k repozitari
-5. Vytvori issues z item files v `.edpa/` s nativnimi Issue Types
-6. Nastavi field values (JS, BV, TC, RR, WSJF, status) na vsech project items
-7. Aktualizuje `.edpa/config/edpa.yaml` s cislem projektu pro sync
-
-### 1.9 Nastavit Project views
-
-GitHub Projects v2 API nepodporuje vytvareni views programaticky. Jsou dve cesty:
-
-**Cesta A: Manual setup s instrukce generatorem**
-
-```bash
-python .claude/edpa/scripts/project_views.py instructions --org my-org --project 1
-```
-
-Skript vygeneruje presne kliknuti pro vytvoreni 6 views:
-
-| View | Typ | Filtr/Razeni |
-|------|-----|-------------|
-| All Items | Table | Vsechny polozky |
-| Board | Board | Funnel / Analyzing / Backlog / Implementing / Done |
-| Epics | Table | `type:Epic`, razeno WSJF |
-| Features | Table | `type:Feature`, razeno WSJF |
-| Stories | Table | `type:Story`, filtrovano iteraci |
-| WSJF Ranking | Table | Razeno WSJF sestupne |
-
-**Cesta B: Oznacit jako sablonu (pro dalsi projekty)**
-
-```bash
-python .claude/edpa/scripts/project_views.py template --org my-org --project 1
-```
-
-**Cesta C: Vytvorit novy projekt ze sablony**
-
-```bash
-python .claude/edpa/scripts/project_views.py create-from-template \
-  --org my-org \
-  --template 1 \
-  --title "Novy Projekt"
-```
-
-**Overeni:**
-
-```bash
-python .claude/edpa/scripts/project_views.py verify --org my-org --project 1
-```
-
-**Cesta D: Playwright automatizace (volitelne)**
-
-Pokud chcete plne automaticke vytvoreni views:
-
-```bash
-pip install playwright && playwright install chromium
-python .edpa/engine/scripts/create_project_views.py
-```
-
-Prvni spusteni: otevre prohlizec -> prihlasit se -> views se vytvori automaticky.
-
-### 1.10 Overit setup
+### 1.7 Overit setup
 
 ```bash
 # Demo EDPA engine (bez realnych dat)
-python .claude/edpa/scripts/engine.py --demo
+python3 .edpa/engine/scripts/engine.py --demo
 
 # Validace backlogu
-python .claude/edpa/scripts/backlog.py validate
+python3 .edpa/engine/scripts/backlog.py validate
 
 # Status projektu
-python .claude/edpa/scripts/backlog.py status
+python3 .edpa/engine/scripts/backlog.py status
 
-# Sync status
-python plugin/edpa/scripts/sync.py status
+# Vizualni HTML board (local-first nahrada za Projects board)
+python3 .edpa/engine/scripts/board.py --output .edpa/board.html
 ```
 
-### 1.11 Commitnout zakladni konfiguraci
+### 1.8 Commitnout zakladni konfiguraci
+
+`backlog.py add` commituje itemy automaticky. Pocatecni config a vendorovany engine commitni:
 
 ```bash
-git add .edpa/config/people.yaml .edpa/config/project.yaml .edpa/config/heuristics.yaml
 git add .edpa/
-git commit -m "feat(edpa): initial EDPA setup for my-project"
-git push origin main
+git commit -m "feat(edpa): initial EDPA V2 setup for my-project"
+git push origin main   # volitelne, pokud mate GitHub remote
 ```
+
+> **Odstraneno v 2.0.0:** §1.6 Issue Types (`issue_types.py setup --org`), §1.8 GitHub Project (`project_setup.py --org/--repo/--project-title`, custom fields, sub-issues), §1.9 Project views (`project_views.py`, `create_project_views.py`, Playwright). V2 nahrazuje board view lokalnim `board.py` / `/edpa:board`.
 
 ---
 
-## Faze 2: Prvni iterace (Tyden 1-2)
+## Faze 2: Prvni iterace (Tyden 1)
 
 ### 2.1 Iteration Planning
 
@@ -542,10 +419,10 @@ git push origin main
 
 ```bash
 # WSJF ranking features
-python .claude/edpa/scripts/backlog.py wsjf --level feature
+python3 .edpa/engine/scripts/backlog.py wsjf --level feature
 
 # Tree pro konkretni iteraci
-python .claude/edpa/scripts/backlog.py tree --iteration PI-2026-1.1
+python3 .edpa/engine/scripts/backlog.py tree --iteration PI-2026-1.1
 ```
 
 3. **Prirazeni assignees** -- kazda story musi mit assignee
@@ -553,7 +430,7 @@ python .claude/edpa/scripts/backlog.py tree --iteration PI-2026-1.1
 
 ### 2.2 Denni prace
 
-**Branch naming konvence** (CI kontrola v `.github/workflows/edpa-branch-check.yml`):
+**Branch naming konvence** `{type}/{ITEM}-{popis}` -- v V2 ji vynucuji **git hooky** (`--with-hooks`), uz ne CI:
 
 ```bash
 # Format: {type}/{ITEM_ID}-{popis}
@@ -564,7 +441,16 @@ git checkout -b chore/T-050-ci-pipeline
 ```
 
 Povolene typy: `feature`, `bugfix`, `hotfix`, `chore`
-Povolene prefixy: `S` (Story), `F` (Feature), `E` (Epic), `T` (Task), `B` (Bug), `I` (Initiative), `A` (architektura)
+Povolene prefixy: `S` (Story), `F` (Feature), `E` (Epic), `T` (Task), `D` (Defect), `I` (Initiative), `EV` (Event)
+
+**Git hooky (`--with-hooks`)** materializuji evidenci lokalne, bez GitHubu:
+
+| Hook | Co dela |
+|------|---------|
+| pre-commit | ID safety -- kontrola referenci |
+| commit-msg | Vyzaduje referenci itemu nebo `no-ticket:` |
+| post-commit | Zaznamenava `commit_author` evidence |
+| pre-push | Kontrola ID kolizi |
 
 **Commit konvence:**
 
@@ -575,9 +461,9 @@ git commit -m "test(S-201): add unit tests for parser"
 git commit -m "docs(E-10): update epic hypothesis"
 ```
 
-EDPA engine rozpoznava reference `S-XXX`, `F-XXX`, `E-XXX` v commitech a PR pro detekci evidence.
+EDPA engine rozpoznava reference `S-XXX`, `F-XXX`, `E-XXX` v commitech (a volitelne v PR) pro detekci evidence.
 
-**Pull Request workflow:**
+**Pull Request workflow (volitelne, jen s GitHub remote):**
 
 ```bash
 git push origin feature/S-200-omop-parser
@@ -593,98 +479,55 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
 "
 ```
 
-PR review = evidence pro EDPA (reviewer dostane CW dle role).
+PR review = signal pro EDPA. Aby se PR-thread signaly (`pr_reviewer`, `issue_comment`) dostaly do `evidence[]`, je potreba volitelny contribution-sync workflow -- viz [2.3](#23-volitelny-github-pr-signal-sync).
 
-### 2.3 Sync (volitelne)
+### 2.3 Volitelny GitHub PR-signal sync
 
-**V2.1 positioning:** sync je *volitelny*. Engine cte evidence primarne z lokalniho gitu (`commit_author`, `yaml_edit`, `gate_events`, `story_activity`), takze EDPA funguje i bez GitHub Projects. Sync zapina pouze tymy, ktere chteji board view pro PM/BO.
+EDPA V2 funguje cisty lokalne -- engine cte evidenci z gitu (`commit_author`) + YAML edits (`yaml_edit`) + gate transitions. GitHub je **volitelny** a slouzi pouze k materializaci PR-thread signalu.
 
-Bidirekcni synchronizace mezi GitHub Projects (UI pro PM/BO) a item files v `.edpa/` (Git-native):
+S `--with-ci` se nainstaluje **jediny** V2 workflow `.github/workflows/edpa-contribution-sync.yml`. Po merge PR spusti `sync_pr_contributions.py`, ktery z PR-threadu vytahne signaly (`pr_reviewer`, `issue_comment`) a zapise je do `evidence[]` prislusnych itemu. Vyzaduje secret `EDPA_TOKEN` (viz `docs/edpa-token-setup.md`). Flow metriky lze cist pres MCP nastroj `edpa_flow_metrics`.
 
-**Automaticky pres GitHub Actions:**
-
-- `edpa-sync-projects-to-git.yml` -- kazych 15 minut stahuje zmeny z Projects do Gitu
-- `edpa-sync-git-to-projects.yml` -- pri push do `main` s zmenou v `.edpa/` propaguje do Projects
-
-**Manualne:**
-
-```bash
-# Pull: GitHub Projects -> item files in .edpa/
-python plugin/edpa/scripts/sync.py pull
-
-# Push: item files in .edpa/ -> GitHub Projects
-python plugin/edpa/scripts/sync.py push
-
-# Diff: zobrazit co by se zmenilo
-python plugin/edpa/scripts/sync.py diff
-
-# Changelog
-python plugin/edpa/scripts/sync.py log
-
-# Status
-python plugin/edpa/scripts/sync.py status
-
-# Konflikty
-python plugin/edpa/scripts/sync.py conflicts
-```
-
-**Testovani syncu (bez GitHub API):**
-
-```bash
-python plugin/edpa/scripts/sync.py pull --mock
-python plugin/edpa/scripts/sync.py diff --mock
-```
+> **Odstraneno v 2.0.0:** obousmerny sync `sync.py` (pull/push/diff/status/conflicts/`--mock`) -- v V2 **neexistuje**. Stejne tak workflow `edpa-sync-projects-to-git.yml` a `edpa-sync-git-to-projects.yml`. Zadny GitHub Project se nepropaguje. Pro board pouzij lokalni `/edpa:board`.
 
 ### 2.4 Iteration Close
 
-Na konci kazde iterace (po 2 tydnech):
+Na konci kazde iterace (1 tyden AI-native / 2 tydny classic):
 
 **Claude Code (doporuceno):**
 
 ```
-/edpa close-iteration PI-2026-1.1
+/edpa:close-iteration PI-2026-1.1
 ```
 
-Claude Code stahne evidenci, spusti EDPA engine a vygeneruje reporty automaticky.
+Claude Code (skill `close-iteration`) pripravi kapacitu, spusti EDPA engine a vygeneruje reporty automaticky.
 
 **Manualni CLI:**
 
 ```bash
-python .claude/edpa/scripts/engine.py \
-  --iteration PI-2026-1.1 \
-  --capacity .edpa/config/people.yaml \
-  --heuristics .edpa/config/heuristics.yaml
+python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1
+# volitelne: --output cesta/edpa_results.json
 ```
-
-Nebo pres GitHub Actions (workflow_dispatch):
-
-1. Jit na Actions -> EDPA Iteration Close
-2. Zadat iteration_id: `PI-2026-1.1`
-3. Zvolit mode: `simple` nebo `full`
-4. Spustit
 
 **Vystupy:**
 
 ```
 .edpa/reports/iteration-PI-2026-1.1/
-  edpa_results.json      # Kompletni vypocet (JSON)
-  vykaz-alice.md         # Vykaz pro kazdou osobu
-  edpa-results.xlsx      # Team Summary + Item Costs tabs (Excel)
+  edpa_results.json        # Kompletni vypocet (JSON)
+  timesheet-alice.md       # Vykaz pro kazdou osobu (DerivedHours > 0)
+  timesheet-team.md        # Agregovany tymovy rollup
+  edpa-results.xlsx        # Team Summary + Item Costs (Excel)
 .edpa/snapshots/
-  PI-2026-1.1.json       # Zmrazeny snapshot
+  PI-2026-1.1.json         # Zmrazeny snapshot (audit trail)
 ```
 
-**Rezim vypoctu:**
+> **Pozn.:** per-person soubory jsou `timesheet-<id>.md` (v V2 uz NE `vykaz-*.md`).
 
-| Rezim | Vzorec | Pouziti |
-|-------|--------|---------|
-| simple | JS x CW | Vychozi -- Job Size x Contribution Weight |
-| full | JS x CW x RS | S Role Strength -- pro presnejsi alokaci |
+**Vypocet** (od v1.14 jedina cesta): `score = JS x CW`, `hours = (score / Σ score) x capacity`. Zadny `--mode simple|full` ani Role Strength.
 
 **Invarianty** (engine automaticky kontroluje):
 
-- Soucet hodin osoby = jeji kapacita (odchylka < 0.01h)
-- Soucet pomeru = 1.0 (odchylka < 0.001)
+- Soucet `DerivedHours` osoby == jeji kapacita (presne)
+- Soucet pomeru == 1.0
 - Zadne zaporne hodiny
 - Pokud invariant selze, engine hlasi `FAIL`
 
@@ -732,13 +575,13 @@ delivery:
 ### Cesta A: Claude Code (doporuceno)
 
 ```
-/edpa calibrate
+/edpa:calibrate
 ```
 
-Claude Code spusti CW kalibraci, vyhodnoti MAD a navrh uprav heuristik. Pro generovani reportu:
+Claude Code (skill `edpa-autocalib`) spusti kalibraci signalovych vah pres Monte Carlo + coordinate-descent optimalizator, vyhodnoti MAD a navrhne upravy `cw_heuristics.yaml`. Pro generovani reportu:
 
 ```
-/edpa reports
+/edpa:reports PI-2026-1
 ```
 
 ### Cesta B: Manualni CLI
@@ -793,17 +636,19 @@ records:
   # ... alespon 20 zaznamu pro kalibraci
 ```
 
-**Doporuceni:** Zaznamenat alespon 20 zaznamu (minimum pro `evaluate_cw.py`). Idealne 30-50 pro statistickou relevanci.
+**Doporuceni:** Zaznamenat alespon 20 zaznamu (minimum pro kalibraci). Idealne 30-50 pro statistickou relevanci.
 
-### 3.3 Kalibrace CW heuristik
+### 3.3 Kalibrace CW signalu
 
 ```bash
-python .claude/edpa/scripts/evaluate_cw.py \
+python3 .edpa/engine/scripts/calibrate_signals.py \
   --ground-truth .edpa/data/ground_truth.yaml \
-  --heuristics .edpa/config/heuristics.yaml
+  --heuristics .edpa/config/cw_heuristics.yaml
 ```
 
-Vystup:
+`calibrate_signals.py` (skill `/edpa:calibrate`) jede dvoufazove: nahodny Monte Carlo sample napric signalovymi vahami -> coordinate-descent (Nelder-Mead) zjemneni kolem nejlepsich kandidatu. Metrika je MAD na synteticikem korpusu; nizsi MAD = lepsi kalibrace.
+
+Vystup (orientacne):
 
 ```
 MAD=0.041200
@@ -817,25 +662,27 @@ TOTAL_DEVIATION=0.824000
 |-----|-----------|------|
 | < 0.03 | Vyborne | Bez zmeny |
 | 0.03 - 0.06 | Dobre | Drobne korekce (volitelne) |
-| 0.06 - 0.10 | Prijatelne | Zvazit upravu role_overrides |
+| 0.06 - 0.10 | Prijatelne | Zvazit upravu signalovych vah |
 | > 0.10 | Spatne | Nutna kalibrace |
 
-**Korekce heuristik:**
+**Korekce signalovych vah:**
 
 Pokud MAD > 0.06, analyzovat kde jsou nejvetsi odchylky:
 
 1. Podivat se na zaznamy kde `abs(auto_cw - confirmed_cw)` je nejvyssi
-2. Identifikovat vzory dle role (typicky BO, PM, Arch)
-3. Upravit `role_overrides` v `.edpa/config/heuristics.yaml`
-4. Znovu spustit evaluaci
+2. Identifikovat vzory dle role (typicky BO, PM, Arch -- strategicke role jsou Gitem podhodnoceny)
+3. Upravit `signals:` vahy v `.edpa/config/cw_heuristics.yaml`
+4. Znovu spustit kalibraci
+
+> **Odstraneno v 2.0.0:** `evaluate_cw.py` (nahrazeno `calibrate_signals.py` / `/edpa:calibrate`) a soubor `heuristics.yaml` (nahrazeno `cw_heuristics.yaml`).
 
 ### 3.4 Planovani dalsiho PI
 
-1. **Nove epicy/features** -- pridat jako soubory do `.edpa/backlog/epics/` a `.edpa/backlog/features/`
+1. **Nove epicy/features** -- pridat pres `backlog.py add` (auto-commit) do `.edpa/backlog/`
 2. **WSJF prioritizace:**
 
 ```bash
-python .claude/edpa/scripts/backlog.py wsjf
+python3 .edpa/engine/scripts/backlog.py wsjf
 ```
 
 3. **Kapacitni planovani** -- aktualizovat `.edpa/config/people.yaml` (zmeny FTE, dostupnost)
@@ -873,50 +720,56 @@ iteration:
 Kazda iterace:
 
 ```
-/edpa close-iteration PI-2026-1.X    # uzavreni iterace
-/edpa reports                         # generovani reportu
+/edpa:close-iteration PI-2026-1.X    # uzavreni iterace
+/edpa:reports PI-2026-1.X             # generovani reportu
 ```
 
 Kazdy PI:
 
 ```
-/edpa calibrate                       # CW kalibrace
+/edpa:calibrate                       # kalibrace signalovych vah
 ```
 
 ### Manualni postup
 
-### Kazda iterace (kazde 2 tydny)
+### Kazda iterace (1 tyden AI-native / 2 tydny classic)
 
 1. **Planning** -- vybrat stories, prirazit assignees
-2. **Denni prace** -- branch naming, commity s referencemi, PR review
+2. **Denni prace** -- branch naming, commity s referencemi, (volitelne) PR review
 3. **Iteration Close** -- EDPA engine, generovani reportu
-4. **Sync** -- automaticky verzuje zmeny (GitHub Actions cron 15min)
-5. **Review** -- tym zkontroluje vykazy, zahlasi korektury
+4. **Review** -- tym zkontroluje vykazy, zahlasi korektury (manualni CW override pres `--contributor` / `/contribute`)
 
-### Kazdy PI (kazych 10 tydnu)
+### Kazdy PI (5 tydnu AI-native / 10 tydnu classic)
 
 1. **Retrospektiva** -- auto-detected CW vs realita
 2. **Ground truth** -- zaznamenat alespon 20 novych zaznamu
-3. **CW kalibrace** -- `evaluate_cw.py`, vyhodnotit MAD
+3. **CW kalibrace** -- `calibrate_signals.py`, vyhodnotit MAD
 4. **Velocity trend** -- porovnat delivery across iteraci
 5. **Predictability** -- (delivered_sp / planned_sp) across iteraci
 
 ```bash
 # Status za celou iteraci
-python .claude/edpa/scripts/backlog.py status --iteration PI-2026-1.3
+python3 .edpa/engine/scripts/backlog.py status --iteration PI-2026-1.3
 
 # Celkovy status projektu
-python .claude/edpa/scripts/backlog.py status
+python3 .edpa/engine/scripts/backlog.py status
+
+# Kapacitni override (napr. dodatecne hodiny mimo evidenci)
+python3 .edpa/engine/scripts/capacity_override.py PI-2026-1.1 --add --person bob --hours 12
+
+# Velocity / flow reporty
+python3 .edpa/engine/scripts/reports.py PI-2026-1.1
 ```
 
-### Automatizace pres GitHub Actions
+### Volitelna automatizace pres GitHub Actions
+
+V2 ma **jediny** volitelny workflow (jen s `--with-ci`):
 
 | Workflow | Trigger | Co dela |
 |----------|---------|--------|
-| `edpa-branch-check.yml` | PR opened/sync | Kontroluje branch naming konvenci |
-| `edpa-iteration-close.yml` | workflow_dispatch | Spusti EDPA engine, commity vysledky |
-| `edpa-sync-projects-to-git.yml` | cron (15min) + manual | Pull: Projects -> item files in .edpa/ |
-| `edpa-sync-git-to-projects.yml` | push na .edpa/ | Push: item files in .edpa/ -> Projects |
+| `edpa-contribution-sync.yml` | po merge PR | `sync_pr_contributions.py` materializuje PR-thread signaly (`pr_reviewer`, `issue_comment`) do `evidence[]` |
+
+> **Odstraneno v 2.0.0:** `edpa-branch-check.yml`, `edpa-iteration-close.yml`, `edpa-sync-projects-to-git.yml`, `edpa-sync-git-to-projects.yml`. Branch konvenci nyni hlida lokalni git hook, iteration close se spousti lokalne, obousmerny sync neexistuje.
 
 ---
 
@@ -924,247 +777,219 @@ python .claude/edpa/scripts/backlog.py status
 
 ### Den 1
 
-- [ ] Repo vytvorene s EDPA strukturou
-- [ ] `.edpa/config/people.yaml` -- tym s rolemi, FTE, kapacitami
-- [ ] `.edpa/config/project.yaml` -- nazev projektu, metadata
-- [ ] `.edpa/config/heuristics.yaml` -- vychozi heuristiky (skopirovano ze sablony)
-- [ ] `.edpa/config/edpa.yaml` -- PI, iterace, datumy, sync konfigurace
-- [ ] Issue Types nastavene na organizaci (`issue_types.py setup`)
-- [ ] Backlog naplneny (alespon 1 Epic, 3 Features, 10 Stories)
+- [ ] Engine vendorovany do `.edpa/engine/` (`/edpa:setup` nebo `project_setup.py`)
+- [ ] `.edpa/config/people.yaml` -- tym s rolemi, FTE, kapacitami (cadence + teams + people)
+- [ ] `.edpa/config/edpa.yaml` -- nazev projektu, governance, naming
+- [ ] `.edpa/config/cw_heuristics.yaml` -- vychozi signalove vahy (ze sablony)
+- [ ] `.edpa/config/id_counters.yaml` -- naseto
+- [ ] `.edpa/iterations/` -- PI + iterace s datumy
+- [ ] Backlog naplneny pres `backlog.py add` (alespon 1 Epic, 3 Features, 10 Stories)
 - [ ] `backlog.py validate` projde bez chyb
-- [ ] GitHub Project vytvoren (`project_setup.py`)
-- [ ] Project views nastaveny (manualne nebo ze sablony)
 - [ ] `engine.py --demo` projde uspesne
+- [ ] (volitelne) git hooky nainstalovany (`--with-hooks`), contribution-sync CI (`--with-ci`)
 
 ### Tyden 1
 
 - [ ] Tym pracuje s branch naming konvenci (`feature/S-XXX-popis`)
 - [ ] Commity referuji work items (`feat(S-XXX): ...`)
-- [ ] PR reviews probihaji
-- [ ] Sync funguje (overit `sync.py status`)
-- [ ] Item files v .edpa/ se automaticky aktualizuji z Projects
+- [ ] post-commit hook zaznamenava `commit_author` evidenci
+- [ ] (volitelne) PR reviews probihaji a contribution-sync je materializuje
 
 ### Konec iterace 1
 
 - [ ] EDPA engine spusten pro iteraci
-- [ ] `edpa_results.json` vygenerovan v `.edpa/reports/`
-- [ ] Vykazy vygenerovany (per-person)
+- [ ] `edpa_results.json` vygenerovan v `.edpa/reports/iteration-<ID>/`
+- [ ] Vykazy `timesheet-<id>.md` vygenerovany (per-person)
 - [ ] Vsechny invarianty prosly (`all_invariants_passed: true`)
+- [ ] Snapshot zmrazen v `.edpa/snapshots/`
 - [ ] Tym zkontroloval vysledky
-- [ ] Iteracni soubor vytvoren v `.edpa/iterations/`
 
 ### Konec iterace 2-4
 
 - [ ] Velocity stabilni (odchylka < 20%)
 - [ ] Prediktabilita > 80% (delivered / planned)
-- [ ] Zadne nevyresene sync konflikty
 
 ### Konec PI 1
 
 - [ ] Ground truth zaznamenano (min. 20 zaznamu)
-- [ ] CW kalibrace provedena (`evaluate_cw.py`)
+- [ ] CW kalibrace provedena (`calibrate_signals.py` / `/edpa:calibrate`)
 - [ ] MAD vyhodnoceno (cil: < 0.06)
-- [ ] Heuristiky upraveny (pokud MAD > 0.06)
+- [ ] Signalove vahy upraveny v `cw_heuristics.yaml` (pokud MAD > 0.06)
 - [ ] Planovani PI 2 -- nove epicy, WSJF, kapacity
-- [ ] `.edpa/config/edpa.yaml` aktualizovan na novy PI
+- [ ] Nove iteration soubory v `.edpa/iterations/` pro novy PI
 
 ---
 
 ## CLI Reference
 
+> Vsechny skripty bezi z vendorovaneho engine: `python3 .edpa/engine/scripts/<skript>.py`.
+
 ### Claude Code prikazy (doporuceno)
 
 | Prikaz | Popis |
 |--------|-------|
-| `/edpa setup` | Pocatecni setup projektu -- repo, tym, Issue Types, GitHub Project |
-| `/edpa close-iteration PI-2026-1.X` | Uzavreni iterace -- stazeni evidence, EDPA engine, reporty |
-| `/edpa reports` | Generovani reportu a vykazu |
-| `/edpa calibrate` | CW kalibrace -- vyhodnoceni MAD, navrh uprav heuristik |
+| `/edpa:setup --with-ci --with-hooks --with-rules` | Vendoruje engine, naseje configy + id_counters, volitelne hooky/CI/rules |
+| `/edpa:add` | Prida backlog item (lokalne, auto-commit) |
+| `/edpa:close-iteration PI-2026-1.X` | Uzavreni iterace -- kapacita, EDPA engine, reporty |
+| `/edpa:reports PI-2026-1.X` | Generovani vykazu a PI summary |
+| `/edpa:board` | Vizualni HTML Kanban board (lokalni) |
+| `/edpa:calibrate` | Kalibrace signalovych vah -- MAD, navrh uprav `cw_heuristics.yaml` |
 
 ### engine.py -- EDPA vypocetni jadro
 
 | Prikaz | Popis |
 |--------|-------|
-| `engine.py --demo` | Demo s ukázkovymi daty (3 osoby, 5 polozek) |
-| `engine.py --iteration PI-2026-1.3 --capacity .edpa/config/people.yaml --heuristics .edpa/config/heuristics.yaml` | Plny EDPA vypocet pro iteraci |
-| `engine.py --iteration ID --mode full ...` | Vypocet s Role Strength (JS x CW x RS) |
-| `engine.py --output cesta/vysledek.json ...` | Vlastni vystupni cesta |
+| `engine.py --demo` | Demo s ukázkovymi daty |
+| `engine.py --edpa-root .edpa --iteration PI-2026-1.3` | Plny EDPA vypocet pro iteraci (cte backlog/config/heuristiky z `.edpa`) |
+| `engine.py --edpa-root .edpa --iteration ID --output cesta/edpa_results.json` | Vlastni vystupni cesta |
+| `engine.py --status` | Stav konfigurace |
 
 ### backlog.py -- Sprava backlogu
 
 | Prikaz | Popis |
 |--------|-------|
+| `backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee bob --iteration PI-2026-1.1` | Prida item lokalne (ID z id_counters.yaml, auto-commit `feat(<ID>):`) |
+| `backlog.py add --type Epic --parent I-1 --title "..." --js 13 --bv 13 --tc 8 --rr-oe 5` | Prida Epic s WSJF metrikami |
+| `backlog.py add ... --contributor PERSON:ROLE:CW` | Prida prispevatele (owner/key/reviewer/consulted, CW ∈ [0,1]) |
 | `backlog.py tree` | Zobrazí plnou hierarchii (I -> E -> F -> S) |
-| `backlog.py tree --level epic` | Jen epicy |
-| `backlog.py tree --level feature` | Jen features |
-| `backlog.py tree --level story` | Jen stories |
+| `backlog.py tree --level epic\|feature\|story` | Filtr na uroven |
 | `backlog.py tree --iteration PI-2026-1.1` | Filtr stories na iteraci |
-| `backlog.py show S-200` | Detail polozky |
-| `backlog.py show E-10` | Detail epicu s features |
-| `backlog.py status` | Celkovy status projektu |
-| `backlog.py status --iteration PI-2026-1.1` | Status pro iteraci |
-| `backlog.py wsjf` | WSJF prioritizace (vsechny urovne) |
-| `backlog.py wsjf --level feature` | WSJF jen features |
+| `backlog.py show S-1` | Detail polozky |
+| `backlog.py status [--iteration PI-2026-1.1]` | Status projektu / iterace |
+| `backlog.py wsjf [--level feature]` | WSJF prioritizace |
 | `backlog.py validate` | Kontrola integrity backlogu |
 
-### sync.py -- Bidirekcni sync
+### reports.py -- Vykazy a PI summary
 
 | Prikaz | Popis |
 |--------|-------|
-| `sync.py pull` | GitHub Projects -> item files in `.edpa/` |
-| `sync.py pull --commit` | Pull + auto-commit (pouziva CI) |
-| `sync.py pull --mock` | Simulace bez GitHub API |
-| `sync.py push` | item files in `.edpa/` -> GitHub Projects |
-| `sync.py push --mock` | Simulace push |
-| `sync.py diff` | Zobrazí rozdily (dry-run) |
-| `sync.py diff --mock` | Rozdily v mock modu |
-| `sync.py log` | Changelog syncu |
-| `sync.py log --limit 50` | Poslednich 50 zaznamu |
-| `sync.py status` | Stav posledni synchronizace |
-| `sync.py conflicts` | Nevyresene konflikty |
+| `reports.py PI-2026-1.1` | Per-person `timesheet-<id>.md` + `timesheet-team.md` + xlsx |
+| `reports.py --pi PI-2026-1` | Agregace vsech iteraci pod PI |
+| `reports.py PI-2026-1.1 --out cesta/` | Vlastni vystupni adresar |
 
-### issue_types.py -- Issue Types (org-level)
+### board.py -- Lokalni HTML board
 
 | Prikaz | Popis |
 |--------|-------|
-| `issue_types.py list --org ORG` | Zobrazí aktualni typy na org |
-| `issue_types.py setup --org ORG` | Vytvori EDPA sadu Issue Types |
-| `issue_types.py setup --org ORG --dry-run` | Dry-run setup |
-| `issue_types.py assign --org ORG --repo REPO --issue 1 --type Epic` | Priradi typ issue |
-| `issue_types.py migrate --org ORG --repo REPO` | Migruje labels -> Issue Types |
-| `issue_types.py migrate --org ORG --repo REPO --dry-run` | Dry-run migrace |
-| `issue_types.py migrate --org ORG --repo REPO --remove-labels` | Migrace + smazani starych labels |
+| `board.py --output .edpa/board.html` | Vygeneruje Kanban board z `.edpa/backlog/` |
+| `board.py --iteration PI-2026-1.4 --open` | Filtr na iteraci + otevre v prohlizeci |
 
-### project_setup.py -- Inicializace GitHub Projectu
+### capacity_override.py -- Kapacitni override
 
 | Prikaz | Popis |
 |--------|-------|
-| `project_setup.py --org ORG --repo REPO` | Vytvori kompletni Project |
-| `project_setup.py --org ORG --repo REPO --project-title "Nazev"` | S vlastnim nazvem |
-| `project_setup.py --org ORG --repo REPO --dry-run` | Jen ukaze co by udelal |
+| `capacity_override.py PI-2026-1.1 --list` | Vypise existujici overridy |
+| `capacity_override.py PI-2026-1.1 --add --person bob --hours 12` | Prida override |
+| `capacity_override.py PI-2026-1.1 --remove --person bob` | Odebere override |
 
-### project_views.py -- Project Views
-
-| Prikaz | Popis |
-|--------|-------|
-| `project_views.py instructions --org ORG --project N` | Instrukce pro manual setup |
-| `project_views.py template --org ORG --project N` | Oznaci project jako sablonu |
-| `project_views.py create-from-template --org ORG --template N --title "..."` | Novy project ze sablony |
-| `project_views.py verify --org ORG --project N` | Overi ze views jsou spravne |
-
-### evaluate_cw.py -- CW Kalibrace
+### detect_contributors.py / calibrate_signals.py
 
 | Prikaz | Popis |
 |--------|-------|
-| `evaluate_cw.py --ground-truth .edpa/data/ground_truth.yaml --heuristics .edpa/config/heuristics.yaml` | Spocita MAD (Mean Absolute Deviation) |
+| `detect_contributors.py` | Prevede `evidence[]` -> `contributors[]` (cw) z realnych signalu |
+| `calibrate_signals.py --ground-truth .edpa/data/ground_truth.yaml --heuristics .edpa/config/cw_heuristics.yaml` | Kalibrace signalovych vah (MAD) |
 
-### Dalsi skripty
+### sync_pr_contributions.py (volitelne, CI)
 
 | Prikaz | Popis |
 |--------|-------|
-| `create_project_views.py` | Playwright automatizace views (vyzaduje `playwright`) |
+| `sync_pr_contributions.py` | Materializuje PR-thread signaly (`pr_reviewer`, `issue_comment`) do `evidence[]`. Spousti `edpa-contribution-sync.yml` po merge PR; vyzaduje `EDPA_TOKEN`. |
+
+> **Odstraneno v 2.0.0:** `sync.py` (obousmerny sync -- v V2 neexistuje), `issue_types.py` (org Issue Types), `project_setup.py --org/--repo/--project-title` (GitHub Project provisioning -- `project_setup.py` v V2 jen vendoruje engine), `project_views.py` + `create_project_views.py` (Project views / Playwright), `evaluate_cw.py` (nahrazeno `calibrate_signals.py`).
 
 ---
 
 ## Architektura
 
-V2.1: `.edpa/` + git log jsou source of truth, GitHub Projects je volitelne PM/BO UI.
+V2 je **local-first**: `.edpa/` (backlog v `.md` + config) je jediny zdroj pravdy, git je audit trail. GitHub je volitelny -- jediny tok smerem dovnitr je jednosmerne materializovani PR-thread signalu do `evidence[]`.
 
 ```
-                       .edpa/ item files (Git)       <-- Source of truth
+                  .edpa/  (git) -- JEDINY ZDROJ PRAVDY
+        backlog/**/*.md  +  config/  +  iterations/
                                 |
               +-----------------+-----------------+
               |                 |                 |
-        EDPA engine     Reports + Snapshots   (optional sync)
-        (vypocet)                                  |
-                                                   v
-                                       GitHub Projects (UI)
-                                       PM/BO board view
-                                       Issue Types (org), Custom fields
+        EDPA engine        backlog.py         board.py
+        (vypocet)          (add/tree/wsjf)    (HTML board)
+              |                                    |
+        +-----+-----+                              v
+        |           |                       .edpa/board.html
+   reports/     snapshots/                  (lokalni)
+   timesheet-*.md  *.json
+   xlsx
 ```
 
 ### Tok dat
 
 ```
-                    +---------------------------+
-                    |    GitHub Projects (UI)    |
-                    |  PM/BO spravuji backlog    |
-                    +---------------------------+
-                         |              ^
-           sync pull     |              |     sync push
-         (cron 15min)    v              |   (push trigger)
-                    +---------------------------+
-                    |  .edpa/ item files (Git)   |
-                    |  Source of truth           |
-                    +---------------------------+
-                              |
-                    +---------+---------+
-                    |                   |
-              +----------+       +----------+
-              |  Engine  |       |  Backlog |
-              | (vypocet)|       |  CLI     |
-              +----------+       +----------+
-                    |                   |
-              +----------+       +----------+
-              | Reports  |       |  WSJF    |
-              | Snapshots|       |  Tree    |
-              | Vykazy   |       |  Validate|
-              +----------+       +----------+
+   (volitelne) GitHub PR thread
+   reviews / komentare
+              |
+              |  edpa-contribution-sync.yml (po merge PR)
+              |  sync_pr_contributions.py
+              v  -- JEDNOSMERNE: signaly -> evidence[]
+   +-------------------------------------+
+   |  .edpa/  (git) -- ZDROJ PRAVDY      |
+   |  backlog *.md  config  iterations   |
+   |  evidence[] <- git commit_author    |
+   |             <- yaml_edit            |
+   |             <- gate transitions     |
+   +-------------------------------------+
+              |
+        detect_contributors.py
+        evidence[] -> contributors[] (cw)
+              |
+        +-----+-----------------------+
+        |             |               |
+   EDPA engine    reports.py      board.py
+   (JS x CW)      timesheety      HTML board
+        |
+   reports/ + snapshots/ + xlsx
 ```
+
+> **Odstraneno v 2.0.0:** obousmerny sync GitHub Projects <-> Git, org Issue Types, custom fields. Zadny GitHub Project se neprovisionuje ani nepropaguje.
 
 ### Evidence detection
 
-EDPA detekuje prispevky z techto Git signaluov:
+EDPA je evidence-driven. `cw[osoba, item] = contribution_score / Σ_osoby contribution_score`, kde `contribution_score = Σ signal_weight`. Vychozi signalove vahy (`cw_heuristics.yaml`):
 
-| Signal | Vaha | Evidence role |
-|--------|------|--------------|
-| GitHub issue assignee | 4.0 | owner |
-| `/contribute @person weight:X` | 3.0 | key |
-| PR author referencing item | 2.0 | key |
-| Commit author s S-XXX/F-XXX | 1.0 | reviewer |
-| PR reviewer | 1.0 | reviewer |
-| Issue/PR komentar | 0.5 | consulted |
+| Signal | Vaha | Zdroj |
+|--------|------|-------|
+| `assignee` | 4.00 | issue assignee |
+| `pr_author` | 3.40 | autor PR referujici item |
+| `commit_author` | 2.78 | commit s ID (lokalni git, post-commit hook) |
+| `pr_reviewer` | 2.25 | odeslany PR review (mimo self) |
+| `issue_comment` | 1.14 | komentar na issue/PR (mimo boty) |
 
-Nejvyssi signal urcuje evidence role (signaly se nescitaji).
+Lokalni signaly (`commit_author`, `yaml_edit`, gate transitions) cte engine primo z gitu/YAMLu. PR-thread signaly (`pr_reviewer`, `issue_comment`) prichazeji jen pres volitelny contribution-sync. Manualni `/contribute @person weight:X` (nebo `--contributor`) nese vahu verbatim.
 
-### Vypocet EDPA (simple mode)
+Rolove vahy prispevatelu: owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; `evidence_threshold` 1.0.
 
-Pro kazdou osobu v iteraci:
+### Vypocet EDPA
 
-1. Detekovat evidence na kazde polozce
+Od v1.14 jedina vypocetni cesta (zadny simple/full/gates mode). Pro kazdou osobu v iteraci:
+
+1. Sebrat evidenci na kazde polozce -> `contributors[]` s `cw`
 2. Pro kazdy par (osoba, polozka): `score = JS x CW`
 3. Pro kazdou osobu: `ratio_i = score_i / sum(scores)`
 4. Odvozene hodiny: `hours_i = ratio_i x capacity`
 
-Invariant: `sum(hours) = capacity` (presne, ne priblizne).
+Invariant: `sum(DerivedHours) = capacity` (presne, ne priblizne). Feature/Epic/Initiative status transitions navic rozdeluji rodicovsky Job Size pres `gate_weights`.
 
 ---
 
 ## Troubleshooting
 
-### gh auth -- chybejici scopes
+### gh auth (jen volitelny PR-signal sync)
 
-```
-ERROR: insufficient scopes for organization query
-```
-
-**Reseni:**
+EDPA V2 jadro `gh` nepotrebuje. Pokud selze volitelny contribution-sync workflow na autentizaci, doplnte secret `EDPA_TOKEN` (viz `docs/edpa-token-setup.md`) nebo lokalne:
 
 ```bash
-gh auth refresh -s repo,project,read:project,admin:org
-gh auth status  # overit
+gh auth login        # bezny repo scope staci
+gh auth status
 ```
 
-### Issue Types -- "Not Found" pri setup
-
-```
-ERROR: Organization not found or insufficient permissions
-```
-
-**Reseni:**
-- Overit ze jste clen organizace s admin pravami
-- Issue Types vyzaduji org-level pristup (ne personal account)
-- `gh auth refresh -s admin:org`
+> V2 uz nepotrebuje org scopy (`admin:org`, `project`) -- GitHub Projecty a org Issue Types byly odstraneny v 2.0.0.
 
 ### Backlog validate -- chyby
 
@@ -1202,73 +1027,41 @@ All invariants passed: NO
 - Overit ze commity/PR referuji spravne item ID (S-XXX, F-XXX)
 - Overit `.edpa/config/people.yaml` -- kapacity > 0
 
-### Sync -- konflikty
-
-```
-CONFLICT: S-200 modified in both Git and Projects
-```
-
-**Reseni:**
-
-```bash
-# Zobrazit konflikty
-python plugin/edpa/scripts/sync.py conflicts
-
-# Diff -- co by se zmenilo
-python plugin/edpa/scripts/sync.py diff
-```
-
-Rucne vyresit v prislusnem item souboru v `.edpa/`, pak:
-
-```bash
-python plugin/edpa/scripts/sync.py push
-```
-
-### Sync -- loop prevence
-
-Workflow `edpa-sync-git-to-projects.yml` obsahuje:
-
-```yaml
-if: github.actor != 'github-actions[bot]'
-```
-
-To zabranuje nekonecne smycce: push -> sync -> push -> sync...
-
-### GitHub Project -- custom fields chybi
-
-```
-ERROR: Field "Job Size" not found on project
-```
-
-**Reseni:**
-- Spustit znovu `project_setup.py` (vytvori chybejici fields)
-- Nebo rucne: Settings -> Custom fields -> Add field
-
-### Branch naming CI failure
+### Branch naming -- odmitnuty commit/push (git hook)
 
 ```
 Branch name does not follow EDPA convention.
 Required format: {type}/{item-id}-{description}
 ```
 
+V V2 hlida konvenci lokalni git hook (`--with-hooks`), uz ne CI.
+
 **Reseni:**
 - Format: `feature/S-200-omop-parser`, `bugfix/S-215-fix-validation`
 - Typ: `feature`, `bugfix`, `hotfix`, `chore`
-- Prefix: `S` (Story), `F` (Feature), `E` (Epic), `T` (Task), `B` (Bug)
+- Prefix: `S` (Story), `F` (Feature), `E` (Epic), `T` (Task), `D` (Defect), `EV` (Event)
 - `main`, `develop`, `release/*` jsou vyjimky (prochazi bez kontroly)
 
-### Python -- chybejici PyYAML
+### commit-msg hook -- chybejici reference itemu
 
 ```
-ERROR: PyYAML required. Install with: pip install pyyaml
+commit-msg: no item reference found
+```
+
+**Reseni:**
+- Pridat referenci itemu do zpravy: `feat(S-200): ...`
+- Nebo pro commity bez ticketu pouzit prefix `no-ticket:`
+
+### Python -- chybejici zavislosti
+
+```
+ERROR: pyyaml required. Install with: pip install pyyaml
 ```
 
 **Reseni:**
 
 ```bash
-pip install pyyaml
-# Nebo v GitHub Actions (uz je v workflow):
-# pip install pyyaml openpyxl
+pip install pyyaml openpyxl ruamel.yaml
 ```
 
 ### Iteration close -- "config not found"
@@ -1278,12 +1071,20 @@ ERROR: .edpa/config/people.yaml not found. Run EDPA setup first.
 ```
 
 **Reseni:**
-- Templates jsou v `.claude/edpa/templates/*.tmpl` -- musi se zkopirovat:
+- Spustit setup (vendoruje engine + naseje configy):
 
 ```bash
-cp .claude/edpa/templates/people.yaml.tmpl .edpa/config/people.yaml
-cp .claude/edpa/templates/heuristics.yaml.tmpl .edpa/config/heuristics.yaml
-cp .claude/edpa/templates/project.yaml.tmpl .edpa/config/project.yaml
+/edpa:setup
+# nebo
+python3 .edpa/engine/scripts/project_setup.py
+```
+
+- Pripadne zkopirovat ze sablon v `.edpa/engine/templates/*.tmpl`:
+
+```bash
+cp .edpa/engine/templates/people.yaml.tmpl .edpa/config/people.yaml
+cp .edpa/engine/templates/cw_heuristics.yaml.tmpl .edpa/config/cw_heuristics.yaml
+cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml
 ```
 
 - Soubory v `.edpa/config/*.yaml` (ne `*.yaml.tmpl`) musi byt commitnute v repu
@@ -1297,21 +1098,18 @@ cp .claude/edpa/templates/project.yaml.tmpl .edpa/config/project.yaml
 **Reseni:**
 1. Analyzovat zaznamy s nejvetsim `abs(auto_cw - confirmed_cw)`
 2. Seskupit dle role
-3. Pokud BO ma konzistentne vyssi confirmed_cw -> zvysit `role_overrides.BO.consulted`
-4. Pokud Arch reviewer je podhodnocen -> zvysit `role_overrides.Arch.reviewer`
-5. Znovu evaluovat
+3. Upravit `signals:` vahy v `.edpa/config/cw_heuristics.yaml` (zvysit vahu signalu, ktery danou roli reprezentuje)
+4. Pripadne pridat manualni `/contribute @person weight:X` u itemu, kde je strategicka prace neviditelna v Gitu
+5. Znovu spustit `calibrate_signals.py`
 
-### Playwright views -- prihlaseni
+### PR-signal sync -- chybejici evidence z PR
 
-```
-ERROR: Login timeout
-```
+PR-thread signaly (`pr_reviewer`, `issue_comment`) se do `evidence[]` dostanou jen pres volitelny contribution-sync.
 
 **Reseni:**
-- Prvni spusteni vyzaduje manualni prihlaseni v prohlizeci
-- Prohlizec se otevre automaticky
-- Po prihlaseni se session ulozi do `~/.edpa/playwright-profile`
-- Dalsi spusteni uz prihlaseni nevyzaduji
+- Overit, ze je nainstalovan `.github/workflows/edpa-contribution-sync.yml` (`/edpa:setup --with-ci`)
+- Overit secret `EDPA_TOKEN` (viz `docs/edpa-token-setup.md`)
+- Workflow bezi az **po merge** PR; pred merge jsou v evidenci jen lokalni signaly (`commit_author`, `yaml_edit`)
 
 ---
 
@@ -1319,15 +1117,16 @@ ERROR: Login timeout
 
 | Termin | Vyznam |
 |--------|--------|
-| **PI** | Planning Interval (10 tydnu = 4 delivery + 1 IP iterace) |
+| **PI** | Planning Interval (AI-native 5 tydnu = 4 delivery + 1 IP; classic SAFe 10 tydnu) |
 | **IP** | Innovation & Planning (posledni iterace PI) |
 | **JS** | Job Size -- relativni velikost prace (Fibonacci) |
 | **BV** | Business Value -- obchodni hodnota |
 | **TC** | Time Criticality -- casova kritickost |
-| **RR** | Risk Reduction -- snizeni rizika |
-| **WSJF** | Weighted Shortest Job First = (BV+TC+RR)/JS |
-| **CW** | Contribution Weight -- vaha prispevku (0.0 - 1.0) |
-| **RS** | Role Strength -- sila role (volitelne v full mode) |
-| **MAD** | Mean Absolute Deviation -- prumerna absolutni odchylka |
-| **Evidence** | Doklad o praci (commit, PR, assignee, komentar) |
+| **RR-OE** | Risk Reduction & Opportunity Enablement -- snizeni rizika / odemceni prilezitosti (CLI flag `--rr-oe`, legacy alias `--rr`) |
+| **WSJF** | Weighted Shortest Job First = (BV+TC+RR-OE)/JS |
+| **CW** | Contribution Weight -- vaha prispevku (0.0 - 1.0); per-item `Σ cw = 1.0` |
+| **Signal** | Doklad prispevku z gitu/PR (assignee, pr_author, commit_author, pr_reviewer, issue_comment) s vahou |
+| **MAD** | Mean Absolute Deviation -- prumerna absolutni odchylka (metrika kalibrace) |
+| **Evidence** | `evidence[]` na itemu -- agregovane signaly; `detect_contributors.py` z nich pocita `contributors[]` |
+| **Gate** | Status transition na Feature/Epic/Initiative; rozdeluje rodicovsky JS pres `gate_weights` |
 | **Ground truth** | Potvrzena realita od tymu (pro kalibraci) |

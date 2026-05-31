@@ -143,7 +143,7 @@ import Layout from '../layouts/Layout.astro';
           </div>
           <div class="config-file">
             <div class="config-file-header">
-              <span class="config-file-name">project.yaml</span>
+              <span class="config-file-name">edpa.yaml</span>
               <button class="btn btn-secondary btn-sm copy-btn" data-target="projectPre">Kopirovat</button>
             </div>
             <pre class="config-pre" id="projectPre"></pre>
@@ -180,7 +180,7 @@ import Layout from '../layouts/Layout.astro';
         </div>
 
         <div class="form-card launch-note">
-          <p class="launch-note-text">Plugin nainstaluje <code>.claude/edpa/</code> (skripty, sablony, workflows) a Claude Code skills/commands. Setup pak vytvori <code>.edpa/</code> strukturu pro projektova data.</p>
+          <p class="launch-note-text">Claude Code skills/commands prijdou z nainstalovaneho pluginu. <code>/edpa:setup</code> pak vendoruje engine (skripty, sablony) do <code>.edpa/engine/</code> a vytvori <code>.edpa/</code> strukturu pro projektova data.</p>
         </div>
       </div>
 
@@ -885,8 +885,10 @@ import Layout from '../layouts/Layout.astro';
         `# Generated: ${new Date().toISOString().split('T')[0]}`,
         '',
         'edpa:',
-        '  version: "2.2.0"',
+        '  version: "2.1.8"',
         '',
+        '# Optional: GitHub repo for contribution-sync (--with-ci). Local-first;',
+        '# omit this block if you are not using the PR-signal CI workflow.',
         'github:',
         `  org: "${org}"`,
         `  repo: "${repo}"`,
@@ -917,35 +919,29 @@ import Layout from '../layouts/Layout.astro';
 
     function generateProjectYaml(): string {
       const name = state.projectName || 'My Project';
-      const org = state.githubOrg || 'my-org';
-      const repo = state.githubRepo || 'my-project';
       const program = state.program;
       const lines = [
-        '# EDPA Project Descriptor',
+        '# EDPA Project Configuration (.edpa/config/edpa.yaml)',
         `# Generated: ${new Date().toISOString().split('T')[0]}`,
         '',
         'project:',
         `  name: "${name}"`,
-        `  github: "${org}/${repo}"`,
+        '  description: ""',
       ];
       if (program) {
-        lines.push(`  program: "${program}"`);
+        lines.push('  funding:');
+        lines.push(`    program: "${program}"`);
+        lines.push('    registration: ""');
       }
+      lines.push('  organizations:');
+      lines.push('    - name: ""');
+      lines.push('      legal_name: ""');
+      lines.push('      role: "primary"');
+      lines.push('      tax_id: ""');
+      lines.push('      vat_id: ""');
       lines.push('');
-      lines.push('work_items:');
-      lines.push('  hierarchy:');
-      lines.push('    - Initiative');
-      lines.push('    - Epic');
-      lines.push('    - Feature');
-      lines.push('    - Story');
-      lines.push('    - Task');
-      lines.push('');
-      lines.push('custom_fields:');
-      lines.push('  - name: "Job Size"');
-      lines.push('    type: single_select');
-      lines.push('    options: [1, 2, 3, 5, 8, 13]');
-      lines.push('  - name: "WSJF"');
-      lines.push('    type: number');
+      lines.push('governance:');
+      lines.push('  methodology: "EDPA 2.1.8"');
       return lines.join('\n');
     }
 
@@ -966,8 +962,8 @@ import Layout from '../layouts/Layout.astro';
       if (launchA) {
         launchA.textContent = [
           `cd ${repo}`,
-          `curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
-          `# potom: /edpa setup "${state.projectName || 'Projekt'}"`,
+          `# v Claude Code: /plugin install edpa@technomaton-edpa`,
+          `/edpa:setup --with-ci --with-hooks --with-rules`,
         ].join('\n');
       }
 
@@ -975,8 +971,8 @@ import Layout from '../layouts/Layout.astro';
       if (launchB) {
         launchB.textContent = [
           `cd ${repo}`,
-          `curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
-          `/edpa setup "${state.projectName || 'Projekt'}"`,
+          `# v Claude Code: /plugin install edpa@technomaton-edpa`,
+          `/edpa:setup   # interaktivni, provede vas vsim`,
         ].join('\n');
       }
 
@@ -984,10 +980,9 @@ import Layout from '../layouts/Layout.astro';
       if (launchC) {
         launchC.textContent = [
           `cd ${repo}`,
-          `gh repo clone technomaton/edpa /tmp/edpa`,
-          `cp -r /tmp/edpa/plugin/ .claude/`,
-          `rm -rf /tmp/edpa`,
-          `# potom: /edpa setup "${state.projectName || 'Projekt'}"`,
+          `curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
+          `# vendoruje engine do .edpa/engine/ (Cursor, Codex CLI, …)`,
+          `# potom v Claude Code: /edpa:setup --with-ci --with-hooks --with-rules`,
         ].join('\n');
       }
     }
@@ -1061,7 +1056,7 @@ import Layout from '../layouts/Layout.astro';
       const files = [
         { name: 'people.yaml', content: generatePeopleYaml() },
         { name: 'config.yaml', content: generateConfigYaml() },
-        { name: 'project.yaml', content: generateProjectYaml() },
+        { name: 'edpa.yaml', content: generateProjectYaml() },
       ];
 
       const encoder = new TextEncoder();

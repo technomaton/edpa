@@ -1,29 +1,27 @@
-# Kashealth Pilot Runbook (v1.17.1)
+# Kashealth Pilot Runbook (v2.1.8)
 
 - **Grant:** CZ.01.01.01/01/24_062/0007440 · OP TAK
 - **Org:** [`kashealth`](https://github.com/kashealth) (ČVUT FBMI + Medicalc software s.r.o.)
 - **Primary repo:** `kashealth/kas-platform-v1` (private monorepo)
-- **EDPA version:** **1.17.1-beta** — pin pre-kickoff. Inherits the
-  v1.17.0 yaml_edit structural signals (8 types) so progressive
-  elaboration on Initiatives / Epics / Features (LBC, benefit
-  hypothesis, acceptance criteria, NFRs, risks) is credited
-  automatically, plus three read-path bug fixes surfaced by the
-  2-PI × 5-iteration E2E rerun on 2026-05-10:
-  - **IP-iter gate events** — `load_gate_events` now credits the
-    transition's commit author when the parent has no
-    `contributors[]` yet (typical for strategic work on Initiatives
-    /Epics being progressively elaborated). Without the fix, PI-x.5
-    closes derived 0h despite real IP work; sandbox went 0h → 120h.
-  - **Defect filter** — Defects (and Tasks) now exact-match the
-    `iteration:` field like Stories. Before, a Defect with
-    `iteration: PI-2026-2.4` was credited in BOTH iter 4 and iter 5,
-    doubling its hours in the PI rollup.
-  - **`backlog.py tree`/`status`** read project metadata from
-    `edpa.yaml` instead of `people.yaml` and tolerate missing keys —
-    no more `KeyError: 'project'` on the canonical pilot template.
-  No CW recalibration, no schema migration. Single calculation path
-  inherited from 1.14; gates + yaml_edit + Done credit converge
-  through the same per-item normalization.
+- **EDPA version:** **2.1.8** — pin pre-kickoff. EDPA V2 je
+  **local-first**: source of truth je `.edpa/backlog/**/*.md` (Markdown
+  s YAML frontmatter), GitHub je **volitelný** (audit trail = git
+  historie). Žádné GitHub Project provisioning, žádné org Issue Types,
+  žádný bidirectional sync. Engine kredituje delivery z lokální
+  evidence (commit authors přes post-commit hook + `/contribute`
+  directive) a — pokud je zapnutý `--with-ci` workflow — z PR-thread
+  signálů. Single calculation path zděděná z 1.14:
+  - **yaml_edit structural signals** — progressive elaboration na
+    Initiatives / Epics / Features (LBC, benefit hypothesis, acceptance
+    criteria, NFRs, risks) se kredituje automaticky podle commitů nad
+    `.edpa/backlog/<typ>/<id>.md` v okně iterace (create / block_add /
+    list_grow / scalar_change / lines_volume / contributors_rebalance /
+    revert).
+  - **Gate events** — Feature/Epic/Initiative status transitions z git
+    history kreditují autora commitu transition.
+  - **Done credit** — Story/Defect s `iteration:` match a status=Done.
+  Všechny tři konvergují přes per-item normalizaci `contributors[].cw`
+  (Σ napříč osobami = 1.0 per item).
 - **Pilot lead:** Jaroslav Urbánek (Lead Architect / Vedoucí VaV)
 - **Pilot kickoff:** 2026-05-07
 - **Pilot duration:** 1 PI (5 weeks, target close 2026-06-11)
@@ -32,123 +30,129 @@
 
 Pilot ověří, že EDPA produkuje audit-grade per-person hodiny **z reálné delivery evidence projektu kas-platform-v1**, bez timesheetů. Cílový stav po PI close:
 
-- ✅ GitHub Project `Kashealth-PI-2026-1` s naplněnou hierarchií Initiative → Epic → Feature → Story
+- ✅ Lokální backlog `.edpa/backlog/**/*.md` s naplněnou hierarchií Initiative → Epic → Feature → Story (git = audit trail)
 - ✅ Per-person `timesheet-<id>.md` pro 4 členy
 - ✅ Single `edpa-results.xlsx` per iteration (Team Summary + Item Costs tabs)
-- ✅ Frozen snapshot `iteration-PI-2026-1.<n>.json` se signature + frozen_at
-- ✅ MAD ≤ 15 % engine-output vs manuální odhad PM-a (v1.14+ má jediný calculation path; mode selector dropnut)
+- ✅ Frozen snapshot `.edpa/snapshots/PI-2026-1.<n>.json` se signature (`payload_signature`) + `frozen_at`
+- ✅ MAD ≤ 15 % engine-output vs manuální odhad PM-a (jediný calculation path; mode selector dropnut)
 - ✅ Per-iteration capacity overrides ošetřeny pro IP iteraci (PI-2026-1.5) i ad-hoc PTO/sick
 
 ## 1. Day-1 setup
 
-Tři kroky. `/edpa:setup` Stage 0 (preflight + Issue Types + git config)
-běží automaticky; cryptic-GraphQL-error path je odstraněna.
+Dva kroky, oba **lokální** — žádný GitHub provisioning. `/edpa:setup`
+vendorne engine do `.edpa/engine/`, naseedne configy + `id_counters.yaml`
+a (s flagy) nainstaluje git hooky, PR-signal CI workflow a `.claude/rules/`.
 
 ```bash
-# 1. Standalone preflight (volitelné, "je projekt ready?"):
-python3 .claude/edpa/scripts/project_setup.py \
-  --org kashealth --repo kas-platform-v1 --check-only
-
-# 2. Instalace + configy:
 cd ~/projects/kas-platform-v1
-curl -fsSL https://edpa.technomaton.com/install.sh | sh
-cp ~/projects/edpa/docs/kashealth-pilot/people.yaml.example .edpa/config/people.yaml
-$EDITOR .edpa/config/people.yaml          # FTE, capacity, email per člena
-git add .edpa/config/ && git commit -m "chore(edpa): seed configs for pilot"
 
-# 3. Setup (Stage 0 preflight + provisioning):
-python3 .claude/edpa/scripts/project_setup.py \
-  --org kashealth --repo kas-platform-v1 \
-  --project-title "Kashealth-PI-2026-1"
+# 1. Instalace + vendoring + configy + hooky + CI + rules:
+#    a) z Claude Code:
+/edpa:setup --with-ci --with-hooks --with-rules
+#    b) nebo z shellu (non-Claude-Code):
+curl -fsSL https://edpa.technomaton.com/install.sh | sh
+
+# 2. Naseedni configy z pilot šablon a vyplň tým:
+cp ~/projects/edpa/docs/kashealth-pilot/edpa.yaml.example   .edpa/config/edpa.yaml
+cp ~/projects/edpa/docs/kashealth-pilot/people.yaml.example .edpa/config/people.yaml
+$EDITOR .edpa/config/people.yaml          # FTE, capacity, email, github per člena
+git add .edpa/config/ && git commit -m "chore(edpa): seed configs for pilot"
 ```
 
-**Stage 0 kontroluje:** `gh` scopes (admin:org, project, repo,
-workflow), org access, member presence, Issue Types (Initiative, Epic,
-Feature, Story, Defect, Task), `git config user.email`, Python ≥ 3.10
-+ `yaml` + `openpyxl`. Failures nabízí auto-fix s explicitním
-potvrzením. Issue Types missing → nabídne `issue_types.py setup --org`.
+**`project_setup.py` (= `/edpa:setup`) udělá:**
+1. **Vendorne engine** (`scripts` + `schemas` + `templates` + `VERSION`)
+   do `.edpa/engine/` — aby CI workflow, dokumentované
+   `.edpa/engine/scripts/*.py` CLI i non-Claude-Code nástroje resolvovaly.
+2. Vytvoří directory tree (`config`, `backlog/*`, `iterations`,
+   `reports`, `snapshots`, …).
+3. Naseedne `.edpa/config/{edpa.yaml,people.yaml,cw_heuristics.yaml}`
+   z `.edpa/engine/templates/*.tmpl` (idempotentně) a stampne
+   `governance.methodology` na nainstalovanou verzi.
+4. Naseedne `.edpa/config/id_counters.yaml` (local-first ID allocator)
+   z existujících file IDs.
+5. `--with-ci` → zkopíruje `.github/workflows/edpa-contribution-sync.yml`.
+6. `--with-hooks` → nainstaluje git hooky (pre-commit + commit-msg +
+   post-commit + pre-push).
+7. `--with-rules` → zkopíruje `plugin/rules/*.md` do `.claude/rules/`
+   (auto-load do každé Claude Code session v repu).
 
-**Pokud chce CI / scripted run:** přidej `--non-interactive --auto-fix`.
+**Ověření, že je projekt ready** (kdykoli, idempotentně):
 
-### 1.1 `EDPA_TOKEN` secret — povinné pro pipeline automation
+```bash
+sh ~/projects/edpa/docs/kashealth-pilot/preflight.sh
+```
 
-`install.sh` zkopíruje 8 workflow souborů do `.github/workflows/`. Z nich
-**dva** (`edpa-sync-projects-to-git.yml`, `edpa-sync-git-to-projects.yml`) potřebují
-PAT s vyššími scopes, protože default `GITHUB_TOKEN` **nemůže číst ani
-zapisovat do GitHub Projects v2** (jsou org-scoped, nikoli repo-scoped).
+Preflight kontroluje **jen lokální stav**: Python ≥ 3.10 + `pyyaml` +
+`openpyxl` (+ `ruamel.yaml`), `git` + `git config user.email`, že
+`.edpa/engine/scripts/` je vendorovaný a `.edpa/config/` naseedovaný.
+Žádné `gh` scopes, žádný org access, žádné Issue Types — `gh` je
+volitelný (jen pro `--with-ci`).
 
-**Trigger model (v1.17.1+):**
-- `sync-projects-to-git` — `cron: '*/30 6-17 * * 1-5'` (každých 30 min
-  v business hours Po-Pá 8-18 CET/CEST; UTC 6-17 pokrývá obě zóny) +
-  `workflow_dispatch` pro manual on-demand sync. Spotřeba ~528 CI
-  min/měsíc, ~26 % Free plan 2000 min limitu. Latence ~15 min průměrně
-  v pracovní době, max 30 min. Mimo business hours / víkendy se sync
-  pozastavuje — Project edits z noci/víkendu se zreplikují do `.edpa/`
-  až s prvním cron tickem v pondělí 8:00 (max ~14 h latence Pá 18:00 →
-  Po 8:00).
-  (`projects_v2_item` je organization webhook event, NE workflow
-  trigger — GitHub Actions ho neumí použít jako `on:` klíč.)
-- `sync-git-to-projects` — `on: push` do `.edpa/backlog/**`, beze změny
-  (push-driven, takže běží i mimo business hours, kdykoliv někdo
-  commitne backlog YAML).
+### 1.1 `EDPA_TOKEN` secret — VOLITELNÉ (jen pro PR-signal sync)
 
-**Bez `EDPA_TOKEN`:**
-- `sync-projects-to-git` **tiše no-opuje** — každý cron tick zavolá
-  sync.py pull, ale GraphQL query bez PAT vrací 0 items. Žádný error
-  v logu kromě warningu. Backlog YAML files v gitu se začnou rozcházet
-  s GH Projectem.
-- `sync-git-to-projects` (on push do `.edpa/backlog/**`) **fail-fast
-  s HTTP 403** na první GraphQL mutaci. Aspoň je to viditelné.
-- **Manuální fallback:** každou středu před týdenním close běž
-  `python3 .claude/edpa/scripts/sync.py pull --commit` lokálně a po
-  každé úpravě backlog YAML files `sync.py push` před commitem.
+V2 nepotřebuje žádný PAT pro chod. Lokální evidence (commit authors přes
+post-commit hook + `/contribute @person weight:N` directive) pokrývá
+attribution sama o sobě. **Jediný** workflow, který GitHub token používá,
+je volitelný `--with-ci` job:
 
-**Setup (jednou per repo, ~5 min) — DOPORUČENÝ POSTUP:**
+- **`edpa-contribution-sync.yml`** → `sync_pr_contributions.py` —
+  materializuje PR-thread signály (pr_author / pr_reviewer /
+  issue_comment) do `evidence[]` backlog items. Tyhle signály jsou
+  *PR-thread-only* (default `GITHUB_TOKEN` na ně stačí pro veřejné repo;
+  pro **private** monorepo `kas-platform-v1` dej fine-grained PAT jako
+  repo secret `EDPA_TOKEN`).
 
-Plný step-by-step průvodce s GitHub UI screenshoty, fine-grained vs.
-classic PAT volba, scope reference, verifikace a rotation policy:
-→ **[`docs/edpa-token-setup.md`](../edpa-token-setup.md)**
+**Bez `EDPA_TOKEN` (nebo bez `--with-ci`):**
+- Attribution běží dál z lokální evidence — commit authors a
+  `/contribute` directives se zapisují post-commit hookem do `evidence[]`
+  lokálně. Ztratíš jen PR-review/PR-comment signály (reviewer kredit).
+- **Manuální fallback při close** (pokud chceš započítat otevřené PR):
+  `python3 .edpa/engine/scripts/sync_pr_contributions.py --pr <N> --rebuild --skip-commit`
+  per otevřený PR — viz §3 Stage 2a.
 
-Stručně, pro experta:
-1. **Vytvoř fine-grained PAT** na GitHubu — Resource owner = `kashealth`,
+**Setup tokenu (jen pokud chceš `--with-ci`, ~5 min):**
+1. **Vytvoř fine-grained PAT** — Resource owner = `kashealth`,
    Repository access = `kas-platform-v1`. Permissions: Repository
-   `Contents`+`Issues`+`Workflows`=write, `Pull requests`+`Metadata`=read;
-   Organization `Projects`=write, `Members`=read.
+   `Contents`+`Pull requests`+`Issues`=read, `Metadata`=read. (Žádné
+   org `Projects`/`Members` scopes — V2 GitHub Project neřeší.)
 2. **Ulož jako repo secret** `EDPA_TOKEN` v *Settings → Secrets and
    variables → Actions → New repository secret*.
-3. **Ověř** test commitem do `.edpa/backlog/` — Actions tab musí
-   ukázat ✓ Success na "Sync Git -> GitHub Projects".
+3. **Ověř** mergem PR, který referencuje EDPA item — Actions tab musí
+   ukázat ✓ Success na "EDPA Contribution Sync" a do daného
+   `.edpa/backlog/<…>.md` se dopíše `evidence[]`.
 
 **Rotace tokenu:** Fine-grained PATs povinně expirují (max 1 rok).
 Do týmového kalendáře recurring event "Rotate EDPA_TOKEN" 2 týdny
-před expirací. Postup rotace v guidu §6.
-
-**Sdílený PAT napříč repos:** Pokud poběží EDPA na víc repos v org,
-ulož PAT jako **organization secret** místo per-repo — jedna rotace
-pro všechny. Detail v guidu §4.
+před expirací.
 
 ## 2. Naplnit počáteční backlog
 
-`backlog.py add` je striktně GH-first — vyžaduje, aby `/edpa:setup` už
-proběhl a v `.edpa/config/edpa.yaml` byla vyplněná sekce `sync`. Issue
-se vytvoří v GitHubu, server přidělí číslo a podle něj se odvodí EDPA
-ID (`I-1`, `E-12`, `S-42`); zároveň se titulek v GH UI přepíše na
-`"{ID}: {title}"` a item se nalinkuje pod parenta. Lokální `.md` soubor
-i `issue_map.yaml` se zapíšou až po úspěšném vytvoření v GH.
+`backlog.py add` je **local-first** — žádné `gh` volání při create.
+ID se přidělí z `.edpa/config/id_counters.yaml` (`I-1`, `E-12`, `S-42`),
+MCP `edpa_item_create` zvaliduje parent hierarchii (Story→Feature,
+Feature→Epic, Epic→Initiative), zapíše se `.edpa/backlog/<typ>/{ID}.md`
+a auto-commitne `feat(<ID>): <title>`. PR-derived signály dorazí
+asynchronně přes `--with-ci` workflow (ne při create).
 
 ```bash
-python3 .claude/edpa/scripts/backlog.py add --type Initiative --title "Medical Platform MVP" --js 0
-python3 .claude/edpa/scripts/backlog.py add --type Epic --parent I-1 --title "OMOP datový e-shop" --js 21 --status Funnel
-python3 .claude/edpa/scripts/backlog.py add --type Story --parent F-1 --title "Implement OMOP parser" \
+python3 .edpa/engine/scripts/backlog.py add --type Initiative --title "Medical Platform MVP" --js 0
+python3 .edpa/engine/scripts/backlog.py add --type Epic --parent I-1 --title "OMOP datový e-shop" --js 21 --status Funnel
+python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 --title "Implement OMOP parser" \
   --js 5 --iteration PI-2026-1.1 \
-  --contributor turyna:owner:0.7 --contributor matousek:reviewer:0.3
+  --contributor turyna-martin:owner:0.7 --contributor matousek-daniel:reviewer:0.3
 
-python3 .claude/edpa/scripts/validate_syntax.py --strict .edpa/backlog/
+# Validace frontmatteru + ID konzistence:
+python3 .edpa/engine/scripts/validate_syntax.py --strict .edpa/backlog/
+python3 .edpa/engine/scripts/validate_ids.py
 ```
 
-(`sync.py push` už není potřeba — `backlog.py add` posílá do GH v jednom
-kroku. Push spouštěj jen pro hromadné změny polí, ne pro nově vytvořené
-items.)
+(Z Claude Code ekvivalentně `/edpa:add Story "Implement OMOP parser"
+--parent F-1 --js 5 --iteration PI-2026-1.1`.)
+
+`--contributor PERSON:ROLE:CW` seedne počáteční `contributors[]` (role
+∈ {owner, key, reviewer, consulted}); engine je při close přepočítá
+z nasbírané `evidence[]` (viz §3 Stage 2b). Manuální korekce kdykoli
+přes `/contribute @person weight:N` v těle commitu / PR / issue.
 
 První PI typicky: 1 Initiative, 2–3 Epics, 4–6 Features, 8–12 Stories
 napříč PI-2026-1.{1..4}.
@@ -158,12 +162,12 @@ napříč PI-2026-1.{1..4}.
 Každé pondělí ráno (= konec předchozí týdenní iterace):
 
 ```bash
-# Pull GH UI changes
-python3 .claude/edpa/scripts/sync.py pull --commit
-
 # Close uplynulou iteraci (prep + engine + reports)
 /edpa:close-iteration PI-2026-1.X
 ```
+
+(Žádný `sync.py pull` — V2 nemá bidirectional sync. Lokální `.edpa/`
+JE source of truth.)
 
 `/edpa:close-iteration` má tři formy:
 
@@ -173,28 +177,61 @@ python3 .claude/edpa/scripts/sync.py pull --commit
 | `<iter> --prep-only` | Jen prep: zaznamená override, necommitne engine. Pro mid-iteration recording (PTO oznámí v úterý, close je v pátek). |
 | `<iter> --skip-prep` | Engine + reports bez prep promptu. Pro re-run / scripted close. |
 
-Stage 1 (prep) interaktivně zeptá *"Did anyone have non-baseline
-capacity?"* a volá `capacity_override.py --add` per osobu. Validuje
-proti people.yaml, computes diff vs baseline, prompts for audit note,
-auto-commits s `<iter>: capacity override <person> -> <hours>h
+**Stage 1 (prep)** se interaktivně zeptá *"Did anyone have non-baseline
+capacity?"* a volá `capacity_override.py <iter> --add` per osobu.
+Validuje proti people.yaml, computes diff vs baseline, prompts for audit
+note, auto-commits s `<iter>: capacity override <person> -> <hours>h
 (<note>)`. Closed iterations odmítnou override.
 
-Stage 2 spustí `edpa-engine` → `edpa-reports`. Engine vyrobí
-`edpa_results.json` + `edpa-results.xlsx` (Team Summary + Item Costs
-tabs). Reports vyrobí `timesheet-<id>.md` per osobu + `timesheet-team.md`
-+ frozen snapshot `iteration-<id>.json`.
+**Stage 2a (volitelně, jen s `--with-ci`)** — mid-flight PR sync: pro
+každý **otevřený** PR referencující item v zavírané iteraci spusť
+`sync_pr_contributions.py --pr <N> --rebuild --skip-commit`, ať engine
+vidí i evidence z PR, které ještě nejsou merged. Přeskoč, když
+`EDPA_NO_GH=1` nebo workflow file chybí.
+
+**Stage 2b (POVINNÉ — neskipovat)** — refresh `contributors[]`:
+
+```bash
+python3 .edpa/engine/scripts/detect_contributors.py --all-items
+```
+
+Engine čte `contributors[]` (normalizovaná per-item CW mapa), NE
+`evidence[]` (raw signal log). Post-commit hook a `sync_pr_contributions.py`
+píšou jen `evidence[]`. Bez tohoto kroku engine vidí prázdné contributors
+a vrátí **0h derived** pro každý item, který přišel přes evidence — bez
+erroru, jen tiché nuly. Idempotentní (items bez evidence = no-op),
+auto-commit `chore(contributors): …`.
+
+**Stage 2c — engine + reports:**
+
+```bash
+# Engine: derived hours z delivery evidence + capacity overrides
+python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.X
+# Reports: per-person timesheety + team rollup
+python3 .edpa/engine/scripts/reports.py PI-2026-1.X
+```
+
+Engine vyrobí `.edpa/reports/iteration-PI-2026-1.X/edpa_results.json` +
+`edpa-results.xlsx` (Team Summary + Item Costs tabs) a zapíše frozen
+snapshot `.edpa/snapshots/PI-2026-1.X.json` (s `payload_signature` +
+`frozen_at`). Reports vyrobí `timesheet-<id>.md` per osobu +
+`timesheet-team.md`. Oboje auto-commitne.
 
 ## 4. PI close (po 5 týdnech)
 
+Po zavření všech 5 iterací udělej PI-level rollup:
+
 ```bash
-/edpa:close-iteration PI-2026-1
+python3 .edpa/engine/scripts/pi_close.py --pi PI-2026-1
 ```
 
-(Bez `.<n>` suffix — close PI-level rollup. Stage 1 prep se přeskočí
-automaticky, overrides žijí na per-iteration files.)
+(Agreguje všechny `iteration-PI-2026-1.*/` výsledky do PI summary.
+Stage 1 prep se přeskočí — overrides žijí na per-iteration files.)
+Per-person timesheety přes PI: `reports.py --pi PI-2026-1` (PI-level rollup).
 
-BankID podpis snapshotu je audit-grade volitelná, viz
-`docs/audit-trail.md`.
+Audit-grade podpis snapshotu (BankID) je volitelná nadstavba, viz
+`docs/audit-trail.md`. Každý iteration snapshot už nese
+`payload_signature` (deterministický hash payloadu) + `frozen_at`.
 
 ## 5. Edge cases
 
@@ -212,40 +249,56 @@ BankID podpis snapshotu je audit-grade volitelná, viz
 Mid-iteration recording (PTO oznámí v úterý, close je v pátek):
 
 ```bash
-python3 .claude/edpa/scripts/capacity_override.py PI-2026-1.3 \
-  --add --person urbanek --hours 16 --note "vacation Jun 9-11 (3 dny PTO cert)"
+python3 .edpa/engine/scripts/capacity_override.py PI-2026-1.3 \
+  --add --person urbanek-jaroslav --hours 16 --note "vacation Jun 9-11 (3 dny PTO cert)"
 ```
 
-Standalone `--list` / `--remove` viz `--help`.
+`--person` musí být `id` z `people.yaml`. Standalone `--list` / `--remove`
+viz `--help`. Po změně capacity re-run `engine.py --iteration PI-2026-1.3`,
+ať reports reflektují novou alokaci.
 
 ### 5.2 MAD validation vs PM ground truth
 
-Mode selector (`--mode simple|gates`) byl odebrán v 1.14 — jediný
-calculation path teď konverguje přes Story/Defect Done credit + gate
-events + (v1.17) yaml_edit signals. PI-1 close porovnej engine output
+Single calculation path konverguje přes Story/Defect Done credit + gate
+events + yaml_edit signals. Při PI-1 close porovnej engine output
 s manuálním PM odhadem:
 
 ```bash
-# Engine spuštěný přes /edpa:close-iteration vyrobí kanonický výstup
-python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1 \
-  --output .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
+# Kanonický výstup vyrobí /edpa:close-iteration (nebo přímo engine.py):
+python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1
 
-# PM napíše per-person odhad ručně (gut estimate) do PI close retro;
-# evaluate_cw.py spočítá MAD proti seedovaným contributors[].cw
-python3 .claude/edpa/scripts/evaluate_cw.py --iteration PI-2026-1.1 \
-  --ground-truth .edpa/reports/pm-baseline-PI-2026-1.1.yaml
+# PM napíše per-person odhad ručně (gut estimate) do PI close retro a porovná
+# se sloupcem "Hours" v edpa-results.xlsx / timesheet-<id>.md.
 ```
 
-Acceptance: MAD ≤ 15 % vůči PM gut estimate; **Σ team derived ≤ Σ
-capacity** (per-person rule `derived ≤ cap`, ne tvrdá rovnost — IP
-iter může mít víc strategie/přípravy než delivery, vyšlí se přes
-yaml_edit signaly automaticky).
+**Acceptance — POZOR, V2 invariant je tvrdá rovnost:** engine validuje
+**Σ per-person derived == capacity** (per osobu, tolerance 0.1 h;
+`ratio_sum == 1.0`). NENÍ to `derived ≤ cap` jako naznačoval V1 — engine
+normalizuje hodiny tak, aby každé osobě seděly přesně na její capacity
+(včetně override). To znamená, že i IP iterace s víc strategií než
+delivery rozdělí celou capacity — yaml_edit / gate signály zachytí
+strategickou práci automaticky, takže se hodiny nikam "neztratí".
+MAD ≤ 15 % se měří na **rozdělení mezi osoby/items** vůči PM gut estimate,
+ne na celkový součet (ten je z definice == capacity).
+
+Recalibration signal weights (až po nasbírání ≥ 20 ground-truth CW
+záznamů z reálného PI): `/edpa:autocalib` (`calibrate_signals.py` —
+Monte Carlo nad signal weights + coordinate descent, metrika MAD vs
+ground truth). Před tím není kalibrace potřeba — pilot běží na seeded
+defaultech z `cw_heuristics.yaml`.
 
 ### 5.3 Rollback
 
-- Pilot lze stoplý smazáním GH Projectu (`gh project delete N --owner kashealth`); repo + `.edpa/` zůstávají.
-- Engine warns `0 evidence pairs` → ověř, že `.edpa/backlog/` má seedované Stories s `iteration:` polem a status=Done; v1.17 yaml_edit signals naběhnou automaticky pokud jsou commits ve window.
-- Setup `--check-only` můžeš spustit kdykoli pro re-validation.
+- **Stop pilotu** = nech být, nebo smaž `.edpa/` (lokální data) — žádný
+  GitHub Project se neprovisioval, takže není co rušit. Git historie
+  commitů zůstává jako audit trail (nebo `git revert` EDPA commitů).
+- Engine warns `0 evidence pairs` / 0h derived → ověř, že (a)
+  `.edpa/backlog/` má seedované Stories s `iteration:` polem a
+  status=Done, a (b) **proběhl Stage 2b** (`detect_contributors.py
+  --all-items`) — nejčastější příčina tichých nul je vynechaný refresh
+  `contributors[]`. yaml_edit signály naběhnou automaticky, pokud jsou
+  commits nad `.edpa/backlog/<typ>/<id>.md` v okně iterace.
+- `sh preflight.sh` můžeš spustit kdykoli pro re-validation lokálního stavu.
 
 ## 6. Success criteria
 
@@ -253,29 +306,29 @@ yaml_edit signaly automaticky).
 |---|-----------|--------|
 | 1 | EDPA produkuje per-person timesheety pro všechny 4 členy s Σ = capacity | reports + manual review |
 | 2 | `edpa-results.xlsx` (Team Summary + Item Costs tabs) je akceptovatelný pro audit | manual cross-check vs governance-reseni-v3.md rates |
-| 3 | Gates mode produkuje "rozumné" hodiny vs PM odhad (MAD ≤ 15 %) | A/B diff (§ 5.2) + PM review |
+| 3 | Engine produkuje "rozumné" rozdělení hodin vs PM odhad (MAD ≤ 15 %) | diff (§ 5.2) + PM review |
 | 4 | Žádná Layer-1 governance ceremonie nebyla zbytečně přidaná (žádný timesheet, žádný TS-tracking tool) | retro feedback od týmu |
 | 5 | Setup → first iteration close ≤ 30 min člověka času | log time-to-close |
-| 6 | Auto-commit feature drží state přes 5+ PR mergů | `git log` ukáže `EDPA:` commits in-place po každém pull |
+| 6 | Auto-commit / local-first attribution drží state přes 5+ PR mergů | `git log` ukáže `feat(<ID>):` + `chore(contributors):` commits in-place |
 
 Pokud 5+ z 6 PASS → pilot úspěšný, pokračuj na PI-2026-2 (full prod) a zveřejni jako case study.
 
 ## 7. Open questions (pre-kickoff sync)
 
-1. **PI cadence** — 1-week × 5 (default) vs 2-week × 5? Nastavitelné v `people.yaml`.
+1. **PI cadence** — 1-week × 5 (default) vs 2-week × 5? Nastavitelné v `cadence:` (edpa.yaml + people.yaml, musí se shodovat).
 2. **FTE distribuce** — 1.0 / 0.5 / 0.25 per člen? Doporučení v `people.yaml.example`.
-3. **Cost reporting** — sazby drží **privátní registr** (ne EDPA people.yaml). Auditor format = open question.
-4. **Calibration timing** — `evaluate_cw.py --check-readiness` po PI-2026-1 close (potřeba ≥ 20 ground truth records).
+3. **Cost reporting** — sazby drží **privátní registr** (ne EDPA people.yaml — engine `hourly_rate` nečte). Auditor format = open question.
+4. **Calibration timing** — `/edpa:autocalib` až po PI-2026-1 close (potřeba ≥ 20 ground truth records).
 5. **PTO / sick policy** — kdo zapisuje override? Návrh: každý člen sám commituje vlastní entry před close; PM/Lead audit-checkne weekly.
 6. **IP iterace overtime** — standard "+4h IP push", nebo ad-hoc? Pokud standard → preventivně override v PI-2026-1.5.
+7. **PR-signal sync** — zapnout `--with-ci` + `EDPA_TOKEN` pro reviewer kredit, nebo stačí lokální commit-author evidence? (Private repo → fine-grained PAT, viz §1.1.)
 
 ## 8. Reference
 
-- Methodology: [`docs/methodology.md`](../methodology.md) (EDPA 1.17.1-beta spec)
-- v1.17.1 E2E validation: `CHANGELOG.md` § 1.17.1-beta — three bugs found by 2-PI × 5-iter rerun, all fixed pre-kickoff
-- v1.17 yaml_edit calibration corpus: [`docs/proposals/v1.17-yaml-edit-calibration-corpus.md`](../proposals/v1.17-yaml-edit-calibration-corpus.md) — pre-Monte Carlo edge case memo
-- v1.10 RFC: [`docs/proposals/v1.10-skill-first-gaps-and-excel-consolidation.md`](../proposals/v1.10-skill-first-gaps-and-excel-consolidation.md)
-- v1.9.0 capacity overrides RFC: [`docs/proposals/per-iteration-capacity-overrides.md`](../proposals/per-iteration-capacity-overrides.md)
-- E2E test plan: [`docs/E2E-TEST-PLAN.md`](../E2E-TEST-PLAN.md)
+- Methodology: [`docs/methodology.md`](../methodology.md) (EDPA 2.1.8 spec)
+- V2 architecture decisions: [`docs/v2/decisions.md`](../v2/decisions.md) — ADR-012 (local-first add), ADR-013 (PR-signal CI materialization)
+- Dev ID collisions (local-first allocator): [`docs/dev-collisions.md`](../dev-collisions.md)
+- `/contribute` directive: [`docs/contribute-directive.md`](../contribute-directive.md)
+- E2E V2 validation: [`docs/e2e-v2-full.md`](../e2e-v2-full.md) — full install → add → close → report run
 - CHANGELOG: [`CHANGELOG.md`](../../CHANGELOG.md)
 - Governance design: [`docs/examples/governance-kashealth/governance-reseni-v3.md`](../examples/governance-kashealth/governance-reseni-v3.md)

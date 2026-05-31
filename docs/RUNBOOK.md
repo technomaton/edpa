@@ -4,171 +4,151 @@ Verified manual walkthrough of every `/edpa:*` slash command. Use this when
 onboarding a new project, debugging an unfamiliar workflow, or before relying
 on the toolchain for a real iteration close.
 
-**Last verified:** 2026-05-04 against branch `main` at `0b583be`.
+**Last reviewed:** 2026-05-31 — **V2 local-first** (2.0.0+). `.edpa/backlog/`
+YAML is the source of truth, git is the audit trail. GitHub Projects sync is
+**optional**; the engine derives hours from local git evidence without it.
 
 ---
 
 ## Quick reference
 
-| Command              | Underlying script / skill          | Status     | Tested by |
-|----------------------|------------------------------------|------------|-----------|
-| `/edpa:setup`        | `plugin/edpa/scripts/project_setup.py` | ✅ verified | `tests/test_e2e_sync.py::test_setup_creates_project_and_persists_ids` |
-| `/edpa:sync`         | `plugin/edpa/scripts/sync.py`      | ✅ verified | `tests/test_e2e_sync.py` (5 tests) |
-| `/edpa:close-iteration` | `engine.py` then `edpa-reports` skill | ✅ verified | `tests/test_invariants.py`, `tests/test_gate_allocation.py` |
-| `/edpa:reports`      | `edpa-reports` skill (no script)   | ✅ verified | manual + skill execution |
-| `/edpa:calibrate`    | `edpa-autocalib` skill             | ⚠️ requires ≥20 ground-truth records — skip until first PI closed |
-| `/edpa:board`        | `plugin/edpa/scripts/board.py`     | ✅ verified | manual run |
+| Command              | Underlying script / skill          | Status |
+|----------------------|------------------------------------|--------|
+| `/edpa:setup`        | `.edpa/engine/scripts/project_setup.py` | ✅ vendors engine + seeds `.edpa/` (local-first) |
+| `/edpa:close-iteration` | `.edpa/engine/scripts/engine.py` → `edpa-reports` skill | ✅ verified by `tests/test_invariants.py`, `tests/test_gate_allocation.py` |
+| `/edpa:reports`      | `edpa-reports` skill (no script)   | ✅ manual + skill execution |
+| `/edpa:board`        | `.edpa/engine/scripts/board.py`    | ✅ manual run |
+| `/edpa:capacity`     | `.edpa/engine/scripts/capacity_override.py` | ✅ per-iteration capacity overrides |
+| `/edpa:calibrate`    | `edpa-autocalib` skill             | ⚠️ needs ≥20 ground-truth records — skip until first PI closed |
+| GitHub PR signals (optional) | `edpa-contribution-sync.yml` CI → `sync_pr_contributions.py` | ⚪ opt-in — materializes PR-thread evidence (§2) |
 
 ---
 
 ## Prerequisites (one-time per machine)
 
+EDPA is **local-first** — you need only Python + git:
+
 ```bash
-gh auth login              # repo + project + admin:org scopes
-gh extension install --upgrade  # ensure latest gh
-python3.13 --version       # 3.10+ required
-python3.13 -m pip install pyyaml openpyxl
+python3 --version                         # 3.10+ required
+python3 -m pip install pyyaml openpyxl ruamel.yaml
+git --version
 ```
 
-For org-level Issue Types (Initiative, Epic, Feature, Story):
+GitHub CLI is needed **only** if you opt into the optional GitHub Projects sync
+or the `--with-ci` PR-signal workflow — neither is required to compute hours:
 
 ```bash
-python3.13 plugin/edpa/scripts/issue_types.py setup --org <your-org>
+gh auth login              # repo scope; optional, for sync / PR-signal CI only
 ```
 
 ---
 
 ## 1. `/edpa:setup` — initialize a new project
 
-**Purpose:** create GitHub Project v2, custom fields, issues from local
-backlog, link parent/child via sub-issues, persist IDs for sync.
+**Purpose:** bootstrap a **local-first** EDPA project. Vendors the engine into
+`.edpa/engine/`, seeds `.edpa/config/{edpa.yaml,people.yaml,cw_heuristics.yaml}`
++ `id_counters.yaml`, and (with flags) installs git hooks, the PR-signal CI
+workflow, and architectural rules. **No GitHub Project provisioning** — the V1
+`--org/--repo/--project-title`, Issue Types, and `issue_map.yaml` path was
+removed in 2.0.0.
 
 **Prerequisites:**
-- Repo exists on GitHub.
-- `.edpa/backlog/{initiatives,epics,features,stories}/` populated with item
-  YAMLs (use `plugin/edpa/templates/*.tmpl` as starting point).
-- `.edpa/config/edpa.yaml` exists (template at `plugin/edpa/templates/project.yaml.tmpl`).
-- Org has native Issue Types set up (see prerequisites above).
+- A git repo (local is fine — no GitHub required).
+- The EDPA plugin installed in Claude Code (`/plugin install edpa@technomaton-edpa`).
 
-**Run:**
+**Run (Claude Code):**
 
-```bash
-python3.13 plugin/edpa/scripts/project_setup.py \
-  --org <org> --repo <repo> \
-  --project-title "Project Name"
+```
+/edpa:setup --with-ci --with-hooks --with-rules
 ```
 
-Use `--dry-run` first to print the plan without touching GitHub.
+Under the hood:
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/edpa/scripts/project_setup.py \
+  --with-ci --with-hooks --with-rules
+```
+
+Idempotent — safe to re-run to add hooks/CI/rules later. Outside Claude Code,
+`curl -fsSL https://edpa.technomaton.com/install.sh | sh` vendors the same
+engine + `.edpa/` tree.
+
+**Flags (all recommended for team workflows):**
+- `--with-hooks` — pre-commit + commit-msg + post-commit + pre-push git hooks
+  (ID safety, ticket-attached, local `commit_author` evidence emission).
+- `--with-ci` — copies `edpa-contribution-sync.yml`; materializes PR-thread
+  signals (`pr_reviewer`, `issue_comment`) into `evidence[]` after merge.
+  Optional, GitHub-only — local commit evidence flows without it.
+- `--with-rules` — copies architectural rules to `.claude/rules/` so AI sessions
+  follow the same ticket-first workflow as humans.
 
 **Expected output (last steps):**
 
 ```
-[9] Persisting GitHub state (.edpa/config/edpa.yaml + issue_map.yaml)
-      ✓ Project #N, K fields, M options saved
-      ✓ issue_map.yaml: X items mapped
-══════════════════════════════════════════════════════════════════════
-  Setup complete!
-  Project: https://github.com/orgs/<org>/projects/N
-  Issues:  X created
-  Fields:  Y values set
-  Links:   Z sub-issue links
+  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (37 scripts, VERSION 2.1.8)
+  [2] Directory tree   ✓ Directory tree at .edpa/
+  [3] Config templates ✓ Seeded people.yaml, edpa.yaml, cw_heuristics.yaml
+  [4] ID counter       ✓ id_counters.yaml seeded
+  [5] Git hooks (--with-hooks)        ✓ pre-commit, pre-push, commit-msg, post-commit
+  [6] Architectural rules (--with-rules)  ✓ edpa-work-rules.md → .claude/rules/
+EDPA setup complete.
 ```
 
-**What got persisted:**
+**What got created:**
 
-- `.edpa/config/edpa.yaml` → `sync.github_org`, `sync.github_repo`,
-  `sync.github_project_id`, `sync.github_project_number`,
-  `sync.field_ids`, `sync.option_ids`.
-- `.edpa/config/issue_map.yaml` → per-item `issue_number`, `project_item_id`,
-  `node_id`.
+- `.edpa/engine/{scripts,schemas,templates}/` — vendored engine (do **not**
+  hand-edit; the SessionStart hook re-syncs it on plugin update).
+- `.edpa/config/{edpa.yaml,people.yaml,cw_heuristics.yaml,id_counters.yaml}`.
+- `.edpa/{backlog,iterations,reports,snapshots}/` tree.
+- (flags) `.git/hooks/*`, `.github/workflows/edpa-contribution-sync.yml`,
+  `.claude/rules/`.
+
+**Next:** edit `people.yaml` (your team) + `edpa.yaml` (`project.name`), then
+create items locally:
+
+```bash
+python3 .edpa/engine/scripts/backlog.py add --type Initiative --title "Project Apollo"
+```
 
 **Common failure modes:**
 
-- `Could not query issue types from org` → run `issue_types.py setup --org X` first.
-- `Project might already exist` → setup reuses it (idempotent re-run is safe;
-  it does NOT recreate fields, but issue creation will skip duplicates).
-
-**Recovery:** if `field_ids` / `issue_map.yaml` are lost (different machine,
-file corruption), run `python3.13 plugin/edpa/scripts/sync.py setup-refresh`.
+- `--with-rules` reports "Rules source dir missing" → the engine's `rules/`
+  weren't vendored; re-run `/edpa:setup` (or `install.sh`), which now vendors them.
+- `.edpa/engine/scripts/*.py` not found → run from the **project root** (the
+  engine resolves `.edpa/` by walking up from CWD, or honoring `EDPA_ROOT`).
 
 ---
 
-## 2. `/edpa:sync` — bidirectional sync GitHub ↔ local YAML (optional)
+## 2. GitHub integration (optional) — PR-signal materialization
 
-**Purpose:** keep local `.edpa/backlog/` and the GitHub Project in agreement.
-Push local changes, pull remote field updates, detect conflicts.
+V2 is **local-first**: the engine reads delivery evidence straight from
+`git log`, so EDPA produces a complete derived timesheet with **no GitHub at
+all**. The V1 bidirectional `sync.py` (GitHub Project push/pull, `issue_map.yaml`,
+sub-issues, org Issue Types, `gh project` provisioning) was removed in 2.0.0.
 
-**V2.1 positioning:** sync is *optional*. The engine reads evidence directly
-from `git log`; running EDPA without ever pushing to GitHub Projects is a
-fully supported path. Enable sync only when PMs/BOs want a board view.
+The single optional GitHub touchpoint is **PR-signal materialization**, enabled
+by `/edpa:setup --with-ci` (which copies `.github/workflows/edpa-contribution-sync.yml`):
 
-**Run options:**
+- After a PR that references an EDPA item (`feat(S-1): …`) merges, the workflow
+  runs `.edpa/engine/scripts/sync_pr_contributions.py`, which writes PR-thread
+  signals (`pr_reviewer`, `issue_comment`) into that item's `evidence[]`.
+- `git pull` brings the enriched item YAML back to every clone.
+- The next `/edpa:close-iteration` reads the new evidence;
+  `.edpa/engine/scripts/detect_contributors.py` turns `evidence[]` into
+  per-person `cw`.
 
-```bash
-python3.13 plugin/edpa/scripts/sync.py status         # health overview
-python3.13 plugin/edpa/scripts/sync.py diff            # dry-run, what would change
-python3.13 plugin/edpa/scripts/sync.py pull            # GH → local
-python3.13 plugin/edpa/scripts/sync.py pull --commit   # also git commit the change
-python3.13 plugin/edpa/scripts/sync.py push            # local → GH (creates new issues)
-python3.13 plugin/edpa/scripts/sync.py log             # last 20 changelog entries
-python3.13 plugin/edpa/scripts/sync.py conflicts       # items changed on both sides
-python3.13 plugin/edpa/scripts/sync.py setup-refresh   # rebuild IDs from existing project
-python3.13 plugin/edpa/scripts/sync.py add-iteration PI-2026-1.5  # add new iteration option to GH
-```
+This captures contributions local commits can't see — a reviewer who approved a
+PR, a BO who commented requirements — **without any board sync**.
 
-**Adding new iterations after setup:** when you create a new
-`.edpa/iterations/PI-2026-1.5.yaml` file, the GitHub Project's
-`Iteration` SINGLE_SELECT field doesn't know about it yet. Run
-`sync add-iteration PI-2026-1.5` to append it via
-`updateProjectV2Field` GraphQL mutation. The `TBD` placeholder
-option (created by `project_setup.py` when no iterations existed
-yet) is dropped automatically the first time a real iteration is
-added. Idempotent — re-running on an iteration whose option already
-exists is a no-op. Pass `--dry-run` to see the plan without calling
-the API; `--color BLUE|GREEN|...` overrides the default `GRAY`.
+**Requires** an `EDPA_TOKEN` secret for the workflow — see
+[`docs/edpa-token-setup.md`](edpa-token-setup.md).
 
-**Per-level typed status fields:** `pull` reads `Initiative Status` /
-`Epic Status` / `Feature Status` / `Story Status` based on the item's level
-(not the default GitHub `Status` field). This is what makes the SAFe
-workflow work end-to-end.
+**Flow metrics:** the `edpa_flow_metrics` MCP tool computes cycle time,
+throughput, and open-item age from item timestamps (backfilled from git
+history via `_git_timestamps.py`). See [`docs/mcp.md`](mcp.md).
 
-**Push semantics:**
-
-- Local-only items → new GitHub issue created, added to project, fields set,
-  parent linked via `addSubIssue`. `issue_map.yaml` updated.
-- Existing items with field deltas → `gh project item-edit` with the right
-  `--number` or `--single-select-option-id` based on field type.
-- Status `→ Done` also closes the issue. Reverting from Done reopens it.
-
-**Timestamp fields (v1.23.0+):** `sync pull` now extracts `created_at`,
-`closed_at`, and `updated_at` from each GitHub issue and stores them as
-read-only frontmatter fields in the local YAML/Markdown item. These are
-populated automatically; do not edit them by hand. They are used for flow
-metrics computation and conflict detection.
-
-**Conflict detection (v1.23.0+):** `_detect_remote_modifications()` compares
-the local `updated_at` timestamp against the GitHub-side value. If the
-remote `updated_at` is newer than the locally stored one, the item is
-flagged as remotely modified (e.g. someone edited the issue directly in
-the GitHub UI, bypassing `sync push`). `sync conflicts` surfaces these
-items alongside the existing changelog-based conflict checks.
-
-**Conflict policy:** items changed on both sides since last sync are surfaced
-by `sync conflicts`. Resolution is manual today — edit `.edpa/backlog/...yaml`
-to the desired state and run `push`. Local then wins.
-
-**Flow metrics (v1.23.0+):** with timestamps in place, the MCP tool
-`edpa_flow_metrics` computes cycle time, throughput, and open item age
-from the synced data. See [`docs/mcp.md`](mcp.md) for inputs and output
-schema.
-
-**Common failure modes:**
-
-- `Push aborted: GitHub setup state missing or incomplete` → run setup or
-  `sync setup-refresh` first.
-- `[skipped: not in issue_map]` → an item exists locally without a GH issue
-  AND has not been created by this push (rare; usually means manual deletion
-  on GH while item remained local).
+**Want a board view?** Use `/edpa:board` for a self-contained local HTML Kanban
+(§6) — no GitHub, no sync.
 
 ---
 
@@ -181,7 +161,7 @@ delivery evidence and produce the per-person reports.
 
 ```bash
 # Step 1: engine — produces .edpa/reports/iteration-<ID>/edpa_results.json
-python3.13 plugin/edpa/scripts/engine.py \
+python3 .edpa/engine/scripts/engine.py \
   --edpa-root .edpa \
   --iteration PI-2026-1.4 \
   --output .edpa/reports/iteration-PI-2026-1.4/edpa_results.json
@@ -211,7 +191,7 @@ event kinds together:
   on parents (LBC, benefit hypothesis, AC, NFRs, risks) that is
   invisible to PR-only or status-only collectors.
 
-**Verification:** `python3.13 -m pytest tests/test_invariants.py -v` ensures
+**Verification:** `python3 -m pytest tests/test_invariants.py -v` ensures
 score formula, capacity invariant, and ratio sums hold for any output.
 
 ---
@@ -312,8 +292,8 @@ No server, no auth — open the file directly.
 **Run:**
 
 ```bash
-python3.13 plugin/edpa/scripts/board.py --open
-# or: python3.13 plugin/edpa/scripts/board.py --output ~/Desktop/board.html
+python3 .edpa/engine/scripts/board.py --open
+# or: python3 .edpa/engine/scripts/board.py --output ~/Desktop/board.html
 ```
 
 **Options:**
@@ -331,26 +311,22 @@ DM Sans fonts. 37 items rendered from current `.edpa/backlog/`.
 After a fresh machine setup, this proves the toolchain is functional:
 
 ```bash
-# 1. Unit + integration suite
-python3.13 -m pytest tests/                # 118 tests, < 10s
+# 1. Unit + integration suite (from the EDPA source checkout)
+python3 -m pytest tests/                       # fast; seconds
 
-# 2. End-to-end against real GH sandbox (5–6 min, opt-in)
-EDPA_E2E_REPO=technomaton/edpa-e2e-test \
-  python3.13 -m pytest tests/test_e2e_sync.py -m e2e -v
+# 2. Engine smoke — demo computation + status (no project data needed)
+python3 .edpa/engine/scripts/engine.py --demo
+python3 .edpa/engine/scripts/engine.py --status
 
-# 3. Engine smoke
-python3.13 plugin/edpa/scripts/engine.py --status
-python3.13 plugin/edpa/scripts/engine.py --demo
+# 3. Backlog smoke
+python3 .edpa/engine/scripts/backlog.py tree
 
-# 4. Sync smoke
-python3.13 plugin/edpa/scripts/sync.py status
-
-# 5. Board smoke
-python3.13 plugin/edpa/scripts/board.py --output /tmp/edpa-board.html
+# 4. Board smoke
+python3 .edpa/engine/scripts/board.py --output /tmp/edpa-board.html
 test -s /tmp/edpa-board.html && echo "board OK"
 ```
 
-If all five pass, the toolchain is ready for a real PI close.
+If these pass, the toolchain is ready for a real PI close.
 
 ---
 

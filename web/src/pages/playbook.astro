@@ -2,14 +2,14 @@
 import Layout from '../layouts/Layout.astro';
 import { VERSION } from '../lib/version';
 ---
-<Layout title="EDPA Playbook" description="Kompletní příručka pro nasazení EDPA — od prázdného repozitáře po uzavření prvního Planning Intervalu a kalibraci heuristik.">
+<Layout title="EDPA Playbook" description="Kompletní příručka pro nasazení EDPA V2 (local-first) — od prázdného repozitáře po uzavření prvního Planning Intervalu a kalibraci signálů.">
 <div class="container section playbook-page">
 
   <div class="page-header">
     <div class="tag">Playbook</div>
     <h1>EDPA Playbook — Od nuly po první PI</h1>
     <p class="subtitle">Kompletní příručka pro nasazení metodiky EDPA na nový projekt</p>
-    <p class="meta">EDPA v{VERSION} &middot; Březen 2026</p>
+    <p class="meta">EDPA v{VERSION} &middot; 2026-05-31</p>
   </div>
 
   <div class="methodology-layout">
@@ -36,6 +36,8 @@ import { VERSION } from '../lib/version';
   <section id="prerekvizity">
     <h2>Prerekvizity</h2>
 
+    <p>EDPA V2 je <strong>local-first</strong>: zdrojem pravdy je <code>.edpa/backlog/**/*.md</code> (YAML frontmatter), git je audit trail. GitHub je <strong>volitelný</strong> — žádný GitHub Project, žádné org Issue Types, žádný obousměrný sync.</p>
+
     <h3>Nástroje</h3>
     <div class="card">
       <table>
@@ -43,27 +45,27 @@ import { VERSION } from '../lib/version';
           <tr><th>Nástroj</th><th>Minimální verze</th><th>Ověření</th></tr>
         </thead>
         <tbody>
-          <tr><td>Python</td><td>3.10+</td><td><code>python --version</code></td></tr>
-          <tr><td>PyYAML</td><td>libovolná</td><td><code>pip install pyyaml</code></td></tr>
-          <tr><td>GitHub CLI (gh)</td><td>2.40+</td><td><code>gh --version</code></td></tr>
+          <tr><td>Python</td><td>3.10+</td><td><code>python3 --version</code></td></tr>
+          <tr><td>pyyaml + openpyxl + ruamel.yaml</td><td>libovolná</td><td><code>pip install pyyaml openpyxl ruamel.yaml</code></td></tr>
           <tr><td>Git</td><td>2.30+</td><td><code>git --version</code></td></tr>
+          <tr><td>GitHub CLI (gh)</td><td>2.40+</td><td><code>gh --version</code> — <strong>volitelné</strong></td></tr>
         </tbody>
       </table>
     </div>
+    <p>EDPA V2 běží čistě lokálně nad gitem. <code>gh</code> je potřeba <strong>pouze</strong> pokud chcete volitelný PR-signal sync (workflow <code>edpa-contribution-sync.yml</code>) — viz <a href="#faze-2">Fáze 2</a>.</p>
 
-    <h3>GitHub CLI scopes</h3>
-    <pre><code>gh auth login
-gh auth refresh -s repo,project,read:project,admin:org</code></pre>
-    <p>Ověření:</p>
-    <pre><code>gh auth status
-# Musí ukazovat scopes: repo, project, admin:org</code></pre>
+    <h3>Volitelné: GitHub CLI scopes pro PR-signal sync</h3>
+    <p>Pokud zapnete volitelný PR-signal sync, stačí běžné <code>repo</code> scope:</p>
+    <pre><code>gh auth login        # běžný repo scope stačí
+gh auth status</code></pre>
+    <div class="note">Org-level scopy (<code>admin:org</code>, <code>project</code>) z EDPA V1 už <strong>nejsou potřeba</strong> — v 2.0.0 zmizely GitHub Projecty i org Issue Types.</div>
 
-    <h3>Organizace a tým</h3>
+    <h3>Tým a backlog</h3>
     <p>Před začátkem je třeba mít:</p>
     <ul>
-      <li>GitHub organizaci (např. <code>my-org</code>)</li>
       <li>Definovaný tým: jména, role (Arch, Dev, DevSecOps, PM, QA, BO), FTE, kapacity</li>
       <li>Alespoň základní backlog (1 Epic, 2-3 Features, 5-10 Stories)</li>
+      <li>Git repozitář (GitHub remote je volitelný)</li>
     </ul>
 
     <p>
@@ -78,236 +80,232 @@ gh auth refresh -s repo,project,read:project,admin:org</code></pre>
 
   <!-- Fáze 1 -->
   <section id="faze-1">
-    <h2>Fáze 1: Infrastruktura (Den 1, ~4 hodiny)</h2>
+    <h2>Fáze 1: Infrastruktura (Den 1, ~1 hodina)</h2>
 
     <h3>Cesta A: Claude Code (doporučeno)</h3>
     <p>V terminálu s Claude Code nainstalovaným:</p>
-    <pre><code>/edpa setup</code></pre>
-    <p>Claude Code provede kroky 1.1-1.6 automaticky — vytvoří repo, nakonfiguruje tým, nastaví Issue Types a vytvoří GitHub Project.</p>
+    <pre><code>/edpa:setup --with-ci --with-hooks --with-rules</code></pre>
+    <p>Claude Code (skill <code>edpa-setup</code>) provede kroky 1.1-1.4 automaticky — vendoruje engine do <code>.edpa/engine/</code>, naseje konfiguraci a <code>id_counters.yaml</code> a volitelně nainstaluje git hooky, PR-signal CI workflow a <code>.claude/rules/</code>. Idempotentní — opakované spuštění nic nerozbije.</p>
 
     <h3>Cesta B: Manuální CLI</h3>
     <p>Následující kroky popisují manuální postup bez Claude Code.</p>
 
-    <h3>1.1 Nainstalovat EDPA plugin</h3>
+    <h3>1.1 Nainstalovat EDPA a vendorovat engine</h3>
     <p><strong>Varianta A: Shell installer (doporučeno)</strong></p>
     <pre><code>cd my-project
 curl -fsSL https://edpa.technomaton.com/install.sh | sh</code></pre>
-    <p><strong>Varianta B: Manuální kopie</strong></p>
-    <pre><code>cd my-project
-gh repo clone technomaton/edpa /tmp/edpa
-cp -r /tmp/edpa/plugin/ .claude/
-rm -rf /tmp/edpa</code></pre>
+    <p><strong>Varianta B: project_setup.py</strong></p>
+    <p><code>project_setup.py</code> vendoruje engine + naseje configy + <code>id_counters.yaml</code>. Flagy navíc nainstalují git hooky, contribution-sync CI workflow a <code>.claude/rules/</code>. Bez <code>--org</code>/<code>--repo</code> — žádné GitHub provisioning.</p>
+    <pre><code>python3 .edpa/engine/scripts/project_setup.py --with-ci --with-hooks --with-rules</code></pre>
 
     <p>Výsledná struktura:</p>
     <pre><code>my-project/
   .edpa/
-    config.yaml          # Hlavní konfigurace
-    people.yaml          # Tým a projekt
-    initiatives/         # 1 soubor = 1 initiative
-    epics/               # 1 soubor = 1 epic
-    features/            # 1 soubor = 1 feature
-    stories/             # 1 soubor = 1 story
-    sync_state.json      # Stav poslední synchronizace
-    iterations/          # Plány a výsledky iterací
-  .github/workflows/
-    edpa-branch-check.yml     # CI: kontrola branch naming
-    edpa-iteration-close.yml  # CI: uzavření iterace (workflow_dispatch)
-    edpa-sync-projects-to-git.yml   # Cron: Projects -&gt; Git (15 min)
-    edpa-sync-git-to-projects.yml   # Push trigger: Git -&gt; Projects
-  .edpa/engine/templates/
-    people.yaml.tmpl   # Šablona kapacitního registru
-    cw_heuristics.yaml.tmpl    # Šablona CW heuristik
-    edpa.yaml.tmpl    # Šablona projektové konfigurace
-  .edpa/engine/scripts/
-    engine.py       # EDPA výpočetní jádro
-    backlog.py      # Správa backlogu (tree, show, wsjf, validate)
-    sync.py         # Bidirekční sync GitHub Projects &lt;-&gt; Git
-    issue_types.py  # Správa Issue Types na org úrovni
-    project_setup.py      # Automatické vytvoření GitHub Projectu
-    project_views.py      # Views setup
-    create_project_views.py    # Playwright automatizace views (volitelné)
-    calibrate_signals.py # CW signal weights kalibrace (Monte Carlo + MAD)
-  .edpa/data/              # Ground truth data (po PI)
-  .edpa/reports/           # Generované reporty per iterace
-  .edpa/snapshots/         # Zmrazené snapshoty iterací
-  docs/                  # Dokumentace</code></pre>
+    config/
+      edpa.yaml          # Projekt + governance (zdroj verze metodiky)
+      people.yaml        # Tym a kapacity (cadence, teams, people)
+      cw_heuristics.yaml # CW signalove vahy
+      id_counters.yaml   # Citace ID (S-1, E-1, F-1, ...)
+    backlog/
+      initiatives/       # 1 soubor = 1 initiative (.md s YAML frontmatter)
+      epics/             # 1 soubor = 1 epic
+      features/          # 1 soubor = 1 feature
+      stories/           # 1 soubor = 1 story
+    iterations/          # PI a iterace (PI-2026-1.yaml, PI-2026-1.1.yaml, ...)
+    reports/             # Generovane reporty + edpa_results.json per iterace
+    snapshots/           # Zmrazene snapshoty iteraci
+    data/                # Ground truth pro kalibraci (po PI)
+    engine/              # VENDOROVANY engine (instaluje project_setup.py)
+      VERSION
+      scripts/
+        engine.py            # EDPA vypocetni jadro
+        backlog.py           # Sprava backlogu (add, tree, show, wsjf, validate)
+        detect_contributors.py  # evidence[] -&gt; contributors[] (cw)
+        calibrate_signals.py    # Kalibrace signalovych vah (MAD)
+        reports.py           # Vykazy + PI summary + xlsx
+        board.py             # Lokalni HTML Kanban board
+        capacity_override.py # Kapacitni override per osoba/iterace
+        sync_pr_contributions.py  # Materializace PR-thread signalu (volitelne CI)
+        ...                  # dalsi pomocne skripty + hooks/
+      templates/
+        people.yaml.tmpl
+        cw_heuristics.yaml.tmpl
+        edpa.yaml.tmpl
+  .github/workflows/         # JEN s --with-ci
+    edpa-contribution-sync.yml  # Po merge PR: PR-thread signaly -&gt; evidence[]
+  .claude/rules/             # JEN s --with-rules (architektonicka pravidla)
+  docs/                      # Dokumentace</code></pre>
+    <div class="note"><strong>V2 cesty:</strong> user-facing engine je vendorovaný v <code>.edpa/engine/scripts/*.py</code> (NE <code>.claude/edpa/scripts/</code>, NE <code>plugin/edpa/scripts/</code>). Šablony v <code>.edpa/engine/templates/</code>.</div>
 
-    <h3>1.2 Nakonfigurovat tým (people.yaml)</h3>
-    <pre><code># /edpa setup generates .edpa/config/people.yaml automatically</code></pre>
-    <p>Upravit <code>.edpa/config/people.yaml</code>:</p>
+    <h3>1.2 Nakonfigurovat tým a kapacity (people.yaml)</h3>
+    <p><code>project_setup.py</code> už <code>.edpa/config/people.yaml</code> naseje ze šablony. Případně ručně:</p>
+    <pre><code>cp .edpa/engine/templates/people.yaml.tmpl .edpa/config/people.yaml</code></pre>
+    <p>Upravit <code>.edpa/config/people.yaml</code>. Tady žije <strong>cadence + teams + people</strong> — žádný separátní registr, vše je v jednom souboru:</p>
     <pre><code>cadence:
-  iteration_weeks: 2                    # 1 (AI-native) nebo 2 (classic)
-  pi_weeks: 10                          # 5 nebo 10
+  # AI-native default: 5-tydenni PI = 4 dodavkove iterace po 1 tydnu + 1 IP
+  # tyden na dluh, prioritizaci a PI planning (s AI zvladnutelne za den).
+  # Classic SAFe (2-tydenni iterace, 10-tydenni PI) zustava podporovany —
+  # nastav iteration_weeks: 2 + pi_weeks: 10.
+  iteration_weeks: 1                    # 1 (AI-native, default) nebo 2 (classic)
+  pi_weeks: 5                           # 5 (AI-native, default) nebo 10 (classic)
   delivery_iterations_per_pi: 4         # PI minus IP iterace
   ip_iterations_per_pi: 1              # Innovation &amp; Planning
 
 teams:
   - id: "Muj Tym"
-    planning_factor: 0.8               # Plánujeme na 80% kapacity
+    planning_factor: 0.8               # Planujeme na 80% kapacity
 
 people:
   - id: alice
-    name: "Alice Nováková"
+    name: "Alice Novakova"
     role: Arch                          # Arch, Dev, DevSecOps, PM, QA, BO
     team: "Muj Tym"
     fte: 0.5
-    capacity_per_iteration: 40          # hodiny (FTE x 80 pro 2-týdenní iter.)
+    capacity_per_iteration: 20          # hodiny: FTE x 40 pro 1-tydenni iter.
+                                        # (40 pro 2-tydenni)
     email: "alice@example.com"
-    availability: confirmed
+    availability: confirmed             # confirmed, partial, unavailable
 
   - id: bob
     name: "Bob Svoboda"
     role: Dev
     team: "Muj Tym"
     fte: 1.0
-    capacity_per_iteration: 80
+    capacity_per_iteration: 40          # FTE x 40 pro 1-tydenni iter.
     email: "bob@example.com"
-    availability: confirmed</code></pre>
-    <div class="note"><strong>Důležité:</strong> <code>planning_factor</code> je plánovací heuristika (plánujeme na 80%). EDPA engine počítá vždy se 100% kapacity — buffer absorbuje neplánované práce.</div>
-    <div class="note"><strong>Kapacita na iteraci:</strong> baseline je <code>capacity_per_iteration</code> v <code>people.yaml</code>. Pro jednorázovou změnu na jednu iteraci (PTO, přesčas, nábor) použij command <code>/edpa:capacity &lt;iterace&gt; --add --person &lt;id&gt; --hours 20|+8|-12 --note "…"</code> (dále <code>--list</code> / <code>--remove</code>). Override se uloží do <code>people:</code> bloku iteračního YAML a v reportu se projeví jako <code>capacity</code> / <code>capacity_baseline</code> / <code>capacity_override</code>. Zavřená iterace override odmítne — nastav <em>před</em> uzávěrkou (je to Stage 1 v <code>/edpa:close-iteration</code>).</div>
+    availability: confirmed
 
-    <h3>1.3 Nakonfigurovat projekt (project.yaml)</h3>
-    <pre><code># /edpa setup generates .edpa/config/project.yaml automatically</code></pre>
-    <p>Upravit <code>.edpa/config/project.yaml</code>:</p>
+  # Pridat dalsi cleny tymu...</code></pre>
+    <div class="note"><strong>Důležité:</strong> <code>planning_factor</code> je plánovací heuristika (plánujeme na 80%). EDPA engine počítá vždy se 100% kapacity — buffer absorbuje neplánované práce. Pole <code>github:</code> u osoby je volitelné — používá ho jen volitelný PR-signal sync k mapování GH login → <code>people[].id</code>.</div>
+    <div class="note"><strong>V2 pozn.:</strong> neexistuje žádný separátní <code>registry</code>/<code>capacity</code> soubor. Celý tým a kapacity žijí v <code>people.yaml</code>. Pro jednorázovou změnu na jednu iteraci (PTO, přesčas, nábor) použij <code>/edpa:capacity &lt;iterace&gt; --add --person &lt;id&gt; --hours 20|+8|-12 --note "…"</code> (dále <code>--list</code> / <code>--remove</code>) nebo CLI <code>capacity_override.py</code>. Override se uloží do <code>people:</code> bloku iteračního YAML a v reportu se projeví jako <code>capacity</code> / <code>capacity_baseline</code> / <code>capacity_override</code>. Zavřená iterace override odmítne — nastav <em>před</em> uzávěrkou (je to Stage 1 v <code>/edpa:close-iteration</code>).</div>
+
+    <h3>1.3 Nakonfigurovat projekt + governance (edpa.yaml)</h3>
+    <p><code>project_setup.py</code> naseje <code>.edpa/config/edpa.yaml</code> ze šablony (NE <code>project.yaml</code> — ten v V2 neexistuje). Případně ručně:</p>
+    <pre><code>cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml</code></pre>
+    <p>Upravit <code>.edpa/config/edpa.yaml</code>:</p>
     <pre><code>project:
-  name: "Muj Projekt"
-  registration: ""
-  program: ""
-  organizations:
-    - name: "Moje Organizace"
+  name: "Muj Projekt"                   # ← Display name (jedine povinne pole)
+  description: ""
   domain: "mujprojekt.cz"
+  # Volitelne: funding (granty/dotace) + organizations (pro audit/fakturaci)
 
 governance:
+  # Auto-razitkovano na verzi pluginu instalatorem.
   methodology: "EDPA v{VERSION}"
+  # Jedina vypocetni cesta od v1.14 (zadny simple/full/gates mode selector,
+  # zadny audit_mode -- snapshoty vzdy nesou plny signals[] audit trail).
 
 naming:
-  pi_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;"
-  iteration_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;.&#123;iter_num&#125;"
-  branch_pattern: "&#123;type&#125;/&#123;item_id&#125;-&#123;description&#125;"
+  pi_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;"                    # PI-2026-1
+  iteration_pattern: "PI-&#123;year&#125;-&#123;pi_num&#125;.&#123;iter_num&#125;"  # PI-2026-1.3
+  branch_pattern: "&#123;type&#125;/&#123;item_id&#125;-&#123;description&#125;"    # feature/S-200-omop-parser
   item_prefixes:
     initiative: "I"
     epic: "E"
     feature: "F"
     story: "S"
     task: "T"
-    defect: "D"</code></pre>
+    defect: "D"
+    event: "EV"</code></pre>
+    <div class="note"><strong>Odstraněno v 2.0.0:</strong> pole <code>calculation_mode</code> (simple/full) a <code>audit_mode</code>. Engine má jedinou výpočetní cestu (JS × CW) a snapshoty vždy nesou plný audit trail.</div>
 
-    <h3>1.4 Nakonfigurovat CW heuristiky</h3>
-    <pre><code># /edpa setup generates .edpa/config/cw_heuristics.yaml automatically</code></pre>
-    <p>Výchozí váhy v šabloně <code>cw_heuristics.yaml.tmpl</code> jsou kalibrované Monte Carlo simulací (1000 scénářů, 31 041 záznamů, MAD = 0.0805). Pro většinu týmů stačí bez úprav.</p>
+    <h3>1.4 Nakonfigurovat CW signálové váhy (cw_heuristics.yaml)</h3>
+    <p><code>project_setup.py</code> naseje <code>.edpa/config/cw_heuristics.yaml</code> (NE <code>heuristics.yaml</code>). Případně ručně:</p>
+    <pre><code>cp .edpa/engine/templates/cw_heuristics.yaml.tmpl .edpa/config/cw_heuristics.yaml</code></pre>
+    <p>Výchozí hodnoty jsou kalibrované Monte Carlo simulací. Pro začátek stačí bez úprav. Kalibrace na vlastní data se provádí po prvním PI (viz <a href="#faze-3">Fáze 3</a>).</p>
 
-    <p>Engine konzumuje pět <strong>signal weights</strong> — kolik každý druh git evidence přispívá k <code>contribution_score</code> na položce:</p>
+    <p>EDPA V2 je <strong>evidence-driven</strong>: <code>cw[osoba, item] = contribution_score / &Sigma; contribution_score</code>, kde <code>contribution_score = &Sigma; signal_weight</code>. Klíčové výchozí signálové váhy:</p>
 
     <div class="card">
       <table>
         <thead>
-          <tr><th>Signál</th><th>Váha</th><th>Co znamená</th></tr>
+          <tr><th>Signál</th><th>Váha</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>assignee</code></td><td>4.00</td><td>GitHub issue assignee</td></tr>
-          <tr><td><code>pr_author</code></td><td>3.40</td><td>Autor PR odkazujícího na položku</td></tr>
-          <tr><td><code>commit_author</code></td><td>2.78</td><td>Commit s S-XXX/F-XXX v branchi, title nebo zprávě</td></tr>
-          <tr><td><code>pr_reviewer</code></td><td>2.25</td><td>PR review submitted (kromě self)</td></tr>
-          <tr><td><code>issue_comment</code></td><td>1.14</td><td>Komentář na issue/PR (kromě botů)</td></tr>
+          <tr><td><code>assignee</code></td><td>4.00</td><td>GitHub issue assignee / owner</td></tr>
+          <tr><td><code>pr_author</code></td><td>3.40</td><td>Autor PR referující item</td></tr>
+          <tr><td><code>commit_author</code></td><td>2.78</td><td>Commit s ID v branchi/title/zprávě</td></tr>
+          <tr><td><code>pr_reviewer</code></td><td>2.25</td><td>Odeslaný PR review (mimo self)</td></tr>
+          <tr><td><code>issue_comment</code></td><td>1.14</td><td>Komentář na issue/PR (mimo boty)</td></tr>
         </tbody>
       </table>
     </div>
 
-    <p>Signály se sčítají additivně do <code>contribution_score</code> per (osoba, item) a normalizují per-item: <code>cw = score / &Sigma;<sub>persons</sub> score</code>. Role labely (owner/key/reviewer/consulted) se odvozují z dominantního signálu jen pro display — engine je neukládá a nepoužívá pro výpočet.</p>
+    <p>Rolové váhy přispěvatelů (<code>--contributor PERSON:ROLE:CW</code>) — owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0. <code>cw_heuristics.yaml</code> navíc obsahuje <code>gate_weights</code> pro Feature/Epic/Initiative — status transition na rodiči rozděluje jeho Job Size napříč lifecyclem (součet = 1.0 per typ).</p>
 
-    <p>Kalibrace přes <code>/edpa calibrate</code> — Monte Carlo random sampling + coordinate descent přes 5D prostor signal weights proti syntetickému korpusu. Detail viz sekce <a href="#architektura">Architektura</a>.</p>
+    <p>Kalibrace přes <code>/edpa:calibrate</code> — Monte Carlo random sampling + coordinate descent přes 5D prostor signálových vah proti syntetickému korpusu. Detail viz sekce <a href="#architektura">Architektura</a>.</p>
 
-    <h3>1.5 Nakonfigurovat .edpa/iterations/ a .edpa/config/edpa.yaml</h3>
-    <p>Od v1.5 žije PI a iterace v <code>.edpa/iterations/</code> jako samostatné soubory. <code>edpa.yaml</code> obsahuje jen stabilní governance / sync konfiguraci.</p>
+    <h3>1.5 Nakonfigurovat iterace (iterations/)</h3>
+    <p>PI a iterace žijí v <code>.edpa/iterations/</code> jako samostatné soubory:</p>
     <pre><code># .edpa/iterations/PI-2026-1.yaml — PI-level metadata
 pi:
   id: PI-2026-1
   status: active
-  iteration_weeks: 2
-  pi_iterations: 5
+  iteration_weeks: 1                      # AI-native default
+  pi_iterations: 5                         # 4 delivery + 1 IP
   start_date: 2026-04-01
-  end_date: 2026-06-09</code></pre>
+  end_date: 2026-05-05</code></pre>
     <pre><code># .edpa/iterations/PI-2026-1.1.yaml — per-iteration data
 iteration:
   id: PI-2026-1.1
   pi: PI-2026-1
   start_date: 2026-04-01
-  end_date: 2026-04-14
-  weeks: 2
+  end_date: 2026-04-07
+  weeks: 1
   status: planned
-# (planning / delivery sekce přibydou s během iterace)</code></pre>
-    <p>Vytvoř obdobně <code>PI-2026-1.2.yaml</code> až <code>PI-2026-1.5.yaml</code>; poslední dostane <code>type: IP</code>. Kontinuitu hlídá <code>validate_iterations.py</code> a PostToolUse hook.</p>
-    <pre><code># .edpa/config/edpa.yaml — sync config
-sync:
-  github_org: "my-org"
-  github_project_number: 1
-  sync_interval: "15m"
-  auto_commit: true</code></pre>
+# planning / delivery / stories_detail follow as the iteration runs</code></pre>
+    <p>Vytvoř obdobně <code>PI-2026-1.&#123;2..5&#125;.yaml</code>. Poslední iterace dostane <code>type: IP</code> (Innovation &amp; Planning). Kontinuitu (žádné mezery / překryvy, <code>weeks</code> × 7 ≈ rozdíl dat) hlídá <code>validate_iterations.py</code> i automatický PostToolUse hook.</p>
+    <div class="note"><strong>Odstraněno v 2.0.0:</strong> sync blok (<code>github_org</code>, <code>github_project_number</code>, <code>sync_interval</code>) — V2 je local-first, žádný GitHub Project se neprovisionuje.</div>
 
-    <h3>1.6 Nastavit Issue Types na organizaci</h3>
-    <p><strong>Claude Code (doporučeno):</strong></p>
-    <pre><code>/edpa setup</code></pre>
-    <p><strong>Manuální CLI:</strong></p>
-    <pre><code># Zobrazit aktuální typy
-python3 .edpa/engine/scripts/issue_types.py list --org my-org
-
-# Vytvořit EDPA sadu Issue Types
-python3 .edpa/engine/scripts/issue_types.py setup --org my-org
-
-# Dry-run (jen ukáže co by se stalo)
-python3 .edpa/engine/scripts/issue_types.py setup --org my-org --dry-run</code></pre>
-
-    <p>EDPA vytvoří tyto Issue Types:</p>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Typ</th><th>Barva</th><th>Popis</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Initiative</td><td style="color:var(--pk)">PINK</td><td>Business case, investiční záměr</td></tr>
-          <tr><td>Epic</td><td style="color:var(--ac2)">PURPLE</td><td>Strategický cíl, 6-9 měsíců</td></tr>
-          <tr><td>Feature</td><td style="color:var(--cy)">BLUE</td><td>Musí se vejít do Planning Intervalu</td></tr>
-          <tr><td>Story</td><td style="color:var(--gn)">GREEN</td><td>Dodáváno v iteraci</td></tr>
-          <tr><td>Defect</td><td style="color:var(--rd)">RED</td><td>Defekt v existující funkcionalitě</td></tr>
-          <tr><td>Task</td><td style="color:var(--yl)">YELLOW</td><td>Technická práce</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="note"><strong>Poznámka:</strong> Enabler je <strong>label</strong> (Business vs Enabler klasifikace, SAFe), ne Issue Type.</div>
-
-    <h3>1.7 Naplnit backlog</h3>
-    <p>EDPA používá file-per-item strukturu — každý work item je samostatný YAML soubor:</p>
+    <h3>1.6 Naplnit backlog</h3>
+    <p>EDPA používá file-per-item strukturu — každý work item je samostatný <strong><code>.md</code> soubor s YAML frontmatter</strong> (v V2 NE <code>.yaml</code>):</p>
     <pre><code>.edpa/
-  people.yaml
-  config.yaml
-  initiatives/
-    I-1.yaml         # 1 soubor = 1 initiative
-  epics/
-    E-1.yaml         # 1 soubor = 1 epic
-  features/
-    F-1.yaml         # 1 soubor = 1 feature
-  stories/
-    S-1.yaml         # 1 soubor = 1 story
+  config/
+    edpa.yaml                    # projekt + governance
+    people.yaml                  # tym a kapacity
+    cw_heuristics.yaml           # CW signalove vahy
+    id_counters.yaml             # citace ID
+  backlog/
+    initiatives/
+      I-1.md                     # 1 soubor = 1 initiative
+    epics/
+      E-1.md                     # 1 soubor = 1 epic
+    features/
+      F-1.md                     # 1 soubor = 1 feature
+    stories/
+      S-1.md                     # 1 soubor = 1 story
   iterations/
-    PI-2026-1.1.yaml # plán iterace</code></pre>
+    PI-2026-1.1.yaml             # plan iterace</code></pre>
 
-    <p>Příklad story souboru (<code>.edpa/backlog/stories/S-1.yaml</code>):</p>
-    <pre><code>id: S-1
+    <p>Příklad story souboru (<code>.edpa/backlog/stories/S-1.md</code> — YAML frontmatter + volitelné tělo):</p>
+    <pre><code>---
+id: S-1
 type: Story
 title: "Implementace parseru"
 status: Backlog
 parent: F-1
 js: 5
-assignee: dev1
-iteration: PI-2026-1.1</code></pre>
+assignee: bob
+iteration: PI-2026-1.1
+---
+Volitelny popis / akceptacni kriteria v Markdownu.</code></pre>
 
-    <p>Přidání nového itemu:</p>
+    <p>Přidání nového itemu (LOKÁLNĚ — žádné GitHub volání):</p>
     <pre><code># Claude Code:
-/edpa setup    # interaktivně přidá items
+/edpa:add    # interaktivne prida jeden item (Initiative/Epic/Feature/Story/Defect/Event/Risk)
 
 # CLI:
-python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee dev1
-python3 .edpa/engine/scripts/backlog.py add --type Epic --title "..." --js 13 --bv 13 --tc 8 --rr 5</code></pre>
+python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 \
+  --title "..." --js 5 --assignee bob --iteration PI-2026-1.1
+python3 .edpa/engine/scripts/backlog.py add --type Epic --parent I-1 \
+  --title "..." --js 13 --bv 13 --tc 8 --rr-oe 5</code></pre>
+    <p><code>backlog.py add</code> je v V2 <strong>čistě lokální</strong> (žádné <code>gh</code>): ID se přidělí z <code>id_counters.yaml</code> (<code>S-42</code>, <code>E-15</code>, <code>I-3</code>), hierarchie rodiče se zvaliduje, YAML se zapíše pod <code>.edpa/backlog/</code> a změna se auto-commitne jako <code>feat(&lt;ID&gt;):</code>. PR-odvozené signály přicházejí až později přes volitelný contribution-sync workflow.</p>
+    <div class="note"><strong>Odstraněno v 2.0.0:</strong> „GH-first" režim <code>add</code> (tvorba GH issue, sub-issue API, přepis title na <code>"&#123;ID&#125;: &#123;title&#125;"</code>). V V2 je <code>add</code> local-only — V1 tvrzení „strictly GH-first" už NEPLATÍ.</div>
+
+    <p>Přidělování přispěvatelů lze udělat hned při založení (per-item CW share):</p>
+    <pre><code>python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 --title "..." --js 5 \
+  --contributor bob:owner:0.7 --contributor carol:reviewer:0.3
+# Format PERSON:ROLE:CW, ROLE ∈ &#123;owner,key,reviewer,consulted&#125;, CW ∈ [0,1]</code></pre>
 
     <p>Ověřit integritu:</p>
     <pre><code>python3 .edpa/engine/scripts/backlog.py validate</code></pre>
@@ -317,123 +315,12 @@ python3 .edpa/engine/scripts/backlog.py tree --level epic</code></pre>
     <p>Zobrazit WSJF prioritizaci:</p>
     <pre><code>python3 .edpa/engine/scripts/backlog.py wsjf
 python3 .edpa/engine/scripts/backlog.py wsjf --level feature</code></pre>
+    <p>Zobrazit detail položky:</p>
+    <pre><code>python3 .edpa/engine/scripts/backlog.py show S-1
+python3 .edpa/engine/scripts/backlog.py show E-1</code></pre>
 
-    <h3>1.8 Vytvořit GitHub Project</h3>
-    <p><strong>Claude Code (doporučeno):</strong></p>
-    <pre><code>/edpa setup</code></pre>
-    <p><strong>Manuální CLI:</strong></p>
-    <pre><code>python3 .edpa/engine/scripts/project_setup.py \
-  --org my-org \
-  --repo my-project \
-  --project-title "EDPA -- Muj Projekt"</code></pre>
-    <p>Skript provede 9 kroků:</p>
-    <ol>
-      <li>Vytvoří labels (Enabler)</li>
-      <li>Vytvoří GitHub Project v2 na org úrovni</li>
-      <li>Vytvoří custom fields: Job Size, BV, TC, RR&amp;OE, WSJF Score, Team + 4 Status fields (Initiative/Epic/Feature/Story Status se SAFe workflow)</li>
-      <li>Linkuje projekt k repozitáři</li>
-      <li>Dotáže nativní Issue Types z organizace</li>
-      <li>Vytvoří issues z item files v <code>.edpa/</code> s nativními Issue Types</li>
-      <li>Nastaví field values na všech project items</li>
-      <li>Propojí sub-issues (parent-child hierarchie Initiative&rarr;Epic&rarr;Feature&rarr;Story)</li>
-      <li>Aktualizuje <code>.edpa/config/edpa.yaml</code> s číslem projektu</li>
-    </ol>
-
-    <h3>1.9 Nastavit Project views</h3>
-    <p><strong>Claude Code (doporučeno):</strong></p>
-    <pre><code>/edpa setup</code></pre>
-    <p><strong>Manuální CLI:</strong></p>
-    <p><strong>Cesta A: Manuální setup s instrukcemi</strong></p>
-    <pre><code>python3 .edpa/engine/scripts/project_views.py instructions --org my-org --project 1</code></pre>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>View</th><th>Typ</th><th>Filtr/Řazení</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>All Items</td><td>Table</td><td>Všechny položky, řazeno WSJF</td></tr>
-          <tr><td>Board</td><td>Board</td><td>Funnel / Analyzing / Backlog / Implementing / Done</td></tr>
-          <tr><td>Epics</td><td>Table</td><td><code>type:Epic</code>, řazeno WSJF</td></tr>
-          <tr><td>Features</td><td>Table</td><td><code>type:Feature</code>, řazeno WSJF</td></tr>
-          <tr><td>WSJF Ranking</td><td>Table</td><td>Seskupeno Issue Type, řazeno WSJF</td></tr>
-          <tr><td>Current Iteration</td><td>Board</td><td>Filtr aktuální iterace, denní standup view</td></tr>
-          <tr><td>My Work</td><td>Table</td><td><code>assignee:@me</code>, osobní přehled</td></tr>
-          <tr><td>Roadmap</td><td>Roadmap</td><td>Timeline podle Planning Interval</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <p><strong>Cesta B: Označit jako šablonu</strong></p>
-    <pre><code>python3 .edpa/engine/scripts/project_views.py template --org my-org --project 1</code></pre>
-    <p><strong>Cesta C: Vytvořit z šablony</strong></p>
-    <pre><code>python3 .edpa/engine/scripts/project_views.py create-from-template \
-  --org my-org --template 1 --title "Novy Projekt"</code></pre>
-    <p><strong>Ověření:</strong></p>
-    <pre><code>python3 .edpa/engine/scripts/project_views.py verify --org my-org --project 1</code></pre>
-
-    <h3>1.10 Nastavit automatizace a Status fields</h3>
-    <p><strong>Status fields (4 typované):</strong></p>
-    <p><code>project_setup.py</code> automaticky vytvoří 4 status fieldy na GitHub Projects &mdash; jeden per work-item level:</p>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Field</th><th>Platí pro</th><th>Workflow</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>Initiative Status</strong></td><td>Initiative</td><td>Funnel &rarr; Reviewing &rarr; Analyzing &rarr; Ready &rarr; Implementing &rarr; Done</td></tr>
-          <tr><td><strong>Epic Status</strong></td><td>Epic</td><td>Funnel &rarr; Reviewing &rarr; Analyzing &rarr; Ready &rarr; Implementing &rarr; Done</td></tr>
-          <tr><td><strong>Feature Status</strong></td><td>Feature</td><td>Funnel &rarr; Analyzing &rarr; Backlog &rarr; Implementing &rarr; Validating &rarr; Deploying &rarr; Releasing &rarr; Done</td></tr>
-          <tr><td><strong>Story Status</strong></td><td>Story</td><td>Funnel &rarr; Analyzing &rarr; Backlog &rarr; Implementing &rarr; Validating &rarr; Deploying &rarr; Releasing &rarr; Done</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p><strong>Engine logika:</strong> <code>status == "Done"</code> = hotovo. Vše ostatní = in-work. Žádné Blocked/Spillover labely.</p>
-
-    <p><strong>GitHub Projects Automations &mdash; co zapnout:</strong></p>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Automatizace</th><th>Doporučení</th><th>Důvod</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Item added to project &rarr; Set status "Funnel"</td><td><strong>Zapnout</strong></td><td>Nové issues mají výchozí status</td></tr>
-          <tr><td>Auto-add issues from linked repo</td><td><strong>Zapnout</strong></td><td>Issues z repo automaticky v projektu</td></tr>
-          <tr><td>PR merged &rarr; Set status "Done"</td><td>Nezapínat</td><td>Předčasné &mdash; item může potřebovat QA</td></tr>
-          <tr><td>Item closed &rarr; Auto-archive</td><td><strong style="color: var(--error)">NIKDY</strong></td><td>Archivované items zmizí z API &rarr; sync.py je ztratí &rarr; EDPA engine přijde o data</td></tr>
-          <tr><td>Item reopened &rarr; Set status "Implementing"</td><td>Nezapínat</td><td>Koliduje se sync &mdash; reopened item může potřebovat jiný status</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p>Konfigurace: projekt &rarr; <strong>...</strong> menu &rarr; <strong>Workflows</strong> &rarr; zapnout jen doporučené.</p>
-
-    <p><strong>Granularita</strong> &mdash; všechny úrovně používají stejnou modifikovanou Fibonacci škálu (1, 2, 3, 5, 8, 13, 20, 40, 100) bez fixního stropu per úroveň. Granularita je odpovědnost týmu při refinementu &mdash; pokud se Story s JS=20+ vejde do iterace, je to v pořádku. AI-asistovaná práce mění reálný throughput a stará lidská heuristika („Story max 8") už neplatí.</p>
-
-    <p><strong>Definition of Ready</strong> &mdash; žádná položka nevstupuje do delivery bez:</p>
-    <ul>
-      <li>Issue Type nastaven</li>
-      <li>Parent issue propojen (sub-issue)</li>
-      <li>Job Size odhadnut</li>
-      <li>BV + TC + RR&amp;OE vyplněny</li>
-      <li>Contributors přiřazeni &mdash; <code>contributors[]</code> v YAML
-          (auto-detekce z PR/commit evidence, nebo seed s <code>person</code> + <code>cw</code> share)</li>
-      <li>Iteration nebo Planning Interval přiřazen</li>
-    </ul>
-
-    <p><strong>Doporučené Insights grafy</strong> (projekt &rarr; <strong>Insights</strong> tab &rarr; <strong>New chart</strong>):</p>
-    <ul>
-      <li><strong>Burn-down</strong> &mdash; X: čas, Y: počet items, Group: Status</li>
-      <li><strong>Items by Status</strong> &mdash; sloupcový graf</li>
-      <li><strong>Items by Team</strong> &mdash; rozložení zátěže</li>
-      <li><strong>Items by Issue Type</strong> &mdash; balance hierarchie</li>
-    </ul>
-    <p>Insights = real-time dashboardy. EDPA engine = governance-grade kalkulace (derived hours, CW). Doplňují se.</p>
-
-    <h3>1.11 Ověřit setup</h3>
-    <p><strong>Claude Code (doporučeno):</strong></p>
-    <pre><code>/edpa close-iteration    # demo ověření engine
-/edpa sync status        # ověření sync</code></pre>
-    <p><strong>Manuální CLI:</strong></p>
-    <pre><code># Demo EDPA engine (bez reálných dat)
+    <h3>1.7 Ověřit setup</h3>
+    <pre><code># Demo EDPA engine (bez realnych dat)
 python3 .edpa/engine/scripts/engine.py --demo
 
 # Validace backlogu
@@ -442,19 +329,20 @@ python3 .edpa/engine/scripts/backlog.py validate
 # Status projektu
 python3 .edpa/engine/scripts/backlog.py status
 
-# Sync status
-python3 .edpa/engine/scripts/sync.py status</code></pre>
+# Vizualni HTML board (local-first nahrada za Projects board)
+python3 .edpa/engine/scripts/board.py --output .edpa/board.html</code></pre>
 
-    <h3>1.12 Commitnout základní konfiguraci</h3>
-    <pre><code>git add .edpa/config/people.yaml .edpa/config/project.yaml .edpa/config/heuristics.yaml
-git add .edpa/
-git commit -m "feat(edpa): initial EDPA setup for my-project"
-git push origin main</code></pre>
+    <h3>1.8 Commitnout základní konfiguraci</h3>
+    <p><code>backlog.py add</code> commituje itemy automaticky. Počáteční config a vendorovaný engine commitni:</p>
+    <pre><code>git add .edpa/
+git commit -m "feat(edpa): initial EDPA V2 setup for my-project"
+git push origin main   # volitelne, pokud mate GitHub remote</code></pre>
+    <div class="note"><strong>Odstraněno v 2.0.0:</strong> §1.6 Issue Types (<code>issue_types.py setup --org</code>), §1.8 GitHub Project (<code>project_setup.py --org/--repo/--project-title</code>, custom fields, sub-issues), §1.9 Project views (<code>project_views.py</code>, <code>create_project_views.py</code>, Playwright). V2 nahrazuje board view lokálním <code>board.py</code> / <code>/edpa:board</code>.</div>
   </section>
 
   <!-- Fáze 2 -->
   <section id="faze-2">
-    <h2>Fáze 2: První iterace (Týden 1-2)</h2>
+    <h2>Fáze 2: První iterace (Týden 1)</h2>
 
     <h3>2.1 Iteration Planning</h3>
     <ol>
@@ -472,22 +360,38 @@ python3 .edpa/engine/scripts/backlog.py tree --iteration PI-2026-1.1</code></pre
     </ol>
 
     <h3>2.2 Denní práce</h3>
-    <p><strong>Branch naming konvence</strong> (CI kontrola v <code>.github/workflows/edpa-branch-check.yml</code>):</p>
+    <p><strong>Branch naming konvence</strong> <code>&#123;type&#125;/&#123;ITEM&#125;-&#123;popis&#125;</code> — v V2 ji vynucují <strong>git hooky</strong> (<code>--with-hooks</code>), už ne CI:</p>
     <pre><code># Formát: &#123;type&#125;/&#123;ITEM_ID&#125;-&#123;popis&#125;
 git checkout -b feature/S-200-omop-parser
 git checkout -b feature/F-102-anon-engine
-git checkout -b defect/D-215-upload-validation
+git checkout -b bugfix/S-215-upload-validation
 git checkout -b chore/T-050-ci-pipeline</code></pre>
-    <p>Povolené typy: <code>feature</code>, <code>defect</code>, <code>hotfix</code>, <code>chore</code></p>
+    <p>Povolené typy: <code>feature</code>, <code>bugfix</code>, <code>hotfix</code>, <code>chore</code><br>
+    Povolené prefixy: <code>S</code> (Story), <code>F</code> (Feature), <code>E</code> (Epic), <code>T</code> (Task), <code>D</code> (Defect), <code>I</code> (Initiative), <code>EV</code> (Event)</p>
+
+    <p><strong>Git hooky (<code>--with-hooks</code>)</strong> materializují evidenci lokálně, bez GitHubu:</p>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Hook</th><th>Co dělá</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>pre-commit</td><td>ID safety — kontrola referencí</td></tr>
+          <tr><td>commit-msg</td><td>Vyžaduje referenci itemu nebo <code>no-ticket:</code></td></tr>
+          <tr><td>post-commit</td><td>Zaznamenává <code>commit_author</code> evidence</td></tr>
+          <tr><td>pre-push</td><td>Kontrola ID kolizí</td></tr>
+        </tbody>
+      </table>
+    </div>
 
     <p><strong>Commit konvence:</strong></p>
     <pre><code>git commit -m "feat(S-200): implement OMOP CDM parser"
 git commit -m "fix(S-215): validate upload file size"
 git commit -m "test(S-201): add unit tests for parser"
 git commit -m "docs(E-10): update epic hypothesis"</code></pre>
-    <p>EDPA engine rozpoznává reference <code>S-XXX</code>, <code>F-XXX</code>, <code>E-XXX</code> v commitech a PR pro detekci evidence.</p>
+    <p>EDPA engine rozpoznává reference <code>S-XXX</code>, <code>F-XXX</code>, <code>E-XXX</code> v commitech (a volitelně v PR) pro detekci evidence.</p>
 
-    <p><strong>Pull Request workflow:</strong></p>
+    <p><strong>Pull Request workflow (volitelné, jen s GitHub remote):</strong></p>
     <pre><code>git push origin feature/S-200-omop-parser
 gh pr create --title "S-200: OMOP CDM parser implementation" \
   --body "Closes #42
@@ -499,49 +403,33 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
 ## Testing
 - Unit tests: 15 passing
 "</code></pre>
-    <p>PR review = evidence pro EDPA (reviewer dostane CW dle role).</p>
+    <p>PR review = signál pro EDPA. Aby se PR-thread signály (<code>pr_reviewer</code>, <code>issue_comment</code>) dostaly do <code>evidence[]</code>, je potřeba volitelný contribution-sync workflow — viz <a href="#faze-2">2.3</a>.</p>
 
-    <h3>2.3 Sync (automaticky)</h3>
-    <p>Bidirekční synchronizace mezi GitHub Projects (UI pro PM/BO) a item files v <code>.edpa/</code> (Git-native):</p>
-    <p><strong>Automaticky přes GitHub Actions:</strong></p>
-    <ul>
-      <li><code>edpa-sync-projects-to-git.yml</code> — každých 15 minut stahuje změny z Projects do Gitu</li>
-      <li><code>edpa-sync-git-to-projects.yml</code> — při push do <code>main</code> se změnou v <code>.edpa/</code> propaguje do Projects</li>
-    </ul>
-    <p><strong>Claude Code (doporučeno):</strong></p>
-    <pre><code>/edpa sync pull      # GitHub Projects -> item files
-/edpa sync push      # item files -> GitHub Projects
-/edpa sync diff      # zobrazit co by se změnilo
-/edpa sync status    # stav synchronizace</code></pre>
-    <p><strong>Manuální CLI:</strong></p>
-    <pre><code># Pull: GitHub Projects -&gt; item files in .edpa/
-python3 .edpa/engine/scripts/sync.py pull
-
-# Push: item files in .edpa/ -&gt; GitHub Projects
-python3 .edpa/engine/scripts/sync.py push
-
-# Diff: zobrazit co by se změnilo
-python3 .edpa/engine/scripts/sync.py diff
-
-# Status
-python3 .edpa/engine/scripts/sync.py status</code></pre>
+    <h3>2.3 Volitelný GitHub PR-signal sync</h3>
+    <p>EDPA V2 funguje čistě lokálně — engine čte evidenci z gitu (<code>commit_author</code>) + YAML edits (<code>yaml_edit</code>) + gate transitions. GitHub je <strong>volitelný</strong> a slouží pouze k materializaci PR-thread signálů.</p>
+    <p>S <code>--with-ci</code> se nainstaluje <strong>jediný</strong> V2 workflow <code>.github/workflows/edpa-contribution-sync.yml</code>. Po merge PR spustí <code>sync_pr_contributions.py</code>, který z PR-threadu vytáhne signály (<code>pr_reviewer</code>, <code>issue_comment</code>) a zapíše je do <code>evidence[]</code> příslušných itemů. Vyžaduje secret <code>EDPA_TOKEN</code> (viz <code>docs/edpa-token-setup.md</code>). Flow metriky lze číst přes MCP nástroj <code>edpa_flow_metrics</code>.</p>
+    <div class="note"><strong>Odstraněno v 2.0.0:</strong> obousměrný sync <code>sync.py</code> (pull/push/diff/status/conflicts/<code>--mock</code>) — v V2 <strong>neexistuje</strong>. Stejně tak workflow <code>edpa-sync-projects-to-git.yml</code> a <code>edpa-sync-git-to-projects.yml</code>. Žádný GitHub Project se nepropaguje. Pro board použij lokální <code>/edpa:board</code>.</div>
 
     <h3>2.4 Iteration Close</h3>
-    <p>Na konci každé iterace (po 2 týdnech):</p>
+    <p>Na konci každé iterace (1 týden AI-native / 2 týdny classic):</p>
     <p><strong>Claude Code (doporučeno):</strong></p>
-    <pre><code>/edpa close-iteration PI-2026-1.1</code></pre>
+    <pre><code>/edpa:close-iteration PI-2026-1.1</code></pre>
+    <p>Claude Code (skill <code>close-iteration</code>) připraví kapacitu, spustí EDPA engine a vygeneruje reporty automaticky.</p>
     <p><strong>Manuální CLI:</strong></p>
-    <pre><code>python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1
+# volitelne: --output cesta/edpa_results.json</code></pre>
 
     <p><strong>Výstupy:</strong></p>
     <pre><code>.edpa/reports/iteration-PI-2026-1.1/
-  edpa_results.json      # Kompletní výpočet (JSON)
-  vykaz-alice.md         # Výkaz pro každou osobu
-  item-costs.xlsx        # Náklady per položka (Excel)
+  edpa_results.json        # Kompletni vypocet (JSON)
+  timesheet-alice.md       # Vykaz pro kazdou osobu (DerivedHours &gt; 0)
+  timesheet-team.md        # Agregovany tymovy rollup
+  edpa-results.xlsx        # Team Summary + Item Costs (Excel)
 .edpa/snapshots/
-  PI-2026-1.1.json       # Zmrazený snapshot</code></pre>
+  PI-2026-1.1.json         # Zmrazeny snapshot (audit trail)</code></pre>
+    <div class="note"><strong>Pozn.:</strong> per-person soubory jsou <code>timesheet-&lt;id&gt;.md</code> (v V2 už NE <code>vykaz-*.md</code>).</div>
 
-    <p><strong>Gated calculation:</strong> kreditujeme Story <code>Done</code> + Feature/Epic/Initiative gate transitions z git historie.</p>
+    <p><strong>Výpočet</strong> (od v1.14 jediná cesta): <code>score = JS × CW</code>, <code>hours = (score / &Sigma; score) × capacity</code>. Žádný <code>--mode simple|full</code> ani Role Strength.</p>
     <div class="card">
       <pre><code>Score        = JobSize &times; CW
 DerivedHours = (Score / &Sigma;Scores) &times; Capacity</code></pre>
@@ -550,8 +438,8 @@ DerivedHours = (Score / &Sigma;Scores) &times; Capacity</code></pre>
 
     <p><strong>Invarianty</strong> (engine automaticky kontroluje):</p>
     <ul>
-      <li>Součet hodin osoby = její kapacita (odchylka &lt; 0.01h)</li>
-      <li>Součet poměrů = 1.0 (odchylka &lt; 0.001)</li>
+      <li>Součet <code>DerivedHours</code> osoby == její kapacita (přesně)</li>
+      <li>Součet poměrů == 1.0</li>
       <li>Žádné záporné hodiny</li>
       <li>Pokud invariant selže, engine hlásí <code>FAIL</code></li>
     </ul>
@@ -589,11 +477,12 @@ delivery:
     <h2>Fáze 3: PI Close (Po 4-5 iteracích)</h2>
 
     <h3>Cesta A: Claude Code (doporučeno)</h3>
-    <pre><code>/edpa calibrate</code></pre>
-    <p>Claude Code spustí CW kalibraci, vyhodnotí MAD a návrh úprav heuristik.</p>
-    <pre><code>/edpa reports</code></pre>
+    <pre><code>/edpa:calibrate</code></pre>
+    <p>Claude Code (skill <code>edpa-autocalib</code>) spustí kalibraci signálových vah přes Monte Carlo + coordinate-descent optimalizátor, vyhodnotí MAD a navrhne úpravy <code>cw_heuristics.yaml</code>. Pro generování reportů:</p>
+    <pre><code>/edpa:reports PI-2026-1</code></pre>
 
     <h3>Cesta B: Manuální CLI</h3>
+    <p>Následující kroky popisují manuální postup.</p>
 
     <h3>3.1 Retrospektiva</h3>
     <p>Na konci PI (po 4 delivery iteracích + 1 IP iterace):</p>
@@ -602,13 +491,12 @@ delivery:
       <li>Pro každou story porovnat: kdo byl auto-detekován, jaké CW engine přiřadil, odpovídá realitě?</li>
     </ol>
 
-    <h3>3.2 Ground truth pro kalibraci (volitelné)</h3>
+    <h3>3.2 Zaznamenat ground truth</h3>
     <p>
-      Kalibrátor běží proti Monte Carlo syntetickému korpusu (1 000
-      scenarios &times; 31 041 records) a hledá MAD-optimální signal
-      weights v <code>.edpa/config/heuristics.yaml</code>. Žádný
-      ground_truth.yaml není povinný &mdash; lze spustit kdykoli, i
-      před prvním PI close.
+      Kalibrátor běží proti Monte Carlo syntetickému korpusu a hledá
+      MAD-optimální signálové váhy v <code>.edpa/config/cw_heuristics.yaml</code>.
+      Žádný <code>ground_truth.yaml</code> není povinný &mdash; lze spustit
+      kdykoli, i před prvním PI close.
     </p>
     <p>
       Pokud chcete kalibrovat proti reálným záznamům z PI retro,
@@ -630,24 +518,18 @@ delivery:
 
   # ... alespoň 20 záznamů pro spolehlivou kalibraci</code></pre>
 
-    <h3>3.3 Kalibrace CW heuristik</h3>
+    <h3>3.3 Kalibrace CW signálů</h3>
     <p><strong>Claude Code (doporučeno):</strong></p>
-    <pre><code>/edpa calibrate</code></pre>
+    <pre><code>/edpa:calibrate</code></pre>
     <p><strong>Manuální CLI:</strong></p>
-    <pre><code># Dry-run &mdash; ukáže navrženou MAD reduction bez zápisu
-python3 .edpa/engine/scripts/calibrate_signals.py
-
-# Apply &mdash; přepíše .edpa/config/heuristics.yaml novými signal weights
-python3 .edpa/engine/scripts/calibrate_signals.py --apply</code></pre>
-    <p>Výstup:</p>
-    <pre><code>Phase 1 (random sample): 1000 scenarios, MAD baseline = 0.0861
-Phase 2 (coordinate descent): MAD calibrated = 0.0805 (-6.5%)
-Calibrated weights:
-  assignee:       4.00
-  pr_author:      3.40
-  commit_author:  2.78
-  pr_reviewer:    2.25
-  issue_comment:  1.14</code></pre>
+    <pre><code>python3 .edpa/engine/scripts/calibrate_signals.py \
+  --ground-truth .edpa/data/ground_truth.yaml \
+  --heuristics .edpa/config/cw_heuristics.yaml</code></pre>
+    <p><code>calibrate_signals.py</code> (skill <code>/edpa:calibrate</code>) jede dvoufázově: náhodný Monte Carlo sample napříč signálovými váhami → coordinate-descent (Nelder-Mead) zjemnění kolem nejlepších kandidátů. Metrika je MAD na syntetickém korpusu; nižší MAD = lepší kalibrace.</p>
+    <p>Výstup (orientačně):</p>
+    <pre><code>MAD=0.041200
+RECORDS=20
+TOTAL_DEVIATION=0.824000</code></pre>
 
     <p><strong>Interpretace MAD (Mean Absolute Deviation):</strong></p>
     <div class="card">
@@ -658,18 +540,21 @@ Calibrated weights:
         <tbody>
           <tr><td>&lt; 0.03</td><td style="color:var(--gn)">Výborné</td><td>Bez změny</td></tr>
           <tr><td>0.03 - 0.06</td><td style="color:var(--cy)">Dobré</td><td>Drobné korekce (volitelné)</td></tr>
-          <tr><td>0.06 - 0.10</td><td style="color:var(--yl)">Přijatelné</td><td>Zvážit re-kalibraci signal weights</td></tr>
+          <tr><td>0.06 - 0.10</td><td style="color:var(--yl)">Přijatelné</td><td>Zvážit úpravu signálových vah</td></tr>
           <tr><td>&gt; 0.10</td><td style="color:var(--rd)">Špatné</td><td>Nutná kalibrace</td></tr>
         </tbody>
       </table>
     </div>
 
+    <p><strong>Korekce signálových vah:</strong> pokud MAD &gt; 0.06, podívat se na záznamy s největším <code>abs(auto_cw - confirmed_cw)</code>, identifikovat vzory dle role (typicky BO, PM, Arch — strategické role jsou Gitem podhodnoceny), upravit <code>signals:</code> váhy v <code>.edpa/config/cw_heuristics.yaml</code> a znovu spustit kalibraci.</p>
+    <div class="note"><strong>Odstraněno v 2.0.0:</strong> <code>evaluate_cw.py</code> (nahrazeno <code>calibrate_signals.py</code> / <code>/edpa:calibrate</code>) a soubor <code>heuristics.yaml</code> (nahrazeno <code>cw_heuristics.yaml</code>).</div>
+
     <h3>3.4 Plánování dalšího PI</h3>
     <ol>
-      <li><strong>Nové epicy/features</strong> — přidat jako soubory do <code>.edpa/backlog/epics/</code> a <code>.edpa/backlog/features/</code></li>
+      <li><strong>Nové epicy/features</strong> — přidat přes <code>backlog.py add</code> (auto-commit) do <code>.edpa/backlog/</code></li>
       <li><strong>WSJF prioritizace:</strong> <code>python3 .edpa/engine/scripts/backlog.py wsjf</code></li>
-      <li><strong>Kapacitní plánování</strong> — aktualizovat <code>.edpa/config/people.yaml</code></li>
-      <li><strong>Aktualizovat <code>.edpa/config/edpa.yaml</code></strong> — nový PI, iterace, datumy</li>
+      <li><strong>Kapacitní plánování</strong> — aktualizovat <code>.edpa/config/people.yaml</code> (změny FTE, dostupnost)</li>
+      <li><strong>Vytvořit nové iteration soubory</strong> v <code>.edpa/iterations/</code> pro nový PI</li>
     </ol>
   </section>
 
@@ -679,43 +564,52 @@ Calibrated weights:
 
     <h3>S Claude Code (doporučeno)</h3>
     <p>Každá iterace:</p>
-    <pre><code>/edpa close-iteration PI-2026-1.X    # uzavření iterace
-/edpa reports                         # generování reportů</code></pre>
+    <pre><code>/edpa:close-iteration PI-2026-1.X    # uzavreni iterace
+/edpa:reports PI-2026-1.X             # generovani reportu</code></pre>
     <p>Každý PI:</p>
-    <pre><code>/edpa calibrate                       # CW kalibrace</code></pre>
+    <pre><code>/edpa:calibrate                       # kalibrace signalovych vah</code></pre>
 
-    <h3>Každá iterace (každé 2 týdny)</h3>
+    <h3>Každá iterace (1 týden AI-native / 2 týdny classic)</h3>
     <ol>
       <li><strong>Planning</strong> — vybrat stories, přiřadit assignees</li>
-      <li><strong>Denní práce</strong> — branch naming, commity s referencemi, PR review</li>
+      <li><strong>Denní práce</strong> — branch naming, commity s referencemi, (volitelně) PR review</li>
       <li><strong>Iteration Close</strong> — EDPA engine, generování reportů</li>
-      <li><strong>Sync</strong> — automaticky verzuje změny (GitHub Actions cron 15min)</li>
-      <li><strong>Review</strong> — tým zkontroluje výkazy, zahlásí korektury</li>
+      <li><strong>Review</strong> — tým zkontroluje výkazy, zahlásí korektury (manuální CW override přes <code>--contributor</code> / <code>/contribute</code>)</li>
     </ol>
 
-    <h3>Každý PI (každých 10 týdnů)</h3>
+    <h3>Každý PI (5 týdnů AI-native / 10 týdnů classic)</h3>
     <ol>
       <li><strong>Retrospektiva</strong> — auto-detected CW vs realita</li>
       <li><strong>Ground truth</strong> — zaznamenat alespoň 20 nových záznamů</li>
-      <li><strong>CW kalibrace</strong> — <code>calibrate_signals.py</code> &mdash; Monte Carlo kalibrace signal weights, vyhodnotit MAD</li>
+      <li><strong>CW kalibrace</strong> — <code>calibrate_signals.py</code>, vyhodnotit MAD</li>
       <li><strong>Velocity trend</strong> — porovnat delivery across iterací</li>
       <li><strong>Predictability</strong> — (delivered_sp / planned_sp) across iterací</li>
     </ol>
+    <pre><code># Status za celou iteraci
+python3 .edpa/engine/scripts/backlog.py status --iteration PI-2026-1.3
 
-    <h3>Automatizace přes GitHub Actions</h3>
+# Celkovy status projektu
+python3 .edpa/engine/scripts/backlog.py status
+
+# Kapacitni override (napr. dodatecne hodiny mimo evidenci)
+python3 .edpa/engine/scripts/capacity_override.py PI-2026-1.1 --add --person bob --hours 12
+
+# Velocity / flow reporty
+python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
+
+    <h3>Volitelná automatizace přes GitHub Actions</h3>
+    <p>V2 má <strong>jediný</strong> volitelný workflow (jen s <code>--with-ci</code>):</p>
     <div class="card">
       <table>
         <thead>
           <tr><th>Workflow</th><th>Trigger</th><th>Co dělá</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>edpa-branch-check.yml</code></td><td>PR opened/sync</td><td>Kontroluje branch naming konvenci</td></tr>
-          <tr><td><code>edpa-iteration-close.yml</code></td><td>workflow_dispatch</td><td>Spustí EDPA engine, commitne výsledky</td></tr>
-          <tr><td><code>edpa-sync-projects-to-git.yml</code></td><td>cron (15min)</td><td>Pull: Projects &rarr; item files</td></tr>
-          <tr><td><code>edpa-sync-git-to-projects.yml</code></td><td>push na .edpa/</td><td>Push: item files &rarr; Projects</td></tr>
+          <tr><td><code>edpa-contribution-sync.yml</code></td><td>po merge PR</td><td><code>sync_pr_contributions.py</code> materializuje PR-thread signaly (<code>pr_reviewer</code>, <code>issue_comment</code>) do <code>evidence[]</code></td></tr>
         </tbody>
       </table>
     </div>
+    <div class="note"><strong>Odstraněno v 2.0.0:</strong> <code>edpa-branch-check.yml</code>, <code>edpa-iteration-close.yml</code>, <code>edpa-sync-projects-to-git.yml</code>, <code>edpa-sync-git-to-projects.yml</code>. Branch konvenci nyní hlídá lokální git hook, iteration close se spouští lokálně, obousměrný sync neexistuje.</div>
   </section>
 
   <!-- Checklist -->
@@ -724,58 +618,58 @@ Calibrated weights:
 
     <h3>Den 1</h3>
     <ul class="checklist">
-      <li>Repo vytvořené s EDPA strukturou</li>
-      <li><code>.edpa/config/people.yaml</code> — tým s rolemi, FTE, kapacitami</li>
-      <li><code>.edpa/config/project.yaml</code> — název projektu, metadata</li>
-      <li><code>.edpa/config/heuristics.yaml</code> — výchozí heuristiky</li>
-      <li><code>.edpa/config/edpa.yaml</code> — PI, iterace, datumy, sync</li>
-      <li>Issue Types nastavené na organizaci</li>
-      <li>Backlog naplněný (alespoň 1 Epic, 3 Features, 10 Stories)</li>
+      <li>Engine vendorovaný do <code>.edpa/engine/</code> (<code>/edpa:setup</code> nebo <code>project_setup.py</code>)</li>
+      <li><code>.edpa/config/people.yaml</code> — tým s rolemi, FTE, kapacitami (cadence + teams + people)</li>
+      <li><code>.edpa/config/edpa.yaml</code> — název projektu, governance, naming</li>
+      <li><code>.edpa/config/cw_heuristics.yaml</code> — výchozí signálové váhy (ze šablony)</li>
+      <li><code>.edpa/config/id_counters.yaml</code> — naseto</li>
+      <li><code>.edpa/iterations/</code> — PI + iterace s datumy</li>
+      <li>Backlog naplněný přes <code>backlog.py add</code> (alespoň 1 Epic, 3 Features, 10 Stories)</li>
       <li><code>backlog.py validate</code> projde bez chyb</li>
-      <li>GitHub Project vytvořen</li>
-      <li>Project views nastaveny</li>
       <li><code>engine.py --demo</code> projde úspěšně</li>
+      <li>(volitelné) git hooky nainstalovány (<code>--with-hooks</code>), contribution-sync CI (<code>--with-ci</code>)</li>
     </ul>
 
     <h3>Týden 1</h3>
     <ul class="checklist">
-      <li>Tým pracuje s branch naming konvencí</li>
+      <li>Tým pracuje s branch naming konvencí (<code>feature/S-XXX-popis</code>)</li>
       <li>Commity referují work items (<code>feat(S-XXX): ...</code>)</li>
-      <li>PR reviews probíhají</li>
-      <li>Sync funguje (<code>sync.py status</code>)</li>
-      <li>Item files v .edpa/ se automaticky aktualizují</li>
+      <li>post-commit hook zaznamenává <code>commit_author</code> evidenci</li>
+      <li>(volitelné) PR reviews probíhají a contribution-sync je materializuje</li>
     </ul>
 
     <h3>Konec iterace 1</h3>
     <ul class="checklist">
       <li>EDPA engine spuštěn pro iteraci</li>
-      <li><code>edpa_results.json</code> vygenerován</li>
-      <li>Výkazy vygenerovány (per-person)</li>
+      <li><code>edpa_results.json</code> vygenerován v <code>.edpa/reports/iteration-&lt;ID&gt;/</code></li>
+      <li>Výkazy <code>timesheet-&lt;id&gt;.md</code> vygenerovány (per-person)</li>
       <li>Všechny invarianty prošly (<code>all_invariants_passed: true</code>)</li>
+      <li>Snapshot zmrazen v <code>.edpa/snapshots/</code></li>
       <li>Tým zkontroloval výsledky</li>
-      <li>Iterační soubor vytvořen v <code>.edpa/iterations/</code></li>
     </ul>
 
     <h3>Konec iterace 2-4</h3>
     <ul class="checklist">
       <li>Velocity stabilní (odchylka &lt; 20%)</li>
-      <li>Prediktabilita &gt; 80%</li>
-      <li>Žádné nevyřešené sync konflikty</li>
+      <li>Prediktabilita &gt; 80% (delivered / planned)</li>
     </ul>
 
     <h3>Konec PI 1</h3>
     <ul class="checklist">
       <li>Ground truth zaznamenáno (min. 20 záznamů)</li>
-      <li>CW kalibrace provedena (<code>calibrate_signals.py --apply</code>)</li>
+      <li>CW kalibrace provedena (<code>calibrate_signals.py</code> / <code>/edpa:calibrate</code>)</li>
       <li>MAD vyhodnoceno (cíl: &lt; 0.06)</li>
-      <li>Heuristiky upraveny (pokud MAD &gt; 0.06)</li>
+      <li>Signálové váhy upraveny v <code>cw_heuristics.yaml</code> (pokud MAD &gt; 0.06)</li>
       <li>Plánování PI 2 — nové epicy, WSJF, kapacity</li>
+      <li>Nové iteration soubory v <code>.edpa/iterations/</code> pro nový PI</li>
     </ul>
   </section>
 
   <!-- CLI Reference -->
   <section id="cli-reference">
     <h2>CLI Reference</h2>
+
+    <div class="note">Všechny skripty běží z vendorovaného engine: <code>python3 .edpa/engine/scripts/&lt;skript&gt;.py</code>.</div>
 
     <h3>Claude Code příkazy (doporučeno)</h3>
     <div class="card">
@@ -784,10 +678,12 @@ Calibrated weights:
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>/edpa setup</code></td><td>Počáteční setup projektu — repo, tým, Issue Types, GitHub Project</td></tr>
-          <tr><td><code>/edpa close-iteration PI-2026-1.X</code></td><td>Uzavření iterace — stažení evidence, EDPA engine, reporty</td></tr>
-          <tr><td><code>/edpa reports</code></td><td>Generování reportů a výkazů</td></tr>
-          <tr><td><code>/edpa calibrate</code></td><td>CW kalibrace — vyhodnocení MAD, návrh úprav heuristik</td></tr>
+          <tr><td><code>/edpa:setup --with-ci --with-hooks --with-rules</code></td><td>Vendoruje engine, naseje configy + id_counters, volitelně hooky/CI/rules</td></tr>
+          <tr><td><code>/edpa:add</code></td><td>Přidá backlog item (lokálně, auto-commit)</td></tr>
+          <tr><td><code>/edpa:close-iteration PI-2026-1.X</code></td><td>Uzavření iterace — kapacita, EDPA engine, reporty</td></tr>
+          <tr><td><code>/edpa:reports PI-2026-1.X</code></td><td>Generování výkazů a PI summary</td></tr>
+          <tr><td><code>/edpa:board</code></td><td>Vizuální HTML Kanban board (lokální)</td></tr>
+          <tr><td><code>/edpa:calibrate</code></td><td>Kalibrace signálových vah — MAD, návrh úprav <code>cw_heuristics.yaml</code></td></tr>
         </tbody>
       </table>
     </div>
@@ -799,9 +695,10 @@ Calibrated weights:
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>engine.py --edpa-root .edpa --iteration ID</code></td><td>Plný EDPA výpočet pro iteraci (čte z .edpa/backlog/)</td></tr>
-          <tr><td><code>engine.py --demo</code></td><td>Demo s vestavěnými ukázkovými daty</td></tr>
-          <tr><td><code>engine.py --iteration ID --capacity ... --heuristics ...</code></td><td>Legacy režim s explicitními soubory</td></tr>
+          <tr><td><code>engine.py --demo</code></td><td>Demo s ukázkovými daty</td></tr>
+          <tr><td><code>engine.py --edpa-root .edpa --iteration PI-2026-1.3</code></td><td>Plný EDPA výpočet pro iteraci (čte backlog/config/heuristiky z <code>.edpa</code>)</td></tr>
+          <tr><td><code>engine.py --edpa-root .edpa --iteration ID --output cesta/edpa_results.json</code></td><td>Vlastní výstupní cesta</td></tr>
+          <tr><td><code>engine.py --status</code></td><td>Stav konfigurace</td></tr>
         </tbody>
       </table>
     </div>
@@ -813,166 +710,189 @@ Calibrated weights:
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
+          <tr><td><code>backlog.py add --type Story --parent F-1 --title "..." --js 5 --assignee bob --iteration PI-2026-1.1</code></td><td>Přidá item lokálně (ID z id_counters.yaml, auto-commit <code>feat(&lt;ID&gt;):</code>)</td></tr>
+          <tr><td><code>backlog.py add --type Epic --parent I-1 --title "..." --js 13 --bv 13 --tc 8 --rr-oe 5</code></td><td>Přidá Epic s WSJF metrikami</td></tr>
+          <tr><td><code>backlog.py add ... --contributor PERSON:ROLE:CW</code></td><td>Přidá přispěvatele (owner/key/reviewer/consulted, CW ∈ [0,1])</td></tr>
           <tr><td><code>backlog.py tree</code></td><td>Zobrazí plnou hierarchii (I &rarr; E &rarr; F &rarr; S)</td></tr>
-          <tr><td><code>backlog.py tree --level epic</code></td><td>Jen epicy</td></tr>
+          <tr><td><code>backlog.py tree --level epic|feature|story</code></td><td>Filtr na úroveň</td></tr>
           <tr><td><code>backlog.py tree --iteration PI-2026-1.1</code></td><td>Filtr stories na iteraci</td></tr>
-          <tr><td><code>backlog.py show S-200</code></td><td>Detail položky</td></tr>
-          <tr><td><code>backlog.py status</code></td><td>Celkový status projektu</td></tr>
-          <tr><td><code>backlog.py wsjf</code></td><td>WSJF prioritizace (všechny úrovně)</td></tr>
+          <tr><td><code>backlog.py show S-1</code></td><td>Detail položky</td></tr>
+          <tr><td><code>backlog.py status [--iteration PI-2026-1.1]</code></td><td>Status projektu / iterace</td></tr>
+          <tr><td><code>backlog.py wsjf [--level feature]</code></td><td>WSJF prioritizace</td></tr>
           <tr><td><code>backlog.py validate</code></td><td>Kontrola integrity backlogu</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>sync.py — Bidirekční sync</h3>
+    <h3>reports.py — Výkazy a PI summary</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>sync.py pull</code></td><td>GitHub Projects &rarr; item files in <code>.edpa/</code></td></tr>
-          <tr><td><code>sync.py push</code></td><td>item files in <code>.edpa/</code> &rarr; GitHub Projects</td></tr>
-          <tr><td><code>sync.py diff</code></td><td>Zobrazí rozdíly (dry-run)</td></tr>
-          <tr><td><code>sync.py status</code></td><td>Stav poslední synchronizace</td></tr>
-          <tr><td><code>sync.py conflicts</code></td><td>Nevyřešené konflikty</td></tr>
+          <tr><td><code>reports.py PI-2026-1.1</code></td><td>Per-person <code>timesheet-&lt;id&gt;.md</code> + <code>timesheet-team.md</code> + xlsx</td></tr>
+          <tr><td><code>reports.py --pi PI-2026-1</code></td><td>Agregace všech iterací pod PI</td></tr>
+          <tr><td><code>reports.py PI-2026-1.1 --out cesta/</code></td><td>Vlastní výstupní adresář</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>issue_types.py — Issue Types (org-level)</h3>
+    <h3>board.py — Lokální HTML board</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>issue_types.py list --org ORG</code></td><td>Zobrazí aktuální typy</td></tr>
-          <tr><td><code>issue_types.py setup --org ORG</code></td><td>Vytvoří EDPA sadu Issue Types</td></tr>
-          <tr><td><code>issue_types.py setup --org ORG --dry-run</code></td><td>Dry-run setup</td></tr>
-          <tr><td><code>issue_types.py migrate --org ORG --repo REPO</code></td><td>Migruje labels &rarr; Issue Types</td></tr>
+          <tr><td><code>board.py --output .edpa/board.html</code></td><td>Vygeneruje Kanban board z <code>.edpa/backlog/</code></td></tr>
+          <tr><td><code>board.py --iteration PI-2026-1.4 --open</code></td><td>Filtr na iteraci + otevře v prohlížeči</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>project_setup.py — Inicializace GitHub Projectu</h3>
+    <h3>capacity_override.py — Kapacitní override</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>project_setup.py --org ORG --repo REPO</code></td><td>Vytvoří kompletní Project</td></tr>
-          <tr><td><code>project_setup.py --org ORG --repo REPO --dry-run</code></td><td>Jen ukáže co by udělal</td></tr>
+          <tr><td><code>capacity_override.py PI-2026-1.1 --list</code></td><td>Vypíše existující overridy</td></tr>
+          <tr><td><code>capacity_override.py PI-2026-1.1 --add --person bob --hours 12</code></td><td>Přidá override</td></tr>
+          <tr><td><code>capacity_override.py PI-2026-1.1 --remove --person bob</code></td><td>Odebere override</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>calibrate_signals.py — CW Signal Weights Kalibrace</h3>
+    <h3>detect_contributors.py / calibrate_signals.py</h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>Příkaz</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>calibrate_signals.py</code></td><td>Dry-run kalibrace proti syntetickému korpusu</td></tr>
+          <tr><td><code>detect_contributors.py</code></td><td>Převede <code>evidence[]</code> &rarr; <code>contributors[]</code> (cw) z reálných signálů</td></tr>
+          <tr><td><code>calibrate_signals.py --ground-truth .edpa/data/ground_truth.yaml --heuristics .edpa/config/cw_heuristics.yaml</code></td><td>Kalibrace signálových vah (MAD)</td></tr>
         </tbody>
       </table>
     </div>
+
+    <h3>sync_pr_contributions.py (volitelné, CI)</h3>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Příkaz</th><th>Popis</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>sync_pr_contributions.py</code></td><td>Materializuje PR-thread signaly (<code>pr_reviewer</code>, <code>issue_comment</code>) do <code>evidence[]</code>. Spouští <code>edpa-contribution-sync.yml</code> po merge PR; vyžaduje <code>EDPA_TOKEN</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note"><strong>Odstraněno v 2.0.0:</strong> <code>sync.py</code> (obousměrný sync — v V2 neexistuje), <code>issue_types.py</code> (org Issue Types), <code>project_setup.py --org/--repo/--project-title</code> (GitHub Project provisioning — <code>project_setup.py</code> v V2 jen vendoruje engine), <code>project_views.py</code> + <code>create_project_views.py</code> (Project views / Playwright), <code>evaluate_cw.py</code> (nahrazeno <code>calibrate_signals.py</code>).</div>
   </section>
 
   <!-- Architektura -->
   <section id="architektura">
     <h2>Architektura</h2>
 
-    <pre><code>GitHub Projects (UI)  &lt;--&gt;  .edpa/ item files (Git)
-       |                          |
-  PM/BO pracují            Verzované, auditovatelné
-       |                          |
-  Issue Types (org)        EDPA engine (výpočet)
-       |                          |
-  Custom fields            Reports + Snapshots</code></pre>
+    <p>V2 je <strong>local-first</strong>: <code>.edpa/</code> (backlog v <code>.md</code> + config) je jediný zdroj pravdy, git je audit trail. GitHub je volitelný — jediný tok směrem dovnitř je jednosměrné materializování PR-thread signálů do <code>evidence[]</code>.</p>
+
+    <pre><code>                  .edpa/  (git) -- JEDINY ZDROJ PRAVDY
+        backlog/**/*.md  +  config/  +  iterations/
+                                |
+              +-----------------+-----------------+
+              |                 |                 |
+        EDPA engine        backlog.py         board.py
+        (vypocet)          (add/tree/wsjf)    (HTML board)
+              |                                    |
+        +-----+-----+                              v
+        |           |                       .edpa/board.html
+   reports/     snapshots/                  (lokalni)
+   timesheet-*.md  *.json
+   xlsx</code></pre>
 
     <h3>Tok dat</h3>
-    <pre><code>                    +---------------------------+
-                    |    GitHub Projects (UI)    |
-                    |  PM/BO spravují backlog    |
-                    +---------------------------+
-                         |              ^
-           sync pull     |              |     sync push
-         (cron 15min)    v              |   (push trigger)
-                    +---------------------------+
-                    |  .edpa/ item files (Git)   |
-                    |  Source of truth           |
-                    +---------------------------+
-                              |
-                    +---------+---------+
-                    |                   |
-              +----------+       +----------+
-              |  Engine  |       |  Backlog |
-              | (výpočet)|       |  CLI     |
-              +----------+       +----------+
-                    |                   |
-              +----------+       +----------+
-              | Reports  |       |  WSJF    |
-              | Snapshots|       |  Tree    |
-              | Výkazy   |       |  Validate|
-              +----------+       +----------+</code></pre>
+    <pre><code>   (volitelne) GitHub PR thread
+   reviews / komentare
+              |
+              |  edpa-contribution-sync.yml (po merge PR)
+              |  sync_pr_contributions.py
+              v  -- JEDNOSMERNE: signaly -&gt; evidence[]
+   +-------------------------------------+
+   |  .edpa/  (git) -- ZDROJ PRAVDY      |
+   |  backlog *.md  config  iterations   |
+   |  evidence[] &lt;- git commit_author    |
+   |             &lt;- yaml_edit            |
+   |             &lt;- gate transitions     |
+   +-------------------------------------+
+              |
+        detect_contributors.py
+        evidence[] -&gt; contributors[] (cw)
+              |
+        +-----+-----------------------+
+        |             |               |
+   EDPA engine    reports.py      board.py
+   (JS x CW)      timesheety      HTML board
+        |
+   reports/ + snapshots/ + xlsx</code></pre>
+    <div class="note"><strong>Odstraněno v 2.0.0:</strong> obousměrný sync GitHub Projects &lt;-&gt; Git, org Issue Types, custom fields. Žádný GitHub Project se neprovisionuje ani nepropaguje.</div>
 
     <h3>Evidence detection</h3>
+    <p>EDPA je evidence-driven. <code>cw[osoba, item] = contribution_score / Σ_osoby contribution_score</code>, kde <code>contribution_score = Σ signal_weight</code>. Výchozí signálové váhy (<code>cw_heuristics.yaml</code>):</p>
     <div class="card">
       <table>
         <thead>
-          <tr><th>Signál</th><th style="text-align:right">Váha</th><th>Derived role (display)</th></tr>
+          <tr><th>Signál</th><th style="text-align:right">Váha</th><th>Zdroj</th></tr>
         </thead>
         <tbody>
-          <tr><td>GitHub issue assignee</td><td style="text-align:right">4.00</td><td>owner</td></tr>
-          <tr><td>PR author referencing item</td><td style="text-align:right">3.40</td><td>key</td></tr>
-          <tr><td>Commit author s S-XXX/F-XXX</td><td style="text-align:right">2.78</td><td>reviewer</td></tr>
-          <tr><td>PR reviewer</td><td style="text-align:right">2.25</td><td>reviewer</td></tr>
-          <tr><td>Issue/PR komentář</td><td style="text-align:right">1.14</td><td>consulted</td></tr>
-          <tr><td><code>/contribute @person weight:X</code></td><td style="text-align:right">explicit</td><td>key (default)</td></tr>
+          <tr><td><code>assignee</code></td><td style="text-align:right">4.00</td><td>issue assignee</td></tr>
+          <tr><td><code>pr_author</code></td><td style="text-align:right">3.40</td><td>autor PR referující item</td></tr>
+          <tr><td><code>commit_author</code></td><td style="text-align:right">2.78</td><td>commit s ID (lokální git, post-commit hook)</td></tr>
+          <tr><td><code>pr_reviewer</code></td><td style="text-align:right">2.25</td><td>odeslaný PR review (mimo self)</td></tr>
+          <tr><td><code>issue_comment</code></td><td style="text-align:right">1.14</td><td>komentář na issue/PR (mimo boty)</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Signály se <strong>sčítají additivně</strong> do contribution_score per (osoba, item), pak se normalizují per-item: <code>cw = score / Σ_persons score</code> (Σ napříč osobami = 1.0). Role label se odvozuje z dominantního signál typu jen pro display, neukládá se.</p>
+    <p>Lokální signály (<code>commit_author</code>, <code>yaml_edit</code>, gate transitions) čte engine přímo z gitu/YAMLu. PR-thread signály (<code>pr_reviewer</code>, <code>issue_comment</code>) přicházejí jen přes volitelný contribution-sync. Manuální <code>/contribute @person weight:X</code> (nebo <code>--contributor</code>) nese váhu verbatim.</p>
+    <p>Rolové váhy přispěvatelů: owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0.</p>
 
-    <h3>Výpočet EDPA — gated calculation</h3>
-    <p>Pro každou osobu v iteraci:</p>
+    <h3>Výpočet EDPA</h3>
+    <p>Od v1.14 jediná výpočetní cesta (žádný simple/full/gates mode). Pro každou osobu v iteraci:</p>
     <ol>
-      <li>Detekovat evidence signály per (osoba, item) přes <code>detect_contributors.py</code></li>
-      <li>Per-item normalizace: <code>cw_i = contribution_score_i / Σ_persons contribution_score</code> (Σ cw na položce = 1.0)</li>
-      <li>Stories <code>status: Done</code> a Feature/Epic/Initiative gate transitions z git history: <code>score = JS × cw</code> (gates: <code>JS × gate_weight × cw</code>)</li>
-      <li>Per osobu: <code>ratio_i = score_i / Σ scores</code></li>
+      <li>Sebrat evidenci na každé položce &rarr; <code>contributors[]</code> s <code>cw</code></li>
+      <li>Pro každý pár (osoba, položka): <code>score = JS × CW</code></li>
+      <li>Pro každou osobu: <code>ratio_i = score_i / sum(scores)</code></li>
       <li>Odvozené hodiny: <code>hours_i = ratio_i × capacity</code></li>
     </ol>
-    <div class="note"><strong>Invariants:</strong> <code>Σ hours = capacity</code> per osobě AND <code>Σ cw = 1.0</code> per položce — vždy, garantováno konstrukcí.</div>
+    <div class="note"><strong>Invariant:</strong> <code>sum(DerivedHours) = capacity</code> (přesně, ne přibližně). Feature/Epic/Initiative status transitions navíc rozdělují rodičovský Job Size přes <code>gate_weights</code>.</div>
   </section>
 
   <!-- Troubleshooting -->
   <section id="troubleshooting">
     <h2>Troubleshooting</h2>
 
-    <h3>gh auth — chybějící scopes</h3>
-    <pre><code>ERROR: insufficient scopes for organization query</code></pre>
-    <p><strong>Řešení:</strong></p>
-    <pre><code>gh auth refresh -s repo,project,read:project,admin:org
-gh auth status  # ověřit</code></pre>
-
-    <h3>Issue Types — "Not Found" při setup</h3>
-    <pre><code>ERROR: Organization not found or insufficient permissions</code></pre>
-    <p><strong>Řešení:</strong></p>
-    <ul>
-      <li>Ověřit že jste člen organizace s admin právy</li>
-      <li>Issue Types vyžadují org-level přístup (ne personal account)</li>
-      <li><code>gh auth refresh -s admin:org</code></li>
-    </ul>
+    <h3>gh auth (jen volitelný PR-signal sync)</h3>
+    <p>EDPA V2 jádro <code>gh</code> nepotřebuje. Pokud selže volitelný contribution-sync workflow na autentizaci, doplňte secret <code>EDPA_TOKEN</code> (viz <code>docs/edpa-token-setup.md</code>) nebo lokálně:</p>
+    <pre><code>gh auth login        # bezny repo scope staci
+gh auth status</code></pre>
+    <div class="note">V2 už nepotřebuje org scopy (<code>admin:org</code>, <code>project</code>) — GitHub Projecty a org Issue Types byly odstraněny v 2.0.0.</div>
 
     <h3>Backlog validate — chyby</h3>
     <pre><code>ERROR: S-200 references non-existent feature F-999</code></pre>
-    <p><strong>Řešení:</strong> ověřit že všechny <code>feature:</code> reference v stories ukazují na existující features.</p>
-    <pre><code>WARNING: S-200 Job Size out of range (JS=120, range=1..100)</code></pre>
-    <p><strong>Řešení:</strong> Job Size mimo modifikovanou Fibonacci škálu (1, 2, 3, 5, 8, 13, 20, 40, 100). Pokud je položka opravdu tak velká, zvážit rozpad &mdash; ale fixní per-úrovňové stropy už neplatí, granularita je odpovědnost týmu při refinementu.</p>
+    <p><strong>Řešení:</strong></p>
+    <ul>
+      <li>Ověřit že všechny <code>feature:</code> reference v stories ukazují na existující features</li>
+      <li>Každá story musí mít parent feature</li>
+      <li>Každá feature musí mít parent epic</li>
+    </ul>
+    <pre><code>WARNING: S-200 Job Size exceeds maximum (JS=13, max=8)</code></pre>
+    <p><strong>Řešení:</strong></p>
+    <ul>
+      <li>Story JS max 8 (classic 2/10) nebo 5 (AI-native 1/5)</li>
+      <li>Rozdělit velkou story na menší</li>
+    </ul>
 
     <h3>EDPA engine — invariant failure</h3>
     <pre><code>INVARIANT FAILURE -- check results
@@ -980,55 +900,76 @@ All invariants passed: NO</code></pre>
     <p><strong>Možné příčiny:</strong></p>
     <ul>
       <li>Osoba nemá žádné evidence (není assignee, žádné commity)</li>
-      <li>Všechny CW jsou 0</li>
+      <li>Všechny CW jsou 0 (žádná evidence nad threshold)</li>
       <li>Kapacita je 0</li>
     </ul>
-    <p><strong>Řešení:</strong> ověřit že každá osoba má alespoň 1 přiřazený work item, commity/PR referují správné item ID, kapacity &gt; 0 v <code>.edpa/config/people.yaml</code>.</p>
+    <p><strong>Řešení:</strong></p>
+    <ul>
+      <li>Ověřit že každá osoba má alespoň 1 přiřazený work item</li>
+      <li>Ověřit že commity/PR referují správné item ID (S-XXX, F-XXX)</li>
+      <li>Ověřit <code>.edpa/config/people.yaml</code> — kapacity &gt; 0</li>
+    </ul>
 
-    <h3>Sync — konflikty</h3>
-    <pre><code>CONFLICT: S-200 modified in both Git and Projects</code></pre>
-    <p><strong>Claude Code (doporučeno):</strong></p>
-    <pre><code>/edpa sync diff       # zobrazit rozdíly
-/edpa sync push       # po vyřešení push</code></pre>
-    <p><strong>Manuální CLI:</strong></p>
-    <pre><code># Zobrazit konflikty
-python3 .edpa/engine/scripts/sync.py conflicts
-
-# Diff
-python3 .edpa/engine/scripts/sync.py diff</code></pre>
-    <p>Ručně vyřešit v příslušném item souboru v <code>.edpa/</code>, pak:</p>
-    <pre><code>python3 .edpa/engine/scripts/sync.py push</code></pre>
-
-    <h3>Sync — loop prevence</h3>
-    <p>Workflow <code>edpa-sync-git-to-projects.yml</code> obsahuje:</p>
-    <pre><code>if: github.actor != 'github-actions[bot]'</code></pre>
-    <p>To zabraňuje nekonečné smyčce: push &rarr; sync &rarr; push &rarr; sync...</p>
-
-    <h3>GitHub Project — custom fields chybí</h3>
-    <pre><code>ERROR: Field "Job Size" not found on project</code></pre>
-    <p><strong>Řešení:</strong> spustit znovu <code>project_setup.py</code> nebo ručně: Settings &rarr; Custom fields &rarr; Add field.</p>
-
-    <h3>Branch naming CI failure</h3>
+    <h3>Branch naming — odmítnutý commit/push (git hook)</h3>
     <pre><code>Branch name does not follow EDPA convention.
 Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</code></pre>
-    <p><strong>Řešení:</strong> formát <code>feature/S-200-omop-parser</code>. Typy: <code>feature</code>, <code>defect</code>, <code>hotfix</code>, <code>chore</code>. <code>main</code>, <code>develop</code>, <code>release/*</code> jsou výjimky.</p>
-
-    <h3>MAD příliš vysoké (&gt; 0.10)</h3>
+    <p>V V2 hlídá konvenci lokální git hook (<code>--with-hooks</code>), už ne CI.</p>
     <p><strong>Řešení:</strong></p>
-    <ol>
-      <li>Analyzovat záznamy s největším <code>abs(predicted_cw - confirmed_cw)</code> per (osoba, item)</li>
-      <li>Seskupit dle dominant signal type (assignee / pr_author / commit_author / pr_reviewer / issue_comment)</li>
-      <li>Pokud strategická role (PM / BO / Arch) je systematicky podhodnocena, kalibrátor zvedne <code>signals.issue_comment</code> nebo <code>signals.pr_reviewer</code></li>
-      <li>Spustit <code>python3 .edpa/engine/scripts/calibrate_signals.py --apply</code> pro re-baseline proti aktuální ground truth</li>
-      <li>Re-run engine, ověřit invariants + nový MAD</li>
-    </ol>
+    <ul>
+      <li>Formát: <code>feature/S-200-omop-parser</code>, <code>bugfix/S-215-fix-validation</code></li>
+      <li>Typ: <code>feature</code>, <code>bugfix</code>, <code>hotfix</code>, <code>chore</code></li>
+      <li>Prefix: <code>S</code> (Story), <code>F</code> (Feature), <code>E</code> (Epic), <code>T</code> (Task), <code>D</code> (Defect), <code>EV</code> (Event)</li>
+      <li><code>main</code>, <code>develop</code>, <code>release/*</code> jsou výjimky (prochází bez kontroly)</li>
+    </ul>
+
+    <h3>commit-msg hook — chybějící reference itemu</h3>
+    <pre><code>commit-msg: no item reference found</code></pre>
+    <p><strong>Řešení:</strong></p>
+    <ul>
+      <li>Přidat referenci itemu do zprávy: <code>feat(S-200): ...</code></li>
+      <li>Nebo pro commity bez ticketu použít prefix <code>no-ticket:</code></li>
+    </ul>
+
+    <h3>Python — chybějící závislosti</h3>
+    <pre><code>ERROR: pyyaml required. Install with: pip install pyyaml</code></pre>
+    <p><strong>Řešení:</strong></p>
+    <pre><code>pip install pyyaml openpyxl ruamel.yaml</code></pre>
 
     <h3>Iteration close — "config not found"</h3>
     <pre><code>ERROR: .edpa/config/people.yaml not found. Run EDPA setup first.</code></pre>
+    <p><strong>Řešení:</strong> spustit setup (vendoruje engine + naseje configy):</p>
+    <pre><code>/edpa:setup
+# nebo
+python3 .edpa/engine/scripts/project_setup.py</code></pre>
+    <p>Případně zkopírovat ze šablon v <code>.edpa/engine/templates/*.tmpl</code>:</p>
+    <pre><code>cp .edpa/engine/templates/people.yaml.tmpl .edpa/config/people.yaml
+cp .edpa/engine/templates/cw_heuristics.yaml.tmpl .edpa/config/cw_heuristics.yaml
+cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml</code></pre>
+    <p>Soubory v <code>.edpa/config/*.yaml</code> (ne <code>*.yaml.tmpl</code>) musí být commitnuté v repu.</p>
+
+    <h3>MAD příliš vysoké (&gt; 0.10)</h3>
+    <p><strong>Možné příčiny:</strong></p>
+    <ul>
+      <li>Strategické role (BO, PM, Arch) mají systematicky nižší auto-CW než realitu</li>
+      <li>Git měří jen commity/PR, ne rozhodování, specifikaci, mentoring</li>
+    </ul>
     <p><strong>Řešení:</strong></p>
-    <pre><code># /edpa setup generates .edpa/config/people.yaml automatically
-# /edpa setup generates .edpa/config/heuristics.yaml automatically
-# /edpa setup generates .edpa/config/project.yaml automatically</code></pre>
+    <ol>
+      <li>Analyzovat záznamy s největším <code>abs(auto_cw - confirmed_cw)</code></li>
+      <li>Seskupit dle role</li>
+      <li>Upravit <code>signals:</code> váhy v <code>.edpa/config/cw_heuristics.yaml</code> (zvýšit váhu signálu, který danou roli reprezentuje)</li>
+      <li>Případně přidat manuální <code>/contribute @person weight:X</code> u itemu, kde je strategická práce neviditelná v Gitu</li>
+      <li>Znovu spustit <code>calibrate_signals.py</code></li>
+    </ol>
+
+    <h3>PR-signal sync — chybějící evidence z PR</h3>
+    <p>PR-thread signály (<code>pr_reviewer</code>, <code>issue_comment</code>) se do <code>evidence[]</code> dostanou jen přes volitelný contribution-sync.</p>
+    <p><strong>Řešení:</strong></p>
+    <ul>
+      <li>Ověřit, že je nainstalován <code>.github/workflows/edpa-contribution-sync.yml</code> (<code>/edpa:setup --with-ci</code>)</li>
+      <li>Ověřit secret <code>EDPA_TOKEN</code> (viz <code>docs/edpa-token-setup.md</code>)</li>
+      <li>Workflow běží až <strong>po merge</strong> PR; před merge jsou v evidenci jen lokální signály (<code>commit_author</code>, <code>yaml_edit</code>)</li>
+    </ul>
   </section>
 
   <!-- Slovníček -->
@@ -1040,18 +981,18 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
           <tr><th>Termín</th><th>Význam</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>PI</strong></td><td>Planning Interval (10 týdnů = 4 delivery + 1 IP iterace)</td></tr>
+          <tr><td><strong>PI</strong></td><td>Planning Interval (AI-native 5 týdnů = 4 delivery + 1 IP; classic SAFe 10 týdnů)</td></tr>
           <tr><td><strong>IP</strong></td><td>Innovation &amp; Planning (poslední iterace PI)</td></tr>
           <tr><td><strong>JS</strong></td><td>Job Size — relativní velikost práce (Fibonacci)</td></tr>
           <tr><td><strong>BV</strong></td><td>Business Value — obchodní hodnota</td></tr>
           <tr><td><strong>TC</strong></td><td>Time Criticality — časová kritičnost</td></tr>
-          <tr><td><strong>RR&amp;OE</strong></td><td>Risk Reduction &amp; Opportunity Enablement — snížení rizika a odblokování budoucích příležitostí</td></tr>
-          <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR&amp;OE)/JS</td></tr>
-          <tr><td><strong>cw</strong></td><td>Contribution Weight — per-item share (Σ napříč osobami = 1.0)</td></tr>
-          <tr><td><strong>contribution_score</strong></td><td>Raw suma signal weights (audit input)</td></tr>
-          <tr><td><strong>signals[]</strong></td><td>Audit trail: type/ref/weight/detected_at per signál</td></tr>
-          <tr><td><strong>MAD</strong></td><td>Mean Absolute Deviation — průměrná absolutní odchylka</td></tr>
-          <tr><td><strong>Evidence</strong></td><td>Doklad o práci (commit, PR, assignee, komentář)</td></tr>
+          <tr><td><strong>RR-OE</strong></td><td>Risk Reduction &amp; Opportunity Enablement — snížení rizika / odemčení příležitostí (CLI flag <code>--rr-oe</code>, legacy alias <code>--rr</code>)</td></tr>
+          <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR-OE)/JS</td></tr>
+          <tr><td><strong>CW</strong></td><td>Contribution Weight — váha příspěvku (0.0 - 1.0); per-item <code>Σ cw = 1.0</code></td></tr>
+          <tr><td><strong>Signal</strong></td><td>Doklad příspěvku z gitu/PR (assignee, pr_author, commit_author, pr_reviewer, issue_comment) s váhou</td></tr>
+          <tr><td><strong>MAD</strong></td><td>Mean Absolute Deviation — průměrná absolutní odchylka (metrika kalibrace)</td></tr>
+          <tr><td><strong>Evidence</strong></td><td><code>evidence[]</code> na itemu — agregované signály; <code>detect_contributors.py</code> z nich počítá <code>contributors[]</code></td></tr>
+          <tr><td><strong>Gate</strong></td><td>Status transition na Feature/Epic/Initiative; rozděluje rodičovský JS přes <code>gate_weights</code></td></tr>
           <tr><td><strong>Ground truth</strong></td><td>Potvrzená realita od týmu (pro kalibraci)</td></tr>
         </tbody>
       </table>

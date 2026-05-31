@@ -1,6 +1,13 @@
 # Organization Lookup (v1.13+)
 
-`plugin/edpa/scripts/lookup_org.py` fetches official company data from
+> **Status (V2):** the `lookup_org.py` helper described here is **not currently
+> shipped** in the EDPA V2 plugin (no `lookup_org.py` is vendored under
+> `.edpa/engine/scripts/`). The `project.organizations[]` block in
+> `.edpa/config/edpa.yaml` still exists and is filled **manually** today. This
+> page is retained as the specification for the helper should it be re-vendored;
+> paths below assume the V2 vendored layout (`.edpa/engine/scripts/`).
+
+`.edpa/engine/scripts/lookup_org.py` fetches official company data from
 public business registries to fill the `project.organizations[]` block
 in `.edpa/config/edpa.yaml` without manual re-keying.
 
@@ -22,10 +29,10 @@ dict in lookup_org.py):
 
 ```bash
 # CZ shorthand: --ico maps to --country=CZ --id=<ICO>
-python3 .claude/edpa/scripts/lookup_org.py --ico 26350513
+python3 .edpa/engine/scripts/lookup_org.py --ico 26350513
 
 # Generic form (works for future non-CZ providers)
-python3 .claude/edpa/scripts/lookup_org.py --country CZ --id 26350513
+python3 .edpa/engine/scripts/lookup_org.py --country CZ --id 26350513
 ```
 
 Output (default text format):
@@ -41,18 +48,18 @@ Output (default text format):
 ### Search by name
 
 ```bash
-python3 .claude/edpa/scripts/lookup_org.py --search "Medicalc software"
-python3 .claude/edpa/scripts/lookup_org.py --search "ČVUT" --limit 5
+python3 .edpa/engine/scripts/lookup_org.py --search "Medicalc software"
+python3 .edpa/engine/scripts/lookup_org.py --search "ČVUT" --limit 5
 ```
 
 ### Output formats
 
 ```bash
 # YAML block ready to paste into project.organizations[]
-python3 .claude/edpa/scripts/lookup_org.py --ico 26350513 --yaml --role partner
+python3 .edpa/engine/scripts/lookup_org.py --ico 26350513 --yaml --role partner
 
 # Full JSON (all metadata, machine-readable)
-python3 .claude/edpa/scripts/lookup_org.py --ico 26350513 --json
+python3 .edpa/engine/scripts/lookup_org.py --ico 26350513 --json
 ```
 
 `--yaml` example output:
@@ -77,16 +84,16 @@ python3 .claude/edpa/scripts/lookup_org.py --ico 26350513 --json
 
 ```bash
 # Interactive (default config path .edpa/config/edpa.yaml, org-index 0)
-python3 .claude/edpa/scripts/lookup_org.py --ico 26350513 --apply
+python3 .edpa/engine/scripts/lookup_org.py --ico 26350513 --apply
 
 # Specify which org slot to patch
-python3 .claude/edpa/scripts/lookup_org.py --ico 26350513 --apply --org-index 1 --role partner
+python3 .edpa/engine/scripts/lookup_org.py --ico 26350513 --apply --org-index 1 --role partner
 
 # CI / scripted (skip confirmation)
-python3 .claude/edpa/scripts/lookup_org.py --ico 26350513 --apply --org-index 1 --yes
+python3 .edpa/engine/scripts/lookup_org.py --ico 26350513 --apply --org-index 1 --yes
 
 # Custom config path
-python3 .claude/edpa/scripts/lookup_org.py --ico 26350513 --apply --config /path/to/edpa.yaml
+python3 .edpa/engine/scripts/lookup_org.py --ico 26350513 --apply --config /path/to/edpa.yaml
 ```
 
 `--apply` semantics:

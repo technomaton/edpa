@@ -6,43 +6,48 @@ const steps = [
     num: 1,
     title: 'Prerequisites',
     color: 'var(--ac)',
-    desc: 'Install GitHub CLI and Python 3.10+. Claude Code users: Python deps are installed automatically by the SessionStart hook. Other environments: pip install manually.',
-    claude: `# GitHub CLI — authenticate with project scope
-gh auth login
-gh auth refresh -s project,read:project
-
-# Python 3.10+ must be in PATH
+    desc: 'EDPA is local-first — all you need is Python 3.10+ and Git. Claude Code users: Python deps are installed automatically by the SessionStart hook. Other environments: pip install manually. GitHub CLI is optional, only if you want the PR-signal CI workflow (--with-ci).',
+    claude: `# Python 3.10+ must be in PATH
 python3 --version   # >= 3.10
+
+# Git for versioning .edpa/ (auto-commits)
+git --version
 
 # Python dependencies install automatically
 # on first Claude Code session in the project (SessionStart hook)`,
-    code: `# GitHub CLI — authenticate with project scope
-gh auth login
-gh auth refresh -s project,read:project
-
-# Python dependencies (Cursor, Codex CLI, raw)
+    code: `# Python dependencies (Cursor, Codex CLI, raw)
 pip install pyyaml ruamel.yaml openpyxl requests
 
 # Verify
 python3 --version   # >= 3.10
-gh --version        # >= 2.40`,
-    result: `✓ Logged in to github.com as your-user
-✓ Token scopes: repo, project, read:project
-Python 3.12.1
-gh version 2.44.1`,
+git --version
+
+# Optional — only for PR-signal CI (--with-ci):
+gh auth login`,
+    result: `Python 3.12.1
+git version 2.44.0
+
+# Local-first: no org, no PAT, no GitHub Projects
+# required for the core flow. Everything lives in .edpa/.`,
   },
   {
     num: 2,
     title: 'Create Repository',
     color: 'var(--cy)',
-    desc: 'Create a new GitHub repository in your organization. EDPA requires an org repo (not personal) for Issue Types and GitHub Projects.',
-    code: `# Create a private org repo
-gh repo create ORG/project-name \\
+    desc: 'EDPA lives inside a Git repository. Any repo works — personal or org, on GitHub or a purely local git init. No Issue Types or GitHub Projects required.',
+    code: `# Option A — new GitHub repo
+gh repo create project-name \\
   --private --clone
+cd project-name
 
-cd project-name`,
-    result: `✓ Created repository ORG/project-name on GitHub
-✓ Cloned to ./project-name`,
+# Option B — purely local (no GitHub)
+mkdir project-name && cd project-name
+git init`,
+    result: `✓ Created repository project-name on GitHub
+✓ Cloned to ./project-name
+
+# or locally:
+Initialized empty Git repository in ./project-name/.git/`,
   },
   {
     num: 3,
@@ -69,59 +74,67 @@ Next: /edpa setup "Project Name"`,
   },
   {
     num: 4,
-    title: '/edpa setup',
+    title: '/edpa:setup',
     color: 'var(--yl)',
-    desc: 'One command configures everything — team, Issue Types, GitHub Project with 8 views, SAFe status fields, custom fields, sub-issue hierarchy, and CI workflows.',
-    claude: `/edpa setup "Project Name"
-# Claude Code handles everything interactively`,
-    code: `# Manual alternative (if not using Claude Code):
-# 1. Edit .edpa/config/people.yaml (team, roles, FTE, capacity)
-# 2. Issue Types:
-python3 .edpa/engine/scripts/issue_types.py setup --org ORG
-# 3. GitHub Project:
-python3 .edpa/engine/scripts/project_setup.py --org ORG --repo project-name
-# 4. Views:
-python3 .edpa/engine/scripts/create_project_views.py`,
-    result: `✓ Team: 3 members configured (2.8 FTE)
-✓ Issue Types: Initiative, Epic, Feature, Story, Defect, Task
-✓ GitHub Project created (#4)
-✓ Status fields: Initiative, Epic, Feature, Story (SAFe workflows)
-✓ Fields: Job Size, BV, TC, RR&amp;OE, WSJF Score, Team
-✓ 8 views: All Items, Board, Epics, Features, WSJF,
-           Current Iteration, My Work, Roadmap
-✓ Branch-check CI workflow installed
-✓ Config saved to .edpa/config/edpa.yaml
+    desc: 'One command vendors the engine into .edpa/engine/ and seeds configs — team, project, and id_counters.yaml. Local-first: no GitHub Project provisioning. Optionally --with-ci adds the PR-signal workflow (edpa-contribution-sync.yml: PR-thread signals → evidence[], plus git hooks).',
+    claude: `/edpa:setup "Project Name"
+# Claude Code handles everything interactively
 
-⚠ Enable in GitHub Project → Workflows:
-  ✓ Item added → Set status "Funnel"
-  ✓ Auto-add issues from linked repo
-  ✗ NEVER enable auto-archive!`,
+# Optional — add the PR-signal CI workflow:
+/edpa:setup "Project Name" --with-ci`,
+    code: `# Manual alternative (outside Claude Code):
+# 1. Edit .edpa/config/people.yaml (team, roles, FTE, capacity)
+# 2. Edit .edpa/config/edpa.yaml (project name, cadence)
+# 3. Seed ID counters:
+python3 .edpa/engine/scripts/setup.py
+
+# Optional — PR-signal CI workflow:
+python3 .edpa/engine/scripts/setup.py --with-ci`,
+    result: `✓ Engine vendored: .edpa/engine/{scripts,templates,schemas}
+✓ Team: 3 members configured (2.8 FTE)
+✓ Config: .edpa/config/edpa.yaml (project + cadence)
+✓ Config: .edpa/config/people.yaml (team)
+✓ Seeded: .edpa/config/id_counters.yaml
+✓ CW heuristics: .edpa/config/cw_heuristics.yaml
+
+# With --with-ci, additionally:
+✓ Workflow: .github/workflows/edpa-contribution-sync.yml
+  → PR-thread signals → evidence[] on items
+✓ Git hooks installed (commit-msg: feat(<ID>): …)
+
+# Local-first: no org, no PAT, no GitHub Projects.`,
   },
   {
     num: 5,
     title: 'Populate Backlog',
     color: 'var(--or)',
-    desc: 'Create YAML files in .edpa/backlog/ — one file per item. Hierarchy: Initiative > Epic > Feature > Story. WSJF is calculated automatically.',
-    code: `# .edpa/backlog/stories/S-1.yaml
-id: S-1
-type: Story
-title: "Implement login endpoint"
-js: 5              # Job Size (Fibonacci)
-bv: 8              # Business Value
-tc: 5              # Time Criticality
-rr: 3              # Risk Reduction & Opportunity Enablement
-status: Backlog
-parent: F-1      # Parent Feature
-assignee: jnovak
-iteration: PI-2026-1.1
-created_at: "2026-05-10T08:00:00Z"   # auto from GitHub sync
-updated_at: "2026-05-12T14:30:00Z"   # auto from GitHub sync
-# closed_at is populated automatically when status → Done
+    desc: 'Add items via backlog.py add — the ID is allocated from id_counters.yaml, the parent hierarchy is validated, and a .md file is written under .edpa/backlog/ and auto-committed as feat(<ID>):. Hierarchy: Initiative > Epic > Feature > Story. WSJF is calculated automatically.',
+    claude: `# In Claude Code, just say:
+/edpa:add Story "Implement login endpoint" \\
+  --parent F-1 --js 5 --bv 8 --tc 5 --rr-oe 3 \\
+  --assignee jnovak --iteration PI-2026-1.1
 
-# Validate backlog
+# Claude, via MCP edpa_item_create:
+#  • allocates the ID from id_counters.yaml (S-1)
+#  • validates the parent (F-1 must exist)
+#  • writes .edpa/backlog/stories/S-1.md
+#  • auto-commits: feat(S-1): add story
+# Then: "Validate the backlog and show me the tree"`,
+    code: `# CLI fallback (outside Claude Code) — add auto-commits feat(<ID>):
+python3 .edpa/engine/scripts/backlog.py add Story \\
+  "Implement login endpoint" \\
+  --parent F-1 --js 5 --bv 8 --tc 5 --rr-oe 3 \\
+  --assignee jnovak --iteration PI-2026-1.1
+
+# Writes .edpa/backlog/stories/S-1.md (front-matter + body):
+#   id: S-1 / type: Story / js,bv,tc,rr_oe / status: Backlog
+#   parent: F-1 / assignee / iteration
+#   created_at filled locally, closed_at on transition to Done
+
 python3 .edpa/engine/scripts/backlog.py validate
 python3 .edpa/engine/scripts/backlog.py tree`,
-    result: `✓ Backlog valid (12 items, 0 errors)
+    result: `✓ feat(S-1): add story  (auto-commit)
+✓ Backlog valid (12 items, 0 errors)
 
 I-1: Medical Platform
 └── E-1: Data Processing Pipeline
@@ -136,7 +149,7 @@ I-1: Medical Platform
     num: 6,
     title: 'Team Starts Working',
     color: 'var(--pk)',
-    desc: 'The team works using standard GitHub flow — branch naming conventions, commits referencing items, PRs and code review. EDPA tracks everything automatically. Sync captures timestamps (created_at, updated_at, closed_at) and detects conflicts via updated_at.',
+    desc: 'The team works using standard Git flow — branch naming conventions, commits referencing items (feat(<ID>):), PRs and code review. EDPA reads evidence locally from Git history; if the PR-signal CI runs (--with-ci), PR-thread signals are additionally appended to evidence[].',
     code: `# Branch naming (CI enforces format)
 git checkout -b feature/S-1-login-endpoint
 
@@ -154,11 +167,13 @@ PR #42: "S-1: Login endpoint"
   → Review requested: pkral
   → Status: Approved ✓ → Merged
 
-Evidence detected:
-  jnovak: assignee (+4), PR author (+2), commits (+1)
-  pkral:  PR reviewer (+1)
+Evidence (signal weights → contribution_score):
+  jnovak: assignee 4.0 + pr_author 3.4 + commit_author 2.78 = 10.18
+  pkral:  pr_reviewer 2.25                                  =  2.25
+  → cw[jnovak, S-1] = 10.18 / 12.43 = 0.82
+  → cw[pkral,  S-1] =  2.25 / 12.43 = 0.18
 
-Timestamps (auto from GitHub sync):
+Timestamps (locally from Git history):
   S-1: created_at=2026-05-10, updated_at=2026-05-15, closed_at=2026-05-15
 
 Flow metrics (MCP tool edpa_flow_metrics):
@@ -168,15 +183,15 @@ Flow metrics (MCP tool edpa_flow_metrics):
     num: 7,
     title: 'End of Iteration',
     color: 'var(--ac)',
-    desc: 'At iteration end, the EDPA engine reads evidence from backlog YAML files and proportionally allocates hours based on actual work.',
-    claude: `/edpa close-iteration PI-2026-1.1
-# Claude Code fetches evidence and computes allocation`,
+    desc: 'At iteration end, the EDPA engine reads evidence from backlog files in .edpa/backlog/ and proportionally allocates hours based on actual work.',
+    claude: `/edpa:close-iteration PI-2026-1.1
+# Claude Code reads evidence and computes allocation`,
     code: `python3 .edpa/engine/scripts/engine.py \\
   --edpa-root .edpa \\
   --iteration PI-2026-1.1
 
 # The engine automatically:
-# 1. Reads evidence from .edpa/backlog/ YAML files
+# 1. Reads evidence from .edpa/backlog/ files
 # 2. Computes contribution weight (CW)
 # 3. Allocates hours: Score / Total × Capacity
 # 4. Generates reports`,
@@ -197,7 +212,7 @@ Invariants: ALL PASSED`,
     title: 'Reports & Timesheets',
     color: 'var(--cy)',
     desc: 'EDPA generates per-person timesheets, per-item cost allocation, JSON exports, and frozen snapshots. All auditable and reproducible.',
-    claude: `/edpa reports
+    claude: `/edpa:reports
 # Claude Code generates all reports and timesheets`,
     code: `# Generated files
 .edpa/reports/
@@ -225,7 +240,7 @@ Invariants: ALL PASSED`,
     title: 'Retrospective + Calibration',
     color: 'var(--gn)',
     desc: 'Calibrate signal weights against a synthetic Monte Carlo corpus. calibrate_signals.py runs MC random sampling + coordinate descent and reports MAD baseline vs. calibrated.',
-    claude: `/edpa calibrate
+    claude: `/edpa:calibrate
 # Claude Code runs MC calibration and shows MAD results`,
     code: `# Monte Carlo signal-weight calibration
 python3 .edpa/engine/scripts/calibrate_signals.py \\
@@ -247,7 +262,7 @@ Verdict: GOOD (defaults are already near optimum)`,
     title: 'Next PI',
     color: 'var(--yl)',
     desc: 'Repeat for each iteration. With every cycle, calibration improves. Target: predictability > 80%, MAD < 0.05 by the third PI.',
-    claude: `/edpa close-iteration PI-2026-1.2
+    claude: `/edpa:close-iteration PI-2026-1.2
 # Next iteration — same workflow`,
     code: `# New iteration
 python3 .edpa/engine/scripts/engine.py \\

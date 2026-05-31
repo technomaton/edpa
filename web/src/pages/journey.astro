@@ -70,17 +70,16 @@ const S=[
 </div>
 <div class="s-note fade d4"><b>V\u00fdsledek:</b> B\u011b\u017e\u00edc\u00ed repo s t\u00fdmem a backlogem. Za 15 minut.</div>`,
 
-// 3 — Issue Types
-`<div class="s-tag fade">Slide 4 &middot; Issue Types</div>
-<div class="s-h1 fade d1">Hierarchie od vize po \u00fakol</div>
-<div class="s-sub fade d2">4 \u00farovn\u011b &mdash; ka\u017ed\u00e1 s vlastn\u00ed barvou, prefixem a \u00fa\u010delem.</div>
-<div class="sg sg4 fade d3">
-<div class="sc p" style="border-left:4px solid var(--pk);min-height:160px"><div class="sc-t" style="color:var(--pk)">Initiative</div><div class="sc-v" style="font-size:20px;color:var(--pk)">INI-001</div><div class="sc-l">Strategick\u00fd c\u00edl<br>Horizont: PI / kvart\u00e1l<br><span class="tg tg-r">Nejvy\u0161\u0161\u00ed \u00farove\u0148</span></div></div>
-<div class="sc o" style="border-left:4px solid var(--or);min-height:160px"><div class="sc-t" style="color:var(--or)">Epic</div><div class="sc-v" style="font-size:20px;color:var(--or)">EPC-010</div><div class="sc-l">Funk\u010dn\u00ed celek<br>Horizont: iterace<br><span class="tg tg-y">Dekompozice Initiative</span></div></div>
-<div class="sc a" style="border-left:4px solid var(--ac);min-height:160px"><div class="sc-t" style="color:var(--ac)">Feature</div><div class="sc-v" style="font-size:20px;color:var(--ac)">FEA-042</div><div class="sc-l">Doru\u010diteln\u00e1 vlastnost<br>Horizont: dny<br><span class="tg tg-b">Dekompozice Epicu</span></div></div>
-<div class="sc g" style="border-left:4px solid var(--gn);min-height:160px"><div class="sc-t" style="color:var(--gn)">Story</div><div class="sc-v" style="font-size:20px;color:var(--gn)">STR-099</div><div class="sc-l">Atomick\u00fd \u00fakol<br>Horizont: hodiny<br><span class="tg tg-g">Nejni\u017e\u0161\u00ed \u00farove\u0148</span></div></div>
+// 3 — Lokalni setup
+`<div class="s-tag fade">Slide 4 &middot; Lok\u00e1ln\u00ed setup</div>
+<div class="s-h1 fade d1">Jeden p\u0159\u00edkaz vendoruje engine do repa</div>
+<div class="s-sub fade d2"><code>/edpa:setup</code> &mdash; \u017e\u00e1dn\u00fd GitHub Project, \u017e\u00e1dn\u00e9 Issue Types, \u017e\u00e1dn\u00e1 custom fields. Lok\u00e1ln\u011b a v Gitu.</div>
+<div class="sg sg3 fade d3">
+<div class="sc a" style="min-height:170px"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">Engine</div><div class="sc-v" style="font-size:14px;color:var(--ac2)">.edpa/engine/</div><div class="sc-l">Vendorovan\u00e9 skripty, sch\u00e9mata a \u0161ablony. V\u00fdpo\u010det b\u011b\u017e\u00ed lok\u00e1ln\u011b &mdash; \u017e\u00e1dn\u00e1 extern\u00ed slu\u017eba.</div></div>
+<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F4C1;</div><div class="sc-t">Konfigurace</div><div class="sc-v" style="font-size:14px;color:var(--cy)">.edpa/config/</div><div class="sc-l"><code>edpa.yaml</code>, <code>people.yaml</code> a <code>id_counters.yaml</code> &mdash; seedov\u00e1no automaticky.</div></div>
+<div class="sc g" style="min-height:170px"><div class="sc-i">&#x1FA9D;</div><div class="sc-t">Git hooks</div><div class="sc-v" style="font-size:14px;color:var(--gn)">post-commit</div><div class="sc-l">Voliteln\u011b nainstaluje hooky &mdash; evidence se zachyt\u00e1v\u00e1 p\u0159i ka\u017ed\u00e9m commitu.</div></div>
 </div>
-<div class="fm fade d4">Initiative &rarr; Epic &rarr; Feature &rarr; Story</div>`,
+<div class="fm fade d4">/edpa:setup &rarr; .edpa/engine/ + .edpa/config/ + git hooks &mdash; za minuty, bez GitHubu</div>`,
 
 // 4 — Backlog v Gitu
 `<div class="s-tag fade">Slide 5 &middot; Backlog v Gitu</div>
@@ -115,16 +114,16 @@ assignee: urbanek</div>
 </div>
 </div>`,
 
-// 5 — GitHub Project
-`<div class="s-tag fade">Slide 6 &middot; GitHub Project</div>
-<div class="s-h1 fade d1">Board, custom fields, WSJF ranking</div>
-<div class="s-sub fade d2">GitHub Projects jako voliteln\u00e9 PM/BO UI pro prioritizaci a board view. Single source of truth z\u016fst\u00e1v\u00e1 .edpa/backlog/ v gitu.</div>
+// 5 — Evidence-driven
+`<div class="s-tag fade">Slide 6 &middot; Evidence-driven</div>
+<div class="s-h1 fade d1">Hodiny z lok\u00e1ln\u00ed evidence v Gitu</div>
+<div class="s-sub fade d2">Z\u00e1dn\u00e9 timesheets. EDPA \u010dte commity, \u00fapravy YAML a stavov\u00e9 p\u0159echody p\u0159\u00edmo z Gitu &mdash; a z nich po\u010d\u00edt\u00e1 CW.</div>
 <div class="sg sg3 fade d3">
-<div class="sc a"><div class="sc-t">Board View</div><div class="sc-l"><b>Funnel</b> &rarr; <b>Analyzing</b> &rarr; <b>Backlog</b> &rarr; <b>Implementing</b> &rarr; <b>Done</b><br><br>Drag-and-drop. Automatick\u00e9 p\u0159esuny p\u0159es GitHub Actions.</div></div>
-<div class="sc c"><div class="sc-t">Custom Fields</div><div class="sc-l"><b>WSJF Score</b> &mdash; prioritizace<br><b>Issue Type</b> &mdash; INI/EPC/FEA/STR<br><b>Iteration</b> &mdash; PI a iterace<br><b>Estimate</b> &mdash; story points</div></div>
-<div class="sc g"><div class="sc-t">WSJF Ranking</div><div class="sc-l"><b>Weighted Shortest Job First</b><br><br>Automatick\u00fd v\u00fdpo\u010det priority na z\u00e1klad\u011b business value, time criticality a risk reduction.</div></div>
+<div class="sc a"><div class="sc-t">commit_author</div><div class="sc-l"><b>Commity</b> s ID polo\u017eky v branchi, titulku nebo zpr\u00e1v\u011b.<br><br>K tomu PR author a review &mdash; re\u00e1ln\u00e1 delivery.</div></div>
+<div class="sc c"><div class="sc-t">yaml_edit</div><div class="sc-l"><b>\u00dapravy</b> <code>.edpa/backlog/*.yaml</code>: nov\u00fd soubor, p\u0159idan\u00fd blok, AC bullet, zm\u011bna scalaru.<br><br>Strukturn\u00ed delta = sign\u00e1l pr\u00e1ce.</div></div>
+<div class="sc g"><div class="sc-t">gate transitions</div><div class="sc-l"><b>Stavov\u00e9 p\u0159echody</b> na Feature/Epic/Initiative (nap\u0159. Implementing&rarr;Validating) kreditovan\u00e9 v okn\u011b iterace.</div></div>
 </div>
-<div class="fm fade d4">WSJF = (Business Value + Time Criticality + Risk Reduction &amp; Opportunity Enablement) / Job Size</div>`,
+<div class="fm fade d4">commit_author &middot; yaml_edit &middot; gate transitions &rarr; CW &mdash; v\u0161e z Gitu, GitHub nen\u00ed pot\u0159eba</div>`,
 
 // 6 — Tyden 1: Tym pracuje
 `<div class="s-tag fade">Slide 7 &middot; T\u00fdden 1: T\u00fdm pracuje</div>
@@ -162,7 +161,7 @@ assignee: urbanek</div>
 <div class="col">
 <div class="sc g" style="padding:16px">
 <div class="sc-t">P\u0159\u00edkaz</div>
-<div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gn);line-height:2;white-space:pre">$ python3 .claude/edpa/scripts/engine.py \\
+<div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gn);line-height:2;white-space:pre">$ python3 .edpa/engine/scripts/engine.py \\
     --iteration PI1-I2 \\
     --team .edpa/config/people.yaml \\
     --output .edpa/reports/</div>
@@ -307,7 +306,7 @@ C\u00edl: MAD < 2h na osobu za iteraci</div>
 <div class="sc g fade d3" style="max-width:650px;margin:20px auto;padding:20px;text-align:left">
 <div class="sc-t">Quick Start</div>
 <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--gn);line-height:2.2;white-space:pre">pip install pyyaml
-python3 .claude/edpa/scripts/engine.py --demo</div>
+python3 .edpa/engine/scripts/engine.py --demo</div>
 </div>
 <div class="sg sg3 fade d4" style="max-width:700px;margin:16px auto 0">
 <div class="sc a" style="text-align:center;padding:12px"><div class="sc-t">GitHub</div><div style="font-size:12px;color:var(--ac2)">Open Source repo<br>MIT licence</div></div>
