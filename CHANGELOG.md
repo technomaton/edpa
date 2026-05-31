@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.1.8 — 2026-05-31 — Fresh-install onboarding fixes (engine vendoring on /edpa:setup)
+
+Three fresh-install friction points on the Claude-Code-only path (install the
+plugin, run `/edpa:setup` on a bare repo), found via a new deterministic E2E
+onboarding harness (`tests/onboarding/`).
+
+### fix(setup): `/edpa:setup` now vendors the engine into `.edpa/engine/`
+`project_setup.py` vendors `scripts`+`schemas`+`templates`+`rules`+`VERSION` as
+step 1 of `main()` (mirrors `install.sh`). The Claude Code path had silently lost
+vendoring when the engine moved from `.claude/edpa/` to `.edpa/engine/` (only
+`install.sh` was rewired), so `/edpa:setup` produced a project referencing a
+`.edpa/engine/scripts/` that never existed — the `--with-ci` workflow it installs
+plus the documented CLI broke, masked by the MCP server running from the plugin
+cache. Rules are vendored from `plugin/rules` (not `plugin/edpa/rules`), fixing a
+parallel `--with-rules` failure.
+
+### fix(install): V2 local-first "Next steps" + stamped methodology version
+`install.sh` no longer prints stale V1 guidance ("provision GitHub Project …
+push to GitHub Projects") or the removed `--org/--repo/--project-title` args; it
+now shows the correct `--with-ci/--with-hooks/--with-rules` flow with `filelock`
+in the dependency hint. Both `install.sh` and `project_setup.py` stamp
+`governance.methodology` in a freshly seeded `edpa.yaml` to the live plugin
+version (was frozen at the template's `EDPA 1.22.1`).
+
+### Tests
+- New `tests/onboarding/` harness (pexpect + tmux) + `test_project_setup_vendor.py`
+  + `test_install_sh_hygiene.py`. Full suite 553 → 564 (+11); 0 failures.
+
 ## 2.1.7 — 2026-05-31 — E2E findings: cross-layer fixes + /contribute @id + /edpa:capacity
 
 Fixes and conveniences surfaced by a full real-GitHub end-to-end re-validation
