@@ -22,6 +22,44 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent /
 import detect_contributors as dc  # noqa: E402
 
 
+# ─── R-2: multi-contract addressable by id ──────────────────────────────────
+
+
+def _people_root(tmp_path, people):
+    cfg = tmp_path / ".edpa" / "config"
+    cfg.mkdir(parents=True)
+    (cfg / "people.yaml").write_text(yaml.safe_dump({"people": people}))
+    return tmp_path / ".edpa"
+
+
+def test_load_people_map_resolves_id_to_itself(tmp_path):
+    """R-2: two contracts sharing one github handle are each addressable by
+    their unique id via `/contribute @<id>` (the shared handle is ambiguous)."""
+    root = _people_root(tmp_path, [
+        {"id": "bob-arch", "github": "bob-shared", "email": "ba@x"},
+        {"id": "bob-pm", "github": "bob-shared", "email": "bp@x"},
+    ])
+    m = dc.load_people_map(root)
+    assert m["bob-arch"] == "bob-arch"
+    assert m["bob-pm"] == "bob-pm"
+    assert m["bob-shared"] in ("bob-arch", "bob-pm")  # shared handle: one contract
+
+
+def test_aggregate_credits_contract_by_id(tmp_path):
+    """A /contribute signal addressed to an id credits that exact id even when
+    the github handle is shared with another contract."""
+    root = _people_root(tmp_path, [
+        {"id": "bob-arch", "github": "bob-shared"},
+        {"id": "bob-pm", "github": "bob-shared"},
+    ])
+    out = dc.aggregate_signals(
+        [{"type": "manual:commit_message", "login": "bob-pm",
+          "weight": 3.0, "ref": "commit/x/contrib/bob-pm"}],
+        dc.load_people_map(root),
+    )
+    assert out is not None and out[0]["person"] == "bob-pm"
+
+
 # ─── parse_contribute_directives ────────────────────────────────────────────
 
 

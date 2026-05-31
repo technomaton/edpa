@@ -188,6 +188,15 @@ def load_people_map(edpa_root: Path) -> dict[str, str]:
             mapping[p["email"].lower()] = pid
         if p.get("name"):
             mapping[p["name"].lower()] = pid
+    # Canonical id always resolves to itself and takes precedence over any
+    # github/email/name collision. Lets `/contribute @<id>` target a specific
+    # contract for multi-contract people who share a github handle (R-2:
+    # bob-arch + bob-pm share one login, so the shared handle is ambiguous —
+    # address them by id). ids are unique, so this pass is collision-free.
+    for p in data.get("people", []) or []:
+        pid = p.get("id", "")
+        if pid:
+            mapping[pid.lower()] = pid
     return mapping
 
 
@@ -520,14 +529,25 @@ def aggregate_signals(signals: list[dict],
     # Resolve every signal's login → person_id, normalising case.
     by_person: dict[str, list[dict]] = defaultdict(list)
     total_score = 0.0
+    unknown: set[str] = set()
     for sig in signals:
         login = sig["login"]
         person_id = people_map.get(login.lower(), login)
+        if login.lower() not in people_map:
+            unknown.add(login)
         # Preserve a clean signal record for YAML — drop the working
         # `login` field, add resolved person id later in contributor entry.
         clean = {k: v for k, v in sig.items() if k != "login"}
         by_person[person_id].append(clean)
         total_score += sig["weight"]
+    # Surface tokens that resolved to neither a known github handle nor a
+    # person id — these are credited as-is and the engine awards 0h, so a
+    # silent typo would otherwise vanish without a trace.
+    for tok in sorted(unknown):
+        print(f"WARNING: contribution token '{tok}' matches no github handle "
+              f"or person id in people.yaml — credited as-is (engine awards 0h "
+              f"unless it is a real person id; typo or external contributor?).",
+              file=sys.stderr)
 
     if total_score <= 0:
         return None
