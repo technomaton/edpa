@@ -1,7 +1,7 @@
 # EDPA V2 — E2E full-flow backlog plan fixture
 #
 # Declarative seed data consumed by the Wave B worker to populate the
-# sandbox backlog via `edpa:edpa-add` (preferred) or MCP `edpa_item_create`.
+# sandbox backlog via `edpa:add` (preferred) or MCP `edpa_item_create`.
 #
 # Parent reference scheme
 # -----------------------
@@ -378,7 +378,7 @@ items:
       per (person, role) pair so payroll can split lines correctly.
 
   - type: Story
-    title: "CLI flag --csv on edpa:edpa-reports"
+    title: "CLI flag --csv on edpa:reports"
     js: 3
     bv: 4
     tc: 3

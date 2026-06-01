@@ -293,7 +293,7 @@ The script bumps the counter only if the new max ID exceeds the existing counter
 ## Related
 
 - [Methodology — EDPA architecture overview](methodology.md)
-- [`/edpa:setup` skill — installs hooks](../plugin/skills/edpa-setup/SKILL.md)
-- [`/edpa:add` skill — allocates IDs](../plugin/skills/edpa-add/SKILL.md)
+- [`/edpa:setup` skill — installs hooks](../plugin/skills/setup/SKILL.md)
+- [`/edpa:add` skill — allocates IDs](../plugin/skills/add/SKILL.md)
 - [E2E test reproducing collision workflow](../tests/e2e_collision/scenario_a.sh)
 - [CHANGELOG v2.1.5 — collision detection fix](../CHANGELOG.md)

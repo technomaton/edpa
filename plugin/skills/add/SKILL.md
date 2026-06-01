@@ -1,5 +1,5 @@
 ---
-name: edpa:add
+name: add
 user-invocable: true
 description: >
   Create a new backlog item (Initiative / Epic / Feature / Story / Defect /

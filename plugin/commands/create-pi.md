@@ -63,3 +63,11 @@ Examples:
   use `/edpa:close-iteration`.
 - This command does not scaffold iterations by design — one explicit PI record,
   iterations added deliberately.
+
+## What NOT to do
+
+- **Don't hand-write the PI file** — go through `create_pi.py` so id validation,
+  the `pi:` shape, atomic write, and commit stay on one path (the same path as
+  the `edpa_pi_create` MCP tool).
+- **Don't use a `.yml` extension** — it's silently ignored by the loader.
+- **Don't scaffold iterations here** — that's `edpa_iteration_create`, by design.

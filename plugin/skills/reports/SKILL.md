@@ -1,11 +1,11 @@
 ---
-name: edpa:reports
+name: reports
 user-invocable: true
 description: >
   Generate EDPA timesheets, reports, and exports. Produces per-person MD/JSON reports,
   per-item cost allocation, PI summaries, Excel exports, and frozen snapshots. Use when
   user asks for "reports", "výkazy", "export", "snapshot", or "per-item analysis".
-  Requires edpa-engine results (edpa_results.json) as input.
+  Requires /edpa:engine results (edpa_results.json) as input.
 license: MIT
 compatibility: Python 3.10+ (openpyxl for XLSX), .edpa/config/people.yaml
 allowed-tools: Read Write Bash(python3 *) Bash(cp *) Bash(mkdir *)
@@ -47,7 +47,7 @@ If `$ARGUMENTS` is empty, blank, or "help":
 
 ## Prerequisites
 
-- `.edpa/reports/iteration-{ID}/edpa_results.json` exists (run edpa-engine first)
+- `.edpa/reports/iteration-{ID}/edpa_results.json` exists (run /edpa:engine first)
 - `.edpa/config/people.yaml` exists
 
 ## Output artifacts
@@ -129,6 +129,6 @@ For lightweight analytics without a full engine run, use the `edpa_flow_metrics`
 
 ## Error handling
 
-- Missing edpa_results.json → "Run edpa-engine for {iteration} first."
+- Missing edpa_results.json → "Run /edpa:engine for {iteration} first."
 - Invariant failures in results → include warning banner in reports
 - Snapshot already exists → create revision (iteration-{ID}_rev2.json)

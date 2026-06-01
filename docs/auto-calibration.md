@@ -108,7 +108,7 @@ Flags:
 | `--apply` | Write best weights back to `cw_heuristics.yaml.tmpl` |
 | `--report PATH` | Emit a JSON report of the run |
 
-Invoke through the `/edpa:calibrate` skill (edpa-autocalib), which prints the
+Invoke through the `/edpa:calibrate` skill (/edpa:autocalib), which prints the
 last calibration metadata, proposes a default run, and applies on confirmation.
 
 ## Safety constraints

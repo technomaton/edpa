@@ -494,7 +494,7 @@ async def list_tools() -> list[Tool]:
                 ".N suffix. Does NOT create child iterations (use "
                 "edpa_iteration_create); status defaults to 'planning'. "
                 "Delegates to create_pi.py — the single source of behavior "
-                "also used by the /edpa:create-pi command and skill."
+                "also used by the /edpa:create-pi command."
             ),
             inputSchema={
                 "type": "object",

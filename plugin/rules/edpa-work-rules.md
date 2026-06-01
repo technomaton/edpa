@@ -84,7 +84,7 @@ CC subject keeps the audit trail readable.
 
 This catches the "did real work but forgot to attribute it" case
 before `local_evidence.py` would silently emit nothing — leaving the
-work unattributed in next iteration's `edpa-engine` allocation.
+work unattributed in next iteration's `/edpa:engine` allocation.
 
 ## What passes automatically
 
@@ -106,7 +106,7 @@ work**, not a chore:
 4. Don't bypass the hooks with `--no-verify` unless the user
    explicitly authorises it.
 
-This guarantees that the next `edpa-engine` run accounts for AI-driven
+This guarantees that the next `/edpa:engine` run accounts for AI-driven
 work the same way it accounts for human-driven work — through the
 local evidence pipeline (`commit_author` → `evidence[]` → `contributors[]`
 → derived hours).

@@ -117,7 +117,7 @@ def check_install_sh_vendors() -> None:
 def check_setup_skill_vendors() -> None:
     sb = new_sandbox("setup")
     try:
-        # Exactly what plugin/skills/edpa-setup/SKILL.md Step 1 runs, with
+        # Exactly what plugin/skills/setup/SKILL.md Step 1 runs, with
         # ${CLAUDE_PLUGIN_ROOT} resolved to the real plugin path.
         proc = subprocess.run(
             [sys.executable, str(PROJECT_SETUP),
@@ -246,7 +246,7 @@ def main() -> int:
         print(f"\n{C.RED}{C.B}Onboarding gap reproduced:{C.R}")
         for n in failed:
             print(f"  {C.RED}✗{C.R} {n}")
-        print(f"\n{C.YEL}Root cause:{C.R} plugin/skills/edpa-setup/SKILL.md Step 1 runs only")
+        print(f"\n{C.YEL}Root cause:{C.R} plugin/skills/setup/SKILL.md Step 1 runs only")
         print("  project_setup.py, which never copies plugin/edpa/{scripts,schemas,")
         print("  templates} → .edpa/engine/. The skill's description + layout diagram")
         print("  both claim it vendors. Only curl|sh install.sh vendors; the")

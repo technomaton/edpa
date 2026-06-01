@@ -43,4 +43,4 @@ python3 .edpa/engine/scripts/capacity_override.py <iteration-id> --remove --pers
 - Each change is validated and auto-committed (`<iter>: capacity override <person> -> <hours>h (<note>)`); pass `--no-commit` to only touch the file.
 - **Closed iterations reject overrides** (audit trail) — set them BEFORE closing. The same prep is Stage 1 of `/edpa:close-iteration` (`<iter> --prep-only`).
 - For a permanent capacity change across all iterations, edit `capacity_per_iteration` in `people.yaml` instead.
-- After changing capacity, re-run `/edpa:edpa-engine <iteration-id>` so reports reflect the new allocation.
+- After changing capacity, re-run `/edpa:engine <iteration-id>` so reports reflect the new allocation.

@@ -16,11 +16,11 @@ YAML is the source of truth, git is the audit trail. GitHub Projects sync is
 |----------------------|------------------------------------|--------|
 | `/edpa:setup`        | `.edpa/engine/scripts/project_setup.py` | ✅ vendors engine + seeds `.edpa/` (local-first) |
 | `/edpa:create-pi`    | `.edpa/engine/scripts/create_pi.py` | ✅ writes the PI-level `pi:` file (also `edpa_pi_create` MCP tool) |
-| `/edpa:close-iteration` | `.edpa/engine/scripts/engine.py` → `edpa-reports` skill | ✅ verified by `tests/test_invariants.py`, `tests/test_gate_allocation.py` |
-| `/edpa:reports`      | `edpa-reports` skill (no script)   | ✅ manual + skill execution |
+| `/edpa:close-iteration` | `.edpa/engine/scripts/engine.py` → `/edpa:reports` skill | ✅ verified by `tests/test_invariants.py`, `tests/test_gate_allocation.py` |
+| `/edpa:reports`      | `/edpa:reports` skill (no script)   | ✅ manual + skill execution |
 | `/edpa:board`        | `.edpa/engine/scripts/board.py`    | ✅ manual run |
 | `/edpa:capacity`     | `.edpa/engine/scripts/capacity_override.py` | ✅ per-iteration capacity overrides |
-| `/edpa:calibrate`    | `edpa-autocalib` skill             | ⚠️ needs ≥20 ground-truth records — skip until first PI closed |
+| `/edpa:calibrate`    | `/edpa:autocalib` skill             | ⚠️ needs ≥20 ground-truth records — skip until first PI closed |
 | GitHub PR signals (optional) | `edpa-contribution-sync.yml` CI → `sync_pr_contributions.py` | ⚪ opt-in — materializes PR-thread evidence (§2) |
 
 ---
@@ -168,7 +168,7 @@ python3 .edpa/engine/scripts/engine.py \
   --output .edpa/reports/iteration-PI-2026-1.4/edpa_results.json
 
 # Step 2: reports skill — reads the JSON and writes timesheets, snapshots, XLSX
-# (the edpa-reports skill is invoked by Claude; no separate script)
+# (the /edpa:reports skill is invoked by Claude; no separate script)
 ```
 
 **Single calculation path (v1.14+, extended in v1.17):** the mode
@@ -247,8 +247,8 @@ allocation, frozen JSON snapshot, optional Excel exports.
 - `.edpa/snapshots/<ID>.json` (frozen, methodology-tagged).
 - `.edpa/reports/pi-<PI>/pi-summary-<PI>.md` (when invoked with `pi`).
 
-**No standalone script** — the `edpa-reports` skill drives Claude to read
-results, format reports, and write artifacts. See `.claude/skills/edpa-reports/SKILL.md`
+**No standalone script** — the `/edpa:reports` skill drives Claude to read
+results, format reports, and write artifacts. See `.claude/skills/reports/SKILL.md`
 for the per-step contract.
 
 **Existing snapshots in this repo:** `.edpa/snapshots/PI-2026-1.1.json` and

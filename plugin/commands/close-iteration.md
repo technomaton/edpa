@@ -115,11 +115,11 @@ follow-up. **Always run, never skip.**
 
 Invoke the existing skills in sequence:
 
-1. `edpa-engine` — computes derived hours from delivery evidence
+1. `/edpa:engine` — computes derived hours from delivery evidence
    (commits, PRs, reviews) plus any capacity overrides recorded in
    Stage 1. Writes `edpa_results.json` and `edpa-results.xlsx`
    (Team Summary + Item Costs tabs).
-2. `edpa-reports` — generates per-person `timesheet-<id>.md` files,
+2. `/edpa:reports` — generates per-person `timesheet-<id>.md` files,
    the team rollup `timesheet-team.md`, and freezes the audit
    snapshot under `.edpa/snapshots/<iteration-id>.json`.
 

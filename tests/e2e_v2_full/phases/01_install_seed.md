@@ -31,7 +31,7 @@ Finished: 2026-05-27T18:14:16Z
    3 YAML templates. Seeded `.edpa/config/people.yaml` and
    `.edpa/config/edpa.yaml` from default templates.
 4. Per the documented gotcha (commit `6fe17ac`), did not attempt to
-   invoke `/edpa:edpa-setup` via the Skill tool. Went directly to the
+   invoke `/edpa:setup` via the Skill tool. Went directly to the
    fallback:
    `python3 .edpa/engine/scripts/project_setup.py --with-ci --with-hooks --with-rules`.
    Outcome: all 6 steps reported `✓`:

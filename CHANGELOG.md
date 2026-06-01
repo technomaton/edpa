@@ -1,5 +1,47 @@
 # Changelog
 
+## 2.2.1 — 2026-06-01 — Skill names: drop the redundant `edpa-` prefix; server + create-pi are command-only
+
+Plugin skill invocations were doubly namespaced — `/edpa:edpa-setup`,
+`/edpa:edpa-engine`, … — because Claude Code derives a skill's slug from its
+**directory name** (`skills/edpa-setup/` → `/edpa:edpa-setup`), not the SKILL.md
+`name:` field. The frontmatter `name:` and `plugin/README.md` already advertised
+the clean `/edpa:setup` form, so the picker *showed* `/edpa:setup` but *inserted*
+`/edpa:edpa-setup` — a half-finished rename. This completes it.
+
+### refactor(skills): rename 5 skill dirs to drop the prefix
+`skills/edpa-{setup,add,engine,reports,autocalib}` → `skills/{setup,add,engine,reports,autocalib}`,
+and each `SKILL.md` `name:` is now the bare slug matching its directory.
+Invocations are now `/edpa:setup`, `/edpa:add`, `/edpa:engine`, `/edpa:reports`,
+`/edpa:autocalib`. `plugin.json` `skills[]` paths updated.
+
+### refactor(server,create-pi): collapse the command+skill pairs to command-only
+Two capabilities shipped as **both** a command and a same-named skill; the prefix
+was the only thing keeping them from colliding (`/edpa:server` command vs
+`/edpa:edpa-server` skill). Dropping the prefix would collide, so the redundant
+skills are removed in favour of the commands:
+- `skills/edpa-server` removed — its workflow (start/stop/status, scoped
+  `allowed-tools`, the "what NOT to do" rails) folded into `commands/server.md`.
+- `skills/edpa-create-pi` removed — `commands/create-pi.md` already carried the
+  full workflow; the `edpa_pi_create` MCP tool remains the model-facing path.
+
+`plugin.json` `skills[]` drops both; `commands[]` is unchanged (still 5).
+
+### Breaking — invocation surface
+- `/edpa:edpa-setup` / `-add` / `-engine` / `-reports` / `-autocalib` → use
+  `/edpa:setup` … `/edpa:autocalib`.
+- The `edpa:edpa-server` and `edpa:edpa-create-pi` **skills** are gone — use the
+  `/edpa:server` and `/edpa:create-pi` **commands** (and the `edpa_pi_create` MCP
+  tool). Run `/reload-plugins` after updating.
+
+### docs + web + tooling
+Swept every active reference: `plugin/README.md` tree + table, `docs/` (RUNBOOK,
+playbook, faq, mcp, dev-collisions, auto-calibration, E2E plans), tests, and the
+CZ+EN website (presentation, kashealth, playbook). Fixed pre-existing
+double-prefix typos (`/edpa:edpa-engine` in `capacity.md`, `/edpa:edpa-setup` in
+`faq.md`). `scripts/bump_version.py` literal-reference paths updated to the new
+skill dirs.
+
 ## 2.2.0 — 2026-06-01 — Create PI: edpa_pi_create tool + /edpa:create-pi command & skill
 
 Adds a first-class way to create the **PI-level metadata file**

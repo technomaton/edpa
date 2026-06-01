@@ -1045,12 +1045,12 @@ iterations:
             method: squash
         final_status: Done
 
-      - item: "#26"  # Story S — CLI flag --csv on edpa:edpa-reports
+      - item: "#26"  # Story S — CLI flag --csv on edpa:reports
         assignee: dave
         commits:
           - day_offset: 0
             time: "11:20:00"
-            message: "<item_id>: add --csv flag to edpa-reports skill entry point"
+            message: "<item_id>: add --csv flag to /edpa:reports skill entry point"
             file_changes:
               - path: plugin/edpa/scripts/reports_cli.py
                 content_hint: "argparse flag wiring"
@@ -1058,10 +1058,10 @@ iterations:
             time: "13:45:00"
             message: "<item_id>: surface flag in skill SKILL.md examples"
             file_changes:
-              - path: plugin/skills/edpa-reports/SKILL.md
+              - path: plugin/skills/reports/SKILL.md
                 content_hint: "example invocation"
         pr:
-          title: "<item_id>: --csv flag on edpa-reports skill"
+          title: "<item_id>: --csv flag on /edpa:reports skill"
           body: |
             Implements <item_id>: exposes the new writer through the
             reports skill so users can ask for "CSV export" in natural
