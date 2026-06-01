@@ -84,7 +84,7 @@ Next: /edpa setup "Project Name"`,
 /edpa:setup "Project Name" --with-ci`,
     code: `# Manual alternative (outside Claude Code):
 # 1. Edit .edpa/config/people.yaml (team, roles, FTE, capacity)
-# 2. Edit .edpa/config/edpa.yaml (project name, cadence)
+# 2. Edit .edpa/config/edpa.yaml (project name, governance, naming)
 # 3. Seed ID counters:
 python3 .edpa/engine/scripts/setup.py
 
@@ -92,7 +92,7 @@ python3 .edpa/engine/scripts/setup.py
 python3 .edpa/engine/scripts/setup.py --with-ci`,
     result: `✓ Engine vendored: .edpa/engine/{scripts,templates,schemas}
 ✓ Team: 3 members configured (2.8 FTE)
-✓ Config: .edpa/config/edpa.yaml (project + cadence)
+✓ Config: .edpa/config/edpa.yaml (project + governance)
 ✓ Config: .edpa/config/people.yaml (team)
 ✓ Seeded: .edpa/config/id_counters.yaml
 ✓ CW heuristics: .edpa/config/cw_heuristics.yaml

@@ -101,7 +101,7 @@ curl -fsSL https://edpa.technomaton.com/install.sh | sh</code></pre>
   .edpa/
     config/
       edpa.yaml          # Project + governance (source of methodology version)
-      people.yaml        # Team and capacities (cadence, teams, people)
+      people.yaml        # Team and capacities (teams, people)
       cw_heuristics.yaml # CW signal weights
       id_counters.yaml   # ID counters (S-1, E-1, F-1, ...)
     backlog/
@@ -138,18 +138,8 @@ curl -fsSL https://edpa.technomaton.com/install.sh | sh</code></pre>
     <h3>1.2 Configure the team and capacities (people.yaml)</h3>
     <p><code>project_setup.py</code> already seeds <code>.edpa/config/people.yaml</code> from the template. Or manually:</p>
     <pre><code>cp .edpa/engine/templates/people.yaml.tmpl .edpa/config/people.yaml</code></pre>
-    <p>Edit <code>.edpa/config/people.yaml</code>. This is where <strong>cadence + teams + people</strong> live — no separate registry, everything is in one file:</p>
-    <pre><code>cadence:
-  # AI-native default: 5-week PI = 4 delivery iterations of 1 week + 1 IP
-  # (a week for debt, prioritization and PI planning — with AI, doable in a day).
-  # Classic SAFe (2-week iterations, 10-week PI) stays supported —
-  # set iteration_weeks: 2 + pi_weeks: 10.
-  iteration_weeks: 1                    # 1 (AI-native, default) or 2 (classic)
-  pi_weeks: 5                           # 5 (AI-native, default) or 10 (classic)
-  delivery_iterations_per_pi: 4         # PI minus IP iteration
-  ip_iterations_per_pi: 1              # Innovation &amp; Planning
-
-teams:
+    <p>Edit <code>.edpa/config/people.yaml</code>. This is where <strong>teams + people</strong> live — no separate registry. Set cadence (iteration_weeks / pi_iterations) per-PI in the <code>pi:</code> block of <code>.edpa/iterations/PI-*.yaml</code>:</p>
+    <pre><code>teams:
   - id: "My Team"
     planning_factor: 0.8               # Plan to 80% of capacity
 
@@ -624,7 +614,7 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
     <h3>Day 1</h3>
     <ul class="checklist">
       <li>Engine vendored into <code>.edpa/engine/</code> (<code>/edpa:setup</code> or <code>project_setup.py</code>)</li>
-      <li><code>.edpa/config/people.yaml</code> — team with roles, FTE, capacities (cadence + teams + people)</li>
+      <li><code>.edpa/config/people.yaml</code> — team with roles, FTE, capacities (teams + people)</li>
       <li><code>.edpa/config/edpa.yaml</code> — project name, governance, naming</li>
       <li><code>.edpa/config/cw_heuristics.yaml</code> — default signal weights (from the template)</li>
       <li><code>.edpa/config/id_counters.yaml</code> — seeded</li>

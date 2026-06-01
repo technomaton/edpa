@@ -2,16 +2,9 @@
 # Edit this file with your team details
 # Updated at each Iteration Planning
 
-cadence:
-  # Default is AI-native: 5-week PI = 4× 1-week delivery iteration + 1× 1-week IP.
-  # The IP iteration absorbs leftover work, debt, prioritization, and PI planning
-  # itself (compressible to a single day with AI-assisted ceremonies).
-  # Set iteration_weeks: 2 + pi_weeks: 10 + delivery_iterations_per_pi: 4 for
-  # classic SAFe cadence on slower-moving teams.
-  iteration_weeks: 1                          # 1 (AI-native, default) or 2 (classic SAFe)
-  pi_weeks: 5                                 # 5 (AI-native, default) or 10 (classic)
-  delivery_iterations_per_pi: 4               # PI minus IP iteration
-  ip_iterations_per_pi: 1                     # Innovation & Planning
+# Cadence (iteration_weeks / pi_iterations) is NOT configured here. It is set
+# per Planning Interval in the `pi:` block of .edpa/iterations/PI-*.yaml, or
+# auto-derived from each iteration's `weeks:`/dates. See docs/cadence.md.
 
 # Teams — planning_factor is a team-level decision, not a cadence property
 teams:
@@ -88,7 +81,7 @@ people:
 # Calculated at runtime by EDPA engine:
 # total_fte: sum of people[].fte
 # total_capacity_per_iteration: sum of people[].capacity_per_iteration
-# total_capacity_per_pi: total_capacity_per_iteration × delivery_iterations_per_pi
+# total_capacity_per_pi: total_capacity_per_iteration × delivery iterations in the PI
 
 # ─────────────────────────────────────────────────────────────────────
 # Backlog item evidence schema (v1.11 — referenced from .edpa/backlog/**/*.yaml)

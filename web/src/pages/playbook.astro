@@ -103,7 +103,7 @@ curl -fsSL https://edpa.technomaton.com/install.sh | sh</code></pre>
   .edpa/
     config/
       edpa.yaml          # Projekt + governance (zdroj verze metodiky)
-      people.yaml        # Tym a kapacity (cadence, teams, people)
+      people.yaml        # Tym a kapacity (teams, people)
       cw_heuristics.yaml # CW signalove vahy
       id_counters.yaml   # Citace ID (S-1, E-1, F-1, ...)
     backlog/
@@ -140,18 +140,8 @@ curl -fsSL https://edpa.technomaton.com/install.sh | sh</code></pre>
     <h3>1.2 Nakonfigurovat tým a kapacity (people.yaml)</h3>
     <p><code>project_setup.py</code> už <code>.edpa/config/people.yaml</code> naseje ze šablony. Případně ručně:</p>
     <pre><code>cp .edpa/engine/templates/people.yaml.tmpl .edpa/config/people.yaml</code></pre>
-    <p>Upravit <code>.edpa/config/people.yaml</code>. Tady žije <strong>cadence + teams + people</strong> — žádný separátní registr, vše je v jednom souboru:</p>
-    <pre><code>cadence:
-  # AI-native default: 5-tydenni PI = 4 dodavkove iterace po 1 tydnu + 1 IP
-  # tyden na dluh, prioritizaci a PI planning (s AI zvladnutelne za den).
-  # Classic SAFe (2-tydenni iterace, 10-tydenni PI) zustava podporovany —
-  # nastav iteration_weeks: 2 + pi_weeks: 10.
-  iteration_weeks: 1                    # 1 (AI-native, default) nebo 2 (classic)
-  pi_weeks: 5                           # 5 (AI-native, default) nebo 10 (classic)
-  delivery_iterations_per_pi: 4         # PI minus IP iterace
-  ip_iterations_per_pi: 1              # Innovation &amp; Planning
-
-teams:
+    <p>Upravit <code>.edpa/config/people.yaml</code>. Tady žijí <strong>teams + people</strong> — žádný separátní registr. Kadenci (iteration_weeks / pi_iterations) nastav per-PI v <code>pi:</code> bloku <code>.edpa/iterations/PI-*.yaml</code>:</p>
+    <pre><code>teams:
   - id: "Muj Tym"
     planning_factor: 0.8               # Planujeme na 80% kapacity
 
@@ -619,7 +609,7 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
     <h3>Den 1</h3>
     <ul class="checklist">
       <li>Engine vendorovaný do <code>.edpa/engine/</code> (<code>/edpa:setup</code> nebo <code>project_setup.py</code>)</li>
-      <li><code>.edpa/config/people.yaml</code> — tým s rolemi, FTE, kapacitami (cadence + teams + people)</li>
+      <li><code>.edpa/config/people.yaml</code> — tým s rolemi, FTE, kapacitami (teams + people)</li>
       <li><code>.edpa/config/edpa.yaml</code> — název projektu, governance, naming</li>
       <li><code>.edpa/config/cw_heuristics.yaml</code> — výchozí signálové váhy (ze šablony)</li>
       <li><code>.edpa/config/id_counters.yaml</code> — naseto</li>

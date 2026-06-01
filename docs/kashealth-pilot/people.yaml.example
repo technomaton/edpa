@@ -19,15 +19,9 @@
 # ani cost (jen Item, Level, JS, Person, CW, Score, Ratio, Hours).
 # Sazby držte v separátním (privátním) registru — dle smluv —
 # ne v EDPA configu, který může skončit v public repu.
-
-cadence:
-  # AI-native default per EDPA: 1-week delivery iteration × 5 (4 delivery + 1 IP).
-  # Pokud preferujete classic SAFe (2-week iter × 5 = 10 weeks), nastavte
-  # iteration_weeks: 2 a pi_weeks: 10.
-  iteration_weeks: 1
-  pi_weeks: 5
-  delivery_iterations_per_pi: 4
-  ip_iterations_per_pi: 1
+#
+# Kadenci (iteration_weeks / pi_iterations) nastav per-PI v `pi:` bloku
+# .edpa/iterations/PI-*.yaml, ne tady. Viz docs/cadence.md.
 
 teams:
   - id: "kashealth"

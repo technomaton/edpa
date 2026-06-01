@@ -48,8 +48,6 @@ def _seed_minimal_edpa(tmp_path: Path, *, iteration_id="PI-2026-1.1",
     (edpa / "backlog" / "features").mkdir(parents=True)
 
     (edpa / "config" / "people.yaml").write_text(yaml.safe_dump({
-        "cadence": {"iteration_weeks": 1, "pi_weeks": 5,
-                    "delivery_iterations_per_pi": 4, "ip_iterations_per_pi": 1},
         "teams": [{"id": "T", "planning_factor": 0.8}],
         "people": [
             {"id": "bob-dev",   "name": "Bob",   "role": "Dev",  "team": "T",
