@@ -31,6 +31,10 @@ Modes:
 """
 from __future__ import annotations
 
+try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+    import _console  # noqa: F401
+except ImportError:
+    pass
 import argparse
 import json
 import os
@@ -117,7 +121,7 @@ def _load_weights(edpa_root: Path) -> dict[str, float]:
     if not h.exists():
         return dict(DEFAULT_WEIGHTS)
     try:
-        data = yaml.safe_load(h.read_text()) or {}
+        data = yaml.safe_load(h.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError:
         return dict(DEFAULT_WEIGHTS)
     sig = data.get("signal_weights") or {}
@@ -296,7 +300,7 @@ def main() -> int:
 
     if args.event:
         try:
-            pr = json.loads(args.event.read_text())
+            pr = json.loads(args.event.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
             print(f"ERROR: cannot read event {args.event}: {e}", file=sys.stderr)
             return 2

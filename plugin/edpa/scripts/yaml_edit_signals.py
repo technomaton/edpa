@@ -42,6 +42,10 @@ API:
 
 from __future__ import annotations
 
+try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+    import _console  # noqa: F401
+except ImportError:
+    pass
 import argparse
 import json
 import re
@@ -136,7 +140,7 @@ def _parse_iter_window(edpa_root: Path, iter_id: str) -> tuple[datetime, datetim
     iter_file = edpa_root / "iterations" / f"{iter_id}.yaml"
     if not iter_file.is_file():
         raise FileNotFoundError(f"iteration file not found: {iter_file}")
-    d = yaml.safe_load(iter_file.read_text())["iteration"]
+    d = yaml.safe_load(iter_file.read_text(encoding="utf-8"))["iteration"]
     start = datetime.fromisoformat(f"{d['start_date']}T00:00:00+00:00")
     end = datetime.fromisoformat(f"{d['end_date']}T23:59:59+00:00")
     return start, end
@@ -146,7 +150,7 @@ def _load_people(edpa_root: Path) -> list[dict]:
     p = edpa_root / "config" / "people.yaml"
     if not p.is_file():
         return []
-    d = yaml.safe_load(p.read_text()) or {}
+    d = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
     return d.get("people", []) or []
 
 

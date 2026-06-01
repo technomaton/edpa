@@ -58,7 +58,7 @@ fi
 # Cheap probe: if every dep already imports, claim victory without
 # bothering pip. This is the common path on machines that already have
 # PyYAML / mcp installed system-wide.
-if python3 -c 'import yaml, ruamel.yaml, mcp.server, openpyxl' >/dev/null 2>&1; then
+if python3 -c 'import yaml, ruamel.yaml, mcp.server, openpyxl, filelock' >/dev/null 2>&1; then
   mkdir -p "$PLUGIN_DATA"
   touch "$MARKER"
   exit 0

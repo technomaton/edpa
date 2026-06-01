@@ -13,6 +13,10 @@ Callers that need a CW for a commit-time hook should call
 detect_contributors directly post-merge instead of pre-commit.
 """
 
+try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+    import _console  # noqa: F401
+except ImportError:
+    pass
 import re
 import subprocess
 import sys
@@ -140,7 +144,7 @@ def load_people(edpa_root):
     """Load people from .edpa/config/people.yaml, or return empty list."""
     people_path = Path(edpa_root) / "config" / "people.yaml"
     try:
-        data = yaml.safe_load(people_path.read_text())
+        data = yaml.safe_load(people_path.read_text(encoding="utf-8"))
         return data.get("people", []) if data else []
     except (FileNotFoundError, yaml.YAMLError):
         return []
@@ -151,7 +155,7 @@ def load_heuristics(edpa_root):
     for name in ("cw_heuristics.yaml", "heuristics.yaml"):
         path = Path(edpa_root) / "config" / name
         try:
-            return yaml.safe_load(path.read_text())
+            return yaml.safe_load(path.read_text(encoding="utf-8"))
         except (FileNotFoundError, yaml.YAMLError):
             continue
     return None

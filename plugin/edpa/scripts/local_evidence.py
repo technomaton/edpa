@@ -39,6 +39,10 @@ Usage (typically called by .git/hooks/post-commit, not by humans):
 
 from __future__ import annotations
 
+try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+    import _console  # noqa: F401
+except ImportError:
+    pass
 import os
 import re
 import subprocess
@@ -139,7 +143,7 @@ def _load_people(edpa_root: Path) -> list[dict]:
         return []
     import yaml
     try:
-        data = yaml.safe_load(p.read_text()) or {}
+        data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError:
         return []
     return data.get("people") or []
@@ -181,7 +185,7 @@ def _load_weights(edpa_root: Path) -> dict[str, float]:
         return dict(DEFAULT_WEIGHTS)
     import yaml
     try:
-        data = yaml.safe_load(h.read_text()) or {}
+        data = yaml.safe_load(h.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError:
         return dict(DEFAULT_WEIGHTS)
     sig = data.get("signal_weights") or {}

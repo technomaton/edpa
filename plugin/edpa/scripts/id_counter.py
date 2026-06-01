@@ -28,7 +28,15 @@ import tempfile
 from pathlib import Path
 
 import yaml
-from filelock import FileLock, Timeout
+try:
+    from filelock import FileLock, Timeout
+except ImportError:
+    # filelock not installed (e.g. a fresh Windows box where the one-time
+    # dependency install was skipped). Fall back to a pure-stdlib lock so ID
+    # allocation still works instead of crashing the bootstrap with
+    # ModuleNotFoundError. The fallback preserves the cross-process
+    # mutual-exclusion contract; see _fallback_lock for its limitations.
+    from _fallback_lock import FileLock, Timeout
 
 # Mirrored from backlog.py to avoid circular import. Keep in sync until
 # backlog.py is refactored to import these from here (Krok 2).
@@ -65,7 +73,7 @@ def _read_counter(counter_path: Path, item_type: str) -> int:
     if not counter_path.exists():
         return 0
     try:
-        data = yaml.safe_load(counter_path.read_text()) or {}
+        data = yaml.safe_load(counter_path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as e:
         raise IdCounterError(f"Cannot parse {counter_path}: {e}") from e
     return int((data.get("counters") or {}).get(item_type, 0))
@@ -90,7 +98,7 @@ def _write_counter_atomic(counter_path: Path, item_type: str, value: int) -> Non
     data: dict = {}
     if counter_path.exists():
         try:
-            data = yaml.safe_load(counter_path.read_text()) or {}
+            data = yaml.safe_load(counter_path.read_text(encoding="utf-8")) or {}
         except yaml.YAMLError as e:
             raise IdCounterError(f"Cannot parse {counter_path}: {e}") from e
     counters = data.get("counters") or {}
@@ -103,7 +111,7 @@ def _write_counter_atomic(counter_path: Path, item_type: str, value: int) -> Non
         dir=str(counter_path.parent),
     )
     try:
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, sort_keys=True, default_flow_style=False)
         os.replace(tmp_path, counter_path)
     except Exception:
@@ -181,7 +189,7 @@ def seed_counters_from_fs(root: Path | str) -> dict[str, int]:
                 dir=str(counter_path.parent),
             )
             try:
-                with os.fdopen(fd, "w") as f:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
                     yaml.safe_dump(
                         {"counters": counters}, f,
                         sort_keys=True, default_flow_style=False,

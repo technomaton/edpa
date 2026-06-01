@@ -17,6 +17,10 @@ Checks:
     contributors[].as / cw shape (.edpa/backlog/{initiatives,epics,features,stories,defects}/*.yaml)
 """
 
+try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+    import _console  # noqa: F401
+except ImportError:
+    pass
 import ast
 import json
 import sys

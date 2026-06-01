@@ -18,6 +18,10 @@ Safe to re-run: each step is a no-op if its post-condition already holds.
 """
 from __future__ import annotations
 
+try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+    import _console  # noqa: F401
+except ImportError:
+    pass
 import argparse
 import shutil
 import subprocess
@@ -130,7 +134,7 @@ def step_strip_sync_config(repo_root: Path) -> dict:
     if not path.exists():
         return {"action": "skipped", "reason": "edpa.yaml not present"}
     try:
-        data = yaml.safe_load(path.read_text()) or {}
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as e:
         return {"action": "failed", "reason": f"parse error: {e}"}
     sync = data.get("sync")
@@ -141,7 +145,7 @@ def step_strip_sync_config(repo_root: Path) -> dict:
     data["v1_sync_archive"] = archived
     path.write_text(yaml.safe_dump(
         data, sort_keys=False, default_flow_style=False, allow_unicode=True,
-    ))
+    ), encoding="utf-8")
     return {"action": "stripped", "archived_keys": sorted(archived)}
 
 

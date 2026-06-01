@@ -13,6 +13,10 @@ Usage:
     python3 .edpa/engine/scripts/engine.py --capacity cap.yaml --heuristics h.yaml --iteration PI-2026-1.3
 """
 
+try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+    import _console  # noqa: F401
+except ImportError:
+    pass
 import argparse
 import json
 import os
@@ -38,7 +42,7 @@ def get_version():
     ]:
         try:
             if candidate.exists():
-                with open(candidate) as f:
+                with open(candidate, encoding="utf-8") as f:
                     return json.load(f).get("version", "unknown")
         except (json.JSONDecodeError, OSError):
             continue
@@ -46,7 +50,7 @@ def get_version():
     version_file = Path(__file__).parent.parent / "VERSION"
     try:
         if version_file.exists():
-            return version_file.read_text().strip()
+            return version_file.read_text(encoding="utf-8").strip()
     except OSError:
         pass
     return "unknown"
@@ -1268,7 +1272,7 @@ def write_snapshot(edpa_root, iteration_id, engine_output, capacity):
     payload["payload_signature"] = new_signature
     payload["frozen_at"] = datetime.now(timezone.utc).isoformat()
 
-    with open(snapshot_path, "w") as f:
+    with open(snapshot_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
     if note:
         print(f"Snapshot {snapshot_path.name}: {note}")
@@ -1542,7 +1546,7 @@ def main():
 
     if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(output, f, indent=2, ensure_ascii=False)
         print(f"\nResults written to: {output_path}")
 

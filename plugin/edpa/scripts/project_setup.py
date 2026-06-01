@@ -33,6 +33,10 @@ Usage:
 
 from __future__ import annotations
 
+try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+    import _console  # noqa: F401
+except ImportError:
+    pass
 import argparse
 import json
 import re
@@ -95,7 +99,7 @@ def _plugin_version(plugin_edpa: Path) -> str | None:
     pj = plugin_edpa.parent / ".claude-plugin" / "plugin.json"
     if pj.exists():
         try:
-            return json.loads(pj.read_text())["version"]
+            return json.loads(pj.read_text(encoding="utf-8"))["version"]
         except (ValueError, KeyError):
             return None
     return None
@@ -132,7 +136,7 @@ def vendor_engine(root: Path) -> bool:
         shutil.copytree(rules_src, target / "rules", dirs_exist_ok=True)
     version = _plugin_version(src)
     if version:
-        (target / "VERSION").write_text(version + "\n")
+        (target / "VERSION").write_text(version + "\n", encoding="utf-8")
     hooks_dir = target / "scripts" / "hooks"
     if hooks_dir.is_dir():
         for f in hooks_dir.iterdir():
@@ -184,10 +188,10 @@ def _stamp_methodology(edpa_yaml: Path) -> None:
     version = _plugin_version(HERE.parent)
     if not version or not edpa_yaml.exists():
         return
-    text = edpa_yaml.read_text()
+    text = edpa_yaml.read_text(encoding="utf-8")
     new = re.sub(r'(methodology:\s*"?EDPA )[^"\n]+("?)', rf"\g<1>{version}\2", text)
     if new != text:
-        edpa_yaml.write_text(new)
+        edpa_yaml.write_text(new, encoding="utf-8")
         ok(f"Stamped governance.methodology → EDPA {version}")
 
 

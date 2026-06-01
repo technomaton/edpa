@@ -19,6 +19,10 @@ Exit codes:
     2  — preflight itself failed (gh missing, network, etc.)
 """
 
+try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+    import _console  # noqa: F401
+except ImportError:
+    pass
 import argparse
 import json
 import os
@@ -290,7 +294,7 @@ def check_people_yaml_members(r: Result, org: str, org_members: list,
         r.warn("yaml module missing; skipping people.yaml cross-check")
         return
     try:
-        data = yaml.safe_load(open(people_path))
+        data = yaml.safe_load(open(people_path, encoding="utf-8"))
     except Exception as e:
         r.warn(f"Could not parse {people_path}: {e}")
         return

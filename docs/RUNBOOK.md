@@ -85,7 +85,7 @@ engine + `.edpa/` tree.
 **Expected output (last steps):**
 
 ```
-  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (37 scripts, VERSION 2.1.8)
+  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (37 scripts, VERSION 2.1.9)
   [2] Directory tree   ✓ Directory tree at .edpa/
   [3] Config templates ✓ Seeded people.yaml, edpa.yaml, cw_heuristics.yaml
   [4] ID counter       ✓ id_counters.yaml seeded

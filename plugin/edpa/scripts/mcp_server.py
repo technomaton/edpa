@@ -90,7 +90,7 @@ def _read_plugin_version() -> str:
         manifest = parent / ".claude-plugin" / "plugin.json"
         if manifest.is_file():
             try:
-                return json.loads(manifest.read_text()).get("version", "unknown")
+                return json.loads(manifest.read_text(encoding="utf-8")).get("version", "unknown")
             except (OSError, ValueError):
                 return "unknown"
     return "unknown"
@@ -1438,7 +1438,7 @@ async def read_resource(uri: str) -> str:
     if not path.exists():
         return f"ERROR: File not found: {path}"
 
-    return path.read_text()
+    return path.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------

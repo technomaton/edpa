@@ -15,6 +15,10 @@ Usage:
     python .claude/edpa/scripts/backlog.py add --type Story --parent F-100 --title "New story" --js 5 --assignee turyna
 """
 
+try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+    import _console  # noqa: F401
+except ImportError:
+    pass
 import argparse
 import os
 import sys

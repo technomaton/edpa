@@ -1,5 +1,48 @@
 # Changelog
 
+## 2.1.9 — 2026-06-01 — Windows onboarding fixes (filelock, UTF-8 console + file I/O)
+
+`/edpa:edpa-setup` crashed on a fresh Windows box, surfaced by colleagues running
+2.1.8. Two reported failures, plus two more that would have hit immediately after
+(masked by the first crash). All four are fixed; the engine now behaves identically
+on Linux, macOS, and Windows.
+
+### fix(setup): bootstrap no longer crashes on `ModuleNotFoundError: filelock`
+`id_counter.py` imported `filelock` unconditionally, but the SessionStart dep hook
+(`install_deps.sh`) skipped `pip install` whenever its cheap import probe passed —
+and the probe never listed `filelock`. On a machine that already had PyYAML/mcp/
+openpyxl system-wide, the hook marked deps "installed" (and wrote its marker) while
+`filelock` was absent, so the bootstrap died. Two-part fix:
+- The probe now includes `filelock`. A new `test_install_deps_probe.py` cross-checks
+  the probe against `requirements.txt` so this drift can't recur.
+- `id_counter.py` falls back to a new pure-stdlib lock (`_fallback_lock.py` —
+  `O_CREAT|O_EXCL` with a stale-lock sweep) when `filelock` can't be imported, so ID
+  allocation keeps its cross-process mutual-exclusion contract even without the
+  package. (Existing installs ride the fallback until `requirements.txt` next changes
+  and busts the dep-marker — fully functional in the meantime.)
+
+### fix(cli): UTF-8 console output — glyphs no longer crash legacy Windows consoles
+25 CLI entry points print progress glyphs (`✓ ✗ → ·`); `print("✓")` raises
+`UnicodeEncodeError` on a cp1250/cp1252 console and aborts the command — the reported
+`/edpa:edpa-setup` failure. A shared `_console.py` reconfigures stdout/stderr to UTF-8
+(`errors="replace"`, idempotent, best-effort); each entry point opts in with a guarded
+`import _console` (`try/except ImportError`, so a partially-vendored engine degrades to
+plain output rather than crashing). `mcp_server.py` is intentionally excluded — its
+glyphs live in JSON-RPC tool descriptions the MCP SDK already frames as UTF-8.
+
+### fix(io): all text-mode file I/O pins `encoding="utf-8"`
+`open()`/`read_text()`/`write_text()`/`os.fdopen()` defaulted to the locale encoding —
+cp1250 on a Czech/German Windows box. After the console fix the next crash would have
+been `_stamp_methodology` reading the freshly seeded UTF-8 `edpa.yaml` (`←`, `×`) →
+`UnicodeDecodeError`; writing an item with diacritics in its title would corrupt or
+crash too. All 28 text-mode handles now pin UTF-8 (`os.open` raw fds and binary modes
+excluded). A new `test_encoding_hygiene.py` AST guard fails CI if any text handle drops
+the kwarg.
+
+### Tests
+- New: `test_install_deps_probe.py`, `test_fallback_lock.py`, `test_console.py`,
+  `test_encoding_hygiene.py`. Full suite 565 → 577 (+12); 0 failures.
+
 ## 2.1.8 — 2026-05-31 — Fresh-install onboarding fixes (engine vendoring on /edpa:setup) + V1→V2 docs/website sweep
 
 Three fresh-install friction points on the Claude-Code-only path (install the
