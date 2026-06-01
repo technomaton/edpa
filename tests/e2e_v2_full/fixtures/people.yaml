@@ -5,13 +5,6 @@
 # Total capacity per iteration must sum to exactly 144 hours, which
 # Wave C asserts as an invariant.
 
-cadence:
-  # Must match the cadence block in edpa.yaml (1-week iters, 5-week PI).
-  iteration_weeks: 1
-  pi_weeks: 5
-  delivery_iterations_per_pi: 4
-  ip_iterations_per_pi: 1
-
 # Single team for the synthetic project; planning_factor 0.8 leaves
 # 20% buffer per the AI-native defaults.
 teams:

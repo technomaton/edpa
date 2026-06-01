@@ -183,7 +183,8 @@ def load_backlog(root):
     """
     edpa = root / ".edpa"
 
-    # Load team metadata (people, teams, cadence)
+    # Load team metadata (people, teams). The cadence: block is not read here —
+    # effective cadence is derived from .edpa/iterations/PI-*.yaml (see _pi_loader).
     people_path = edpa / "config" / "people.yaml"
     backlog = yaml.safe_load(open(people_path, encoding="utf-8")) if people_path.exists() else {}
 

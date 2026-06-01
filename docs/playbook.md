@@ -108,7 +108,7 @@ my-project/
   .edpa/
     config/
       edpa.yaml          # Projekt + governance (zdroj verze metodiky)
-      people.yaml        # Tym a kapacity (cadence, teams, people)
+      people.yaml        # Tym a kapacity (teams, people)
       cw_heuristics.yaml # CW signalove vahy
       id_counters.yaml   # Citace ID (S-1, E-1, F-1, ...)
     backlog/
@@ -152,19 +152,9 @@ my-project/
 cp .edpa/engine/templates/people.yaml.tmpl .edpa/config/people.yaml
 ```
 
-Upravit `.edpa/config/people.yaml`. Tady zije **cadence + teams + people** -- zadny separatni registr, vse je v jednom souboru:
+Upravit `.edpa/config/people.yaml`. Tady ziji **teams + people** -- zadny separatni registr. Kadence (iteration_weeks / pi_iterations) se nastavuje per-PI v `pi:` bloku `.edpa/iterations/PI-*.yaml`, pripadne se odvodi z `weeks:`/dat iteraci -- viz [cadence.md](cadence.md):
 
 ```yaml
-cadence:
-  # AI-native default: 5-tydenni PI = 4 dodavkove iterace po 1 tydnu + 1 IP
-  # tyden na dluh, prioritizaci a PI planning (s AI zvladnutelne za den).
-  # Classic SAFe (2-tydenni iterace, 10-tydenni PI) zustava podporovany —
-  # nastav iteration_weeks: 2 + pi_weeks: 10.
-  iteration_weeks: 1                    # 1 (AI-native, default) nebo 2 (classic)
-  pi_weeks: 5                           # 5 (AI-native, default) nebo 10 (classic)
-  delivery_iterations_per_pi: 4         # PI minus IP iterace
-  ip_iterations_per_pi: 1              # Innovation & Planning
-
 teams:
   - id: "Muj Tym"
     planning_factor: 0.8               # Planujeme na 80% kapacity
@@ -784,7 +774,7 @@ V2 ma **jediny** volitelny workflow (jen s `--with-ci`):
 ### Den 1
 
 - [ ] Engine vendorovany do `.edpa/engine/` (`/edpa:setup` nebo `project_setup.py`)
-- [ ] `.edpa/config/people.yaml` -- tym s rolemi, FTE, kapacitami (cadence + teams + people)
+- [ ] `.edpa/config/people.yaml` -- tym s rolemi, FTE, kapacitami (teams + people)
 - [ ] `.edpa/config/edpa.yaml` -- nazev projektu, governance, naming
 - [ ] `.edpa/config/cw_heuristics.yaml` -- vychozi signalove vahy (ze sablony)
 - [ ] `.edpa/config/id_counters.yaml` -- naseto

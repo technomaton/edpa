@@ -58,15 +58,6 @@ naming:
     defect: "D"
     event: "EV"
 
-# AI-native cadence: 1-week iterations, 5-week PI (4 delivery + 1 IP).
-# Must mirror the cadence block in people.yaml — the test harness
-# verifies this match as part of Wave C invariant checks.
-cadence:
-  iteration_weeks: 1
-  pi_weeks: 5
-  delivery_iterations_per_pi: 4
-  ip_iterations_per_pi: 1
-
 # Native GitHub Issue Types (org-level, not labels)
 issue_types:
   Initiative: "Business case, investment proposal"

@@ -40,6 +40,37 @@ assertions. `docs/mcp.md` gains a write-tools note (and the stale "read-only"
 claim is corrected); `docs/playbook.md` §1.5, `docs/RUNBOOK.md`, and
 `plugin/README.md` list the new tool / command / skill.
 
+## 2.1.10 — 2026-06-01 — Drop dead `cadence:` config (cadence is iteration-sourced)
+
+The `cadence:` block (`iteration_weeks` / `pi_weeks` / `delivery_iterations_per_pi`
+/ `ip_iterations_per_pi`) that shipped in the `people.yaml` template was **never read
+by the engine**. Effective cadence is derived per Planning Interval from the `pi:`
+block of `.edpa/iterations/PI-*.yaml` (`_pi_loader.derive_pis`), or inferred from each
+iteration's `weeks:`/dates. The block was dead config that invited "edit this to change
+the rhythm" mistakes, and it had been copied — with a misleading "must mirror" note —
+into `edpa.yaml` examples and test fixtures too.
+
+### refactor(cadence): remove the dead block everywhere, redirect to the live surface
+- `people.yaml.tmpl`: drop the `cadence:` block; add a breadcrumb pointing at the
+  iteration `pi:` block. `people.yaml` is now just `teams` + `people`.
+- Examples/fixtures: drop `cadence:` from `docs/kashealth-pilot/{edpa,people}.yaml.example`,
+  `docs/examples/capacity-small-team.yaml`, and `tests/e2e_v2_full/fixtures/{edpa,people}.yaml`
+  (incl. the stale "must mirror / Wave C verifies this match" comments — no code ever
+  verified it).
+- Docs + web: remove the `cadence:` snippet from README / SETUP / quick-start / playbook
+  (CZ+EN) and the web setup wizard's generated config; point users at the iteration
+  `pi:` block. `docs/cadence.md` gains a "Where cadence is configured" section.
+  Conceptual cadence content (2/10 vs 1/5 variants) is unchanged.
+
+### docs(mcp,backlog): fix two stale "cadence" references
+- `mcp_server.py`: the `edpa://config` resource serves `edpa.yaml` but was described as
+  "Master config: PI, iterations, cadence, sync settings" — corrected to the project
+  config it actually serves.
+- `backlog.py`: the "Load team metadata (people, teams, cadence)" comment overstated —
+  cadence is loaded into the dict but never read; the comment now says so.
+
+No engine behaviour change — cadence was already iteration-sourced. Full suite 577 passing.
+
 ## 2.1.9 — 2026-06-01 — Windows onboarding fixes (filelock, UTF-8 console + file I/O)
 
 `/edpa:edpa-setup` crashed on a fresh Windows box, surfaced by colleagues running

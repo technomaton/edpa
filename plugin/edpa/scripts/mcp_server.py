@@ -1466,7 +1466,7 @@ async def list_resources() -> list[Resource]:
     resources = []
     if edpa_root:
         if (edpa_root / "config" / "edpa.yaml").exists():
-            resources.append(Resource(uri="edpa://config", name="EDPA Configuration", description="Master config: PI, iterations, cadence, sync settings", mimeType="application/x-yaml"))
+            resources.append(Resource(uri="edpa://config", name="EDPA Configuration", description="Project config: name, funding, organizations, governance, naming, issue types", mimeType="application/x-yaml"))
         if (edpa_root / "config" / "people.yaml").exists():
             resources.append(Resource(uri="edpa://people", name="EDPA Team Registry", description="Team members, roles, FTE, capacity", mimeType="application/x-yaml"))
         # Add iteration resources for each iteration
