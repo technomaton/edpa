@@ -212,6 +212,30 @@ Returns:
 for items not yet closed. Both require timestamp fields synced from GitHub
 (see `sync pull` timestamp extraction).
 
+### Write tools
+
+The server also exposes local-first **write** tools (V2). They mutate `.edpa/`
+files directly (atomic tmp+rename) and do **not** commit or call the network —
+the calling skill/command owns the commit. Full set: `edpa_item_create`,
+`edpa_item_update`, `edpa_item_transition`, `edpa_item_link_parent`,
+`edpa_iteration_create`, `edpa_iteration_close`, `edpa_pi_create`,
+`edpa_people_upsert`.
+
+#### `edpa_pi_create`
+
+```json
+{ "id": "PI-2026-2", "start_date": "2026-06-02", "iteration_weeks": 1,
+  "pi_iterations": 5, "status": "active" }
+```
+
+Creates the PI-level metadata file `.edpa/iterations/<id>.yaml` (top-level
+`pi:` block). Only `id` is required, and it must be **PI-level** (`PI-YYYY-N`) —
+an iteration id with a `.N` suffix is rejected, as is overwriting an existing
+PI. The filename is always `.yaml` (the loader globs `*.yaml`; a `.yml` is
+silently ignored). Delegates to `create_pi.py`, the single source of behavior
+also used by the `/edpa:create-pi` command and `edpa:create-pi` skill. Does not
+scaffold child iterations — add those with `edpa_iteration_create`.
+
 ---
 
 ## Production hardening (v1.3-beta)
@@ -259,8 +283,10 @@ What changed from the v1.0–v1.2 prototype:
 
 ## Security model
 
-- **Read-only.** No tool writes `.edpa/`. Bidirectional sync (`/edpa:sync`)
-  goes through the regular CLI, not MCP.
+- **Local-first writes.** Read tools never mutate state. The V2 write tools
+  (`edpa_item_*`, `edpa_iteration_*`, `edpa_pi_create`, `edpa_people_upsert`)
+  write `.edpa/` files via atomic tmp+rename and do not commit or call the
+  network; the calling skill/command owns the commit.
 - **Path traversal blocked.** `item_id` parameter is the only user input that
   reaches the filesystem; the regex guard plus prefix→directory whitelist
   means a request like `{"item_id": "../etc/passwd"}` is rejected at the

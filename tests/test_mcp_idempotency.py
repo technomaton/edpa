@@ -24,6 +24,7 @@ from mcp_server import (  # noqa: E402
     _handle_item_transition,
     _handle_iteration_create,
     _handle_people_upsert,
+    _handle_pi_create,
     _idempotency_lookup,
     _idempotency_record,
 )
@@ -138,6 +139,17 @@ def test_iteration_create_idempotent(edpa_root: Path) -> None:
     second = _parse(_handle_iteration_create(edpa_root, {
         "id": "PI-2026-2.1", "start_date": "2026-07-01", "end_date": "2026-07-07",
         "idempotency_key": "iter-1",
+    }))
+    assert first == second
+
+
+def test_pi_create_idempotent(edpa_root: Path) -> None:
+    first = _parse(_handle_pi_create(edpa_root, {
+        "id": "PI-2026-2", "status": "active", "idempotency_key": "pi-1",
+    }))
+    # Second call would normally fail (already exists), but idempotency wins.
+    second = _parse(_handle_pi_create(edpa_root, {
+        "id": "PI-2026-2", "status": "active", "idempotency_key": "pi-1",
     }))
     assert first == second
 

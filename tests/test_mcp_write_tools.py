@@ -1,12 +1,13 @@
 """Tests for V2 MCP write tools (mcp_server.py + id_counter.py).
 
-Covers all 7 write handlers:
+Covers all 8 write handlers:
   - edpa_item_create
   - edpa_item_update
   - edpa_item_transition
   - edpa_item_link_parent
   - edpa_iteration_create
   - edpa_iteration_close
+  - edpa_pi_create
   - edpa_people_upsert
 
 Each test uses an isolated tmp .edpa/ tree (no shared state with the
@@ -35,6 +36,7 @@ from mcp_server import (  # noqa: E402
     _handle_iteration_close,
     _handle_iteration_create,
     _handle_people_upsert,
+    _handle_pi_create,
 )
 
 
@@ -461,6 +463,60 @@ def test_iteration_create_rejects_bad_id(edpa_root: Path) -> None:
     assert _is_err(_handle_iteration_create(edpa_root, {
         "id": "bogus", "start_date": "2026-07-06", "end_date": "2026-07-12",
     }))
+
+
+# ---------------------------------------------------------------------------
+# edpa_pi_create (thin delegate to create_pi.py)
+# ---------------------------------------------------------------------------
+
+def test_pi_create_writes_pi_block(edpa_root: Path) -> None:
+    data = _parse(_handle_pi_create(edpa_root, {
+        "id": "PI-2026-2",
+        "start_date": "2026-07-06",
+        "pi_iterations": 5,
+        "status": "active",
+    }))
+    assert data["id"] == "PI-2026-2"
+    assert data["path"] == ".edpa/iterations/PI-2026-2.yaml"
+    pi_path = edpa_root / "iterations" / "PI-2026-2.yaml"
+    assert pi_path.exists()
+    parsed = yaml.safe_load(pi_path.read_text())
+    assert parsed["pi"]["id"] == "PI-2026-2"
+    assert parsed["pi"]["status"] == "active"
+    assert parsed["pi"]["iteration_weeks"] == 1
+    assert parsed["pi"]["pi_iterations"] == 5
+    assert parsed["pi"]["start_date"] == "2026-07-06"
+    # A PI-level file must NOT carry an iteration: block.
+    assert "iteration" not in parsed
+
+
+def test_pi_create_defaults(edpa_root: Path) -> None:
+    """Minimal id → status planning, iteration_weeks 1, no dates/count."""
+    _parse(_handle_pi_create(edpa_root, {"id": "PI-2026-4"}))
+    parsed = yaml.safe_load(
+        (edpa_root / "iterations" / "PI-2026-4.yaml").read_text())
+    assert parsed["pi"]["status"] == "planning"
+    assert parsed["pi"]["iteration_weeks"] == 1
+    assert "pi_iterations" not in parsed["pi"]
+    assert "start_date" not in parsed["pi"]
+
+
+def test_pi_create_rejects_iteration_level_id(edpa_root: Path) -> None:
+    """An iteration id (with .N suffix) is not a PI-level id."""
+    result = _handle_pi_create(edpa_root, {"id": "PI-2026-2.1"})
+    assert _is_err(result)
+    assert "PI-YYYY-N" in result[0].text
+
+
+def test_pi_create_rejects_bad_id(edpa_root: Path) -> None:
+    assert _is_err(_handle_pi_create(edpa_root, {"id": "bogus"}))
+
+
+def test_pi_create_rejects_duplicate(edpa_root: Path) -> None:
+    _parse(_handle_pi_create(edpa_root, {"id": "PI-2026-2"}))
+    result = _handle_pi_create(edpa_root, {"id": "PI-2026-2"})
+    assert _is_err(result)
+    assert "already exists" in result[0].text
 
 
 # ---------------------------------------------------------------------------

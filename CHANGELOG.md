@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.2.0 — 2026-06-01 — Create PI: edpa_pi_create tool + /edpa:create-pi command & skill
+
+Adds a first-class way to create the **PI-level metadata file**
+`.edpa/iterations/<PI-YYYY-N>.yaml` (top-level `pi:` block). Previously only
+per-iteration files had tooling (`edpa_iteration_create`); the PI parent had to
+be hand-written, which was error-prone — most notably the loader globs `*.yaml`
+only, so a `PI-2026-1.yml` (short extension) is silently ignored and the PI
+metadata (status, `pi_iterations`, dates) silently falls back to values derived
+from the child iterations.
+
+Built **script-first**, matching the rest of EDPA: behavior lives in one script
+and every interface delegates to it.
+
+### feat(pi): `create_pi.py` — single source of behavior
+New `plugin/edpa/scripts/create_pi.py` with an importable `create_pi()` core
+(validates a PI-level id, refuses to overwrite, atomic write of the `pi:` block)
+plus a CLI (`--start/--end/--weeks/--iterations/--status/--no-commit`) that runs
+continuity validation and auto-commits. Self-contained — no dependency on the
+MCP layer, so it runs as a plain CLI and is importable by the server.
+
+### feat(mcp): `edpa_pi_create` tool
+Thin delegate that imports `create_pi()` — no business logic in the handler
+(write only; no commit, like the other MCP write tools). Inputs: `id` (required,
+PI-level), `start_date`, `end_date`, `iteration_weeks`, `pi_iterations`,
+`status`. Rejects an iteration-level id (`PI-YYYY-N.M`) and duplicates. The tool
+surface is now 7 read + 8 write.
+
+### feat(skill+command): `/edpa:create-pi` and `edpa:create-pi`
+Both shell out to `create_pi.py` (like `/edpa:capacity` → `capacity_override.py`).
+The command takes explicit args; the skill auto-triggers on "create / start a
+PI". Neither scaffolds the child iterations — those are added with
+`edpa_iteration_create` (`<PI>.1 … .N`, last `type: IP`).
+
+### tests + docs
+New `tests/test_create_pi.py` (core + CLI + loader round-trip); `edpa_pi_create`
+added to the MCP write-tool and idempotency suites and the advertised-tool
+assertions. `docs/mcp.md` gains a write-tools note (and the stale "read-only"
+claim is corrected); `docs/playbook.md` §1.5, `docs/RUNBOOK.md`, and
+`plugin/README.md` list the new tool / command / skill.
+
 ## 2.1.10 — 2026-06-01 — Drop dead `cadence:` config (cadence is iteration-sourced)
 
 The `cadence:` block (`iteration_weeks` / `pi_weeks` / `delivery_iterations_per_pi`

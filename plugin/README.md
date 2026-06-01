@@ -58,20 +58,22 @@ plugin/
 ├── requirements.txt                 # Python runtime deps (pyyaml, ruamel.yaml, mcp, openpyxl)
 ├── hooks/
 │   └── hooks.json                   # SessionStart (install_deps) + PostToolUse (validate_on_save, post_commit)
-├── skills/                          # 6 skills, auto-discovered. Slug = name: field in SKILL.md frontmatter
+├── skills/                          # 7 skills, auto-discovered. Slug = name: field in SKILL.md frontmatter
 │   ├── edpa-setup/SKILL.md          # → /edpa:setup     — provision .edpa/ governance (engine, config, hooks, CI)
 │   ├── edpa-add/SKILL.md            # → /edpa:add       — create a backlog item (local-first, id_counters)
 │   ├── edpa-engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
 │   ├── edpa-reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
 │   ├── edpa-autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
-│   └── edpa-server/SKILL.md         # → /edpa:server    — optional PI-planning HTTP server (experimental)
-├── commands/                        # 4 slash commands, flat layout (no edpa/ subdir)
+│   ├── edpa-server/SKILL.md         # → /edpa:server    — optional PI-planning HTTP server (experimental)
+│   └── edpa-create-pi/SKILL.md      # → /edpa:create-pi — create the PI-level metadata file (pi: block)
+├── commands/                        # 5 slash commands, flat layout (no edpa/ subdir)
 │   ├── close-iteration.md           # → /edpa:close-iteration — capacity prep + engine + reports
 │   ├── board.md                     # → /edpa:board          — HTML Kanban snapshot
 │   ├── capacity.md                  # → /edpa:capacity       — per-iteration capacity overrides
-│   └── server.md                    # → /edpa:server         — start/stop PI-planning server
+│   ├── server.md                    # → /edpa:server         — start/stop PI-planning server
+│   └── create-pi.md                 # → /edpa:create-pi      — create the PI-level metadata file (pi: block)
 └── edpa/
-    ├── scripts/                     # 31 Python modules
+    ├── scripts/                     # 32 Python modules
     │   ├── engine.py                # Core engine (Score, DerivedHours, invariants)
     │   ├── mcp_server.py            # MCP server for /edpa:status, /edpa:backlog, /edpa:iterations, /edpa:flow_metrics
     │   ├── calibrate_signals.py     # CW signal-weights calibrator (Monte Carlo + coordinate descent)
@@ -80,6 +82,7 @@ plugin/
     │   ├── local_evidence.py        # post-commit: commit_author + /contribute signals → evidence[]
     │   ├── sync_pr_contributions.py # CI: PR review/comment signals (edpa-contribution-sync)
     │   ├── capacity_override.py     # per-iteration capacity overrides (/edpa:capacity)
+    │   ├── create_pi.py             # create the PI-level metadata file (edpa_pi_create / /edpa:create-pi)
     │   ├── project_setup.py         # provision .edpa/ governance (config, id_counters, --with-ci/hooks/rules)
     │   ├── traceability.py          # Parent-chain validation
     │   ├── pi_close.py + velocity.py + transitions.py
@@ -127,6 +130,7 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `/edpa:close-iteration` | command | Capacity prep + engine + reports for an iteration |
 | `/edpa:capacity` | command | Per-iteration per-person capacity overrides (PTO, overtime) |
 | `/edpa:board` | command | HTML Kanban snapshot from local backlog |
+| `/edpa:create-pi` | command | Create the PI-level `pi:` file (also `edpa:create-pi` skill + `edpa_pi_create` MCP tool) |
 
 ## Multi-developer setup — ID collision handling
 
