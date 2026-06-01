@@ -4,7 +4,7 @@ Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allo
 
 EDPA V2 je **local-first**: zdrojem pravdy je `.edpa/backlog/**/*.md` (YAML frontmatter), git je audit trail. GitHub je **volitelny** -- zadny GitHub Project, zadne org Issue Types, zadny obousmerny sync.
 
-**Verze:** EDPA 2.1.9
+**Verze:** EDPA 2.2.0
 **Posledni aktualizace:** 2026-06-01
 
 ---
@@ -215,7 +215,7 @@ project:
 
 governance:
   # Auto-razitkovano na verzi pluginu instalatorem.
-  methodology: "EDPA 2.1.9"
+  methodology: "EDPA 2.2.0"
   # Jedina vypocetni cesta od v1.14 (zadny simple/full/gates mode selector,
   # zadny audit_mode -- snapshoty vzdy nesou plny signals[] audit trail).
 
@@ -288,6 +288,12 @@ Vytvoř obdobně `PI-2026-1.{2..5}.yaml`. Poslední iterace dostane
 `type: IP` (Innovation & Planning). Kontinuitu (žádné mezery /
 překryvy, `weeks` × 7 ≈ rozdíl dat) hlídá `validate_iterations.py`
 i automatický PostToolUse hook.
+
+> **Tip:** PI-level soubor (`pi:`) nemusíš psát ručně — založ ho příkazem
+> `/edpa:create-pi PI-2026-1` (nebo MCP nástrojem `edpa_pi_create` / skillem
+> `edpa:create-pi`). Validuje id, odmítne přepis a commitne. Per-iteration
+> soubory přidávej přes `edpa_iteration_create`. Pozor: přípona musí být
+> `.yaml`, ne `.yml` — loader `.yml` tiše ignoruje.
 
 > **Odstraneno v 2.0.0:** sync blok (`github_org`, `github_project_number`, `sync_interval`) -- V2 je local-first, zadny GitHub Project se neprovisionuje.
 

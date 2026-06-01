@@ -1,6 +1,6 @@
 {
   "name": "edpa",
-  "version": "2.1.9",
+  "version": "2.2.0",
   "description": "EDPA — Evidence-Driven Proportional Allocation. Derive hours from local git evidence (commits, yaml edits, status transitions). Zero timesheets, mathematical guarantee, Monte Carlo calibrated CW weights. Local-first: .edpa/backlog/ YAML as source of truth, git as the audit trail. GitHub Projects sync optional.",
   "author": {
     "name": "TECHNOMATON",
@@ -17,13 +17,15 @@
     "./skills/edpa-engine",
     "./skills/edpa-reports",
     "./skills/edpa-autocalib",
-    "./skills/edpa-server"
+    "./skills/edpa-server",
+    "./skills/edpa-create-pi"
   ],
   "commands": [
     "./commands/close-iteration.md",
     "./commands/board.md",
     "./commands/capacity.md",
-    "./commands/server.md"
+    "./commands/server.md",
+    "./commands/create-pi.md"
   ],
   "agents": []
 }

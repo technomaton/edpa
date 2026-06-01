@@ -486,6 +486,32 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="edpa_pi_create",
+            description=(
+                "Create the PI-level metadata file at "
+                ".edpa/iterations/{id}.yaml (top-level `pi:` block). The id "
+                "must be PI-level (PI-YYYY-N) — NOT an iteration id with a "
+                ".N suffix. Does NOT create child iterations (use "
+                "edpa_iteration_create); status defaults to 'planning'. "
+                "Delegates to create_pi.py — the single source of behavior "
+                "also used by the /edpa:create-pi command and skill."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "start_date": {"type": "string", "pattern": r"^\d{4}-\d{2}-\d{2}$"},
+                    "end_date": {"type": "string", "pattern": r"^\d{4}-\d{2}-\d{2}$"},
+                    "iteration_weeks": {"type": "integer", "minimum": 1},
+                    "pi_iterations": {"type": "integer", "minimum": 1},
+                    "status": {"type": "string", "enum": ["planning", "active", "closed"]},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
+                },
+                "required": ["id"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
             name="edpa_people_upsert",
             description=(
                 "Add a new person to .edpa/config/people.yaml or update fields "
@@ -559,6 +585,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_iteration_create(edpa_root, arguments)
         elif name == "edpa_iteration_close":
             return _handle_iteration_close(edpa_root, arguments)
+        elif name == "edpa_pi_create":
+            return _handle_pi_create(edpa_root, arguments)
         elif name == "edpa_people_upsert":
             return _handle_people_upsert(edpa_root, arguments)
         logger.warning("call_tool: unknown tool %s", name)
@@ -1354,6 +1382,37 @@ def _handle_iteration_close(edpa_root: Path, args: dict) -> list[TextContent]:
 
     logger.info("edpa_iteration_close: id=%s", safe_id)
     return _ok({"id": safe_id, "status": "closed"})
+
+
+@_idempotent("edpa_pi_create")
+def _handle_pi_create(edpa_root: Path, args: dict) -> list[TextContent]:
+    """Create the PI-level metadata file by delegating to create_pi.py — the
+    single source of behavior (also driven by the /edpa:create-pi command).
+
+    Write only; no git commit, consistent with the other MCP write tools (the
+    CLI layer is what commits). create_pi() raises ValueError on a bad/
+    duplicate id or invalid field, which we surface via _err.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from create_pi import create_pi  # noqa: E402
+        result = create_pi(
+            edpa_root,
+            args.get("id", ""),
+            start_date=args.get("start_date"),
+            end_date=args.get("end_date"),
+            iteration_weeks=args.get("iteration_weeks", 1),
+            pi_iterations=args.get("pi_iterations"),
+            status=args.get("status", "planning"),
+        )
+    except ValueError as exc:
+        return _err(str(exc))
+    finally:
+        sys.path.pop(0)
+
+    logger.info("edpa_pi_create: id=%s", result["id"])
+    rel_path = str(Path(result["path"]).relative_to(edpa_root.parent))
+    return _ok({"id": result["id"], "path": rel_path})
 
 
 _PEOPLE_ALLOWED_FIELDS = frozenset({

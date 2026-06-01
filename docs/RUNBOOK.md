@@ -15,6 +15,7 @@ YAML is the source of truth, git is the audit trail. GitHub Projects sync is
 | Command              | Underlying script / skill          | Status |
 |----------------------|------------------------------------|--------|
 | `/edpa:setup`        | `.edpa/engine/scripts/project_setup.py` | ✅ vendors engine + seeds `.edpa/` (local-first) |
+| `/edpa:create-pi`    | `.edpa/engine/scripts/create_pi.py` | ✅ writes the PI-level `pi:` file (also `edpa_pi_create` MCP tool) |
 | `/edpa:close-iteration` | `.edpa/engine/scripts/engine.py` → `edpa-reports` skill | ✅ verified by `tests/test_invariants.py`, `tests/test_gate_allocation.py` |
 | `/edpa:reports`      | `edpa-reports` skill (no script)   | ✅ manual + skill execution |
 | `/edpa:board`        | `.edpa/engine/scripts/board.py`    | ✅ manual run |

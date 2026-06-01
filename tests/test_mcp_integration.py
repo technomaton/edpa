@@ -229,7 +229,7 @@ class TestToolsAdvertised:
                 "edpa_item_create", "edpa_item_update",
                 "edpa_item_transition", "edpa_item_link_parent",
                 "edpa_iteration_create", "edpa_iteration_close",
-                "edpa_people_upsert",
+                "edpa_pi_create", "edpa_people_upsert",
             }, f"Tool set drift: {names}"
 
     def test_edpa_item_requires_item_id(self, edpa_workspace):
