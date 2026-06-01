@@ -58,15 +58,6 @@ governance:
   # audit_mode — snapshoty vždy nesou plný signals[] audit trail.
   methodology: "EDPA 2.1.8"
 
-# Kadence (AI-native default): 1-week iterace × 5 (4 delivery + 1 IP).
-# Musí zrcadlit `cadence:` blok v people.yaml. Pro classic SAFe nastav
-# iteration_weeks: 2 a pi_weeks: 10.
-cadence:
-  iteration_weeks: 1
-  pi_weeks: 5
-  delivery_iterations_per_pi: 4
-  ip_iterations_per_pi: 1
-
 naming:
   pi_pattern: "PI-{year}-{pi_num}"
   iteration_pattern: "PI-{year}-{pi_num}.{iter_num}"

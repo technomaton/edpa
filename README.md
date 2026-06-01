@@ -103,10 +103,6 @@ The template ships with placeholder names. Replace them with your team
 (1-week iterations, 5-week PI = 4 delivery + 1 IP):
 
 ```yaml
-cadence:
-  iteration_weeks: 1        # AI-native default; use 2 for classic SAFe
-  pi_weeks: 5               # 4 delivery iterations + 1 IP
-
 people:
   - id: alice
     name: "Alice Architect"

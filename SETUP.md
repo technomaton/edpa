@@ -34,9 +34,6 @@ If you prefer to configure manually instead of using `/edpa setup`:
 Edit `.edpa/config/people.yaml`:
 
 ```yaml
-cadence:
-  iteration_weeks: 2    # 1 (AI-native) or 2 (classic)
-
 people:
   - id: alice
     name: "Alice Smith"

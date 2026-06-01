@@ -31,10 +31,6 @@ cp plugin/edpa/templates/people.yaml.tmpl .edpa/config/people.yaml
 
 Edit `.edpa/config/people.yaml` with your team:
 ```yaml
-cadence:
-  iteration_weeks: 1        # 1-week iterations (AI-native default; use 2 for classic SAFe)
-  pi_weeks: 5               # 5-week planning intervals (4 delivery + 1 IP)
-
 people:
   - id: alice
     name: "Alice Smith"

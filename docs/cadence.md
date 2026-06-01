@@ -33,3 +33,19 @@ Switch after first PI if:
 ## EDPA is cadence-agnostic
 
 The formula works identically for both variants — only `Capacity[P, I]` changes.
+
+## Where cadence is configured
+
+Cadence is **not** set in `people.yaml`. The engine derives it per Planning
+Interval from the iteration files in `.edpa/iterations/`:
+
+```yaml
+# .edpa/iterations/PI-2026-1.yaml
+pi:
+  id: PI-2026-1
+  iteration_weeks: 1      # 1 (AI-native) or 2 (classic)
+  pi_iterations: 5        # total iterations incl. IP (4 delivery + 1 IP)
+```
+
+If `iteration_weeks` / `pi_iterations` are omitted, the engine infers them from
+each iteration's `weeks:` (or its start/end dates) and the iteration count.

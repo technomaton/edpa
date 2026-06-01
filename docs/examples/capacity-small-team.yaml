@@ -1,16 +1,8 @@
-# Example: 3-person startup team
-# Classic SAFe cadence (2-week iterations, 10-week PI).
-#
-# As of 1.4 the default ships AI-native (1-week iter / 5-week PI) — see
-# plugin/edpa/templates/people.yaml.tmpl for the new defaults. This file
-# stays as a reference for teams that want classic SAFe; just halve every
-# capacity_per_iteration value below if you switch to iteration_weeks: 1.
-
-cadence:
-  iteration_weeks: 2
-  pi_weeks: 10
-  delivery_iterations_per_pi: 4
-  ip_iterations_per_pi: 1
+# Example: 3-person startup team.
+# Capacities below assume classic SAFe (2-week iterations): 1.0 FTE = 80h.
+# For the AI-native default (1-week iterations) halve every
+# capacity_per_iteration. Cadence itself is set per-PI in the `pi:` block of
+# .edpa/iterations/PI-*.yaml, not here — see docs/cadence.md.
 
 teams:
   - id: "Acme Corp"

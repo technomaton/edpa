@@ -879,7 +879,6 @@ import Layout from '../../layouts/Layout.astro';
     function generateConfigYaml(): string {
       const org = state.githubOrg || 'my-org';
       const repo = state.githubRepo || 'my-project';
-      const fteCap = getFullCapacity();
       const lines = [
         '# EDPA Configuration',
         `# Generated: ${new Date().toISOString().split('T')[0]}`,
@@ -892,13 +891,6 @@ import Layout from '../../layouts/Layout.astro';
         'github:',
         `  org: "${org}"`,
         `  repo: "${repo}"`,
-        '',
-        'cadence:',
-        `  iteration_weeks: ${state.iterWeeks}`,
-        `  delivery_iterations: ${state.deliveryIters}`,
-        `  ip_iterations: ${state.ipIters}`,
-        `  pi_weeks: ${(state.deliveryIters + state.ipIters) * state.iterWeeks}`,
-        `  capacity_per_fte: ${fteCap}`,
         '',
         'scoring:',
         '  contribution_weights:',

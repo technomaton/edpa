@@ -315,7 +315,7 @@ Pokud 5+ z 6 PASS → pilot úspěšný, pokračuj na PI-2026-2 (full prod) a zv
 
 ## 7. Open questions (pre-kickoff sync)
 
-1. **PI cadence** — 1-week × 5 (default) vs 2-week × 5? Nastavitelné v `cadence:` (edpa.yaml + people.yaml, musí se shodovat).
+1. **PI cadence** — 1-week × 5 (default) vs 2-week × 5? Nastavitelné per-PI v `pi:` bloku `.edpa/iterations/PI-*.yaml` (`iteration_weeks` / `pi_iterations`).
 2. **FTE distribuce** — 1.0 / 0.5 / 0.25 per člen? Doporučení v `people.yaml.example`.
 3. **Cost reporting** — sazby drží **privátní registr** (ne EDPA people.yaml — engine `hourly_rate` nečte). Auditor format = open question.
 4. **Calibration timing** — `/edpa:autocalib` až po PI-2026-1 close (potřeba ≥ 20 ground truth records).
