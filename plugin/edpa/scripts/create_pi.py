@@ -5,7 +5,7 @@ EDPA PI creator — writes the PI-level metadata file
 
 This script is the single source of behavior for PI creation. The MCP tool
 ``edpa_pi_create`` imports :func:`create_pi`, and the ``/edpa:create-pi``
-command / ``edpa:create-pi`` skill shell out to this CLI — same engine, like
+command shells out to this CLI — same engine, like
 the rest of EDPA (``capacity_override.py`` <-> ``/edpa:capacity``,
 ``backlog.py`` <-> ``edpa:add``).
 

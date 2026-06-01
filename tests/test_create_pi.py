@@ -2,7 +2,7 @@
 
 create_pi.py is the single source of behavior for PI creation: the
 ``edpa_pi_create`` MCP tool imports :func:`create_pi.create_pi`, and the
-``/edpa:create-pi`` command and ``edpa:create-pi`` skill shell out to its CLI.
+``/edpa:create-pi`` command shells out to its CLI.
 These cover the importable core (``create_pi``) and the CLI (subprocess),
 mirroring ``test_capacity_overrides.py``.
 """

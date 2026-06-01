@@ -78,7 +78,7 @@ V terminalu s Claude Code nainstalovanym:
 /edpa:setup --with-ci --with-hooks --with-rules
 ```
 
-Claude Code (skill `edpa-setup`) provede kroky 1.1-1.4 automaticky -- vendoruje engine do `.edpa/engine/`, naseje konfiguraci a `id_counters.yaml`, a volitelne nainstaluje git hooky, PR-signal CI workflow a `.claude/rules/`. Idempotentni -- opakovane spusteni nic nerozbije.
+Claude Code (skill `/edpa:setup`) provede kroky 1.1-1.4 automaticky -- vendoruje engine do `.edpa/engine/`, naseje konfiguraci a `id_counters.yaml`, a volitelne nainstaluje git hooky, PR-signal CI workflow a `.claude/rules/`. Idempotentni -- opakovane spusteni nic nerozbije.
 
 ### Cesta B: Manualni CLI
 
@@ -280,8 +280,8 @@ překryvy, `weeks` × 7 ≈ rozdíl dat) hlídá `validate_iterations.py`
 i automatický PostToolUse hook.
 
 > **Tip:** PI-level soubor (`pi:`) nemusíš psát ručně — založ ho příkazem
-> `/edpa:create-pi PI-2026-1` (nebo MCP nástrojem `edpa_pi_create` / skillem
-> `edpa:create-pi`). Validuje id, odmítne přepis a commitne. Per-iteration
+> `/edpa:create-pi PI-2026-1` (nebo MCP nástrojem `edpa_pi_create`). Validuje
+> id, odmítne přepis a commitne. Per-iteration
 > soubory přidávej přes `edpa_iteration_create`. Pozor: přípona musí být
 > `.yaml`, ne `.yml` — loader `.yml` tiše ignoruje.
 
@@ -574,7 +574,7 @@ delivery:
 /edpa:calibrate
 ```
 
-Claude Code (skill `edpa-autocalib`) spusti kalibraci signalovych vah pres Monte Carlo + coordinate-descent optimalizator, vyhodnoti MAD a navrhne upravy `cw_heuristics.yaml`. Pro generovani reportu:
+Claude Code (skill `/edpa:autocalib`) spusti kalibraci signalovych vah pres Monte Carlo + coordinate-descent optimalizator, vyhodnoti MAD a navrhne upravy `cw_heuristics.yaml`. Pro generovani reportu:
 
 ```
 /edpa:reports PI-2026-1

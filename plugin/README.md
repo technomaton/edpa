@@ -58,14 +58,12 @@ plugin/
 ├── requirements.txt                 # Python runtime deps (pyyaml, ruamel.yaml, mcp, openpyxl)
 ├── hooks/
 │   └── hooks.json                   # SessionStart (install_deps) + PostToolUse (validate_on_save, post_commit)
-├── skills/                          # 7 skills, auto-discovered. Slug = name: field in SKILL.md frontmatter
-│   ├── edpa-setup/SKILL.md          # → /edpa:setup     — provision .edpa/ governance (engine, config, hooks, CI)
-│   ├── edpa-add/SKILL.md            # → /edpa:add       — create a backlog item (local-first, id_counters)
-│   ├── edpa-engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
-│   ├── edpa-reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
-│   ├── edpa-autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
-│   ├── edpa-server/SKILL.md         # → /edpa:server    — optional PI-planning HTTP server (experimental)
-│   └── edpa-create-pi/SKILL.md      # → /edpa:create-pi — create the PI-level metadata file (pi: block)
+├── skills/                          # 5 skills. Slug = directory name -> /edpa:<dir>
+│   ├── setup/SKILL.md          # → /edpa:setup     — provision .edpa/ governance (engine, config, hooks, CI)
+│   ├── add/SKILL.md            # → /edpa:add       — create a backlog item (local-first, id_counters)
+│   ├── engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
+│   ├── reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
+│   └── autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
 ├── commands/                        # 5 slash commands, flat layout (no edpa/ subdir)
 │   ├── close-iteration.md           # → /edpa:close-iteration — capacity prep + engine + reports
 │   ├── board.md                     # → /edpa:board          — HTML Kanban snapshot
@@ -126,11 +124,11 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `edpa:engine` | `/edpa:engine` | Compute hours from local git evidence + validate invariants |
 | `edpa:reports` | `/edpa:reports` | Per-person timesheets, per-item cost, snapshots, Excel |
 | `edpa:autocalib` | `/edpa:autocalib` | Auto-calibrate CW heuristics (Monte Carlo + coordinate descent) |
-| `edpa:server` | `/edpa:server` | Optional PI-planning HTTP server (experimental) |
+| `/edpa:server` | command | Optional PI-planning HTTP server (experimental) |
 | `/edpa:close-iteration` | command | Capacity prep + engine + reports for an iteration |
 | `/edpa:capacity` | command | Per-iteration per-person capacity overrides (PTO, overtime) |
 | `/edpa:board` | command | HTML Kanban snapshot from local backlog |
-| `/edpa:create-pi` | command | Create the PI-level `pi:` file (also `edpa:create-pi` skill + `edpa_pi_create` MCP tool) |
+| `/edpa:create-pi` | command | Create the PI-level `pi:` file (also `edpa_pi_create` MCP tool) |
 
 ## Multi-developer setup — ID collision handling
 

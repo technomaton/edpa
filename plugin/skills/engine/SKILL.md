@@ -1,5 +1,5 @@
 ---
-name: edpa:engine
+name: engine
 user-invocable: true
 description: >
   Run EDPA evidence-driven calculation for an iteration. Gathers GitHub delivery evidence
@@ -44,7 +44,7 @@ If `$ARGUMENTS` is empty, blank, or "help":
 
 ## Prerequisites
 
-- `.edpa/config/people.yaml` exists (run edpa-setup first)
+- `.edpa/config/people.yaml` exists (run /edpa:setup first)
 - `.edpa/config/heuristics.yaml` exists
 - GitHub issues have Job Size field populated
 - Iteration has closed stories (status: Done)

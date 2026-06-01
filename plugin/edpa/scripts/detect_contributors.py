@@ -830,7 +830,7 @@ def main():
     ap.add_argument("--item", help="Recompute contributors for a single item ID (e.g. S-200)")
     ap.add_argument("--all-items", action="store_true",
                     help="V2.1: refresh contributors[] for every item with "
-                         "evidence (run before edpa-engine at close-iteration)")
+                         "evidence (run before /edpa:engine at close-iteration)")
     ap.add_argument("--since", default="30days",
                     help="With --item: how far back to scan PRs (default: 30days)")
     ap.add_argument("--repo",

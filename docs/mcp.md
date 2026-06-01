@@ -233,7 +233,7 @@ Creates the PI-level metadata file `.edpa/iterations/<id>.yaml` (top-level
 an iteration id with a `.N` suffix is rejected, as is overwriting an existing
 PI. The filename is always `.yaml` (the loader globs `*.yaml`; a `.yml` is
 silently ignored). Delegates to `create_pi.py`, the single source of behavior
-also used by the `/edpa:create-pi` command and `edpa:create-pi` skill. Does not
+also used by the `/edpa:create-pi` command. Does not
 scaffold child iterations — add those with `edpa_iteration_create`.
 
 ---

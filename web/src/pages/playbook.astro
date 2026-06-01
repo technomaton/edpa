@@ -85,7 +85,7 @@ gh auth status</code></pre>
     <h3>Cesta A: Claude Code (doporučeno)</h3>
     <p>V terminálu s Claude Code nainstalovaným:</p>
     <pre><code>/edpa:setup --with-ci --with-hooks --with-rules</code></pre>
-    <p>Claude Code (skill <code>edpa-setup</code>) provede kroky 1.1-1.4 automaticky — vendoruje engine do <code>.edpa/engine/</code>, naseje konfiguraci a <code>id_counters.yaml</code> a volitelně nainstaluje git hooky, PR-signal CI workflow a <code>.claude/rules/</code>. Idempotentní — opakované spuštění nic nerozbije.</p>
+    <p>Claude Code (skill <code>/edpa:setup</code>) provede kroky 1.1-1.4 automaticky — vendoruje engine do <code>.edpa/engine/</code>, naseje konfiguraci a <code>id_counters.yaml</code> a volitelně nainstaluje git hooky, PR-signal CI workflow a <code>.claude/rules/</code>. Idempotentní — opakované spuštění nic nerozbije.</p>
 
     <h3>Cesta B: Manuální CLI</h3>
     <p>Následující kroky popisují manuální postup bez Claude Code.</p>
@@ -468,7 +468,7 @@ delivery:
 
     <h3>Cesta A: Claude Code (doporučeno)</h3>
     <pre><code>/edpa:calibrate</code></pre>
-    <p>Claude Code (skill <code>edpa-autocalib</code>) spustí kalibraci signálových vah přes Monte Carlo + coordinate-descent optimalizátor, vyhodnotí MAD a navrhne úpravy <code>cw_heuristics.yaml</code>. Pro generování reportů:</p>
+    <p>Claude Code (skill <code>/edpa:autocalib</code>) spustí kalibraci signálových vah přes Monte Carlo + coordinate-descent optimalizátor, vyhodnotí MAD a navrhne úpravy <code>cw_heuristics.yaml</code>. Pro generování reportů:</p>
     <pre><code>/edpa:reports PI-2026-1</code></pre>
 
     <h3>Cesta B: Manuální CLI</h3>

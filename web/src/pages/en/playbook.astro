@@ -83,7 +83,7 @@ gh auth status</code></pre>
     <h3>Path A: Claude Code (recommended)</h3>
     <p>In a terminal with Claude Code installed:</p>
     <pre><code>/edpa:setup --with-ci --with-hooks --with-rules</code></pre>
-    <p>Claude Code (the <code>edpa-setup</code> skill) runs steps 1.1-1.4 automatically — it vendors the engine into <code>.edpa/engine/</code>, seeds the configuration and <code>id_counters.yaml</code>, and optionally installs git hooks, the PR-signal CI workflow, and <code>.claude/rules/</code>. Idempotent — re-running breaks nothing.</p>
+    <p>Claude Code (the <code>/edpa:setup</code> skill) runs steps 1.1-1.4 automatically — it vendors the engine into <code>.edpa/engine/</code>, seeds the configuration and <code>id_counters.yaml</code>, and optionally installs git hooks, the PR-signal CI workflow, and <code>.claude/rules/</code>. Idempotent — re-running breaks nothing.</p>
 
     <h3>Path B: Manual CLI</h3>
     <p>The steps below describe the manual procedure without Claude Code.</p>
@@ -466,7 +466,7 @@ delivery:
 
     <h3>Path A: Claude Code (recommended)</h3>
     <pre><code>/edpa:calibrate</code></pre>
-    <p>Claude Code (the <code>edpa-autocalib</code> skill) runs calibration of the signal weights via a Monte Carlo + coordinate-descent optimizer, evaluates MAD, and proposes adjustments to <code>cw_heuristics.yaml</code>. To generate reports:</p>
+    <p>Claude Code (the <code>/edpa:autocalib</code> skill) runs calibration of the signal weights via a Monte Carlo + coordinate-descent optimizer, evaluates MAD, and proposes adjustments to <code>cw_heuristics.yaml</code>. To generate reports:</p>
     <pre><code>/edpa:reports PI-2026-1</code></pre>
 
     <h3>Path B: Manual CLI</h3>

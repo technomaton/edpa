@@ -568,7 +568,7 @@ python3 .edpa/engine/scripts/reports.py --pi PI-2026-1 --edpa-root .edpa
 
 ## Fáze 9 — Calibration readiness
 
-**Cíl:** ověřit, že `edpa-autocalib` / `/edpa:calibrate` správně odmítne běh
+**Cíl:** ověřit, že `/edpa:autocalib` / `/edpa:calibrate` správně odmítne běh
 před prvním PI s dostatkem ground truth.
 
 ### 9.1 Před prvním PI

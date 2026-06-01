@@ -98,7 +98,7 @@ without failing the run.
 | 04    | Seed people, edpa.yaml, heuristics; install git hooks                                  |
 | 05    | Create GitHub sandbox repo (`${GH_OWNER}/edpa-e2e-${RUN_TAG}`); push initial commit    |
 | 06    | Run `/edpa:setup` flow (project_setup.py); persist `field_ids` + `issue_map`           |
-| 10    | PI-1 backlog plant — initiatives, epics, features, stories via `edpa-add` + MCP        |
+| 10    | PI-1 backlog plant — initiatives, epics, features, stories via `/edpa:add` + MCP        |
 | 11    | PI-1 iteration 1 — work simulation (4 people, branches, commits, PRs, reviews)         |
 | 12    | PI-1 iteration 2 — work simulation                                                     |
 | 13    | PI-1 iteration 3 — work simulation                                                     |

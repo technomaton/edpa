@@ -14,8 +14,8 @@ Files that import from the sources of truth (no edit needed, automatic):
 Files that contain the version literally and need manual update (this
 script handles them):
   - plugin/edpa/templates/edpa.yaml.tmpl       (`methodology: "EDPA X.Y.Z-tag"`)
-  - plugin/skills/edpa-reports/SKILL.md       (example output blocks)
-  - plugin/skills/edpa-setup/SKILL.md         (example output blocks)
+  - plugin/skills/reports/SKILL.md       (example output blocks)
+  - plugin/skills/setup/SKILL.md         (example output blocks)
   - docs/methodology.md                       (header line "Version X.Y.Z-tag — Month Year")
   - README.md                                 (badge URL + demo block + version mentions)
   - CHANGELOG.md                              (existing entries are immutable; this script
@@ -132,8 +132,8 @@ def main():
     # 2. Literal references
     targets = [
         REPO_ROOT / "plugin/edpa/templates/edpa.yaml.tmpl",
-        REPO_ROOT / "plugin/skills/edpa-reports/SKILL.md",
-        REPO_ROOT / "plugin/skills/edpa-setup/SKILL.md",
+        REPO_ROOT / "plugin/skills/reports/SKILL.md",
+        REPO_ROOT / "plugin/skills/setup/SKILL.md",
     ]
     for t in targets:
         n = bump_literal(t, old, new, args.apply)

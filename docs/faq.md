@@ -104,7 +104,7 @@ No. Snapshots are immutable. Corrections create new revisions:
 
 ### Does EDPA work on Windows?
 
-Yes, as of **2.1.9**. EDPA's Python scripts force UTF-8 on stdout/stderr and pin `encoding="utf-8"` on every file read/write, so progress glyphs (`✓ → ·`) and diacritics no longer raise `UnicodeEncodeError`/`UnicodeDecodeError` on a cp1250/cp1252 console. ID allocation also falls back to a pure-stdlib lock when the optional `filelock` package isn't installed. If you hit `ModuleNotFoundError: No module named 'filelock'` or a Unicode error during `/edpa:edpa-setup` on an older build, update to 2.1.9+.
+Yes, as of **2.1.9**. EDPA's Python scripts force UTF-8 on stdout/stderr and pin `encoding="utf-8"` on every file read/write, so progress glyphs (`✓ → ·`) and diacritics no longer raise `UnicodeEncodeError`/`UnicodeDecodeError` on a cp1250/cp1252 console. ID allocation also falls back to a pure-stdlib lock when the optional `filelock` package isn't installed. If you hit `ModuleNotFoundError: No module named 'filelock'` or a Unicode error during `/edpa:setup` on an older build, update to 2.1.9+.
 
 ### What cadence should I use?
 

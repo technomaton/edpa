@@ -10,9 +10,9 @@ points, MCP tool dispatch, error messages users actually see. Both must
 pass for a release to be production-ready.
 
 **Verze plánu:** 2.1.x (2026-05-31, EDPA V2 local-first)
-**Pokrývá:** 6 skills (`edpa:setup`, `edpa:add`, `edpa:engine`,
-`edpa:reports`, `edpa:calibrate`, `edpa:server`) + 3 slash commands
-(`edpa:close-iteration`, `edpa:board`, `edpa:capacity`) + MCP server
+**Pokrývá:** 5 skills (`edpa:setup`, `edpa:add`, `edpa:engine`,
+`edpa:reports`, `edpa:calibrate`) + 4 slash commands
+(`edpa:close-iteration`, `edpa:board`, `edpa:capacity`, `edpa:server`) + MCP server
 (14 tools, 3 resource families).
 
 > **V2 is local-first.** `.edpa/backlog/**/*.md` is the source of truth and
@@ -189,7 +189,7 @@ Project, no custom fields, no Issue Types, no `issue_map.yaml`.
 > /edpa:setup --with-ci --with-hooks --with-rules
 ```
 
-**[expect skill: edpa-setup]**
+**[expect skill: setup]**
 
 **[expect prompt]** Setup is a write operation; the skill should narrate
 what it is about to vendor/seed before doing it, or confirm the flag set.
@@ -269,7 +269,7 @@ auto-commits `feat(<ID>): <title>`. No GitHub calls happen at create time.
 > /edpa:add Story "Implement login endpoint" --parent <the F- id> --js 5 --iteration PI-2026-1.1
 ```
 
-**[expect skill: edpa-add]** for each.
+**[expect skill: add]** for each.
 
 **[expect MCP: edpa_item_create]** (or `Bash: python3
 .edpa/engine/scripts/backlog.py add`). The ID is allocated from
@@ -545,7 +545,7 @@ closed iteration; the command tried a `--mode simple|full` flag.
 > /edpa:reports PI-2026-1.1
 ```
 
-**[expect skill: edpa-reports]**
+**[expect skill: reports]**
 
 Skill should be idempotent — running twice should produce identical
 artifacts (modulo timestamps): per-person `timesheet-<id>.md` for each
@@ -557,7 +557,7 @@ person with derived hours > 0, plus `timesheet-team.md`.
 > /edpa:reports pi PI-2026-1
 ```
 
-**[expect skill: edpa-reports]** Aggregates all closed iterations in the
+**[expect skill: reports]** Aggregates all closed iterations in the
 PI into `pi-summary-PI-2026-1.md`.
 
 **[pass]** Each invocation produces the right artifact; the skill
@@ -577,7 +577,7 @@ engine instead of just rendering.
 > /edpa:board
 ```
 
-**[expect skill/command: edpa-board]**
+**[expect command: board]**
 **[expect Bash]** `python3 .edpa/engine/scripts/board.py --open`.
 
 **[pass]** An HTML board file is produced (default location, or the path
@@ -607,7 +607,7 @@ required.
 > /edpa:calibrate
 ```
 
-**[expect skill: edpa-autocalib]**
+**[expect skill: autocalib]**
 
 **[expect]** the skill describes the run against
 `plugin/edpa/templates/cw_heuristics.yaml.tmpl`: a baseline MAD, the
@@ -658,7 +658,7 @@ source of truth). Off by default.
 > /edpa:server stop
 ```
 
-**[expect skill: edpa-server]** Reports not-running, then starts on
+**[expect command: server]** Reports not-running, then starts on
 `localhost:3001`, then running, then stopped.
 
 **[pass]** Server is opt-in, binds to localhost:3001, and goes through MCP
@@ -717,7 +717,7 @@ In a Claude Code session opened inside the customer project root:
 Then edit `.edpa/config/{edpa.yaml,people.yaml}` with the real project
 name and team.
 
-**[expect skill: edpa-setup]** vendors the engine and seeds configs. No
+**[expect skill: setup]** vendors the engine and seeds configs. No
 GitHub org/repo prompts.
 
 ### 13.2 First backlog

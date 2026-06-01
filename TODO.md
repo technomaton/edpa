@@ -126,7 +126,7 @@ Project shows only the default Table view.
 
 ### `/edpa:setup` skill template forbids flat issue lists (~ 5 lines)
 
-Update `plugin/skills/edpa-setup/SKILL.md` STEP 7 / "Output
+Update `plugin/skills/setup/SKILL.md` STEP 7 / "Output
 confirmation" section: change the next-step suggestion from
 > "Create work items using GitHub Issues with the hierarchy ..."
 

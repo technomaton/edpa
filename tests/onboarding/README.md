@@ -27,7 +27,7 @@ network, no GitHub, nothing written outside `/tmp`.
 
 ### The gap, in one line
 
-`plugin/skills/edpa-setup/SKILL.md` Step 1 runs only `project_setup.py`, which
+`plugin/skills/setup/SKILL.md` Step 1 runs only `project_setup.py`, which
 never copies `plugin/edpa/{scripts,schemas,templates} → .edpa/engine/` — yet the
 skill's description and layout diagram both claim it vendors. The SessionStart
 hook (`update_engine.sh`) can't compensate: on a repo with no `.edpa/engine/` it
