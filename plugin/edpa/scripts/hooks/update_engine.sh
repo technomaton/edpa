@@ -109,6 +109,26 @@ VENDOR templates
 echo "$PLUGIN_VERSION" > "$TARGET/VERSION"
 chmod +x "$TARGET/scripts/hooks/"* 2>/dev/null || true
 
+# Self-heal git hooks after an engine update. A version bump can leave
+# .git/hooks/ holding a stale snapshot, or another tool (e.g. lefthook) may
+# have clobbered EDPA's hooks — which silently stops contribution evidence
+# from firing. Re-register ONLY when the project already opted into hooks
+# (an EDPA-owned hook is present, or lefthook is in use), so a version bump
+# never forces hooks on a repo that deliberately skipped them.
+_has_lefthook() {
+  for _lf in lefthook.yml lefthook.yaml .lefthook.yml .lefthook.yaml lefthook.toml lefthook.json; do
+    [ -f "$PROJECT/$_lf" ] && return 0
+  done
+  return 1
+}
+if _has_lefthook; then
+  echo "EDPA: lefthook detected — verify EDPA hooks are registered with:" >&2
+  echo "       python3 $TARGET/scripts/project_setup.py --check-hooks" >&2
+elif grep -q "EDPA-MANAGED-HOOK" "$PROJECT"/.git/hooks/* 2>/dev/null; then
+  echo "EDPA: re-registering git hooks after update..." >&2
+  python3 "$TARGET/scripts/project_setup.py" --refresh-hooks --root "$PROJECT" 1>&2 || true
+fi
+
 echo "EDPA: engine updated. $(find "$TARGET/scripts" -maxdepth 1 -name '*.py' | wc -l | tr -d ' ') Python modules, $(find "$TARGET/templates" -maxdepth 1 -name '*.tmpl' | wc -l | tr -d ' ') templates." >&2
 
 # Legacy backlog format check after update — the .md migration arrived

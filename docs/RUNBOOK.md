@@ -76,7 +76,9 @@ engine + `.edpa/` tree.
 
 **Flags (all recommended for team workflows):**
 - `--with-hooks` — pre-commit + commit-msg + post-commit + pre-push git hooks
-  (ID safety, ticket-attached, local `commit_author` evidence emission).
+  (ID safety, ticket-attached, local `commit_author` evidence emission). Detects
+  lefthook and prints a paste-ready snippet instead of touching `.git/hooks/`;
+  never clobbers a foreign hook. See **Git hooks** below.
 - `--with-ci` — copies `edpa-contribution-sync.yml`; materializes PR-thread
   signals (`pr_reviewer`, `issue_comment`) into `evidence[]` after merge.
   Optional, GitHub-only — local commit evidence flows without it.
@@ -86,7 +88,7 @@ engine + `.edpa/` tree.
 **Expected output (last steps):**
 
 ```
-  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (37 scripts, VERSION 2.1.9)
+  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (37 scripts, VERSION 2.3.0)
   [2] Directory tree   ✓ Directory tree at .edpa/
   [3] Config templates ✓ Seeded people.yaml, edpa.yaml, cw_heuristics.yaml
   [4] ID counter       ✓ id_counters.yaml seeded
@@ -101,8 +103,61 @@ EDPA setup complete.
   hand-edit; the SessionStart hook re-syncs it on plugin update).
 - `.edpa/config/{edpa.yaml,people.yaml,cw_heuristics.yaml,id_counters.yaml}`.
 - `.edpa/{backlog,iterations,reports,snapshots}/` tree.
-- (flags) `.git/hooks/*`, `.github/workflows/edpa-contribution-sync.yml`,
-  `.claude/rules/`.
+- (flags) `.git/hooks/*` (or a lefthook snippet),
+  `.github/workflows/edpa-contribution-sync.yml`, `.claude/rules/`.
+
+**Git hooks — registration, lefthook, verification:**
+
+`--with-hooks` writes four hooks into `.git/hooks/` (`pre-commit`, `pre-push`,
+`commit-msg`, `post-commit`). The `post-commit` one runs `local_evidence.py` —
+**this is what records contribution evidence onto items**, so if it isn't
+registered, contributions silently never appear. The registration is
+deliberately careful:
+
+- **Re-running is safe and self-refreshing.** Re-run `/edpa:setup --with-hooks`
+  (or `python3 .edpa/engine/scripts/project_setup.py --refresh-hooks`) any time:
+  EDPA-owned hooks are overwritten with the current version, missing ones
+  reinstalled. EDPA marks its hooks with an `EDPA-MANAGED-HOOK` sentinel.
+- **Foreign hooks are never clobbered.** If a non-EDPA file already occupies a
+  slot, EDPA skips it and prints a loud warning with the exact line to chain
+  EDPA in by hand (`sh .edpa/engine/scripts/hooks/<hook> "$@"`).
+- **lefthook (or any tool that owns `.git/hooks/`).** lefthook generates its own
+  dispatcher shims into `.git/hooks/` (and can set `core.hooksPath`), so a plain
+  copy would be ignored or clobbered — this is the usual cause of "contribution
+  stopped working after an update". EDPA detects `lefthook.yml` and, instead of
+  writing `.git/hooks/`, prints a paste-ready block. Add it to your
+  `lefthook.yml`, then run `lefthook install`:
+
+  ```yaml
+  pre-commit:
+    commands:
+      edpa-id-safety:
+        run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety
+  commit-msg:
+    commands:
+      edpa-ticket-attached:
+        run: sh .edpa/engine/scripts/hooks/commit-msg-ticket-attached {1}
+  post-commit:
+    commands:
+      edpa-evidence:
+        run: sh .edpa/engine/scripts/hooks/post-commit-evidence
+  pre-push:
+    commands:
+      edpa-id-safety:
+        run: sh .edpa/engine/scripts/hooks/pre-push-id-safety {1} {2}
+        use_stdin: true   # pre-push refs arrive on stdin — without this lefthook hangs
+  ```
+
+- **After a plugin update**, the SessionStart auto-update re-registers EDPA hooks
+  automatically when the project already uses them (and, under lefthook, reminds
+  you to verify). No manual step needed for the plain `.git/hooks/` case.
+- **Verify any time** (read-only doctor — no changes):
+
+  ```bash
+  python3 .edpa/engine/scripts/project_setup.py --check-hooks
+  ```
+  Reports each hook as active / missing / foreign, or flags lefthook so you know
+  to register via the snippet.
 
 **Next:** edit `people.yaml` (your team) + `edpa.yaml` (`project.name`), then
 create items locally:
@@ -367,10 +422,15 @@ git add .github/workflows/edpa-collision-check.yml
 git commit -m "ci: add EDPA collision check"
 ```
 
-Verify hooks are installed:
+Verify hooks are installed (read-only doctor — works for `.git/hooks/` and
+flags lefthook):
 ```bash
-ls -la .git/hooks/pre-commit .git/hooks/pre-push   # must be -rwxr-xr-x
+python3 .edpa/engine/scripts/project_setup.py --check-hooks
 ```
+
+If your repo uses **lefthook**, `--with-hooks` prints a paste-ready snippet
+instead of writing `.git/hooks/`; add it to `lefthook.yml` and run
+`lefthook install` (see §1 → *Git hooks — registration, lefthook, verification*).
 
 See [`docs/dev-collisions.md`](dev-collisions.md) for decision tree, common collision shapes (single / multi / parent-chain / cascading), troubleshooting, and the `--target develop` flag for Git Flow projects.
 

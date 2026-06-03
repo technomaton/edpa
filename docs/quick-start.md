@@ -129,8 +129,12 @@ If your team has more than one person creating backlog items in parallel, you'll
 **Setup** (one-time per project):
 
 ```bash
-# 1. Install pre-commit + pre-push hooks
+# 1. Install git hooks (pre-commit, pre-push, commit-msg, post-commit).
+#    Under lefthook this prints a snippet to paste into lefthook.yml + run
+#    `lefthook install` instead of writing .git/hooks/. Foreign hooks are
+#    never overwritten; re-run any time to refresh.
 python3 .edpa/engine/scripts/project_setup.py --with-hooks
+python3 .edpa/engine/scripts/project_setup.py --check-hooks   # verify (read-only)
 
 # 2. Copy CI workflow template
 cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \

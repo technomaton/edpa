@@ -1,4 +1,5 @@
 #!/bin/sh
+# EDPA-MANAGED-HOOK
 # EDPA V2.1 commit-msg hook — require an EDPA item reference (or escape).
 #
 # Git invokes this with $1 = path to COMMIT_EDITMSG. Exit non-zero

@@ -371,6 +371,27 @@ git checkout -b chore/T-050-ci-pipeline</code></pre>
         </tbody>
       </table>
     </div>
+    <p>Hook registration is idempotent and self-refreshing (the SessionStart auto-update re-registers them after a plugin update). Foreign (non-EDPA) hooks are never clobbered — they are skipped with a warning. Check hook state (active / missing / foreign / lefthook) anytime with the read-only doctor:</p>
+    <pre><code>python3 .edpa/engine/scripts/project_setup.py --check-hooks
+python3 .edpa/engine/scripts/project_setup.py --refresh-hooks   # register only</code></pre>
+    <div class="note"><strong>lefthook:</strong> if the project uses <code>lefthook.yml</code> (lefthook owns <code>.git/hooks/</code>), EDPA does <strong>not</strong> write <code>.git/hooks/</code> — instead it prints a paste-ready snippet to add to <code>lefthook.yml</code>, then run <code>lefthook install</code>. Note: <code>pre-push</code> must have <code>use_stdin: true</code> or lefthook hangs.</div>
+    <pre><code>pre-commit:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety
+commit-msg:
+  commands:
+    edpa-ticket-attached:
+      run: sh .edpa/engine/scripts/hooks/commit-msg-ticket-attached &#123;1&#125;
+post-commit:
+  commands:
+    edpa-evidence:
+      run: sh .edpa/engine/scripts/hooks/post-commit-evidence
+pre-push:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-push-id-safety &#123;1&#125; &#123;2&#125;
+      use_stdin: true</code></pre>
 
     <p><strong>Commit convention:</strong></p>
     <pre><code>git commit -m "feat(S-200): implement OMOP CDM parser"

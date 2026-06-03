@@ -373,6 +373,27 @@ git checkout -b chore/T-050-ci-pipeline</code></pre>
         </tbody>
       </table>
     </div>
+    <p>Registrace hooků je idempotentní a self-refreshing (SessionStart auto-update je po update pluginu znovu zaregistruje). Cizí (ne-EDPA) hooky se nikdy nepřepisují — přeskočí se s varováním. Stav hooků (aktivní / chybějící / cizí / lefthook) zkontroluješ kdykoli read-only doctorem:</p>
+    <pre><code>python3 .edpa/engine/scripts/project_setup.py --check-hooks
+python3 .edpa/engine/scripts/project_setup.py --refresh-hooks   # jen znovu zaregistruje</code></pre>
+    <div class="note"><strong>lefthook:</strong> pokud projekt používá <code>lefthook.yml</code> (lefthook vlastní <code>.git/hooks/</code>), EDPA do <code>.git/hooks/</code> <strong>nezapisuje</strong> — místo toho vytiskne hotový snippet, který vložíš do <code>lefthook.yml</code>, a pak spustíš <code>lefthook install</code>. Pozor: <code>pre-push</code> musí mít <code>use_stdin: true</code>, jinak lefthook visí.</div>
+    <pre><code>pre-commit:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety
+commit-msg:
+  commands:
+    edpa-ticket-attached:
+      run: sh .edpa/engine/scripts/hooks/commit-msg-ticket-attached &#123;1&#125;
+post-commit:
+  commands:
+    edpa-evidence:
+      run: sh .edpa/engine/scripts/hooks/post-commit-evidence
+pre-push:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-push-id-safety &#123;1&#125; &#123;2&#125;
+      use_stdin: true</code></pre>
 
     <p><strong>Commit konvence:</strong></p>
     <pre><code>git commit -m "feat(S-200): implement OMOP CDM parser"

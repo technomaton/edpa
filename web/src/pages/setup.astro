@@ -182,6 +182,27 @@ import Layout from '../layouts/Layout.astro';
         <div class="form-card launch-note">
           <p class="launch-note-text">Claude Code skills/commands prijdou z nainstalovaneho pluginu. <code>/edpa:setup</code> pak vendoruje engine (skripty, sablony) do <code>.edpa/engine/</code> a vytvori <code>.edpa/</code> strukturu pro projektova data.</p>
         </div>
+
+        <div class="form-card launch-note">
+          <p class="launch-note-text"><code>--with-hooks</code> registruje 4 git hooky (pre-commit, commit-msg, post-commit, pre-push) do <code>.git/hooks/</code>. Registrace je idempotentni a cizi hooky se nikdy neprepisuji. Pokud projekt pouziva <strong>lefthook</strong> (<code>lefthook.yml</code> vlastni <code>.git/hooks/</code>), EDPA misto toho vytiskne hotovy snippet — vloz ho do <code>lefthook.yml</code> a spust <code>lefthook install</code>. Stav hooku kdykoli overis pres <code>project_setup.py --check-hooks</code>.</p>
+          <pre class="launch-pre">pre-commit:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety
+commit-msg:
+  commands:
+    edpa-ticket-attached:
+      run: sh .edpa/engine/scripts/hooks/commit-msg-ticket-attached &#123;1&#125;
+post-commit:
+  commands:
+    edpa-evidence:
+      run: sh .edpa/engine/scripts/hooks/post-commit-evidence
+pre-push:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-push-id-safety &#123;1&#125; &#123;2&#125;
+      use_stdin: true</pre>
+        </div>
       </div>
 
       <!-- Navigation buttons -->

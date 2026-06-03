@@ -1,9 +1,10 @@
 #!/bin/sh
+# EDPA-MANAGED-HOOK
 # EDPA V2 ID safety pre-commit hook — validates staged .edpa/backlog/ files.
 # Layer 5 from docs/v2/plan.md.
 #
-# Install: symlink to .git/hooks/pre-commit-id-safety, then chain from
-# .git/hooks/pre-commit (or use install.sh's --with-id-hooks flag).
+# Install: /edpa:setup --with-hooks (or project_setup.py --with-hooks). Detects
+# lefthook and prints a paste-ready snippet instead of writing .git/hooks/.
 #
 # Exit 1 to block commit on any ID safety violation.
 

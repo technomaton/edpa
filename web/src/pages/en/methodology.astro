@@ -372,7 +372,7 @@ Accuracy = Actual / Planned &times; 100 %</div>
     </div>
 
     <h3>9.2 The engine runs locally; the GitHub layer is optional</h3>
-    <p>V2 has no GitHub Actions pipeline. The engine, WSJF computation, iteration/PI close, and velocity all run <strong>locally</strong> via <code>/edpa:close-iteration</code> and MCP tools. Attribution is handled by a post-commit hook (<code>local_evidence.py</code>) — it emits <code>commit_author</code> for every commit that references an EDPA item, and works offline and on GitLab/Forgejo too.</p>
+    <p>V2 has no GitHub Actions pipeline. The engine, WSJF computation, iteration/PI close, and velocity all run <strong>locally</strong> via <code>/edpa:close-iteration</code> and MCP tools. Attribution is handled by a post-commit hook (<code>local_evidence.py</code>) — it emits <code>commit_author</code> for every commit that references an EDPA item, and works offline and on GitLab/Forgejo too. Hooks register into <code>.git/hooks/</code>, or — if the project uses lefthook — via a printed snippet for <code>lefthook.yml</code>.</p>
     <div class="card">
       <table>
         <thead>

@@ -371,7 +371,7 @@ Accuracy = Actual / Planned &times; 100 %</div>
     </div>
 
     <h3>9.2 Engine běží lokálně, GitHub vrstva je volitelná</h3>
-    <p>V2 nemá pipeline GitHub Actions. Engine, výpočet WSJF, iteration/PI close i velocity běží <strong>lokálně</strong> přes <code>/edpa:close-iteration</code> a MCP nástroje. Atribuci řeší post-commit hook (<code>local_evidence.py</code>) — pro každý commit s referencí na EDPA item emituje <code>commit_author</code>, funguje i offline a na GitLab/Forgejo.</p>
+    <p>V2 nemá pipeline GitHub Actions. Engine, výpočet WSJF, iteration/PI close i velocity běží <strong>lokálně</strong> přes <code>/edpa:close-iteration</code> a MCP nástroje. Atribuci řeší post-commit hook (<code>local_evidence.py</code>) — pro každý commit s referencí na EDPA item emituje <code>commit_author</code>, funguje i offline a na GitLab/Forgejo. Hooky se registrují do <code>.git/hooks/</code>, nebo — pokud projekt používá lefthook — přes vytištěný snippet do <code>lefthook.yml</code>.</p>
     <div class="card">
       <table>
         <thead>

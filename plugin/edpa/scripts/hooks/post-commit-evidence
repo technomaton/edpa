@@ -1,4 +1,5 @@
 #!/bin/sh
+# EDPA-MANAGED-HOOK
 # EDPA V2.1 local-evidence post-commit hook.
 #
 # Runs after every commit. Detects item refs in the commit (msg + paths),

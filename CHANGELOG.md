@@ -1,5 +1,49 @@
 # Changelog
 
+## 2.3.0 — 2026-06-03 — Robust git-hook registration + lefthook support
+
+Git hooks could silently stop firing — most visibly the `post-commit`
+`local_evidence.py` emitter, so **contribution evidence stopped landing on
+items** — whenever a hook slot was already occupied (typically by lefthook,
+which owns `.git/hooks/`) or after a plugin update left a stale snapshot.
+Registration is now robust and hook-manager-aware.
+
+### Fixed
+- `project_setup.install_hooks` no longer skips a slot with a blunt
+  `not dst.exists()` guard. EDPA marks its hooks with an `EDPA-MANAGED-HOOK`
+  sentinel and decides per slot: install when missing, refresh when EDPA-owned,
+  and **never clobber a foreign hook** (it warns + prints the exact chain-in
+  line instead).
+- The SessionStart auto-update (`update_engine.sh`) now **re-registers EDPA git
+  hooks after a version bump** when the project already uses them — fixing
+  "hooks gone / contribution stopped after update". Opt-out repos stay untouched.
+
+### Added
+- **lefthook support.** When a `lefthook.yml` (or other lefthook config) is
+  present, `--with-hooks` detects it and prints a paste-ready lefthook snippet
+  (with `use_stdin: true` on `pre-push` — required, or lefthook hangs the push)
+  instead of writing `.git/hooks/`. EDPA never edits your lefthook config.
+- `project_setup.py --check-hooks` — a read-only hooks doctor (active / missing
+  / foreign / lefthook) — and `--refresh-hooks` — register/refresh only.
+
+### Changed
+- `scripts/hooks/install.sh` is now a thin delegator to
+  `project_setup.py --refresh-hooks`; the old conflicting `core.hooksPath`
+  mechanism (and its stale `.claude/edpa/...` path) is gone.
+- ANSI colour codes in `project_setup.py` are suppressed when stdout is not a
+  TTY (no escape-code leak into captured SessionStart output).
+- Removed the dead generic `pre-commit` hook (superseded by `pre-commit-id-safety`),
+  and the dead V1 GitHub-Projects sync workflows (`edpa-sync-git-to-projects.yml`,
+  `edpa-sync-projects-to-git.yml`) — they called a `sync.py` removed in 2.0.0 and
+  had been failing on every release.
+- Docs + website (CZ/EN) now document hook registration, the lefthook snippet,
+  foreign-hook behavior, and `--check-hooks` verification.
+
+### Tests
+- New `tests/test_project_setup_hooks.py` (fresh install, refresh, foreign-skip,
+  lefthook snippet validity) plus self-heal cases in
+  `tests/test_update_engine_hook.py`. Full suite green.
+
 ## 2.2.1 — 2026-06-01 — Skill names: drop the redundant `edpa-` prefix; server + create-pi are command-only
 
 Plugin skill invocations were doubly namespaced — `/edpa:edpa-setup`,
