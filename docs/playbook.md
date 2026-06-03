@@ -78,7 +78,7 @@ V terminalu s Claude Code nainstalovanym:
 /edpa:setup --with-ci --with-hooks --with-rules
 ```
 
-Claude Code (skill `/edpa:setup`) provede kroky 1.1-1.4 automaticky -- vendoruje engine do `.edpa/engine/`, naseje konfiguraci a `id_counters.yaml`, a volitelne nainstaluje git hooky, PR-signal CI workflow a `.claude/rules/`. Idempotentni -- opakovane spusteni nic nerozbije.
+Claude Code (skill `/edpa:setup`) provede kroky 1.1-1.4 automaticky -- vendoruje engine do `.edpa/engine/`, naseje konfiguraci a `id_counters.yaml`, a volitelne nainstaluje git hooky, PR-signal CI workflow a `.claude/rules/`. Idempotentni -- opakovane spusteni nic nerozbije. `--with-hooks` je lefthook-aware (pri pritomnem `lefthook.yml` vypise snippet misto zapisu do `.git/hooks/`); stav overis pres `--check-hooks`.
 
 ### Cesta B: Manualni CLI
 
@@ -100,6 +100,8 @@ curl -fsSL https://edpa.technomaton.com/install.sh | sh
 ```bash
 python3 .edpa/engine/scripts/project_setup.py --with-ci --with-hooks --with-rules
 ```
+
+> `--with-hooks` je lefthook-aware (pri pritomnem `lefthook.yml` vypise paste-ready snippet misto zapisu do `.git/hooks/`); stav hooku overis pres `--check-hooks`.
 
 Vysledna struktura:
 
@@ -446,7 +448,30 @@ Povolene prefixy: `S` (Story), `F` (Feature), `E` (Epic), `T` (Task), `D` (Defec
 | pre-commit | ID safety -- kontrola referenci |
 | commit-msg | Vyzaduje referenci itemu nebo `no-ticket:` |
 | post-commit | Zaznamenava `commit_author` evidence |
-| pre-push | Kontrola ID kolizi |
+| pre-push | Kontrola ID kolizi vuci remote |
+
+Registrace je idempotentni a sebe-obnovujici: EDPA znacka sve hooky sentinelem `EDPA-MANAGED-HOOK`, opakovany `--with-hooks` (nebo `--refresh-hooks`) je osvezi a cizi (ne-EDPA) hook v dane pozici **nikdy nepreplacne** -- vypise hlasku + radek k rucnimu zaretezeni (`sh .edpa/engine/scripts/hooks/<hook> "$@"`). Pokud je v repu **lefthook** (`lefthook.yml`), `.git/hooks/` vlastni lefthook, takze EDPA tam nezapisuje a misto toho vypise hotovy snippet do `lefthook.yml`; pote spust `lefthook install`. Stav hooku overis read-only pres `--check-hooks` (kazdy hook jako active / missing / foreign, pripadne flag lefthook).
+
+```yaml
+# lefthook.yml -- EDPA hooky (pre-push MUSI mit use_stdin: true, jinak push zatuhne)
+pre-commit:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety
+commit-msg:
+  commands:
+    edpa-ticket-attached:
+      run: sh .edpa/engine/scripts/hooks/commit-msg-ticket-attached {1}
+post-commit:
+  commands:
+    edpa-evidence:
+      run: sh .edpa/engine/scripts/hooks/post-commit-evidence
+pre-push:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-push-id-safety {1} {2}
+      use_stdin: true
+```
 
 **Commit konvence:**
 
@@ -782,13 +807,13 @@ V2 ma **jediny** volitelny workflow (jen s `--with-ci`):
 - [ ] Backlog naplneny pres `backlog.py add` (alespon 1 Epic, 3 Features, 10 Stories)
 - [ ] `backlog.py validate` projde bez chyb
 - [ ] `engine.py --demo` projde uspesne
-- [ ] (volitelne) git hooky nainstalovany (`--with-hooks`), contribution-sync CI (`--with-ci`)
+- [ ] (volitelne) git hooky nainstalovany (`--with-hooks`) a overeny (`--check-hooks` -> vsechny active; pri lefthooku snippet v `lefthook.yml` + `lefthook install`), contribution-sync CI (`--with-ci`)
 
 ### Tyden 1
 
 - [ ] Tym pracuje s branch naming konvenci (`feature/S-XXX-popis`)
 - [ ] Commity referuji work items (`feat(S-XXX): ...`)
-- [ ] post-commit hook zaznamenava `commit_author` evidenci
+- [ ] post-commit hook zaznamenava `commit_author` evidenci (overeno `--check-hooks`; je-li post-commit `missing`/`foreign`, contribution evidence se tise nezapisuji -- u lefthooku doplnit snippet + `lefthook install`)
 - [ ] (volitelne) PR reviews probihaji a contribution-sync je materializuje
 
 ### Konec iterace 1

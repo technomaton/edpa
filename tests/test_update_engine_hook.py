@@ -169,3 +169,56 @@ def test_finds_edpa_root_from_subdirectory(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "updating engine" in result.stderr
     assert (tmp_path / ".edpa/engine/VERSION").read_text().strip() == _current_plugin_version()
+
+
+# ─── Git-hook self-heal after update (2.3.0) ────────────────────────────────
+
+SENTINEL = "EDPA-MANAGED-HOOK"
+
+
+def _git_hooks(project: Path) -> Path:
+    hooks = project / ".git" / "hooks"
+    hooks.mkdir(parents=True, exist_ok=True)
+    return hooks
+
+
+def test_self_heal_reregisters_when_edpa_hooks_present(tmp_path):
+    """A prior EDPA install (sentinel in .git/hooks/) signals opt-in; after an
+    engine update the hook re-registers — reinstalling a clobbered hook and
+    refreshing the rest. This is the user's "hooks gone after update" fix."""
+    _seed_engine(tmp_path, version="1.0.0")
+    hooks = _git_hooks(tmp_path)
+    # Simulate: post-commit survived (EDPA-owned), pre-commit got clobbered/removed.
+    (hooks / "post-commit").write_text(f"#!/bin/sh\n# {SENTINEL}\nexit 0\n")
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "re-registering git hooks" in result.stderr
+    # The missing pre-commit hook is now installed with the sentinel.
+    assert (hooks / "pre-commit").exists()
+    assert SENTINEL in (hooks / "pre-commit").read_text()
+
+
+def test_self_heal_skipped_when_no_edpa_hooks(tmp_path):
+    """A repo that never opted into hooks must not get them forced on update."""
+    _seed_engine(tmp_path, version="1.0.0")
+    hooks = _git_hooks(tmp_path)  # empty .git/hooks, no EDPA sentinel anywhere
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "updating engine" in result.stderr
+    assert "re-registering git hooks" not in result.stderr
+    for name in ("pre-commit", "pre-push", "commit-msg", "post-commit"):
+        assert not (hooks / name).exists(), f"{name} forced onto opt-out repo"
+
+
+def test_self_heal_lefthook_prints_check_reminder(tmp_path):
+    """Under lefthook the hook does not edit .git/hooks/ — it points the user
+    at the doctor instead (EDPA never edits the lefthook config)."""
+    _seed_engine(tmp_path, version="1.0.0")
+    hooks = _git_hooks(tmp_path)
+    (tmp_path / "lefthook.yml").write_text("# user config\n")
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "lefthook detected" in result.stderr
+    assert "--check-hooks" in result.stderr
+    for name in ("pre-commit", "pre-push", "commit-msg", "post-commit"):
+        assert not (hooks / name).exists(), f"{name} written under lefthook"

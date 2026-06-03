@@ -1,6 +1,6 @@
 {
   "name": "edpa",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "EDPA — Evidence-Driven Proportional Allocation. Derive hours from local git evidence (commits, yaml edits, status transitions). Zero timesheets, mathematical guarantee, Monte Carlo calibrated CW weights. Local-first: .edpa/backlog/ YAML as source of truth, git as the audit trail. GitHub Projects sync optional.",
   "author": {
     "name": "TECHNOMATON",

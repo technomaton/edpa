@@ -50,7 +50,7 @@ All invariants passed: YES
 
 ## Key Features
 
-- **Zero manual input** — hours derived from **local git evidence**: post-commit hook emits `commit_author` + `/contribute` signals; engine reads `yaml_edit`, gate-event, and in-flight Story activity directly from `git log`.
+- **Zero manual input** — hours derived from **local git evidence**: post-commit hook emits `commit_author` + `/contribute` signals; engine reads `yaml_edit`, gate-event, and in-flight Story activity directly from `git log`. Hooks register into `.git/hooks/` (or, under lefthook, via a printed snippet) and can be verified with `project_setup.py --check-hooks`.
 - **Mathematical guarantee** — derived hours always sum to declared capacity
 - **Gates mode (default)** — credits each Initiative/Epic/Feature status transition as a mini-deliverable, so prep work (LBC, decomposition, design) gets credited as it happens, not only at final Done. Validated to ±0.35 pp stability under ±20 % CW perturbation across 100 Monte Carlo runs.
 - **C7.5 in-flight Story credit** — Stories with `yaml_edit` activity in the iteration window receive partial credit (`js × credit_factor`, default 0.40) even before they reach Done; the `story_activity_events[]` audit log in `edpa_results.json` records what was credited and why.

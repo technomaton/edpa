@@ -89,7 +89,7 @@ plugin/
     │       ├── validate_on_save.sh  # PostToolUse Edit|Write — YAML/JSON syntax check
     │       ├── edpa_post_commit.sh  # PostToolUse Bash — commit info
     │       ├── pre-commit           # Git pre-commit (user-installed, not auto-wired)
-    │       └── install.sh           # Helper to install pre-commit into .git/hooks/
+    │       └── install.sh           # Thin delegator → project_setup.py --refresh-hooks (lefthook-aware; old core.hooksPath mechanism removed)
     ├── schemas/
     │   └── edpa_commit_info.schema.json
     ├── templates/
@@ -140,6 +140,8 @@ When teams have multiple devs creating backlog items in parallel branches, ID co
 | 6 — pre-push hook | local | `git push` | `validate_ids.py --pre-push` (blocks push if ID exists upstream) |
 | 7 — CI workflow | server | PR open/sync | `edpa-collision-check.yml` (comments on PR + fails check) |
 | Recovery | local | after conflict | `renumber_collisions.py --apply` (renames + updates parents + bumps counter) |
+
+Hook registration (`--with-hooks` / `--refresh-hooks`) is idempotent and lefthook-aware: EDPA tags its own hooks with an `EDPA-MANAGED-HOOK` sentinel, never clobbers a foreign hook already in a slot, and — if a `lefthook.yml` is present — prints a paste-ready snippet instead of writing to `.git/hooks/`. Verify any time with the read-only doctor `project_setup.py --check-hooks` (reports each hook as active / missing / foreign, or flags lefthook).
 
 **Quick setup** (one-time per project):
 

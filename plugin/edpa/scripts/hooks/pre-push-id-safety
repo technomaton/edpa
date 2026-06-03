@@ -1,8 +1,10 @@
 #!/bin/sh
+# EDPA-MANAGED-HOOK
 # EDPA V2 ID safety pre-push hook — verifies no ID collisions with upstream.
 # Layer 6 from docs/v2/plan.md.
 #
-# Install: symlink to .git/hooks/pre-push.
+# Install: /edpa:setup --with-hooks. Under lefthook, the command needs
+# `use_stdin: true` (push refs arrive on stdin, read below).
 #
 # Git invokes this with two args: remote_name and remote_url, and pipes
 # the push refs on stdin (local_ref local_sha remote_ref remote_sha).

@@ -16,8 +16,11 @@ What it does:
   5. Optionally copy the CI workflow template (``--with-ci``) to
      ``.github/workflows/edpa-contribution-sync.yml`` so the engine
      can read PR signals materialized from PR events.
-  6. Optionally install git hooks (``--with-hooks``) — pre-commit +
-     pre-push ID safety validators.
+  6. Optionally install git hooks (``--with-hooks``) — pre-commit + pre-push
+     ID safety, commit-msg ticket-attached, post-commit local-evidence. Detects
+     lefthook (prints a paste-ready snippet instead of clobbering .git/hooks/),
+     warns on foreign hooks, and is idempotent. ``--refresh-hooks`` re-registers
+     only; ``--check-hooks`` is a read-only doctor.
 
 What it does NOT do (V2.0 hard cut from V1):
   - No ``gh project`` calls
@@ -56,13 +59,16 @@ finally:
 
 
 class C:
-    RESET = "\033[0m"
-    BOLD = "\033[1m"
-    DIM = "\033[2m"
-    GREEN = "\033[32m"
-    YELLOW = "\033[33m"
-    CYAN = "\033[36m"
-    RED = "\033[31m"
+    # Disable ANSI when stdout isn't a TTY (CI, the SessionStart auto-update
+    # self-heal path) so escape codes don't leak into captured output.
+    _tty = bool(getattr(sys.stdout, "isatty", lambda: False)())
+    RESET = "\033[0m" if _tty else ""
+    BOLD = "\033[1m" if _tty else ""
+    DIM = "\033[2m" if _tty else ""
+    GREEN = "\033[32m" if _tty else ""
+    YELLOW = "\033[33m" if _tty else ""
+    CYAN = "\033[36m" if _tty else ""
+    RED = "\033[31m" if _tty else ""
 
 
 def step(n: int, text: str) -> None:
@@ -283,45 +289,168 @@ def install_rules(root: Path) -> bool:
     return True
 
 
-def install_hooks(root: Path) -> bool:
-    git_hooks = root / ".git" / "hooks"
-    if not git_hooks.exists():
-        warn("Not a git repo (no .git/hooks) — skipping hooks install")
-        return False
+# ─── Git hook registration ───────────────────────────────────────────────────
+
+EDPA_HOOK_SENTINEL = "EDPA-MANAGED-HOOK"
+
+# git hook name → (vendored source filename, one-line purpose)
+_HOOK_SPECS: tuple[tuple[str, str, str], ...] = (
+    ("pre-commit", "pre-commit-id-safety",
+     "ID safety: staged backlog filename≡id consistency"),
+    ("pre-push", "pre-push-id-safety",
+     "ID safety: no ID collisions with the remote tip"),
+    ("commit-msg", "commit-msg-ticket-attached",
+     "require an EDPA item ref (or a 'no-ticket:' escape)"),
+    ("post-commit", "post-commit-evidence",
+     "emit commit_author evidence into the item's evidence[]"),
+)
+_HOOK_SRC = {hook: name for hook, name, _ in _HOOK_SPECS}
+_HOOK_PURPOSE = {hook: purpose for hook, _, purpose in _HOOK_SPECS}
+
+# Lefthook owns .git/hooks/ — it writes dispatcher shims there (and can set
+# core.hooksPath), so any plain copy EDPA drops into .git/hooks/ is ignored or
+# clobbered. Presence of a lefthook config is the canonical "managed" signal.
+_LEFTHOOK_CONFIGS = (
+    "lefthook.yml", "lefthook.yaml", ".lefthook.yml", ".lefthook.yaml",
+    "lefthook.toml", "lefthook.json",
+)
+
+# Paste-ready lefthook config. pre-push reads its refs on stdin, so its command
+# MUST set ``use_stdin: true`` — without it lefthook keeps a pseudo-TTY open and
+# hangs the push. {1}/{2} are the args git passes the hook (commit-msg: the
+# message file; pre-push: remote name + URL).
+LEFTHOOK_SNIPPET = """\
+# --- EDPA-managed hooks: paste into lefthook.yml, then run `lefthook install` ---
+# Merge these `commands:` under any matching hook keys you already have;
+# do not duplicate the top-level hook name.
+pre-commit:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety
+commit-msg:
+  commands:
+    edpa-ticket-attached:
+      run: sh .edpa/engine/scripts/hooks/commit-msg-ticket-attached {1}
+post-commit:
+  commands:
+    edpa-evidence:
+      run: sh .edpa/engine/scripts/hooks/post-commit-evidence
+pre-push:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-push-id-safety {1} {2}
+      use_stdin: true
+"""
+
+
+def detect_lefthook(root: Path) -> Path | None:
+    """Return the lefthook config path if this repo is managed by lefthook."""
+    for name in _LEFTHOOK_CONFIGS:
+        p = root / name
+        if p.exists():
+            return p
+    return None
+
+
+def _hook_src_dir(root: Path) -> Path:
+    """Hook sources — plugin layout when running from source, else vendored."""
     src_dir = HERE / "hooks"
     if not (src_dir / "pre-commit-id-safety").exists():
         src_dir = root / ".edpa" / "engine" / "scripts" / "hooks"
+    return src_dir
 
-    installed = []
-    # Pre-commit + pre-push: ID safety
-    for hook in ("pre-commit", "pre-push"):
-        src = src_dir / f"{hook}-id-safety"
+
+def _is_edpa_owned(path: Path) -> bool:
+    """True if an installed hook carries EDPA's sentinel (vs. a foreign hook)."""
+    try:
+        return EDPA_HOOK_SENTINEL in path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
+
+
+def install_hooks(root: Path, *, refresh: bool = False,
+                  check_only: bool = False) -> bool:
+    """Register EDPA's git hooks robustly.
+
+    Per-hook decision (replaces the old blunt ``not dst.exists()`` guard, which
+    silently dropped EDPA hooks whenever any file already held the slot — the
+    lefthook collision that stopped contribution evidence from firing):
+
+      * lefthook detected → print the lefthook snippet, leave .git/hooks/ alone
+        (lefthook owns it); the user pastes it + runs ``lefthook install``.
+      * dst missing       → install (copy + chmod 0755).
+      * dst EDPA-owned    → ``refresh`` overwrites with the current version so a
+        plugin update propagates hook fixes (update_engine.sh self-heal path);
+        otherwise reported as already active.
+      * dst foreign       → never touched; loud warning with manual chain-in
+        instructions.
+
+    ``check_only`` reports status and writes nothing (the ``--check-hooks``
+    doctor). Returns False only when there is no .git/hooks at all.
+    """
+    git_hooks = root / ".git" / "hooks"
+    if not git_hooks.exists():
+        warn("Not a git repo (no .git/hooks) — skipping hooks")
+        return False
+
+    lefthook_cfg = detect_lefthook(root)
+    if lefthook_cfg:
+        warn(f"lefthook detected ({lefthook_cfg.name}) — it owns .git/hooks/, "
+             f"so EDPA registers via lefthook, not by copying hooks.")
+        if not check_only:
+            info("EDPA does not edit your lefthook config. Add this block, "
+                 "then run `lefthook install`:")
+            print()
+            print(LEFTHOOK_SNIPPET)
+        info("Re-check anytime: python3 .edpa/engine/scripts/project_setup.py "
+             "--check-hooks")
+        return True
+
+    src_dir = _hook_src_dir(root)
+    installed: list[str] = []
+    refreshed: list[str] = []
+    active: list[str] = []
+    missing: list[str] = []
+    foreign: list[str] = []
+    for hook, src_name, _ in _HOOK_SPECS:
+        src = src_dir / src_name
         dst = git_hooks / hook
-        if src.exists() and not dst.exists():
-            shutil.copy(src, dst)
-            dst.chmod(0o755)
-            installed.append(hook)
-    # Commit-msg: ticket-attached check (V2.1)
-    cm_src = src_dir / "commit-msg-ticket-attached"
-    cm_dst = git_hooks / "commit-msg"
-    if cm_src.exists() and not cm_dst.exists():
-        shutil.copy(cm_src, cm_dst)
-        cm_dst.chmod(0o755)
-        installed.append("commit-msg")
-    # Post-commit: local evidence emitter (V2.1)
-    pc_src = src_dir / "post-commit-evidence"
-    pc_dst = git_hooks / "post-commit"
-    if pc_src.exists() and not pc_dst.exists():
-        shutil.copy(pc_src, pc_dst)
-        pc_dst.chmod(0o755)
-        installed.append("post-commit")
+        if not src.exists():
+            continue
+        if not dst.exists():
+            if check_only:
+                missing.append(hook)
+            else:
+                shutil.copy(src, dst)
+                dst.chmod(0o755)
+                installed.append(hook)
+        elif _is_edpa_owned(dst):
+            if not check_only and refresh:
+                shutil.copy(src, dst)
+                dst.chmod(0o755)
+                refreshed.append(hook)
+            else:
+                active.append(hook)
+        else:
+            foreign.append(hook)
+
     if installed:
         ok(f"Installed git hooks: {', '.join(installed)}")
-        info("pre-commit/pre-push: filename≡id, no upstream collisions")
-        info("commit-msg: require EDPA item ref (or 'no-ticket:' escape)")
-        info("post-commit: emit commit_author signals into item evidence[]")
-    else:
-        info("Hooks already installed or sources missing — no changes")
+    if refreshed:
+        ok(f"Refreshed git hooks: {', '.join(refreshed)}")
+    if active:
+        (ok if check_only else info)(f"Active EDPA hooks: {', '.join(active)}")
+    if missing:
+        warn(f"Missing EDPA hooks: {', '.join(missing)} — run "
+             f"/edpa:setup --with-hooks")
+    for hook in foreign:
+        warn(f"{hook}: .git/hooks/{hook} already exists and is NOT EDPA-managed "
+             f"— EDPA's hook was NOT installed (skipped, your file untouched).")
+        info(f"   purpose not wired: {_HOOK_PURPOSE[hook]}")
+        info(f"   chain EDPA in by adding to .git/hooks/{hook}:  "
+             f"sh .edpa/engine/scripts/hooks/{_HOOK_SRC[hook]} \"$@\"")
+    if not (installed or refreshed or active or missing or foreign):
+        info("No EDPA hook sources found (engine not vendored?) — nothing to do")
     return True
 
 
@@ -348,12 +477,33 @@ def main() -> int:
              "auto-load into every Claude Code session in this repo.",
     )
     parser.add_argument(
+        "--refresh-hooks", action="store_true",
+        help="Re-register EDPA git hooks only (install missing, refresh "
+             "EDPA-owned, warn on foreign / print lefthook snippet). Skips "
+             "vendor/seed — used by the auto-update self-heal path.",
+    )
+    parser.add_argument(
+        "--check-hooks", action="store_true",
+        help="Report EDPA git hook status (active/missing/foreign/lefthook) "
+             "without changing anything — the hooks doctor.",
+    )
+    parser.add_argument(
         "--root", type=Path, default=None,
         help="Project root (default: walk up from CWD to .git/)",
     )
     args = parser.parse_args()
 
     root = args.root.resolve() if args.root else find_repo_root(Path.cwd())
+
+    # Hook-only fast paths. They skip vendor/seed so they are cheap and safe to
+    # call on every session start (update_engine.sh self-heal) or on demand
+    # (the --check-hooks doctor). check_only wins if both are passed.
+    if args.check_hooks or args.refresh_hooks:
+        print(f"{C.BOLD}EDPA git hooks{C.RESET}  (root: {root})")
+        install_hooks(root, refresh=args.refresh_hooks,
+                      check_only=args.check_hooks)
+        return 0
+
     print(f"{C.BOLD}EDPA V2 project bootstrap{C.RESET}")
     print(f"Root: {root}")
 
@@ -377,7 +527,7 @@ def main() -> int:
 
     if args.with_hooks:
         step(next_step, "Git hooks (--with-hooks)")
-        install_hooks(root)
+        install_hooks(root, refresh=True)
         next_step += 1
 
     if args.with_rules:

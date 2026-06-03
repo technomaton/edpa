@@ -785,7 +785,7 @@ Plán je úspěšně provedený, pokud:
 | `.edpa/engine/scripts/calibrate_signals.py`         | auto-kalibrace CW vah (Monte Carlo + coord descent) |
 | `.edpa/engine/scripts/hooks/commit-msg-ticket-attached` | commit-msg hook — vyžaduje item ref / escape |
 | `.edpa/engine/scripts/hooks/post-commit-evidence`   | post-commit hook — emituje evidence        |
-| `.edpa/engine/scripts/hooks/pre-commit`             | pre-commit hook — schema + ID safety       |
+| `.edpa/engine/scripts/hooks/pre-commit-id-safety`   | pre-commit hook — ID safety                |
 | `plugin/edpa/templates/github-workflows/edpa-contribution-sync.yml` | (volitelně) jediný V2 GH Action |
 | `plugin/hooks/hooks.json`                           | Claude Code hooks (validate, commit info)  |
 | `plugin/.claude-plugin/plugin.json`                 | plugin manifest (single source of truth verze) |

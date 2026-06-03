@@ -5,7 +5,8 @@ description: >
   Initialize EDPA V2 governance for a project. Vendors the engine
   (scripts + schemas + templates) into `.edpa/engine/`, creates
   `.edpa/config/{edpa.yaml,people.yaml}`, seeds id_counters.yaml, and
-  optionally copies the PR-signal CI workflow + installs git hooks.
+  optionally copies the PR-signal CI workflow + registers git hooks
+  (lefthook-aware; prints a snippet instead of clobbering managed hooks).
   No GitHub Project provisioning (V1 path removed in 2.0.0).
 license: MIT
 compatibility: Python 3.10+, MCP edpa server
@@ -67,6 +68,18 @@ Resulting layout:
     separate manual step — copy from
     `.edpa/engine/templates/github-workflows/` to `.github/workflows/`
     after running setup.
+  - **Registration is robust + lefthook-aware:**
+    - Under **lefthook** (`lefthook.yml` present, which owns `.git/hooks/`),
+      EDPA does **not** write `.git/hooks/` — it prints a paste-ready snippet
+      (with `use_stdin: true` on pre-push, or the push hangs) to add to
+      `lefthook.yml`, then run `lefthook install`.
+    - A **foreign** hook already occupying a slot is never clobbered — EDPA
+      skips it and prints the exact line to chain itself in by hand.
+    - **Idempotent + self-refreshing:** re-running `--with-hooks` (or
+      `--refresh-hooks`) refreshes EDPA-owned hooks to the current version;
+      the SessionStart auto-update re-registers them after a plugin update.
+    - **Verify:** `python3 .edpa/engine/scripts/project_setup.py --check-hooks`
+      (read-only doctor — active / missing / foreign / lefthook).
 - `--with-rules` — copy `plugin/rules/*.md` to `.claude/rules/`.
   Claude Code auto-loads these into every agent session, so
   AI assistants in this repo follow the same ticket-first workflow
@@ -87,7 +100,8 @@ The script first **vendors the engine** (`scripts` + `schemas` +
 `templates` + `VERSION`) into `.edpa/engine/` from
 `${CLAUDE_PLUGIN_ROOT}`, then seeds the configs + `id_counters.yaml`. It
 is idempotent — safe to re-run when adding hooks/CI after the initial
-setup.
+setup; re-running also refreshes EDPA-owned git hooks to the current
+version (see `--check-hooks` to verify, `--refresh-hooks` to register only).
 
 ### 2. Edit the seeded configs
 
@@ -180,4 +194,5 @@ python3 .edpa/engine/scripts/migrate_v1_to_v2.py             # apply
 It seeds the counter from existing IDs, backfills timestamps from git
 log, archives `issue_map.yaml`, and strips the `sync:` block from
 `edpa.yaml`. After migration, run `project_setup.py --with-ci
---with-hooks` to opt into the CI workflow.
+--with-hooks` to opt into the CI workflow + git hooks (verify with
+`--check-hooks`).

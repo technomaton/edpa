@@ -101,6 +101,9 @@ python3 .edpa/engine/scripts/setup.py --with-ci`,
 ✓ Workflow: .github/workflows/edpa-contribution-sync.yml
   → PR-thread signals → evidence[] on items
 ✓ Git hooks installed (commit-msg: feat(<ID>): …)
+# Under lefthook (lefthook.yml present): EDPA does not write .git/hooks/,
+#   it prints a snippet → paste into lefthook.yml and run: lefthook install
+# Verify anytime: project_setup.py --check-hooks
 
 # Local-first: no org, no PAT, no GitHub Projects.`,
   },
