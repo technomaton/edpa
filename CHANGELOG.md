@@ -32,7 +32,10 @@ Registration is now robust and hook-manager-aware.
   mechanism (and its stale `.claude/edpa/...` path) is gone.
 - ANSI colour codes in `project_setup.py` are suppressed when stdout is not a
   TTY (no escape-code leak into captured SessionStart output).
-- Removed the dead generic `pre-commit` hook (superseded by `pre-commit-id-safety`).
+- Removed the dead generic `pre-commit` hook (superseded by `pre-commit-id-safety`),
+  and the dead V1 GitHub-Projects sync workflows (`edpa-sync-git-to-projects.yml`,
+  `edpa-sync-projects-to-git.yml`) — they called a `sync.py` removed in 2.0.0 and
+  had been failing on every release.
 - Docs + website (CZ/EN) now document hook registration, the lefthook snippet,
   foreign-hook behavior, and `--check-hooks` verification.
 
