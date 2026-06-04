@@ -130,7 +130,10 @@ def vendor_engine(root: Path) -> bool:
         warn(f"Engine source not found at {src} — skipping vendor")
         return False
     target.mkdir(parents=True, exist_ok=True)
-    for sub in ("scripts", "schemas", "templates"):
+    # "assets" carries the prebuilt PI planning bundle (pi-bundle.html) that
+    # pi_planning.py hydrates — vendored so /edpa:pi-planning works with only
+    # Python on the target machine.
+    for sub in ("scripts", "schemas", "templates", "assets"):
         s = src / sub
         if s.exists():
             shutil.copytree(s, target / sub, dirs_exist_ok=True)

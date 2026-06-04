@@ -224,7 +224,7 @@ class TestToolsAdvertised:
                 # Read tools (V2)
                 "edpa_status", "edpa_iterations", "edpa_people",
                 "edpa_backlog", "edpa_item", "edpa_validate",
-                "edpa_flow_metrics",
+                "edpa_flow_metrics", "edpa_pi_board",
                 # Write tools (V2 local-first CRUD)
                 "edpa_item_create", "edpa_item_update",
                 "edpa_item_transition", "edpa_item_link_parent",

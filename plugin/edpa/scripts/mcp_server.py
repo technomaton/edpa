@@ -512,6 +512,24 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="edpa_pi_board",
+            description=(
+                "Generate the self-contained PI planning / overview HTML for a "
+                "PI (program board, objectives, ROAM, portfolio, capacity) at "
+                ".edpa/reports/pi-{id}/pi-{id}.html and return its path. A "
+                "read-only projection of .edpa/ — safe to re-run after edits. "
+                "Optional 'pi' (default: planning > active > first). Delegates to "
+                "pi_planning.py — the single source also used by /edpa:pi-planning."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pi": {"type": "string"},
+                },
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
             name="edpa_people_upsert",
             description=(
                 "Add a new person to .edpa/config/people.yaml or update fields "
@@ -587,6 +605,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_iteration_close(edpa_root, arguments)
         elif name == "edpa_pi_create":
             return _handle_pi_create(edpa_root, arguments)
+        elif name == "edpa_pi_board":
+            return _handle_pi_board(edpa_root, arguments)
         elif name == "edpa_people_upsert":
             return _handle_people_upsert(edpa_root, arguments)
         logger.warning("call_tool: unknown tool %s", name)
@@ -1413,6 +1433,35 @@ def _handle_pi_create(edpa_root: Path, args: dict) -> list[TextContent]:
     logger.info("edpa_pi_create: id=%s", result["id"])
     rel_path = str(Path(result["path"]).relative_to(edpa_root.parent))
     return _ok({"id": result["id"], "path": rel_path})
+
+
+def _handle_pi_board(edpa_root: Path, args: dict) -> list[TextContent]:
+    """Generate the self-contained PI planning / overview HTML by delegating to
+    pi_planning.py — the single source of behavior (also driven by the
+    /edpa:pi-planning command). A read-only projection of .edpa/; safe to re-run.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from pi_planning import generate_pi_board  # noqa: E402
+        result = generate_pi_board(edpa_root, pi=args.get("pi"))
+    except ValueError as exc:
+        return _err(str(exc))
+    finally:
+        sys.path.pop(0)
+
+    logger.info("edpa_pi_board: pi=%s items=%s", result["pi"], result["items"])
+    try:
+        rel_path = str(Path(result["path"]).relative_to(edpa_root.parent))
+    except ValueError:
+        rel_path = result["path"]
+    return _ok({
+        "pi": result["pi"],
+        "path": rel_path,
+        "items": result["items"],
+        "people": result["people"],
+        "objectives": result["objectives"],
+        "schema_version": result["schema_version"],
+    })
 
 
 _PEOPLE_ALLOWED_FIELDS = frozenset({

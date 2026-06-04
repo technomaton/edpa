@@ -23,7 +23,8 @@
     "./commands/board.md",
     "./commands/capacity.md",
     "./commands/server.md",
-    "./commands/create-pi.md"
+    "./commands/create-pi.md",
+    "./commands/pi-planning.md"
   ],
   "agents": []
 }
