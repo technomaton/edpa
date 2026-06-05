@@ -486,6 +486,27 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="edpa_item_link_dep",
+            description=(
+                "Add or remove a dependency on a backlog item. depends_on=[B] "
+                "on item A means 'A depends on B' (B must land first) — the "
+                "program board's dependency arrows. Validates both items exist, "
+                "refuses a self-loop, and (on add) refuses an edge that would "
+                "create a cycle. action: 'add' (default) | 'remove'."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "string"},
+                    "depends_on_id": {"type": "string"},
+                    "action": {"type": "string", "enum": ["add", "remove"]},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
+                },
+                "required": ["item_id", "depends_on_id"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
             name="edpa_pi_create",
             description=(
                 "Create the PI-level metadata file at "
@@ -599,6 +620,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_item_transition(edpa_root, arguments)
         elif name == "edpa_item_link_parent":
             return _handle_item_link_parent(edpa_root, arguments)
+        elif name == "edpa_item_link_dep":
+            return _handle_item_link_dep(edpa_root, arguments)
         elif name == "edpa_iteration_create":
             return _handle_iteration_create(edpa_root, arguments)
         elif name == "edpa_iteration_close":
@@ -1433,6 +1456,98 @@ def _handle_pi_create(edpa_root: Path, args: dict) -> list[TextContent]:
     logger.info("edpa_pi_create: id=%s", result["id"])
     rel_path = str(Path(result["path"]).relative_to(edpa_root.parent))
     return _ok({"id": result["id"], "path": rel_path})
+
+
+def _load_depends_on_map(edpa_root: Path) -> dict:
+    """Map every backlog item id -> its depends_on list (scans all type dirs)."""
+    graph: dict[str, list[str]] = {}
+    backlog = edpa_root / "backlog"
+    for sub in TYPE_DIRS.values():
+        dir_path = backlog / sub
+        if not dir_path.is_dir():
+            continue
+        for f in dir_path.glob("*.md"):
+            data = _load_md_item(f)
+            if not data:
+                continue
+            iid = data.get("id")
+            if not iid:
+                continue
+            deps = data.get("depends_on")
+            graph[str(iid)] = [str(x) for x in deps] if isinstance(deps, list) else []
+    return graph
+
+
+def _dep_would_cycle(edpa_root: Path, src: str, dst: str) -> bool:
+    """True if adding the edge src -> dst (src depends_on dst) creates a cycle,
+    i.e. src is already reachable from dst via existing depends_on edges."""
+    graph = _load_depends_on_map(edpa_root)
+    seen: set[str] = set()
+    stack = list(graph.get(dst, []))
+    while stack:
+        node = stack.pop()
+        if node == src:
+            return True
+        if node in seen:
+            continue
+        seen.add(node)
+        stack.extend(graph.get(node, []))
+    return False
+
+
+@_idempotent("edpa_item_link_dep")
+def _handle_item_link_dep(edpa_root: Path, args: dict) -> list[TextContent]:
+    """Add or remove a dependency edge on a backlog item's ``depends_on`` list.
+
+    ``depends_on=[B]`` on item A means "A depends on B" (B must land first) —
+    the program board's dependency arrows. Validates both items exist, refuses
+    a self-loop, and (on add) refuses an edge that would create a cycle.
+    """
+    raw_id = args.get("item_id", "")
+    safe_id = _safe_item_id(raw_id)
+    if safe_id is None:
+        return _err(f"invalid item_id {raw_id!r}")
+    raw_dep = args.get("depends_on_id", "")
+    safe_dep = _safe_item_id(raw_dep)
+    if safe_dep is None:
+        return _err(f"invalid depends_on_id {raw_dep!r}")
+    action = args.get("action", "add")
+    if action not in ("add", "remove"):
+        return _err(f"action must be 'add' or 'remove' (got {action!r})")
+    if safe_id == safe_dep:
+        return _err("item cannot depend on itself")
+
+    path = _find_item_file(edpa_root, safe_id)
+    if not path:
+        return _err(f"item {safe_id} not found")
+
+    item = _load_md_item(path) or {}
+    deps = item.get("depends_on")
+    deps = [str(d) for d in deps] if isinstance(deps, list) else []
+
+    if action == "add":
+        if not _find_item_file(edpa_root, safe_dep):
+            return _err(f"depends_on target {safe_dep} not found")
+        if safe_dep in deps:
+            return _ok({"id": safe_id, "depends_on": deps, "action": "add", "noop": True})
+        if _dep_would_cycle(edpa_root, safe_id, safe_dep):
+            return _err(f"adding {safe_id} -> {safe_dep} would create a dependency cycle")
+        deps.append(safe_dep)
+    else:  # remove
+        if safe_dep not in deps:
+            return _ok({"id": safe_id, "depends_on": deps, "action": "remove", "noop": True})
+        deps = [d for d in deps if d != safe_dep]
+
+    body = item.pop("body", "") if isinstance(item, dict) else ""
+    if deps:
+        item["depends_on"] = deps
+    else:
+        item.pop("depends_on", None)
+    _save_md_item(path, item, body=body)
+    _load_yaml_cache_clear()
+
+    logger.info("edpa_item_link_dep: id=%s %s %s", safe_id, action, safe_dep)
+    return _ok({"id": safe_id, "depends_on": deps, "action": action})
 
 
 def _handle_pi_board(edpa_root: Path, args: dict) -> list[TextContent]:
