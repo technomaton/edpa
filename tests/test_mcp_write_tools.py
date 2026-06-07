@@ -30,6 +30,7 @@ sys.path.insert(0, str(ROOT / "plugin" / "edpa" / "scripts"))
 import mcp_server  # noqa: E402
 from mcp_server import (  # noqa: E402
     _handle_item_create,
+    _handle_item_link_dep,
     _handle_item_link_parent,
     _handle_item_transition,
     _handle_item_update,
@@ -414,6 +415,68 @@ def test_link_parent_missing_parent_errors(edpa_root: Path) -> None:
         "item_id": "I-1", "parent_id": "I-99",
     })
     assert _is_err(result)
+
+
+# ---------------------------------------------------------------------------
+# edpa_item_link_dep
+# ---------------------------------------------------------------------------
+
+def _two_features(edpa_root: Path) -> None:
+    """Seed I-1 > E-1 > {F-1, F-2} for dependency tests."""
+    _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "I"}))
+    _parse(_handle_item_create(edpa_root, {"type": "Epic", "title": "E", "parent": "I-1"}))
+    _parse(_handle_item_create(edpa_root, {"type": "Feature", "title": "F1", "parent": "E-1"}))
+    _parse(_handle_item_create(edpa_root, {"type": "Feature", "title": "F2", "parent": "E-1"}))
+
+
+def test_link_dep_adds_field(edpa_root: Path) -> None:
+    _two_features(edpa_root)
+    data = _parse(_handle_item_link_dep(edpa_root, {
+        "item_id": "F-1", "depends_on_id": "F-2",
+    }))
+    assert data["depends_on"] == ["F-2"]
+    md = _read_md(edpa_root, "F-1")
+    assert md["depends_on"] == ["F-2"]
+
+
+def test_link_dep_is_idempotent(edpa_root: Path) -> None:
+    _two_features(edpa_root)
+    _parse(_handle_item_link_dep(edpa_root, {"item_id": "F-1", "depends_on_id": "F-2"}))
+    data = _parse(_handle_item_link_dep(edpa_root, {"item_id": "F-1", "depends_on_id": "F-2"}))
+    assert data["depends_on"] == ["F-2"]  # not duplicated
+
+
+def test_link_dep_remove_drops_field_when_empty(edpa_root: Path) -> None:
+    _two_features(edpa_root)
+    _parse(_handle_item_link_dep(edpa_root, {"item_id": "F-1", "depends_on_id": "F-2"}))
+    data = _parse(_handle_item_link_dep(edpa_root, {
+        "item_id": "F-1", "depends_on_id": "F-2", "action": "remove",
+    }))
+    assert data["depends_on"] == []
+    md = _read_md(edpa_root, "F-1")
+    assert "depends_on" not in md  # field dropped when empty
+
+
+def test_link_dep_rejects_self(edpa_root: Path) -> None:
+    _two_features(edpa_root)
+    result = _handle_item_link_dep(edpa_root, {"item_id": "F-1", "depends_on_id": "F-1"})
+    assert _is_err(result)
+    assert "itself" in result[0].text
+
+
+def test_link_dep_missing_target_errors(edpa_root: Path) -> None:
+    _two_features(edpa_root)
+    result = _handle_item_link_dep(edpa_root, {"item_id": "F-1", "depends_on_id": "F-99"})
+    assert _is_err(result)
+
+
+def test_link_dep_rejects_cycle(edpa_root: Path) -> None:
+    _two_features(edpa_root)
+    _parse(_handle_item_link_dep(edpa_root, {"item_id": "F-1", "depends_on_id": "F-2"}))
+    # F-2 -> F-1 would close the loop (F-1 already depends on F-2).
+    result = _handle_item_link_dep(edpa_root, {"item_id": "F-2", "depends_on_id": "F-1"})
+    assert _is_err(result)
+    assert "cycle" in result[0].text
 
 
 # ---------------------------------------------------------------------------

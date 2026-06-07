@@ -9,6 +9,17 @@
 </head>
 <body>
   <div id="root"></div>
+  <!-- EDPA snapshot injection point. pi_planning.py replaces the __EDPA_DATA__
+       token with the project state JSON. Left untouched (invalid JSON) in
+       Vite dev / Express mode, so the app falls back to the live /api backend. -->
+  <script type="application/json" id="__edpa_data__">__EDPA_DATA__</script>
+  <script>
+    try {
+      window.__EDPA__ = JSON.parse(document.getElementById('__edpa_data__').textContent);
+    } catch (_e) {
+      window.__EDPA__ = undefined;
+    }
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

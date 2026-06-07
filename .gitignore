@@ -22,6 +22,10 @@ Thumbs.db
 .edpa/.idempotency.log
 .edpa/.server.pid
 
+# EDPA — generated PI planning board (regenerable from .edpa/ via
+# pi_planning.py; the .edpa/ source is the audit trail, not this projection)
+.edpa/reports/pi-*/pi-*.html
+
 # Temporary
 *.tmp
 *.bak
