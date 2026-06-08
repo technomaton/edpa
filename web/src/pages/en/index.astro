@@ -288,6 +288,17 @@ Guarantee: Σ shares = 100%</div>
             <code>/edpa:board</code> HTML — no Projects sync.
           </p>
         </div>
+        <div class="card cyan">
+          <h3 class="card-heading">PI planning / overview (v2.4)</h3>
+          <p class="card-text">
+            <code>/edpa:pi-planning</code> renders the whole SAFe program
+            picture — program board with dependency arrows, PI objectives, ROAM,
+            portfolio, WSJF, capacity — as a single <strong>self-contained,
+            read-only HTML</strong>. No server, no Node, no network; it
+            regenerates deterministically from <code>.edpa/</code>. Dependencies
+            are first-class via <code>edpa_item_link_dep</code> (cycle-checked).
+          </p>
+        </div>
       </div>
     </div>
   </section>

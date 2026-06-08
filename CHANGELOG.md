@@ -1,5 +1,46 @@
 # Changelog
 
+## 2.4.0 — 2026-06-08 — Self-contained PI planning / overview view
+
+A new **PI planning / overview** view renders the whole SAFe program picture —
+program board (teams × iterations with dependency arrows), PI objectives, ROAM,
+portfolio rollup, WSJF, capacity — as a single self-contained, read-only HTML.
+It runs natively on any machine with the EDPA Python engine: no server, no Node,
+no network. Much broader than `/edpa:reports`, and complementary (`reports` =
+backward audit, this = forward program state).
+
+### Added
+- **`/edpa:pi-planning [PI]`** command and **`edpa_pi_board`** MCP tool — both
+  call `pi_planning.py` (`generate_pi_board()` is the single source). They read
+  `.edpa/`, build the versioned `window.__EDPA__` snapshot, inject it into a
+  prebuilt single-file UI bundle, and write `.edpa/reports/pi-<PI>/pi-<PI>.html`
+  — a portable, deterministic, regenerable artifact.
+- **`edpa_item_link_dep`** MCP tool — add/remove a dependency (`depends_on`) on a
+  backlog item, with existence, self-loop, and cycle validation. The program
+  board renders the dependency arrows (and flags backward / same-iteration
+  cross-team edges).
+- The PI planning UI bundle (`pi-bundle.html`) is vendored by `project_setup`
+  (the engine now also vendors `assets/`), so the view works with only Python on
+  the target machine.
+
+### Architecture
+- The view is a **read-only projection**: state lives in `.edpa/` + git; the MCP
+  write-tools / LLM mutate it, then the page is re-rendered. No write-back, no
+  running server (unidirectional / CQRS).
+- Versioned snapshot contract (`window.__EDPA__`, `EDPA_SNAPSHOT_SCHEMA`) — a
+  generated report carrying an unknown schema is refused with a visible
+  "regenerate" message instead of silently mis-rendering.
+
+### Changed
+- `depends_on` is accepted by the backlog validator (Feature / Story / Epic /
+  Defect).
+- MCP tool surface is now 8 read + 9 write (added `edpa_pi_board`,
+  `edpa_item_link_dep`).
+
+### Tests
+- New dependency-tool tests (add / idempotent / remove / self-loop / missing
+  target / cycle); MCP drift-guards updated. Full non-E2E suite green (614).
+
 ## 2.3.0 — 2026-06-03 — Robust git-hook registration + lefthook support
 
 Git hooks could silently stop firing — most visibly the `post-commit`

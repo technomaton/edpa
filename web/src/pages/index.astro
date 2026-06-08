@@ -55,6 +55,17 @@ import { VERSION } from '../lib/version';
       <p class="tag">Novinky</p>
       <h2 class="section-title">Co je v EDPA v této vlně</h2>
       <div class="grid grid-3">
+        <div class="card accent">
+          <h3 class="card-heading">PI planning / overview (v2.4)</h3>
+          <p class="card-text">
+            <code>/edpa:pi-planning</code> vyrenderuje celý SAFe program board
+            (týmy × iterace, šipky závislostí), PI cíle, ROAM, portfolio, WSJF
+            a kapacitu do <strong>jednoho self-contained HTML</strong> — bez
+            serveru, bez Node, bez sítě. Read-only projekce z <code>.edpa/</code>,
+            deterministicky regenerovatelná. Závislosti přes
+            <code>edpa_item_link_dep</code> (s detekcí cyklů).
+          </p>
+        </div>
         <div class="card cyan">
           <h3 class="card-heading">Gates mode (default)</h3>
           <p class="card-text">
