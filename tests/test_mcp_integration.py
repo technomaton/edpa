@@ -228,7 +228,7 @@ class TestToolsAdvertised:
                 # Write tools (V2 local-first CRUD)
                 "edpa_item_create", "edpa_item_update",
                 "edpa_item_transition", "edpa_item_link_parent",
-                "edpa_item_link_dep",
+                "edpa_item_link_dep", "edpa_item_roam",
                 "edpa_iteration_create", "edpa_iteration_close",
                 "edpa_pi_create", "edpa_people_upsert",
             }, f"Tool set drift: {names}"
