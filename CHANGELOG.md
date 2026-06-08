@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.5.0 — 2026-06-08 — PI planning: ROAM board and PI objectives
+
+Extends the PI planning board's SAFe data model: the ROAM risk board and PI
+objectives are now first-class, editable through MCP write tools (and rendered
+by `/edpa:pi-planning`). Builds on 2.4.0's dependency edges.
+
+### Added
+- **`edpa_item_roam`** — classify a Risk as Resolved / Owned / Accepted /
+  Mitigated; the ROAM board groups risks into those four columns.
+- **PI objectives** — `edpa_objective_set` (upsert committed/stretch objectives
+  by title), `edpa_objective_remove`, and `edpa_confidence_vote` (team confidence
+  1-5), persisted to `.edpa/pi-objectives/<PI>.yaml` and shown on the Objectives
+  board.
+- A `Risk` schema in the backlog validator (risks were previously unvalidated);
+  `roam_status` / `severity` / `depends_on` recognized, `status` optional (a
+  risk's lifecycle is its ROAM classification, not the delivery workflow).
+
+The MCP tool surface is now 8 read + 13 write (21 tools).
+
+### Fixed
+- **`edpa_pi_board` MCP tool** passed the `.edpa/` directory to the generator,
+  which expects the repo root — so it looked under `.edpa/.edpa/` and reported
+  "no PIs". It now resolves the repo root (`edpa_root.parent`). The
+  `/edpa:pi-planning` command was unaffected (it uses `find_repo_root`).
+
+### Tests
+- ROAM, objectives, and `edpa_pi_board` regression tests; MCP drift-guards
+  updated to 21 tools. Full non-E2E suite green (627).
+
 ## 2.4.0 — 2026-06-08 — Self-contained PI planning / overview view
 
 A new **PI planning / overview** view renders the whole SAFe program picture —

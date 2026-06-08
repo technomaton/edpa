@@ -218,8 +218,9 @@ The server also exposes local-first **write** tools (V2). They mutate `.edpa/`
 files directly (atomic tmp+rename) and do **not** commit or call the network —
 the calling skill/command owns the commit. Full set: `edpa_item_create`,
 `edpa_item_update`, `edpa_item_transition`, `edpa_item_link_parent`,
-`edpa_item_link_dep`, `edpa_iteration_create`, `edpa_iteration_close`,
-`edpa_pi_create`, `edpa_people_upsert`.
+`edpa_item_link_dep`, `edpa_item_roam`, `edpa_objective_set`,
+`edpa_objective_remove`, `edpa_confidence_vote`, `edpa_iteration_create`,
+`edpa_iteration_close`, `edpa_pi_create`, `edpa_people_upsert`.
 
 #### `edpa_pi_create`
 
@@ -247,6 +248,28 @@ Adds or removes a dependency on a backlog item's `depends_on` list —
 first). Validates both items exist, refuses a self-loop, and (on `add`) refuses
 an edge that would create a cycle. `action` is `add` (default) or `remove`. The
 PI planning program board renders these as dependency arrows.
+
+#### `edpa_item_roam`
+
+```json
+{ "item_id": "R-1", "roam_status": "mitigated" }
+```
+
+Sets the ROAM classification (`resolved` / `owned` / `accepted` / `mitigated`)
+on a Risk item — the ROAM board groups risks into those four columns. Applies
+only to items of type `Risk`.
+
+### PI objectives
+
+`edpa_objective_set` upserts a committed/stretch objective (keyed by title) for
+a team; `edpa_objective_remove` deletes one; `edpa_confidence_vote` sets a team's
+confidence (1-5). All persist to `.edpa/pi-objectives/<pi>.yaml` and render on
+the PI planning Objectives board.
+
+```json
+{ "pi": "PI-2026-1", "team": "CVUT", "kind": "committed",
+  "title": "OMOP parser production-ready", "bv": 8, "status": "done" }
+```
 
 ### PI planning / overview
 
