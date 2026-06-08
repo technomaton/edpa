@@ -218,8 +218,8 @@ The server also exposes local-first **write** tools (V2). They mutate `.edpa/`
 files directly (atomic tmp+rename) and do **not** commit or call the network —
 the calling skill/command owns the commit. Full set: `edpa_item_create`,
 `edpa_item_update`, `edpa_item_transition`, `edpa_item_link_parent`,
-`edpa_iteration_create`, `edpa_iteration_close`, `edpa_pi_create`,
-`edpa_people_upsert`.
+`edpa_item_link_dep`, `edpa_iteration_create`, `edpa_iteration_close`,
+`edpa_pi_create`, `edpa_people_upsert`.
 
 #### `edpa_pi_create`
 
@@ -235,6 +235,35 @@ PI. The filename is always `.yaml` (the loader globs `*.yaml`; a `.yml` is
 silently ignored). Delegates to `create_pi.py`, the single source of behavior
 also used by the `/edpa:create-pi` command. Does not
 scaffold child iterations — add those with `edpa_iteration_create`.
+
+#### `edpa_item_link_dep`
+
+```json
+{ "item_id": "F-101", "depends_on_id": "F-100", "action": "add" }
+```
+
+Adds or removes a dependency on a backlog item's `depends_on` list —
+`depends_on: [F-100]` on `F-101` means "F-101 depends on F-100" (F-100 must land
+first). Validates both items exist, refuses a self-loop, and (on `add`) refuses
+an edge that would create a cycle. `action` is `add` (default) or `remove`. The
+PI planning program board renders these as dependency arrows.
+
+### PI planning / overview
+
+#### `edpa_pi_board`
+
+```json
+{ "pi": "PI-2026-1" }
+```
+
+Generates the self-contained **PI planning / overview** HTML for a PI (program
+board, PI objectives, ROAM, portfolio rollup, WSJF, capacity) at
+`.edpa/reports/pi-<id>/pi-<id>.html` and returns its path. `pi` is optional
+(default: planning > active > first). It is a **read-only projection** of
+`.edpa/` — a single portable file with no server, no Node, no network, safe to
+re-run after edits. Delegates to `pi_planning.py`, the single source also driven
+by the `/edpa:pi-planning` command. To change the plan, edit `.edpa/` (via the
+write tools) and re-run.
 
 ---
 

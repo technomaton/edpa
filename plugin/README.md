@@ -64,12 +64,13 @@ plugin/
 │   ├── engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
 │   ├── reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
 │   └── autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
-├── commands/                        # 5 slash commands, flat layout (no edpa/ subdir)
+├── commands/                        # 6 slash commands, flat layout (no edpa/ subdir)
 │   ├── close-iteration.md           # → /edpa:close-iteration — capacity prep + engine + reports
 │   ├── board.md                     # → /edpa:board          — HTML Kanban snapshot
 │   ├── capacity.md                  # → /edpa:capacity       — per-iteration capacity overrides
 │   ├── server.md                    # → /edpa:server         — start/stop PI-planning server
-│   └── create-pi.md                 # → /edpa:create-pi      — create the PI-level metadata file (pi: block)
+│   ├── create-pi.md                 # → /edpa:create-pi      — create the PI-level metadata file (pi: block)
+│   └── pi-planning.md               # → /edpa:pi-planning    — self-contained PI planning / overview HTML
 └── edpa/
     ├── scripts/                     # 32 Python modules
     │   ├── engine.py                # Core engine (Score, DerivedHours, invariants)
@@ -81,6 +82,7 @@ plugin/
     │   ├── sync_pr_contributions.py # CI: PR review/comment signals (edpa-contribution-sync)
     │   ├── capacity_override.py     # per-iteration capacity overrides (/edpa:capacity)
     │   ├── create_pi.py             # create the PI-level metadata file (edpa_pi_create / /edpa:create-pi)
+    │   ├── pi_planning.py           # PI planning / overview HTML generator (edpa_pi_board / /edpa:pi-planning)
     │   ├── project_setup.py         # provision .edpa/ governance (config, id_counters, --with-ci/hooks/rules)
     │   ├── traceability.py          # Parent-chain validation
     │   ├── pi_close.py + velocity.py + transitions.py
@@ -129,6 +131,7 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `/edpa:capacity` | command | Per-iteration per-person capacity overrides (PTO, overtime) |
 | `/edpa:board` | command | HTML Kanban snapshot from local backlog |
 | `/edpa:create-pi` | command | Create the PI-level `pi:` file (also `edpa_pi_create` MCP tool) |
+| `/edpa:pi-planning` | command | Self-contained PI planning / overview HTML — program board, objectives, ROAM, portfolio, WSJF, capacity (also `edpa_pi_board` MCP tool) |
 
 ## Multi-developer setup — ID collision handling
 

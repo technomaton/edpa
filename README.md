@@ -56,6 +56,7 @@ All invariants passed: YES
 - **C7.5 in-flight Story credit** — Stories with `yaml_edit` activity in the iteration window receive partial credit (`js × credit_factor`, default 0.40) even before they reach Done; the `story_activity_events[]` audit log in `edpa_results.json` records what was credited and why.
 - **Optional GitHub Projects sync** — `sync push` creates issues with custom fields, `sync pull` mirrors GH UI changes back into local YAML (including `created_at`, `closed_at`, `updated_at` timestamps); useful when PMs/BOs want a board view, but **not required** — V2.1 produces a complete derived timesheet from local git alone.
 - **Flow metrics** — `edpa_flow_metrics` MCP tool computes cycle time, throughput, and open item age from synced timestamps, filterable by iteration and level.
+- **PI planning / overview** — `/edpa:pi-planning` (and the `edpa_pi_board` MCP tool) render the whole SAFe program picture — program board with dependency arrows, PI objectives, ROAM, portfolio rollup, WSJF, capacity — as a single self-contained, read-only HTML. No server, no Node, no network: it runs with only the Python engine and regenerates deterministically from `.edpa/`. Dependencies are first-class via `edpa_item_link_dep` (with cycle detection).
 - **Dual-view** — per-person timesheets AND per-item cost allocation from the same data
 - **Audit-grade** — frozen snapshots, immutable records, BankID signing support
 - **Self-tuning** — auto-calibrates heuristics using Karpathy's autoresearch loop
