@@ -115,6 +115,18 @@ ITEM_SCHEMA = {
         "statuses": DELIVERY_STATUSES | LEGACY_STATUSES,
         "parent_required": False,
     },
+    "Risk": {
+        "dir": "risks",
+        # A risk's lifecycle is its ROAM classification (roam_status), not the
+        # delivery workflow — so `status` is optional here (validated against the
+        # delivery set only when present).
+        "required": {"id", "type", "title"},
+        "optional": {"parent", "js", "owner", "assignee", "contributors", "iteration",
+                     "status", "roam_status", "severity", "depends_on",
+                     "created_at", "closed_at", "updated_at"},
+        "statuses": DELIVERY_STATUSES | LEGACY_STATUSES,
+        "parent_required": False,
+    },
 }
 
 # Mirror engine.EVIDENCE_ROLES — kept here so the validator stays
@@ -130,6 +142,7 @@ TYPE_PREFIXES = {
     "Story": "S",
     "Defect": "D",
     "Task": "T",
+    "Risk": "R",
 }
 
 

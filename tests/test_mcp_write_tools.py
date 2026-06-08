@@ -32,6 +32,7 @@ from mcp_server import (  # noqa: E402
     _handle_item_create,
     _handle_item_link_dep,
     _handle_item_link_parent,
+    _handle_item_roam,
     _handle_item_transition,
     _handle_item_update,
     _handle_iteration_close,
@@ -477,6 +478,36 @@ def test_link_dep_rejects_cycle(edpa_root: Path) -> None:
     result = _handle_item_link_dep(edpa_root, {"item_id": "F-2", "depends_on_id": "F-1"})
     assert _is_err(result)
     assert "cycle" in result[0].text
+
+
+# ---------------------------------------------------------------------------
+# edpa_item_roam
+# ---------------------------------------------------------------------------
+
+def test_roam_sets_status(edpa_root: Path) -> None:
+    _parse(_handle_item_create(edpa_root, {"type": "Risk", "title": "OMOP may break"}))
+    data = _parse(_handle_item_roam(edpa_root, {"item_id": "R-1", "roam_status": "mitigated"}))
+    assert data["roam_status"] == "mitigated"
+    md = _read_md(edpa_root, "R-1")
+    assert md["roam_status"] == "mitigated"
+
+
+def test_roam_rejects_invalid_status(edpa_root: Path) -> None:
+    _parse(_handle_item_create(edpa_root, {"type": "Risk", "title": "R"}))
+    result = _handle_item_roam(edpa_root, {"item_id": "R-1", "roam_status": "bogus"})
+    assert _is_err(result)
+
+
+def test_roam_rejects_non_risk(edpa_root: Path) -> None:
+    _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "I"}))
+    result = _handle_item_roam(edpa_root, {"item_id": "I-1", "roam_status": "owned"})
+    assert _is_err(result)
+    assert "Risk" in result[0].text
+
+
+def test_roam_missing_item_errors(edpa_root: Path) -> None:
+    result = _handle_item_roam(edpa_root, {"item_id": "R-99", "roam_status": "owned"})
+    assert _is_err(result)
 
 
 # ---------------------------------------------------------------------------

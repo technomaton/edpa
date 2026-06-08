@@ -507,6 +507,27 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="edpa_item_roam",
+            description=(
+                "Set the ROAM classification (resolved / owned / accepted / "
+                "mitigated) on a Risk item. The PI planning ROAM board groups "
+                "risks into these four columns. Applies only to Risk items."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "string"},
+                    "roam_status": {
+                        "type": "string",
+                        "enum": ["resolved", "owned", "accepted", "mitigated"],
+                    },
+                    "idempotency_key": {"type": "string", "maxLength": 128},
+                },
+                "required": ["item_id", "roam_status"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
             name="edpa_pi_create",
             description=(
                 "Create the PI-level metadata file at "
@@ -622,6 +643,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_item_link_parent(edpa_root, arguments)
         elif name == "edpa_item_link_dep":
             return _handle_item_link_dep(edpa_root, arguments)
+        elif name == "edpa_item_roam":
+            return _handle_item_roam(edpa_root, arguments)
         elif name == "edpa_iteration_create":
             return _handle_iteration_create(edpa_root, arguments)
         elif name == "edpa_iteration_close":
@@ -1548,6 +1571,40 @@ def _handle_item_link_dep(edpa_root: Path, args: dict) -> list[TextContent]:
 
     logger.info("edpa_item_link_dep: id=%s %s %s", safe_id, action, safe_dep)
     return _ok({"id": safe_id, "depends_on": deps, "action": action})
+
+
+ROAM_STATUSES = frozenset({"resolved", "owned", "accepted", "mitigated"})
+
+
+@_idempotent("edpa_item_roam")
+def _handle_item_roam(edpa_root: Path, args: dict) -> list[TextContent]:
+    """Set the ROAM classification (Resolved / Owned / Accepted / Mitigated) on a
+    Risk item — the PI planning ROAM board groups risks into these four columns.
+    Applies only to items of type Risk.
+    """
+    raw_id = args.get("item_id", "")
+    safe_id = _safe_item_id(raw_id)
+    if safe_id is None:
+        return _err(f"invalid item_id {raw_id!r}")
+    roam = args.get("roam_status")
+    if roam not in ROAM_STATUSES:
+        return _err(f"roam_status must be one of {sorted(ROAM_STATUSES)} (got {roam!r})")
+
+    path = _find_item_file(edpa_root, safe_id)
+    if not path:
+        return _err(f"item {safe_id} not found")
+
+    item = _load_md_item(path) or {}
+    if item.get("type") != "Risk":
+        return _err(f"roam_status applies only to Risk items ({safe_id} is {item.get('type')!r})")
+
+    body = item.pop("body", "") if isinstance(item, dict) else ""
+    item["roam_status"] = roam
+    _save_md_item(path, item, body=body)
+    _load_yaml_cache_clear()
+
+    logger.info("edpa_item_roam: id=%s roam_status=%s", safe_id, roam)
+    return _ok({"id": safe_id, "roam_status": roam})
 
 
 def _handle_pi_board(edpa_root: Path, args: dict) -> list[TextContent]:
