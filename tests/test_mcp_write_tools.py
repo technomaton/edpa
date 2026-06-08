@@ -35,9 +35,13 @@ from mcp_server import (  # noqa: E402
     _handle_item_roam,
     _handle_item_transition,
     _handle_item_update,
+    _handle_objective_remove,
+    _handle_objective_set,
+    _handle_confidence_vote,
     _handle_iteration_close,
     _handle_iteration_create,
     _handle_people_upsert,
+    _handle_pi_board,
     _handle_pi_create,
 )
 
@@ -508,6 +512,99 @@ def test_roam_rejects_non_risk(edpa_root: Path) -> None:
 def test_roam_missing_item_errors(edpa_root: Path) -> None:
     result = _handle_item_roam(edpa_root, {"item_id": "R-99", "roam_status": "owned"})
     assert _is_err(result)
+
+
+# ---------------------------------------------------------------------------
+# edpa_pi_board (generator — receives the .edpa/ dir, must use the repo root)
+# ---------------------------------------------------------------------------
+
+def test_pi_board_resolves_repo_root_from_edpa_dir(edpa_root: Path) -> None:
+    """find_edpa_root() hands handlers the .edpa/ dir; _handle_pi_board must
+    pass the repo root to the generator. Regression: it passed .edpa/ itself, so
+    the generator looked under .edpa/.edpa/ and found no PIs."""
+    (edpa_root / "iterations" / "PI-2026-1.yaml").write_text(
+        yaml.safe_dump({"pi": {"id": "PI-2026-1", "status": "active",
+                               "iteration_weeks": 1, "pi_iterations": 1}})
+    )
+    data = _parse(_handle_pi_board(edpa_root, {"pi": "PI-2026-1"}))
+    assert data["pi"] == "PI-2026-1"
+    out = edpa_root / "reports" / "pi-PI-2026-1" / "pi-PI-2026-1.html"
+    assert out.exists()
+    assert data["path"].endswith("pi-PI-2026-1.html")
+
+
+# ---------------------------------------------------------------------------
+# edpa_objective_set / edpa_objective_remove / edpa_confidence_vote
+# ---------------------------------------------------------------------------
+
+def _read_objectives(edpa_root: Path, pi: str) -> dict:
+    p = edpa_root / "pi-objectives" / f"{pi}.yaml"
+    return yaml.safe_load(p.read_text()) if p.exists() else {}
+
+
+def test_objective_set_adds_and_creates_file(edpa_root: Path) -> None:
+    data = _parse(_handle_objective_set(edpa_root, {
+        "pi": "PI-2026-1", "team": "CVUT", "kind": "committed",
+        "title": "OMOP parser", "bv": 8, "status": "done",
+    }))
+    assert data["action"] == "added"
+    obj = _read_objectives(edpa_root, "PI-2026-1")
+    assert obj["teams"]["CVUT"]["committed"][0] == {
+        "title": "OMOP parser", "bv": 8, "status": "done"}
+    assert obj["teams"]["CVUT"]["confidence"] == 3  # default
+
+
+def test_objective_set_upserts_by_title(edpa_root: Path) -> None:
+    _parse(_handle_objective_set(edpa_root, {
+        "pi": "PI-2026-1", "team": "CVUT", "kind": "committed", "title": "X", "bv": 5}))
+    data = _parse(_handle_objective_set(edpa_root, {
+        "pi": "PI-2026-1", "team": "CVUT", "kind": "committed", "title": "X",
+        "bv": 9, "status": "in_progress"}))
+    assert data["action"] == "updated"
+    committed = _read_objectives(edpa_root, "PI-2026-1")["teams"]["CVUT"]["committed"]
+    assert len(committed) == 1 and committed[0]["bv"] == 9  # updated, not duplicated
+
+
+def test_objective_set_defaults(edpa_root: Path) -> None:
+    data = _parse(_handle_objective_set(edpa_root, {
+        "pi": "PI-2026-1", "team": "T", "kind": "stretch", "title": "Y"}))
+    assert data["bv"] == 5 and data["status"] == "planned"
+
+
+def test_objective_set_rejects_bad_kind_and_pi(edpa_root: Path) -> None:
+    assert _is_err(_handle_objective_set(edpa_root, {
+        "pi": "PI-2026-1", "team": "T", "kind": "bogus", "title": "Y"}))
+    # iteration id (with .N) is not a PI-level id
+    assert _is_err(_handle_objective_set(edpa_root, {
+        "pi": "PI-2026-1.1", "team": "T", "kind": "committed", "title": "Y"}))
+
+
+def test_objective_remove(edpa_root: Path) -> None:
+    _parse(_handle_objective_set(edpa_root, {
+        "pi": "PI-2026-1", "team": "T", "kind": "committed", "title": "Y"}))
+    data = _parse(_handle_objective_remove(edpa_root, {
+        "pi": "PI-2026-1", "team": "T", "kind": "committed", "title": "Y"}))
+    assert data["action"] == "removed"
+    assert _read_objectives(edpa_root, "PI-2026-1")["teams"]["T"]["committed"] == []
+
+
+def test_objective_remove_missing_errors(edpa_root: Path) -> None:
+    _parse(_handle_objective_set(edpa_root, {
+        "pi": "PI-2026-1", "team": "T", "kind": "committed", "title": "Y"}))
+    assert _is_err(_handle_objective_remove(edpa_root, {
+        "pi": "PI-2026-1", "team": "T", "kind": "committed", "title": "ZZZ"}))
+
+
+def test_confidence_vote(edpa_root: Path) -> None:
+    data = _parse(_handle_confidence_vote(edpa_root, {
+        "pi": "PI-2026-1", "team": "CVUT", "confidence": 4}))
+    assert data["confidence"] == 4
+    assert _read_objectives(edpa_root, "PI-2026-1")["teams"]["CVUT"]["confidence"] == 4
+
+
+def test_confidence_vote_rejects_out_of_range(edpa_root: Path) -> None:
+    assert _is_err(_handle_confidence_vote(edpa_root, {
+        "pi": "PI-2026-1", "team": "CVUT", "confidence": 7}))
 
 
 # ---------------------------------------------------------------------------

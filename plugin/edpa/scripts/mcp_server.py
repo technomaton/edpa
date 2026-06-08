@@ -528,6 +528,68 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="edpa_objective_set",
+            description=(
+                "Add or update a PI objective for a team (upsert by title) in "
+                ".edpa/pi-objectives/<pi>.yaml. kind: 'committed' | 'stretch'. "
+                "bv 1-10 (default 5); status planned/in_progress/done (default "
+                "planned). Creates the file/team as needed. Rendered on the PI "
+                "planning Objectives board."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pi": {"type": "string"},
+                    "team": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["committed", "stretch"]},
+                    "title": {"type": "string", "minLength": 1},
+                    "bv": {"type": "integer", "minimum": 1, "maximum": 10},
+                    "status": {"type": "string", "enum": ["planned", "in_progress", "done"]},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
+                },
+                "required": ["pi", "team", "kind", "title"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_objective_remove",
+            description=(
+                "Remove a PI objective by (team, kind, title) from "
+                ".edpa/pi-objectives/<pi>.yaml."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pi": {"type": "string"},
+                    "team": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["committed", "stretch"]},
+                    "title": {"type": "string", "minLength": 1},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
+                },
+                "required": ["pi", "team", "kind", "title"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_confidence_vote",
+            description=(
+                "Set a team's PI confidence vote (1-5) in "
+                ".edpa/pi-objectives/<pi>.yaml. Drives the Objectives board's "
+                "predictability summary."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pi": {"type": "string"},
+                    "team": {"type": "string"},
+                    "confidence": {"type": "integer", "minimum": 1, "maximum": 5},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
+                },
+                "required": ["pi", "team", "confidence"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
             name="edpa_pi_create",
             description=(
                 "Create the PI-level metadata file at "
@@ -645,6 +707,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_item_link_dep(edpa_root, arguments)
         elif name == "edpa_item_roam":
             return _handle_item_roam(edpa_root, arguments)
+        elif name == "edpa_objective_set":
+            return _handle_objective_set(edpa_root, arguments)
+        elif name == "edpa_objective_remove":
+            return _handle_objective_remove(edpa_root, arguments)
+        elif name == "edpa_confidence_vote":
+            return _handle_confidence_vote(edpa_root, arguments)
         elif name == "edpa_iteration_create":
             return _handle_iteration_create(edpa_root, arguments)
         elif name == "edpa_iteration_close":
@@ -1607,6 +1675,59 @@ def _handle_item_roam(edpa_root: Path, args: dict) -> list[TextContent]:
     return _ok({"id": safe_id, "roam_status": roam})
 
 
+@_idempotent("edpa_objective_set")
+def _handle_objective_set(edpa_root: Path, args: dict) -> list[TextContent]:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from objectives import set_objective  # noqa: E402
+        result = set_objective(
+            edpa_root, args.get("pi", ""), args.get("team", ""),
+            args.get("kind", ""), args.get("title", ""),
+            bv=args.get("bv"), status=args.get("status"),
+        )
+    except ValueError as exc:
+        return _err(str(exc))
+    finally:
+        sys.path.pop(0)
+    logger.info("edpa_objective_set: pi=%s team=%s %s",
+                result["pi"], result["team"], result["action"])
+    return _ok(result)
+
+
+@_idempotent("edpa_objective_remove")
+def _handle_objective_remove(edpa_root: Path, args: dict) -> list[TextContent]:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from objectives import remove_objective  # noqa: E402
+        result = remove_objective(
+            edpa_root, args.get("pi", ""), args.get("team", ""),
+            args.get("kind", ""), args.get("title", ""),
+        )
+    except ValueError as exc:
+        return _err(str(exc))
+    finally:
+        sys.path.pop(0)
+    logger.info("edpa_objective_remove: pi=%s team=%s", result["pi"], result["team"])
+    return _ok(result)
+
+
+@_idempotent("edpa_confidence_vote")
+def _handle_confidence_vote(edpa_root: Path, args: dict) -> list[TextContent]:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from objectives import set_confidence  # noqa: E402
+        result = set_confidence(
+            edpa_root, args.get("pi", ""), args.get("team", ""), args.get("confidence"),
+        )
+    except ValueError as exc:
+        return _err(str(exc))
+    finally:
+        sys.path.pop(0)
+    logger.info("edpa_confidence_vote: pi=%s team=%s c=%s",
+                result["pi"], result["team"], result["confidence"])
+    return _ok(result)
+
+
 def _handle_pi_board(edpa_root: Path, args: dict) -> list[TextContent]:
     """Generate the self-contained PI planning / overview HTML by delegating to
     pi_planning.py — the single source of behavior (also driven by the
@@ -1615,7 +1736,9 @@ def _handle_pi_board(edpa_root: Path, args: dict) -> list[TextContent]:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
         from pi_planning import generate_pi_board  # noqa: E402
-        result = generate_pi_board(edpa_root, pi=args.get("pi"))
+        # find_edpa_root() returns the .edpa/ dir; generate_pi_board wants the
+        # repo root (it builds root/.edpa/... paths).
+        result = generate_pi_board(edpa_root.parent, pi=args.get("pi"))
     except ValueError as exc:
         return _err(str(exc))
     finally:
