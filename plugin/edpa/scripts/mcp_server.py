@@ -1834,7 +1834,10 @@ async def read_resource(uri: str) -> str:
         path = edpa_root / "config" / "people.yaml"
     elif uri.startswith("edpa://results/"):
         it_id = uri.replace("edpa://results/", "")
-        path = edpa_root / "reports" / f"iteration-{it_id}" / "edpa_results.json"
+        safe = _safe_iteration_id(it_id)
+        if safe is None:
+            return f"ERROR: invalid iteration id: {it_id!r}"
+        path = edpa_root / "reports" / f"iteration-{safe}" / "edpa_results.json"
     else:
         return f"ERROR: Unknown resource URI: {uri}"
 

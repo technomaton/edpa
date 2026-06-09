@@ -419,6 +419,14 @@ def test_read_resource_no_edpa_root(tmp_path, monkeypatch):
     assert "ERROR" in content
 
 
+def test_read_resource_invalid_iteration_id_rejected(monkeypatch):
+    """read_resource rejects path-traversal and invalid iteration ids."""
+    monkeypatch.chdir(ROOT)
+    for bad in ("../../foo", "../etc/passwd", "foo bar", "'; drop", ""):
+        content = asyncio.run(mcp_server.read_resource(f"edpa://results/{bad}"))
+        assert "ERROR" in content, f"expected ERROR for iteration id {bad!r}, got: {content[:80]}"
+
+
 # ---------------------------------------------------------------------------
 # Edge cases: item lookup
 # ---------------------------------------------------------------------------
