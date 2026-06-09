@@ -2,6 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { EDPA_SNAPSHOT_SCHEMA, isSupportedSnapshot } from './types/snapshot';
+// Self-hosted fonts (variable, latin + latin-ext) inlined into the single-file
+// bundle — no Google Fonts request, fully offline.
+import '@fontsource-variable/dm-sans';
+import '@fontsource-variable/jetbrains-mono';
 import './index.css';
 
 const root = document.getElementById('root')!;

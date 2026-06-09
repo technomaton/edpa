@@ -23,6 +23,8 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@fontsource-variable/dm-sans": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@tailwindcss/vite": "^4.1.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",

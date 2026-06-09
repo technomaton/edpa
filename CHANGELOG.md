@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.1 — 2026-06-09 — Fully-offline PI planning reports
+
+The generated `/edpa:pi-planning` HTML now makes **zero external requests**: the
+DM Sans and JetBrains Mono fonts are self-hosted (variable, latin + latin-ext)
+and inlined into the single-file bundle as base64. Previously the only network
+call was to Google Fonts; the report now renders identically offline.
+
+### Changed
+- PI planning bundle: fonts inlined via `@fontsource-variable/*` +
+  `assetsInlineLimit`; the Google Fonts `<link>` is gone. Bundle ~489 → ~676 kB.
+
 ## 2.5.0 — 2026-06-08 — PI planning: ROAM board and PI objectives
 
 Extends the PI planning board's SAFe data model: the ROAM risk board and PI
