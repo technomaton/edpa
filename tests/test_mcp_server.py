@@ -428,6 +428,14 @@ def test_read_resource_invalid_iteration_id_rejected(monkeypatch):
         assert "ERROR" in content, f"expected ERROR for iteration id {bad!r}, got: {content[:80]}"
 
 
+def test_sibling_path_does_not_leak_sys_path():
+    """_sibling_path() must clean up sys.path after the with-block."""
+    before = list(sys.path)
+    with mcp_server._sibling_path():
+        pass
+    assert sys.path == before, "sys.path leaked after _sibling_path() exited"
+
+
 # ---------------------------------------------------------------------------
 # Edge cases: item lookup
 # ---------------------------------------------------------------------------
