@@ -697,6 +697,27 @@ async def list_tools() -> list[Tool]:
                 "additionalProperties": False,
             },
         ),
+        Tool(
+            name="edpa_pi_metrics",
+            description=(
+                "PI confidence & predictability trending. Accumulates per-PI metrics: "
+                "planned vs delivered SP (predictability %), average team confidence "
+                "votes, objective completion ratio, and average velocity per iteration. "
+                "Returns a table of the last N PIs — ideal for Inspect&Adapt. "
+                "Also writes .edpa/reports/pi-metrics.json and pi-metrics.md. "
+                "Read-only with respect to backlog/iteration data."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "window": {"type": "integer", "minimum": 1, "maximum": 20,
+                               "description": "Number of most-recent PIs to include (default 5)"},
+                    "pi": {"type": "string",
+                           "description": "Limit to a single PI ID, e.g. PI-2026-1 (optional)"},
+                },
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -766,6 +787,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_people_upsert(edpa_root, arguments)
         elif name == "edpa_forecast_pi":
             return _handle_forecast_pi(edpa_root, arguments)
+        elif name == "edpa_pi_metrics":
+            return _handle_pi_metrics(edpa_root, arguments)
         logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception:
@@ -1867,6 +1890,21 @@ def _handle_forecast_pi(edpa_root: Path, args: dict) -> list[TextContent]:
 
     logger.info("edpa_forecast_pi: pi=%s p50=%s prob=%s%%",
                 pi, result.get("p50"), result.get("completion_probability"))
+    return _ok(result)
+
+
+def _handle_pi_metrics(edpa_root: Path, args: dict) -> list[TextContent]:
+    window = args.get("window", 5)
+    pi = args.get("pi") or None
+
+    with _sibling_path():
+        try:
+            from pi_metrics import pi_metrics  # noqa: E402
+            result = pi_metrics(edpa_root, window=window, pi=pi)
+        except ImportError as exc:
+            return _err(f"pi_metrics module not available: {exc}")
+
+    logger.info("edpa_pi_metrics: pis=%s", len(result.get("pis", [])))
     return _ok(result)
 
 
