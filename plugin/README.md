@@ -64,7 +64,7 @@ plugin/
 │   ├── engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
 │   ├── reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
 │   └── autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
-├── commands/                        # 15 slash commands, flat layout (no edpa/ subdir)
+├── commands/                        # 16 slash commands, flat layout (no edpa/ subdir)
 │   ├── close-iteration.md           # → /edpa:close-iteration — capacity prep + engine + reports
 │   ├── board.md                     # → /edpa:board          — HTML Kanban snapshot
 │   ├── capacity.md                  # → /edpa:capacity       — per-iteration capacity overrides
@@ -150,6 +150,7 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `/edpa:export` | command | Export billable hours to CSV (payroll / invoicing — Xero, QuickBooks) |
 | `/edpa:explain` | command | Explain one person's allocation (signal → CW → JS×CW → ratio → hours) |
 | `/edpa:metrics` | command | PI predictability & confidence trending — planned/delivered SP, avg velocity, team confidence votes |
+| `/edpa:insights` | command | Mid-iteration anomaly detection — capacity overload, job-size creep, stalled stories, critical-path blockers |
 
 ## Multi-developer setup — ID collision handling
 
@@ -205,6 +206,7 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 | `edpa_flow_metrics` | Cycle time, throughput, and open-item age computed from `created_at`/`closed_at` timestamp fields |
 | `edpa_forecast_pi` | Monte-Carlo PI completion forecast — p20/p50/p80 bands, completion probability, scope recommendation |
 | `edpa_pi_metrics` | PI predictability & confidence trending — planned/delivered SP, predictability %, avg velocity, team confidence votes, objective completion. Writes `.edpa/reports/pi-metrics.json` |
+| `edpa_insights` | Mid-iteration anomaly detection — capacity overload, job-size creep, stalled stories, critical-path blockers. Writes `.edpa/reports/iteration-<iter>/insights.json` |
 
 **Write tools** (mutate `.edpa/backlog/` or `.edpa/iterations/` YAML; always commit after):
 

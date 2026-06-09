@@ -718,6 +718,38 @@ async def list_tools() -> list[Tool]:
                 "additionalProperties": False,
             },
         ),
+        Tool(
+            name="edpa_insights",
+            description=(
+                "Mid-iteration anomaly detection. Reads edpa_results.json + backlog items "
+                "+ git history and surfaces: capacity_overload (derived > threshold%), "
+                "job_size_creep (JS > threshold), stalled_story (in_progress, no git "
+                "activity > N days), critical_path_blocker (blocked by unfinished dep). "
+                "Returns JSON anomaly list + writes insights.json and insights-<iter>.md "
+                "to the reports directory. Read-only with respect to backlog data."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "iteration": {"type": "string",
+                                  "description": "Iteration ID, e.g. PI-2026-1.3 (required)"},
+                    "overload_threshold": {
+                        "type": "number", "minimum": 1.0, "maximum": 2.0,
+                        "description": "Capacity overload ratio, default 1.10 (110%)",
+                    },
+                    "js_threshold": {
+                        "type": "integer", "minimum": 1, "maximum": 100,
+                        "description": "JS above which job-size creep is flagged, default 8",
+                    },
+                    "stale_days": {
+                        "type": "integer", "minimum": 1, "maximum": 90,
+                        "description": "Days of git inactivity to flag as stalled, default 5",
+                    },
+                },
+                "required": ["iteration"],
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -789,6 +821,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_forecast_pi(edpa_root, arguments)
         elif name == "edpa_pi_metrics":
             return _handle_pi_metrics(edpa_root, arguments)
+        elif name == "edpa_insights":
+            return _handle_insights(edpa_root, arguments)
         logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception:
@@ -1905,6 +1939,33 @@ def _handle_pi_metrics(edpa_root: Path, args: dict) -> list[TextContent]:
             return _err(f"pi_metrics module not available: {exc}")
 
     logger.info("edpa_pi_metrics: pis=%s", len(result.get("pis", [])))
+    return _ok(result)
+
+
+def _handle_insights(edpa_root: Path, args: dict) -> list[TextContent]:
+    iteration = args.get("iteration", "")
+    if not iteration:
+        return _err("iteration is required (e.g. PI-2026-1.3)")
+    overload = float(args.get("overload_threshold", 1.10))
+    js_max = int(args.get("js_threshold", 8))
+    stale = int(args.get("stale_days", 5))
+
+    with _sibling_path():
+        try:
+            from insights import insights as run_insights  # noqa: E402
+            result = run_insights(
+                edpa_root=edpa_root,
+                iteration_id=iteration,
+                overload_threshold=overload,
+                js_threshold=js_max,
+                stale_days=stale,
+            )
+        except FileNotFoundError as exc:
+            return _err(str(exc))
+        except ImportError as exc:
+            return _err(f"insights module not available: {exc}")
+
+    logger.info("edpa_insights: iter=%s anomalies=%s", iteration, result.get("anomaly_count"))
     return _ok(result)
 
 
