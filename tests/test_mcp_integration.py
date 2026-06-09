@@ -233,6 +233,8 @@ class TestToolsAdvertised:
                 "edpa_confidence_vote",
                 "edpa_iteration_create", "edpa_iteration_close",
                 "edpa_pi_create", "edpa_people_upsert",
+                # Read tools added in F1
+                "edpa_forecast_pi",
             }, f"Tool set drift: {names}"
 
     def test_edpa_item_requires_item_id(self, edpa_workspace):

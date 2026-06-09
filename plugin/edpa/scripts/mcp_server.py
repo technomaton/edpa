@@ -675,6 +675,28 @@ async def list_tools() -> list[Tool]:
                 "additionalProperties": False,
             },
         ),
+        Tool(
+            name="edpa_forecast_pi",
+            description=(
+                "Monte-Carlo PI completion forecast. Fits a velocity distribution "
+                "from the last N closed iterations and simulates remaining-iteration "
+                "delivery 1000×, returning p20/p50/p80 delivery bands, completion "
+                "probability, and a scope recommendation. Read-only — does not "
+                "modify any files."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pi": {"type": "string", "description": "PI ID, e.g. PI-2026-2"},
+                    "window": {"type": "integer", "minimum": 2, "maximum": 20,
+                               "description": "Velocity history window (default 3)"},
+                    "simulations": {"type": "integer", "minimum": 100, "maximum": 10000,
+                                    "description": "Monte-Carlo simulations (default 1000)"},
+                },
+                "required": ["pi"],
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -742,6 +764,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_pi_board(edpa_root, arguments)
         elif name == "edpa_people_upsert":
             return _handle_people_upsert(edpa_root, arguments)
+        elif name == "edpa_forecast_pi":
+            return _handle_forecast_pi(edpa_root, arguments)
         logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception:
@@ -1823,6 +1847,27 @@ def _handle_people_upsert(edpa_root: Path, args: dict) -> list[TextContent]:
 
     logger.info("edpa_people_upsert: id=%s action=%s", safe_id, action)
     return _ok({"id": safe_id, "action": action, "fields": sorted(fields)})
+
+
+def _handle_forecast_pi(edpa_root: Path, args: dict) -> list[TextContent]:
+    pi = args.get("pi", "")
+    if not pi or not isinstance(pi, str):
+        return _err("pi is required (e.g. PI-2026-2)")
+    window = args.get("window", 3)
+    simulations = args.get("simulations", 1000)
+
+    with _sibling_path():
+        try:
+            from forecast import forecast_pi  # noqa: E402
+            result = forecast_pi(edpa_root, pi, window=window, simulations=simulations)
+        except ValueError as exc:
+            return _err(str(exc))
+        except ImportError as exc:
+            return _err(f"forecast module not available: {exc}")
+
+    logger.info("edpa_forecast_pi: pi=%s p50=%s prob=%s%%",
+                pi, result.get("p50"), result.get("completion_probability"))
+    return _ok(result)
 
 
 # ---------------------------------------------------------------------------

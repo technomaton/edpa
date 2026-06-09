@@ -64,7 +64,7 @@ plugin/
 │   ├── engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
 │   ├── reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
 │   └── autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
-├── commands/                        # 11 slash commands, flat layout (no edpa/ subdir)
+├── commands/                        # 13 slash commands, flat layout (no edpa/ subdir)
 │   ├── close-iteration.md           # → /edpa:close-iteration — capacity prep + engine + reports
 │   ├── board.md                     # → /edpa:board          — HTML Kanban snapshot
 │   ├── capacity.md                  # → /edpa:capacity       — per-iteration capacity overrides
@@ -75,7 +75,9 @@ plugin/
 │   ├── update.md                    # → /edpa:update         — update item fields with before/after diff
 │   ├── objectives.md                # → /edpa:objectives     — manage PI objectives + confidence votes
 │   ├── link-dep.md                  # → /edpa:link-dep       — add/remove dependency edges (program board)
-│   └── roam.md                      # → /edpa:roam           — ROAM-classify a Risk item
+│   ├── roam.md                      # → /edpa:roam           — ROAM-classify a Risk item
+│   ├── forecast.md                  # → /edpa:forecast       — Monte-Carlo PI completion forecast
+│   └── export.md                    # → /edpa:export         — billable hours CSV (payroll / invoicing)
 └── edpa/
     ├── scripts/                     # 32 Python modules
     │   ├── engine.py                # Core engine (Score, DerivedHours, invariants)
@@ -142,6 +144,8 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `/edpa:objectives` | command | Manage PI objectives (set / remove) and team confidence votes |
 | `/edpa:link-dep` | command | Add or remove a dependency edge between two items (program board arrows) |
 | `/edpa:roam` | command | ROAM-classify a Risk item (Resolved / Owned / Accepted / Mitigated) |
+| `/edpa:forecast` | command | Monte-Carlo PI completion forecast — p20/p50/p80 bands + scope recommendation |
+| `/edpa:export` | command | Export billable hours to CSV (payroll / invoicing — Xero, QuickBooks) |
 
 ## Multi-developer setup — ID collision handling
 
@@ -195,6 +199,7 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 | `edpa_item` | Single item detail |
 | `edpa_validate` | Schema + invariant validation |
 | `edpa_flow_metrics` | Cycle time, throughput, and open-item age computed from `created_at`/`closed_at` timestamp fields |
+| `edpa_forecast_pi` | Monte-Carlo PI completion forecast — p20/p50/p80 bands, completion probability, scope recommendation |
 
 **Write tools** (mutate `.edpa/backlog/` or `.edpa/iterations/` YAML; always commit after):
 
@@ -224,7 +229,7 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 ├── requirements.txt
 ├── hooks/hooks.json
 ├── skills/                           # 5 SKILL.md
-├── commands/                         # 11 slash commands (flat)
+├── commands/                         # 13 slash commands (flat)
 └── edpa/                             # Python engine, schemas, templates, workflows
 
 .edpa/                                # Project data (created by install.sh / /edpa:setup)
