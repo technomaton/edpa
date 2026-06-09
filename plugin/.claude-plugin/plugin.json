@@ -31,7 +31,8 @@
     "./commands/link-dep.md",
     "./commands/roam.md",
     "./commands/forecast.md",
-    "./commands/export.md"
+    "./commands/export.md",
+    "./commands/explain.md"
   ],
   "agents": []
 }
