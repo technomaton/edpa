@@ -171,6 +171,42 @@ def _is_iteration_path(path: Path) -> bool:
             and path.suffix in YAML_EXTENSIONS)
 
 
+def _is_heuristics_path(path: Path) -> bool:
+    """True if path is a cw_heuristics.yaml (config or template)."""
+    return path.name in ("cw_heuristics.yaml", "cw_heuristics.yaml.tmpl")
+
+
+_CW_SIGNAL_NAMES = ("assignee", "pr_author", "commit_author",
+                    "pr_reviewer", "issue_comment")
+_CW_WEIGHT_MIN = 0.1
+_CW_WEIGHT_MAX = 8.0
+
+
+def validate_cw_heuristics(path: Path, data: dict) -> tuple[list[str], list[str]]:
+    """Validate signal weights in cw_heuristics.yaml are within [0.1, 8.0]."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    signals = (data or {}).get("signals", {})
+    if not isinstance(signals, dict):
+        errors.append(f"{path}: signals: must be a mapping")
+        return errors, warnings
+    for sig in _CW_SIGNAL_NAMES:
+        if sig not in signals:
+            warnings.append(f"{path}: signals.{sig} missing (will use default)")
+            continue
+        try:
+            val = float(signals[sig])
+        except (TypeError, ValueError):
+            errors.append(f"{path}: signals.{sig} is not a number: {signals[sig]!r}")
+            continue
+        if not (_CW_WEIGHT_MIN <= val <= _CW_WEIGHT_MAX):
+            errors.append(
+                f"{path}: signals.{sig} = {val:.3f} is outside valid range "
+                f"[{_CW_WEIGHT_MIN}, {_CW_WEIGHT_MAX}]"
+            )
+    return errors, warnings
+
+
 def _people_ids_for_iteration(path: Path) -> set[str] | None:
     """Find the .edpa/config/people.yaml that sits next to this iteration
     file and return the set of person ids declared there. Returns None
@@ -569,6 +605,12 @@ def validate_yaml(path, *, content=None, strict=False):
             path, data, strict=strict)
         errors.extend(iter_errors)
         warnings.extend(iter_warnings)
+
+    # cw_heuristics.yaml: validate signal weight bounds [0.1, 8.0].
+    if data is not None and _is_heuristics_path(path):
+        h_errors, h_warnings = validate_cw_heuristics(path, data)
+        errors.extend(h_errors)
+        warnings.extend(h_warnings)
 
     return errors, warnings
 

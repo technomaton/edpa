@@ -311,32 +311,81 @@ for the per-step contract.
 
 ---
 
-## 5. `/edpa:calibrate` — auto-calibrate CW heuristics
+## 5. `/edpa:autocalib` — auto-calibrate CW signal weights
 
-**Purpose:** optimize role weights in `heuristics.yaml` against ground-truth
-records using Karpathy autoresearch loop.
+**Purpose:** optimize the 5 signal weights (`assignee`, `pr_author`,
+`commit_author`, `pr_reviewer`, `issue_comment`) in
+`.edpa/config/cw_heuristics.yaml` using Monte Carlo + coordinate descent
+against a synthetic corpus (always available) or blended with team-confirmed
+corrections from a closed PI retrospective.
 
-**Prerequisites:**
+**Target file:** `.edpa/config/cw_heuristics.yaml`
+(installed from `plugin/edpa/templates/cw_heuristics.yaml.tmpl`)
 
-- ≥20 records in `.edpa/data/ground_truth.yaml` — manually confirmed CW
-  values from a closed PI with retrospective adjustments.
-- Closed iterations with engine results.
+### Quarterly cadence
 
-**Skip until first PI is closed and reviewed.** Running before that has no
-signal — the loop will overfit on noise. See `feedback_cw_calibration.md` in
-auto-memory.
-
-**When ready:**
+Run after each PI close, once the retrospective corrections are recorded:
 
 ```bash
-# Skill invocation handles experiment budget + iteration count
-# Manual fallback for inspection:
-ls .edpa/data/ground_truth.yaml      # must exist
-cat .edpa/config/heuristics.yaml     # current state
+# 1. Record corrections after retrospective
+#    .edpa/data/calibration_corrections.yaml (create from template if missing)
+cp .edpa/engine/templates/calibration_corrections.yaml.tmpl \
+   .edpa/data/calibration_corrections.yaml
+# Edit: add iteration/item/person/actual_cw entries
+
+# 2. Preview what would change (no write)
+python3 .edpa/engine/scripts/calibrate_signals.py \
+  --real-data --quick --dry-run
+
+# 3. Run and apply
+python3 .edpa/engine/scripts/calibrate_signals.py \
+  --real-data --scenarios 1000 --apply --commit
+
+# 4. Verify
+cat .edpa/config/cw_heuristics.yaml | grep -A6 "signals:"
 ```
 
-The skill writes `.edpa/data/calibration_log.tsv` per iteration with MAD
-delta. Acceptance: MAD reduction ≥ 5%.
+Or via the skill: `/edpa:autocalib --real-data apply`
+
+### Synthetic-only (no real data yet)
+
+```bash
+python3 .edpa/engine/scripts/calibrate_signals.py \
+  --scenarios 1000 --seed 42 --apply --commit
+```
+
+Synthetic calibration is runnable any time. Real-data blending requires at
+least one closed PI with retrospective corrections.
+
+### Governance flags
+
+| Flag | Effect |
+|---|---|
+| `--dry-run` | Show weight diff + MAD improvement without writing |
+| `--apply` | Write best weights to template |
+| `--commit` | After `--apply`, `git commit` with MAD-diff message |
+| `--real-data` | Blend `.edpa/data/calibration_corrections.yaml` with synthetic |
+| `--real-weight N` | How many times real records count vs synthetic (default 10) |
+
+### Rollback
+
+```bash
+git log --oneline --follow plugin/edpa/templates/cw_heuristics.yaml.tmpl | head -5
+git checkout <SHA> -- plugin/edpa/templates/cw_heuristics.yaml.tmpl
+cp plugin/edpa/templates/cw_heuristics.yaml.tmpl .edpa/config/cw_heuristics.yaml
+```
+
+### Acceptance threshold
+
+A calibration run is worth applying when MAD improvement ≥ 2% vs baseline.
+Below that, the synthetic corpus is near the local optimum — add more real
+corrections and re-run next quarter.
+
+### Weight bounds
+
+Signal weights must stay in **[0.1, 8.0]**. The `validate_on_save` hook
+checks `cw_heuristics.yaml` on every edit and reports bound violations.
+Manual edits outside this range will produce a validation warning.
 
 ---
 

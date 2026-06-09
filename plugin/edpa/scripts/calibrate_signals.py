@@ -486,15 +486,65 @@ def run_calibration(n_scenarios: int, seed: int, quick: bool = False) -> dict:
     }
 
 
-def apply_to_heuristics(report: dict, target: Path):
+def _read_current_weights(target: Path) -> dict[str, float]:
+    """Parse current signal weights from cw_heuristics.yaml.tmpl."""
+    import re
+    if not target.exists():
+        return {}
+    text = target.read_text(encoding="utf-8")
+    out: dict[str, float] = {}
+    in_signals = False
+    for line in text.splitlines():
+        if line.strip().startswith("signals:"):
+            in_signals = True
+            continue
+        if in_signals:
+            m = re.match(r"^\s+(\w+):\s*([\d.]+)", line)
+            if m:
+                out[m.group(1)] = float(m.group(2))
+            elif line.strip() and not line.startswith(" "):
+                break
+    return out
+
+
+def diff_weights(old: dict[str, float], new: dict[str, float]) -> list[str]:
+    """Return human-readable diff lines for signal weight changes."""
+    lines = []
+    for sig in SIGNAL_TYPES:
+        o = old.get(sig)
+        n = new.get(sig)
+        if o is None or n is None:
+            continue
+        delta = n - o
+        marker = "  " if abs(delta) < 0.01 else ("↑ " if delta > 0 else "↓ ")
+        lines.append(f"  {marker}{sig}: {o:.2f} → {n:.2f}  ({delta:+.3f})")
+    return lines
+
+
+def apply_to_heuristics(report: dict, target: Path, dry_run: bool = False):
     """Write calibrated weights into cw_heuristics.yaml.tmpl, preserving
-    the rest of the file and updating calibration metadata."""
+    the rest of the file and updating calibration metadata.
+
+    With dry_run=True: show the diff but do NOT write the file.
+    """
     if not target.exists():
         print(f"ERROR: target {target} not found", file=sys.stderr)
         sys.exit(2)
 
+    old_weights = _read_current_weights(target)
     text = target.read_text(encoding="utf-8")
     weights = report["calibrated_weights"]
+
+    # Show weight diff
+    print(f"\nWeight diff (old → new):")
+    for line in diff_weights(old_weights, weights):
+        print(line)
+    print(f"MAD: {report['baseline_mad']:.4f} → {report['calibrated_mad']:.4f}  "
+          f"({report['improvement_pct']:+.1f}%)")
+
+    if dry_run:
+        print(f"\n[dry-run] Would write to {target} — not written.")
+        return
 
     # Re-emit the signals: block (5 keys, fixed order)
     new_signals_block = (
@@ -517,13 +567,14 @@ def apply_to_heuristics(report: dict, target: Path):
     # Update calibration metadata
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    real_records = report.get("real_records", 0)
     calib_block = (
         f'calibration:\n'
         f'  method: "{report["method"]}"\n'
         f'  monte_carlo:\n'
         f'    scenarios: {report["n_scenarios"]}\n'
         f'    records: {report["n_records"]}\n'
-        f'  ground_truth_records: 0   # synthetic baseline; re-run with real data after first PI\n'
+        f'  ground_truth_records: {real_records}\n'
         f'  mad_baseline: {report["baseline_mad"]:.4f}\n'
         f'  mad_calibrated: {report["calibrated_mad"]:.4f}\n'
         f'  improvement_pct: {report["improvement_pct"]:.1f}\n'
@@ -546,6 +597,44 @@ def apply_to_heuristics(report: dict, target: Path):
 
     target.write_text(text2, encoding="utf-8")
     print(f"\n✓ Calibrated weights written to {target}")
+
+
+def commit_heuristics(target: Path, report: dict) -> bool:
+    """git add + git commit the heuristics template with a structured message.
+
+    Returns True on success, False if git is unavailable or the working tree
+    is inside a directory with no git repo.
+    """
+    import subprocess
+    mad_b = report["baseline_mad"]
+    mad_c = report["calibrated_mad"]
+    pct = report["improvement_pct"]
+    real = report.get("real_records", 0)
+    mode = "real-data blended" if real > 0 else "synthetic"
+
+    old_weights = _read_current_weights(target)
+    new_weights = report["calibrated_weights"]
+    diff_lines = diff_weights(old_weights, new_weights)
+    diff_summary = "  " + "\n  ".join(diff_lines) if diff_lines else "  (no changes)"
+
+    msg = (
+        f"chore(calibration): update CW weights "
+        f"(MAD {mad_b:.4f} → {mad_c:.4f}, {pct:+.1f}%)\n\n"
+        f"Mode: {mode}"
+        + (f" ({real} real records)" if real > 0 else "") + "\n"
+        f"Weight changes:\n{diff_summary}\n"
+    )
+
+    try:
+        subprocess.run(["git", "add", str(target)], check=True,
+                       capture_output=True)
+        subprocess.run(["git", "commit", "-m", msg], check=True,
+                       capture_output=True)
+        print(f"✓ Committed heuristics update: MAD {mad_b:.4f} → {mad_c:.4f}")
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        print(f"WARNING: git commit failed: {exc}", file=sys.stderr)
+        return False
 
 
 # ── Real-data calibration feedback loop ────────────────────────────────────
@@ -825,6 +914,10 @@ def main():
                     help="Smaller MC sample (200 instead of 2000) — faster, less accurate")
     ap.add_argument("--apply", action="store_true",
                     help="Write calibrated weights to plugin/edpa/templates/cw_heuristics.yaml.tmpl")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="Show what --apply would write (weight diff + MAD) without writing")
+    ap.add_argument("--commit", action="store_true",
+                    help="After --apply, git add + git commit with structured MAD-diff message")
     ap.add_argument("--report", type=Path, default=None,
                     help="Optional path to write JSON calibration report")
     ap.add_argument("--real-data", action="store_true",
@@ -856,9 +949,14 @@ def main():
                                encoding="utf-8")
         print(f"\n✓ Report written to {args.report}")
 
-    if args.apply:
-        target = Path(__file__).parent.parent / "templates" / "cw_heuristics.yaml.tmpl"
-        apply_to_heuristics(report, target)
+    target = Path(__file__).parent.parent / "templates" / "cw_heuristics.yaml.tmpl"
+
+    if args.dry_run:
+        apply_to_heuristics(report, target, dry_run=True)
+    elif args.apply:
+        apply_to_heuristics(report, target, dry_run=False)
+        if args.commit:
+            commit_heuristics(target, report)
 
 
 if __name__ == "__main__":
