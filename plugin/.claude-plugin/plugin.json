@@ -24,7 +24,12 @@
     "./commands/capacity.md",
     "./commands/server.md",
     "./commands/create-pi.md",
-    "./commands/pi-planning.md"
+    "./commands/pi-planning.md",
+    "./commands/change-state.md",
+    "./commands/update.md",
+    "./commands/objectives.md",
+    "./commands/link-dep.md",
+    "./commands/roam.md"
   ],
   "agents": []
 }

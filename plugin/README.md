@@ -64,13 +64,18 @@ plugin/
 │   ├── engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
 │   ├── reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
 │   └── autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
-├── commands/                        # 6 slash commands, flat layout (no edpa/ subdir)
+├── commands/                        # 11 slash commands, flat layout (no edpa/ subdir)
 │   ├── close-iteration.md           # → /edpa:close-iteration — capacity prep + engine + reports
 │   ├── board.md                     # → /edpa:board          — HTML Kanban snapshot
 │   ├── capacity.md                  # → /edpa:capacity       — per-iteration capacity overrides
 │   ├── server.md                    # → /edpa:server         — start/stop PI-planning server
 │   ├── create-pi.md                 # → /edpa:create-pi      — create the PI-level metadata file (pi: block)
-│   └── pi-planning.md               # → /edpa:pi-planning    — self-contained PI planning / overview HTML
+│   ├── pi-planning.md               # → /edpa:pi-planning    — self-contained PI planning / overview HTML
+│   ├── change-state.md              # → /edpa:change-state   — transition item status (wraps edpa_item_transition)
+│   ├── update.md                    # → /edpa:update         — update item fields with before/after diff
+│   ├── objectives.md                # → /edpa:objectives     — manage PI objectives + confidence votes
+│   ├── link-dep.md                  # → /edpa:link-dep       — add/remove dependency edges (program board)
+│   └── roam.md                      # → /edpa:roam           — ROAM-classify a Risk item
 └── edpa/
     ├── scripts/                     # 32 Python modules
     │   ├── engine.py                # Core engine (Score, DerivedHours, invariants)
@@ -132,6 +137,11 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `/edpa:board` | command | HTML Kanban snapshot from local backlog |
 | `/edpa:create-pi` | command | Create the PI-level `pi:` file (also `edpa_pi_create` MCP tool) |
 | `/edpa:pi-planning` | command | Self-contained PI planning / overview HTML — program board, objectives, ROAM, portfolio, WSJF, capacity (also `edpa_pi_board` MCP tool) |
+| `/edpa:change-state` | command | Transition item status with workflow validation (wraps `edpa_item_transition`) |
+| `/edpa:update` | command | Update item fields (`iteration`, `js`, WSJF inputs, `assignee`, `title`) with before/after diff |
+| `/edpa:objectives` | command | Manage PI objectives (set / remove) and team confidence votes |
+| `/edpa:link-dep` | command | Add or remove a dependency edge between two items (program board arrows) |
+| `/edpa:roam` | command | ROAM-classify a Risk item (Resolved / Owned / Accepted / Mitigated) |
 
 ## Multi-developer setup — ID collision handling
 
@@ -174,6 +184,8 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 
 ### MCP tools provided by `mcp_server.py`
 
+**Read tools** (safe to call any time — no writes):
+
 | Tool | What it does |
 |------|-------------|
 | `edpa_status` | Project governance summary (PI, iteration, team) |
@@ -182,8 +194,26 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 | `edpa_people` | Capacity registry lookup |
 | `edpa_item` | Single item detail |
 | `edpa_validate` | Schema + invariant validation |
-| `edpa_sync_people` | Collaborator reconciliation |
 | `edpa_flow_metrics` | Cycle time, throughput, and open-item age computed from `created_at`/`closed_at` timestamp fields |
+
+**Write tools** (mutate `.edpa/backlog/` or `.edpa/iterations/` YAML; always commit after):
+
+| Tool | What it does | Skill / command wrapper |
+|------|-------------|------------------------|
+| `edpa_item_create` | Create a new backlog item (allocates ID) | `/edpa:add` |
+| `edpa_item_update` | Update item fields (`iteration`, `js`, WSJF inputs, `assignee`, `title`) | `/edpa:update` |
+| `edpa_item_transition` | Change item status (workflow-validated; stamps `closed_at` on Done) | `/edpa:change-state` |
+| `edpa_item_link_parent` | Set or change an item's parent | — |
+| `edpa_item_link_dep` | Add/remove dependency edges (cycle detection) | `/edpa:link-dep` |
+| `edpa_item_roam` | ROAM-classify a Risk item | `/edpa:roam` |
+| `edpa_iteration_create` | Create a new iteration YAML | — |
+| `edpa_iteration_close` | Mark an iteration closed (audit state) | `/edpa:close-iteration` |
+| `edpa_pi_create` | Create the PI-level metadata file | `/edpa:create-pi` |
+| `edpa_pi_board` | Generate the self-contained PI planning HTML | `/edpa:pi-planning` |
+| `edpa_objective_set` | Add or update a PI objective (upsert by title) | `/edpa:objectives` |
+| `edpa_objective_remove` | Remove a PI objective | `/edpa:objectives` |
+| `edpa_confidence_vote` | Set a team's PI confidence vote (1–5) | `/edpa:objectives` |
+| `edpa_people_upsert` | Add or update a person in people.yaml | — |
 
 ## Target project layout (after install)
 
@@ -193,8 +223,8 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 ├── .mcp.json
 ├── requirements.txt
 ├── hooks/hooks.json
-├── skills/                           # 6 SKILL.md
-├── commands/                         # 6 slash commands (flat)
+├── skills/                           # 5 SKILL.md
+├── commands/                         # 11 slash commands (flat)
 └── edpa/                             # Python engine, schemas, templates, workflows
 
 .edpa/                                # Project data (created by install.sh / /edpa:setup)
