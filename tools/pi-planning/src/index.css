@@ -1395,6 +1395,25 @@ body {
   text-transform: uppercase;
 }
 
+/* Feature card rollup (E1: done/total stories + Σ JS) */
+.rf-card__rollup {
+  margin: 3px 0;
+}
+
+.rf-card__rollup-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rf-card__rollup-label {
+  font-family: 'JetBrains Mono Variable', monospace;
+  font-size: 0.5rem;
+  color: var(--t3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Shared capacity bar (used in Team Board, People) */
 .capacity-bar {
   flex: 1;
