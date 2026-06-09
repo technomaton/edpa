@@ -1,0 +1,53 @@
+# EDPA calibration corrections — team-confirmed CW adjustments
+#
+# Add entries here after each PI retrospective when EDPA's computed
+# contribution weights differ from team consensus.
+#
+# After adding corrections, re-run calibration with real-data blending:
+#   python3 .edpa/engine/scripts/calibrate_signals.py --real-data
+#   or: /edpa:autocalib --real-data
+#
+# Format:
+#   corrections:
+#     - iteration: <PI-YYYY-M>    # which iteration this correction applies to
+#       item:      <ITEM-ID>      # backlog item (Story, Defect, Feature, …)
+#       person:    <PERSON-ID>    # person ID from people.yaml
+#       actual_cw: <0.01–1.0>    # team-confirmed contribution weight
+#       note: "optional explanation"
+#
+# Notes:
+#   - actual_cw values per item should sum to ≈ 1.0 across all persons listed
+#     for that item.  The calibrator normalizes per-item, so small deviations
+#     are fine, but large imbalances will skew the optimizer.
+#   - If a person is NOT listed for an item, only listed persons are used for
+#     that item in the real-data corpus.
+#   - signal_counts are inferred from the item's contributors[].signals[]
+#     when present; otherwise derived from the `as:` role field (assignee/
+#     key/reviewer/consulted).
+#   - Corrections are ADDITIVE over PIs — keep past corrections in the file so
+#     the optimizer accumulates evidence over time.
+#
+# Example (remove and replace with real data after first PI close):
+
+corrections: []
+
+# corrections:
+#   # PI-2026-1 retrospective — 2026-05-12
+#   - iteration: PI-2026-1
+#     item: S-200
+#     person: turyna
+#     actual_cw: 0.70
+#     note: "Pair session on Monday not reflected in commits (mob programming)"
+#   - iteration: PI-2026-1
+#     item: S-200
+#     person: tuma
+#     actual_cw: 0.30
+#   - iteration: PI-2026-1
+#     item: S-203
+#     person: tuma
+#     actual_cw: 0.60
+#   - iteration: PI-2026-1
+#     item: S-203
+#     person: matousek
+#     actual_cw: 0.40
+#     note: "Pair review counted as reviewer but was actually key contributor"
