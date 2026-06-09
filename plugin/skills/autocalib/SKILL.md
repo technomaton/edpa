@@ -151,23 +151,59 @@ Re-run with: python3 plugin/edpa/scripts/calibrate_signals.py --apply
 ## Re-run with real data (post-first-PI)
 
 The MC corpus is a *prior*: it encodes plausible signal/cw mappings under
-v1.11's procedural model. To improve on it, replace synthetic
-`SyntheticContribution` records with team-confirmed corrections from a closed
-PI retrospective.
+v1.11's procedural model. After a PI closes, capture team-confirmed CW
+corrections in `.edpa/data/calibration_corrections.yaml` and run the blended
+calibration — real corrections are weighted 10× higher than synthetic records.
 
-Today this requires a small adapter (not yet implemented as a skill):
+### Step 1 — Add corrections after PI retrospective
 
-1. Export per-item engine output from a closed PI (`edpa_results.json`).
-2. Run the retrospective; capture team-corrected CW shares.
-3. Build a list of
-   `SyntheticContribution(person, role, item_id, true_cw=<confirmed_cw>,
-   signal_counts=<observed_counts_from_engine>)`.
-4. Replace `generate_corpus(...)` with the loaded real corpus and rerun the
-   optimizer.
+```bash
+# .edpa/data/calibration_corrections.yaml (use project_setup template or create manually)
+corrections:
+  - iteration: PI-2026-1
+    item: S-200
+    person: turyna
+    actual_cw: 0.70
+    note: "Pair session not in commits"
+  - iteration: PI-2026-1
+    item: S-200
+    person: tuma
+    actual_cw: 0.30
+```
 
-If the user asks for this flow now, refuse with: "Real-data calibration adapter
-not yet implemented. Run the synthetic MC pipeline first; track real
-corrections in retros until the adapter ships."
+Each entry: `iteration`, `item` (backlog ID), `person` (people.yaml ID),
+`actual_cw` (team-confirmed weight, values per item should sum to ≈ 1.0).
+Signal counts are derived from `contributors[].signals[]` in the item YAML
+when present; otherwise inferred from the `as:` role field.
+
+### Step 2 — Run blended calibration
+
+```bash
+python3 plugin/edpa/scripts/calibrate_signals.py \
+  --real-data \
+  [--corrections .edpa/data/calibration_corrections.yaml] \
+  [--scenarios 1000] \
+  [--seed 42] \
+  [--apply]
+```
+
+Or via the skill: `/edpa:autocalib --real-data apply`
+
+The script:
+1. Loads corrections → builds real `SyntheticContribution` records
+2. Generates `--scenarios` synthetic records as regularisation prior
+3. Blends real (×10) + synthetic → runs MC + coordinate-descent
+4. Reports: blended MAD vs synthetic-only baseline, real record count
+5. `--apply` writes best weights to `cw_heuristics.yaml.tmpl`
+
+Argument variants for this skill when `$ARGUMENTS` includes `--real-data`:
+- `--real-data` → blended with default corrections path
+- `--real-data apply` → blended + write weights
+- `--real-data --corrections <path>` → custom corrections file
+- `--real-data --real-weight 20` → stronger real-data influence
+
+Keep corrections across PIs — the file accumulates evidence. The `iteration`
+field is for audit; all corrections are used together in each run.
 
 ## Strategy guidance
 

@@ -1,6 +1,8 @@
 """Tests for calibrate_signals.py — Monte Carlo signal-weight calibrator.
 
 D2 roadmap item: 580-line statistical optimizer had zero tests.
+C2 roadmap item: real-data calibration feedback loop.
+
 Critical failure modes to guard (per roadmap §5.D2):
   - NaN / Inf weights appearing in output
   - Weight constraint violations (floor < 0.05)
@@ -24,13 +26,19 @@ from calibrate_signals import (  # noqa: E402
     SIGNAL_TYPES,
     SyntheticContribution,
     SyntheticScenario,
+    _count_signals,
+    blend_corpora,
+    build_real_contribution,
     coordinate_descent,
     evaluate_mad,
     generate_corpus,
     generate_scenario,
     generate_signals,
+    load_corrections,
+    load_real_corpus,
     random_sample_phase,
     run_calibration,
+    run_calibration_real_data,
 )
 
 
@@ -330,3 +338,261 @@ class TestRunCalibration:
         report = run_calibration(n_scenarios=5, seed=2, quick=True)
         assert report["n_records"] > 0
         assert report["n_scenarios"] == 5
+
+
+# ---------------------------------------------------------------------------
+# C2: real-data calibration helpers
+# ---------------------------------------------------------------------------
+
+CORRECTIONS_YAML = """\
+corrections:
+  - iteration: PI-2026-1
+    item: S-1
+    person: alice
+    actual_cw: 0.70
+    note: "pair session"
+  - iteration: PI-2026-1
+    item: S-1
+    person: bob
+    actual_cw: 0.30
+  - iteration: PI-2026-1
+    item: S-2
+    person: alice
+    actual_cw: 1.0
+"""
+
+BACKLOG_ITEM_WITH_SIGNALS = """\
+---
+id: S-1
+type: Story
+title: Auth endpoint
+js: 5
+status: Done
+iteration: PI-2026-1
+assignee: alice
+contributors:
+  - person: alice
+    cw: 0.80
+    as: owner
+    signals:
+      - type: commit_author
+        ref: abc1
+        weight: 2.78
+      - type: commit_author
+        ref: abc2
+        weight: 2.78
+      - type: assignee
+        ref: S-1
+        weight: 4.0
+  - person: bob
+    cw: 0.20
+    as: reviewer
+    signals:
+      - type: pr_reviewer
+        ref: pr-55
+        weight: 2.25
+---
+"""
+
+BACKLOG_ITEM_NO_SIGNALS = """\
+---
+id: S-2
+type: Story
+title: Login UI
+js: 3
+status: Done
+iteration: PI-2026-1
+assignee: alice
+contributors:
+  - person: alice
+    cw: 1.0
+    as: owner
+---
+"""
+
+
+@pytest.fixture
+def corrections_workspace(tmp_path):
+    edpa = tmp_path / ".edpa"
+    (edpa / "data").mkdir(parents=True)
+    (edpa / "backlog" / "stories").mkdir(parents=True)
+
+    (edpa / "data" / "calibration_corrections.yaml").write_text(
+        CORRECTIONS_YAML, encoding="utf-8"
+    )
+    (edpa / "backlog" / "stories" / "S-1.md").write_text(
+        BACKLOG_ITEM_WITH_SIGNALS, encoding="utf-8"
+    )
+    (edpa / "backlog" / "stories" / "S-2.md").write_text(
+        BACKLOG_ITEM_NO_SIGNALS, encoding="utf-8"
+    )
+    return edpa
+
+
+class TestCountSignals:
+    def test_counts_by_type(self):
+        raw = [
+            {"type": "commit_author", "ref": "a"},
+            {"type": "commit_author", "ref": "b"},
+            {"type": "assignee", "ref": "S-1"},
+        ]
+        counts = _count_signals(raw)
+        assert counts["commit_author"] == 2
+        assert counts["assignee"] == 1
+        assert counts["pr_reviewer"] == 0
+
+    def test_ignores_unknown_types(self):
+        raw = [{"type": "unknown_signal"}, {"type": "commit_author", "ref": "x"}]
+        counts = _count_signals(raw)
+        assert counts["commit_author"] == 1
+        assert all(counts[s] >= 0 for s in SIGNAL_TYPES)
+
+    def test_empty_returns_all_zeros(self):
+        counts = _count_signals([])
+        assert all(counts[s] == 0 for s in SIGNAL_TYPES)
+
+
+class TestLoadCorrections:
+    def test_loads_records(self, corrections_workspace):
+        recs = load_corrections(corrections_workspace / "data" / "calibration_corrections.yaml")
+        assert len(recs) == 3
+
+    def test_missing_file_returns_empty(self, tmp_path):
+        assert load_corrections(tmp_path / "nonexistent.yaml") == []
+
+    def test_empty_corrections_returns_empty(self, tmp_path):
+        f = tmp_path / "c.yaml"
+        f.write_text("corrections: []\n", encoding="utf-8")
+        assert load_corrections(f) == []
+
+
+class TestBuildRealContribution:
+    def test_uses_signals_from_backlog(self, corrections_workspace):
+        rec = {"iteration": "PI-2026-1", "item": "S-1",
+               "person": "alice", "actual_cw": 0.70}
+        c = build_real_contribution(rec, corrections_workspace)
+        assert c is not None
+        assert c.true_cw == pytest.approx(0.70)
+        assert c.signal_counts["commit_author"] == 2
+        assert c.signal_counts["assignee"] == 1
+
+    def test_infers_signals_when_none(self, corrections_workspace):
+        rec = {"iteration": "PI-2026-1", "item": "S-2",
+               "person": "alice", "actual_cw": 1.0}
+        c = build_real_contribution(rec, corrections_workspace)
+        assert c is not None
+        # Inferred from as: owner + assignee
+        assert c.signal_counts["assignee"] >= 1
+
+    def test_missing_item_returns_none(self, corrections_workspace):
+        rec = {"item": "S-999", "person": "alice", "actual_cw": 0.5}
+        assert build_real_contribution(rec, corrections_workspace) is None
+
+    def test_invalid_cw_returns_none(self, corrections_workspace):
+        rec = {"item": "S-1", "person": "alice", "actual_cw": -0.1}
+        assert build_real_contribution(rec, corrections_workspace) is None
+
+    def test_zero_cw_returns_none(self, corrections_workspace):
+        rec = {"item": "S-1", "person": "alice", "actual_cw": 0.0}
+        assert build_real_contribution(rec, corrections_workspace) is None
+
+
+class TestLoadRealCorpus:
+    def test_groups_by_iteration(self, corrections_workspace):
+        corpus = load_real_corpus(
+            corrections_workspace,
+            corrections_workspace / "data" / "calibration_corrections.yaml",
+        )
+        assert len(corpus) == 1  # all corrections in PI-2026-1
+        assert corpus[0].items  # at least one item
+
+    def test_contributions_count(self, corrections_workspace):
+        corpus = load_real_corpus(
+            corrections_workspace,
+            corrections_workspace / "data" / "calibration_corrections.yaml",
+        )
+        # 3 corrections → 3 SyntheticContribution records
+        total = sum(len(s.contributions) for s in corpus)
+        assert total == 3
+
+    def test_empty_corrections_returns_empty(self, tmp_path):
+        edpa = tmp_path / ".edpa"
+        (edpa / "data").mkdir(parents=True)
+        f = edpa / "data" / "calibration_corrections.yaml"
+        f.write_text("corrections: []\n", encoding="utf-8")
+        assert load_real_corpus(edpa, f) == []
+
+
+class TestBlendCorpora:
+    def test_blend_length(self):
+        real = _minimal_corpus(2, seed=0)
+        synthetic = _minimal_corpus(5, seed=1)
+        blended = blend_corpora(real, synthetic, real_weight=3)
+        assert len(blended) == 3 * 2 + 5  # real×3 + synthetic
+
+    def test_zero_weight_keeps_only_synthetic(self):
+        real = _minimal_corpus(2, seed=0)
+        synthetic = _minimal_corpus(5, seed=1)
+        blended = blend_corpora(real, synthetic, real_weight=0)
+        assert len(blended) == 5
+
+    def test_blend_preserves_contributions(self, corrections_workspace):
+        real = load_real_corpus(
+            corrections_workspace,
+            corrections_workspace / "data" / "calibration_corrections.yaml",
+        )
+        synthetic = _minimal_corpus(3, seed=7)
+        blended = blend_corpora(real, synthetic, real_weight=2)
+        assert len(blended) > 0
+
+
+class TestRunCalibrationRealData:
+    def test_falls_back_to_synthetic_on_empty_corrections(self, tmp_path, capsys):
+        edpa = tmp_path / ".edpa"
+        (edpa / "data").mkdir(parents=True)
+        f = edpa / "data" / "calibration_corrections.yaml"
+        f.write_text("corrections: []\n", encoding="utf-8")
+        report = run_calibration_real_data(
+            edpa_root=edpa,
+            corrections_file=f,
+            n_scenarios=5,
+            seed=0,
+            quick=True,
+        )
+        assert report["real_records"] == 0
+        assert report["mode"] == "synthetic-only (no corrections found)"
+
+    def test_real_data_report_keys(self, corrections_workspace, capsys):
+        report = run_calibration_real_data(
+            edpa_root=corrections_workspace,
+            corrections_file=corrections_workspace / "data" / "calibration_corrections.yaml",
+            n_scenarios=5,
+            seed=42,
+            quick=True,
+        )
+        for key in ("real_records", "calibrated_weights", "calibrated_mad",
+                    "baseline_mad", "improvement_pct", "mode"):
+            assert key in report, f"missing key: {key}"
+
+    def test_real_data_mode_string(self, corrections_workspace, capsys):
+        report = run_calibration_real_data(
+            edpa_root=corrections_workspace,
+            corrections_file=corrections_workspace / "data" / "calibration_corrections.yaml",
+            n_scenarios=5,
+            seed=0,
+            quick=True,
+        )
+        assert report["mode"] == "real-data blended"
+        assert report["real_records"] == 3
+
+    def test_real_data_weights_valid(self, corrections_workspace, capsys):
+        report = run_calibration_real_data(
+            edpa_root=corrections_workspace,
+            corrections_file=corrections_workspace / "data" / "calibration_corrections.yaml",
+            n_scenarios=5,
+            seed=1,
+            quick=True,
+        )
+        for s, v in report["calibrated_weights"].items():
+            assert v >= 0.05, f"{s} weight below floor"
+            assert not math.isnan(v), f"NaN weight for {s}"
