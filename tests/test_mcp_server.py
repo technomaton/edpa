@@ -211,7 +211,7 @@ def test_handle_backlog_filter_iteration():
 def test_handle_backlog_filter_type():
     """Filters by type (Story, Feature, etc.)."""
     stories = parse_result(_handle_backlog(EDPA_ROOT, None, "Story", None))
-    assert len(stories) == 27
+    assert len(stories) >= 27  # S-227 added in E2
     assert all(i["type"] == "Story" for i in stories)
 
     features = parse_result(_handle_backlog(EDPA_ROOT, None, "Feature", None))
@@ -263,20 +263,22 @@ def test_handle_item_feature():
 # ---------------------------------------------------------------------------
 
 def test_list_tools():
-    """Returns the documented EDPA V2 tool surface (9 read + 13 write).
+    """Returns the documented EDPA V2 tool surface (10 read + 13 write).
 
     edpa_sync_people was removed in V2.0 along with sync_collaborators.py.
     edpa_pi_create was added in 2.2.0; edpa_pi_board (PI planning HTML),
     edpa_item_link_dep (dependencies), edpa_item_roam (ROAM), and the PI
     objectives tools (set / remove / confidence) added later.
+    edpa_forecast_pi added in F1; edpa_pi_metrics added in E2.
     """
     tools = asyncio.run(mcp_server.list_tools())
-    assert len(tools) == 22
+    assert len(tools) == 23
 
     names = {t.name for t in tools}
     expected_read = {"edpa_status", "edpa_iterations", "edpa_people",
                      "edpa_backlog", "edpa_item", "edpa_validate",
-                     "edpa_flow_metrics", "edpa_pi_board", "edpa_forecast_pi"}
+                     "edpa_flow_metrics", "edpa_pi_board", "edpa_forecast_pi",
+                     "edpa_pi_metrics"}
     expected_write = {"edpa_item_create", "edpa_item_update",
                       "edpa_item_transition", "edpa_item_link_parent",
                       "edpa_item_link_dep", "edpa_item_roam",

@@ -32,7 +32,8 @@
     "./commands/roam.md",
     "./commands/forecast.md",
     "./commands/export.md",
-    "./commands/explain.md"
+    "./commands/explain.md",
+    "./commands/metrics.md"
   ],
   "agents": []
 }
