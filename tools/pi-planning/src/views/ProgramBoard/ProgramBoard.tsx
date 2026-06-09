@@ -51,6 +51,22 @@ function iterationForItem(item: WorkItem, iterations: Iteration[]): string | nul
 
 // -- Build nodes & edges ------------------------------------------------------
 
+interface BoardFilter {
+  team: string;
+  status: string;
+  text: string;
+}
+
+function matchesFilter(item: WorkItem, f: BoardFilter, personTeam: Record<string, string>): boolean {
+  if (f.team && getTeamForItem(item, personTeam) !== f.team) return false;
+  if (f.status && (item.status || '').toLowerCase() !== f.status.toLowerCase()) return false;
+  if (f.text) {
+    const t = f.text.toLowerCase();
+    if (!item.id.toLowerCase().includes(t) && !(item.title || '').toLowerCase().includes(t)) return false;
+  }
+  return true;
+}
+
 function buildBoard(
   items: WorkItem[],
   iterations: Iteration[],
@@ -63,6 +79,7 @@ function buildBoard(
   pi_iteration_weeks: number,
   onSelectItem: (item: WorkItem) => void,
   dropTarget: string | null,
+  boardFilter: BoardFilter,
 ): { nodes: Node[]; edges: Edge[]; rowYOffsets: Record<string, number>; rowHeights: Record<string, number>; backwardDeps: number; sameIterCrossTeam: number } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -96,8 +113,12 @@ function buildBoard(
       contributors: [],
     }));
   const events = [...backlogEvents, ...syntheticEvents];
-  // Features/Stories for the board
-  const features = piItems.filter(i => i.type === 'Feature' || i.type === 'Story');
+  // Features/Stories for the board (filtered by boardFilter)
+  const allFeatures = piItems.filter(i => i.type === 'Feature' || i.type === 'Story');
+  const hasFilter = boardFilter.team || boardFilter.status || boardFilter.text;
+  const features = hasFilter
+    ? allFeatures.filter(f => matchesFilter(f, boardFilter, personTeam))
+    : allFeatures;
 
   // Child story rollup per feature (done/total/totalJS from ALL backlog stories, not just PI)
   const DONE_STATUSES = new Set(['done', 'closed', 'accepted', 'complete', 'completed']);
@@ -376,6 +397,7 @@ export function ProgramBoard() {
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [boardFilter, setBoardFilter] = useState<BoardFilter>({ team: '', status: '', text: '' });
 
   const iterations = pi?.iterations || [];
   const sharedServiceIds = useMemo(() => new Set(pi?.shared_services || []), [pi]);
@@ -406,12 +428,12 @@ export function ProgramBoard() {
   const { builtNodes, builtEdges, backwardDeps, sameIterCrossTeam } = useMemo(
     () => {
       const { nodes, edges, rowYOffsets: ryo, rowHeights: rh, backwardDeps: bd, sameIterCrossTeam: si } = buildBoard(
-        items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, pi?.events || [], pi?.iteration_weeks || 2, setSelectedItem, dropTarget,
+        items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, pi?.events || [], pi?.iteration_weeks || 2, setSelectedItem, dropTarget, boardFilter,
       );
       layoutRef.current = { rowYOffsets: ryo, rowHeights: rh };
       return { builtNodes: nodes, builtEdges: edges, backwardDeps: bd, sameIterCrossTeam: si };
     },
-    [items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, pi, dropTarget],
+    [items, iterations, internalTeamIds, externalTeamIds, people, personTeam, planningFactors, pi, dropTarget, boardFilter],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(builtNodes);
@@ -537,7 +559,48 @@ export function ProgramBoard() {
           )}
         </div>
       )}
+      <div className="pb-filter-bar">
+        <select
+          className="pb-filter-select"
+          value={boardFilter.team}
+          onChange={e => setBoardFilter(f => ({ ...f, team: e.target.value }))}
+          title="Filter by team"
+        >
+          <option value="">All teams</option>
+          {[...internalTeamIds, ...externalTeamIds].map(t => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <select
+          className="pb-filter-select"
+          value={boardFilter.status}
+          onChange={e => setBoardFilter(f => ({ ...f, status: e.target.value }))}
+          title="Filter by status"
+        >
+          <option value="">All statuses</option>
+          {['Backlog', 'Implementing', 'Validating', 'Done'].map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <input
+          className="pb-filter-input"
+          type="search"
+          placeholder="Search ID or title…"
+          value={boardFilter.text}
+          onChange={e => setBoardFilter(f => ({ ...f, text: e.target.value }))}
+        />
+        {(boardFilter.team || boardFilter.status || boardFilter.text) && (
+          <button
+            className="pb-filter-clear"
+            onClick={() => setBoardFilter({ team: '', status: '', text: '' })}
+            title="Clear filters"
+          >
+            ✕ clear
+          </button>
+        )}
+      </div>
       <ReactFlow
+        style={{ flex: 1 }}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
