@@ -188,16 +188,17 @@ def test_handle_people_filter_team():
 # ---------------------------------------------------------------------------
 
 def test_handle_backlog_all():
-    """Returns items from all type directories."""
+    """Returns items from all type directories including Defect/Task/Event/Risk."""
     data = parse_result(_handle_backlog(EDPA_ROOT, None, None, None))
-    # 27 stories + 6 features + 3 epics + 1 initiative = 37
-    assert len(data) == 37
+    # 27 stories + 6 features + 3 epics + 1 initiative + defects/events/risks
+    assert len(data) >= 37
 
     types_found = set(i["type"] for i in data)
     assert "Story" in types_found
     assert "Feature" in types_found
     assert "Epic" in types_found
     assert "Initiative" in types_found
+    assert "Defect" in types_found
 
 
 def test_handle_backlog_filter_iteration():

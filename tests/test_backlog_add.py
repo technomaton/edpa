@@ -285,3 +285,53 @@ def test_local_bad_contributor_cw_exits(tmp_path, silence_git, capsys):
 # test_fails_without_sync_and_without_local_flag) were removed in V2.0
 # (Krok 6): there is no longer a GH-first path, so there's nothing to
 # fall back from. See git history at branch v1-github-coupled.
+
+
+# ---------------------------------------------------------------------------
+# D-3: Task/Event/Risk visibility + PREFIX_TO_DIR consistency
+# ---------------------------------------------------------------------------
+
+def _write_workspace_with_extra_types(tmp_path):
+    """Workspace containing Task, Event, and Risk items."""
+    edpa = tmp_path / ".edpa"
+    for d in ("config", "backlog/tasks", "backlog/events", "backlog/risks"):
+        (edpa / d).mkdir(parents=True, exist_ok=True)
+    (edpa / "config" / "people.yaml").write_text(
+        yaml.safe_dump({"people": [
+            {"id": "alice", "name": "Alice", "role": "Dev", "fte": 1.0, "capacity": 80},
+        ]})
+    )
+    (edpa / "config" / "edpa.yaml").write_text(yaml.safe_dump({"project": {"name": "Test"}}))
+    from _md_frontmatter import save_md
+    save_md(edpa / "backlog" / "tasks"  / "T-1.md",
+            {"id": "T-1", "type": "Task",  "title": "Write docs", "status": "Backlog"}, body="")
+    save_md(edpa / "backlog" / "events" / "EV-1.md",
+            {"id": "EV-1", "type": "Event", "title": "Sprint review", "status": "Backlog"}, body="")
+    save_md(edpa / "backlog" / "risks"  / "R-1.md",
+            {"id": "R-1", "type": "Risk",  "title": "Scope creep", "status": "Backlog"}, body="")
+    return tmp_path
+
+
+def test_load_backlog_shows_task_event_risk(tmp_path):
+    """Task/Event/Risk items must appear in load_backlog() items list."""
+    root = _write_workspace_with_extra_types(tmp_path)
+    bl = backlog.load_backlog(root)
+    ids = {item["id"] for item in bl["items"]}
+    assert "T-1"  in ids, "Task missing from backlog"
+    assert "EV-1" in ids, "Event missing from backlog"
+    assert "R-1"  in ids, "Risk missing from backlog"
+
+
+def test_prefix_to_dir_t_maps_to_tasks():
+    """T prefix must map to 'tasks', not 'stories' (regression guard)."""
+    assert backlog.PREFIX_TO_DIR["T"] == "tasks"
+    assert backlog.PREFIX_TO_DIR["EV"] == "events"
+    assert backlog.PREFIX_TO_DIR["R"] == "risks"
+
+
+def test_detect_contributors_prefix_to_dir_complete():
+    """detect_contributors PREFIX_TO_DIR must include EV and R prefixes."""
+    import detect_contributors
+    assert detect_contributors.PREFIX_TO_DIR["EV"] == "events"
+    assert detect_contributors.PREFIX_TO_DIR["R"] == "risks"
+    assert detect_contributors.PREFIX_TO_DIR["T"] == "tasks"

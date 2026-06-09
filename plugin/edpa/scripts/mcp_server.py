@@ -867,6 +867,10 @@ def _handle_backlog(edpa_root: Path, iteration: str | None, type_filter: str | N
         "features": "Feature",
         "epics": "Epic",
         "initiatives": "Initiative",
+        "defects": "Defect",
+        "tasks": "Task",
+        "events": "Event",
+        "risks": "Risk",
     }
 
     items = []
@@ -986,6 +990,8 @@ def _handle_flow_metrics(
     open_items: list[dict] = []
     skipped = 0
 
+    # flow_metrics intentionally covers only delivery-tracked types (Story,
+    # Feature, Epic, Initiative) — Task/Event/Risk have no derived hours.
     for dir_name, item_level in type_dirs.items():
         type_dir = backlog_dir / dir_name
         if not type_dir.exists():
