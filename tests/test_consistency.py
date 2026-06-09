@@ -342,6 +342,10 @@ def test_changelog_has_all_versions():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.slow
+@pytest.mark.skipif(
+    not (ROOT / "web" / "node_modules" / ".bin" / "astro").exists(),
+    reason="web/node_modules not installed — run `npm ci` in web/",
+)
 def test_web_build_succeeds():
     """npm run build must exit 0 and produce >= 14 HTML files."""
     web_dir = ROOT / "web"
