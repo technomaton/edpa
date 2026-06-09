@@ -64,7 +64,7 @@ plugin/
 │   ├── engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
 │   ├── reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
 │   └── autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
-├── commands/                        # 13 slash commands, flat layout (no edpa/ subdir)
+├── commands/                        # 14 slash commands, flat layout (no edpa/ subdir)
 │   ├── close-iteration.md           # → /edpa:close-iteration — capacity prep + engine + reports
 │   ├── board.md                     # → /edpa:board          — HTML Kanban snapshot
 │   ├── capacity.md                  # → /edpa:capacity       — per-iteration capacity overrides
@@ -77,7 +77,8 @@ plugin/
 │   ├── link-dep.md                  # → /edpa:link-dep       — add/remove dependency edges (program board)
 │   ├── roam.md                      # → /edpa:roam           — ROAM-classify a Risk item
 │   ├── forecast.md                  # → /edpa:forecast       — Monte-Carlo PI completion forecast
-│   └── export.md                    # → /edpa:export         — billable hours CSV (payroll / invoicing)
+│   ├── export.md                    # → /edpa:export         — billable hours CSV (payroll / invoicing)
+│   └── explain.md                   # → /edpa:explain        — allocation audit trail (signal → CW → hours)
 └── edpa/
     ├── scripts/                     # 32 Python modules
     │   ├── engine.py                # Core engine (Score, DerivedHours, invariants)
@@ -146,6 +147,7 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `/edpa:roam` | command | ROAM-classify a Risk item (Resolved / Owned / Accepted / Mitigated) |
 | `/edpa:forecast` | command | Monte-Carlo PI completion forecast — p20/p50/p80 bands + scope recommendation |
 | `/edpa:export` | command | Export billable hours to CSV (payroll / invoicing — Xero, QuickBooks) |
+| `/edpa:explain` | command | Explain one person's allocation (signal → CW → JS×CW → ratio → hours) |
 
 ## Multi-developer setup — ID collision handling
 
@@ -229,7 +231,7 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 ├── requirements.txt
 ├── hooks/hooks.json
 ├── skills/                           # 5 SKILL.md
-├── commands/                         # 13 slash commands (flat)
+├── commands/                         # 14 slash commands (flat)
 └── edpa/                             # Python engine, schemas, templates, workflows
 
 .edpa/                                # Project data (created by install.sh / /edpa:setup)
