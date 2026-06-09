@@ -222,7 +222,7 @@ def explain_person(
         lines += [
             "## Invariant",
             "",
-            f"Σ derived hours = {total_derived}h {"=" if inv_ok else "≠"} "
+            f"Σ derived hours = {total_derived}h {'=' if inv_ok else '!='} "
             f"capacity {capacity}h  {inv_sym}",
             "",
         ]
