@@ -12,13 +12,21 @@ const DEP_COLORS: Record<string, { border: string; bg: string; fg: string }> = {
   event:       { border: '#f59e0b', bg: 'rgba(245,158,11,0.08)', fg: '#d97706' },
 };
 
+interface ChildRollup {
+  done: number;
+  total: number;
+  totalJS: number;
+}
+
 function FeatureCardInner({ data }: NodeProps) {
   const item = data.item as WorkItem;
   const onSelect = data.onSelect as ((item: WorkItem) => void) | undefined;
   const depColor = (data.depColor as string) || 'independent';
+  const rollup = data.rollup as ChildRollup | null;
   const colors = DEP_COLORS[depColor] || DEP_COLORS.independent;
   const isDone = item.status === 'Done';
   const isEvent = item.type === 'Event';
+  const pct = rollup && rollup.total > 0 ? Math.min(100, (rollup.done / rollup.total) * 100) : 0;
 
   return (
     <div
@@ -34,6 +42,21 @@ function FeatureCardInner({ data }: NodeProps) {
         {!isEvent && item.wsjf != null && <span className="rf-card__wsjf">W {item.wsjf.toFixed(1)}</span>}
       </div>
       <div className="rf-card__title">{item.title}</div>
+      {rollup && rollup.total > 0 && (
+        <div className="rf-card__rollup">
+          <div className="rf-card__rollup-bar">
+            <div className="capacity-bar">
+              <div
+                className={`capacity-bar__fill${pct >= 100 ? ' capacity-bar__fill--over' : ''}`}
+                style={{ width: `${pct}%`, background: pct >= 100 ? undefined : 'var(--ac)' }}
+              />
+            </div>
+            <span className="rf-card__rollup-label">
+              {rollup.done}/{rollup.total} · Σ {rollup.totalJS}
+            </span>
+          </div>
+        </div>
+      )}
       <div className="rf-card__foot">
         <span className="rf-card__owner">{item.owner || item.assignee || ''}</span>
         <span className="rf-card__status">{isEvent ? item.type : item.status}</span>

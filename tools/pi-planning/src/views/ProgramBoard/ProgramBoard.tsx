@@ -99,6 +99,20 @@ function buildBoard(
   // Features/Stories for the board
   const features = piItems.filter(i => i.type === 'Feature' || i.type === 'Story');
 
+  // Child story rollup per feature (done/total/totalJS from ALL backlog stories, not just PI)
+  const DONE_STATUSES = new Set(['done', 'closed', 'accepted', 'complete', 'completed']);
+  const childRollup = new Map<string, { done: number; total: number; totalJS: number }>();
+  items.filter(i => i.type === 'Story' && i.parent).forEach(story => {
+    const fid = story.parent!;
+    const cur = childRollup.get(fid) || { done: 0, total: 0, totalJS: 0 };
+    const isDone = DONE_STATUSES.has((story.status || '').toLowerCase().replace(/[\s-]/g, ''));
+    childRollup.set(fid, {
+      done: cur.done + (isDone ? 1 : 0),
+      total: cur.total + 1,
+      totalJS: cur.totalJS + (story.js || 0),
+    });
+  });
+
   // Build dependency lookup for color coding
   const hasIncomingDep = new Set<string>();
   const hasOutgoingDep = new Set<string>();
@@ -275,7 +289,7 @@ function buildBoard(
       id: item.id,
       type: 'featureCard',
       position: { x, y },
-      data: { item, onSelect: onSelectItem, depColor },
+      data: { item, onSelect: onSelectItem, depColor, rollup: item.type === 'Feature' ? (childRollup.get(item.id) || null) : null },
       style: { width: (pi_iteration_weeks || 2) <= 1 ? COL_W - 24 : CARD_W, zIndex: 10 },
     });
 
