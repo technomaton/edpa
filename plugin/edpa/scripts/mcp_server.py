@@ -16,6 +16,7 @@ Environment:
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -126,6 +127,24 @@ def _safe_person_id(person_id: str) -> str | None:
     if not isinstance(person_id, str):
         return None
     return person_id if PERSON_ID_RE.match(person_id) else None
+
+
+@contextlib.contextmanager
+def _sibling_path():
+    """Temporarily add this file's directory to sys.path for sibling imports.
+
+    Uses try/finally to guarantee removal even if the import raises, preventing
+    the path from leaking into long-running MCP sessions.
+    """
+    sibling = str(Path(__file__).resolve().parent)
+    sys.path.insert(0, sibling)
+    try:
+        yield
+    finally:
+        try:
+            sys.path.remove(sibling)
+        except ValueError:
+            pass
 
 
 # Type metadata — single source of truth for write tools (mirrors
@@ -740,8 +759,8 @@ def _handle_status(edpa_root: Path) -> list[TextContent]:
     config = load_yaml(edpa_root / "config" / "edpa.yaml") or {}
     people_cfg = load_yaml(edpa_root / "config" / "people.yaml") or {}
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _pi_loader import derive_pis, find_active_pi, split_diagnostics  # noqa: E402
+    with _sibling_path():
+        from _pi_loader import derive_pis, find_active_pi, split_diagnostics  # noqa: E402
 
     pis, diags = derive_pis(edpa_root)
     _, warnings = split_diagnostics(diags)
@@ -780,8 +799,8 @@ def _handle_status(edpa_root: Path) -> list[TextContent]:
 
 
 def _handle_iterations(edpa_root: Path, status_filter: str | None) -> list[TextContent]:
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _pi_loader import derive_pis, find_active_pi, split_diagnostics  # noqa: E402
+    with _sibling_path():
+        from _pi_loader import derive_pis, find_active_pi, split_diagnostics  # noqa: E402
 
     pis, diags = derive_pis(edpa_root)
     _, warnings = split_diagnostics(diags)
@@ -816,9 +835,9 @@ def _handle_validate(edpa_root: Path) -> list[TextContent]:
     """Run iteration + people validation, return structured report."""
     # Local import: keeps the optional helpers out of module-load path so the
     # MCP server can still start even if a plugin upgrade is mid-flight.
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _pi_loader import derive_pis, split_diagnostics  # noqa: E402
-    from _people_loader import validate_people  # noqa: E402
+    with _sibling_path():
+        from _pi_loader import derive_pis, split_diagnostics  # noqa: E402
+        from _people_loader import validate_people  # noqa: E402
 
     pis, iter_diags = derive_pis(edpa_root)
     people_diags = validate_people(edpa_root)
@@ -867,6 +886,10 @@ def _handle_backlog(edpa_root: Path, iteration: str | None, type_filter: str | N
         "features": "Feature",
         "epics": "Epic",
         "initiatives": "Initiative",
+        "defects": "Defect",
+        "tasks": "Task",
+        "events": "Event",
+        "risks": "Risk",
     }
 
     items = []
@@ -986,6 +1009,8 @@ def _handle_flow_metrics(
     open_items: list[dict] = []
     skipped = 0
 
+    # flow_metrics intentionally covers only delivery-tracked types (Story,
+    # Feature, Epic, Initiative) — Task/Event/Risk have no derived hours.
     for dir_name, item_level in type_dirs.items():
         type_dir = backlog_dir / dir_name
         if not type_dir.exists():
@@ -1834,7 +1859,10 @@ async def read_resource(uri: str) -> str:
         path = edpa_root / "config" / "people.yaml"
     elif uri.startswith("edpa://results/"):
         it_id = uri.replace("edpa://results/", "")
-        path = edpa_root / "reports" / f"iteration-{it_id}" / "edpa_results.json"
+        safe = _safe_iteration_id(it_id)
+        if safe is None:
+            return f"ERROR: invalid iteration id: {it_id!r}"
+        path = edpa_root / "reports" / f"iteration-{safe}" / "edpa_results.json"
     else:
         return f"ERROR: Unknown resource URI: {uri}"
 

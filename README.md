@@ -2,7 +2,7 @@
 
 **Derive hours from Git evidence. No timesheets.**
 
-[![EDPA](https://img.shields.io/badge/EDPA-2.1.6-34d399)](docs/methodology.md)
+[![EDPA](https://img.shields.io/badge/EDPA-2.5.1-34d399)](docs/methodology.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/Made_for-GitHub-181717?logo=github)](https://github.com)
 
@@ -29,7 +29,7 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 ```
 $ python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
 
-EDPA 2.1.6 — Iteration PI-2026-1.3
+EDPA 2.5.1 — Iteration PI-2026-1.3
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -87,7 +87,7 @@ EDPA Installer
   mcp (MCP SDK) ✓
   openpyxl ✓
   ...
-EDPA 2.1.6 installed successfully!
+EDPA 2.5.1 installed successfully!
 ```
 
 Three config files were seeded from templates:
@@ -124,7 +124,7 @@ python3 .claude/edpa/scripts/engine.py --status
 ```
 
 ```
-EDPA 2.1.6 — Status
+EDPA 2.5.1 — Status
 ========================================
 ✓ .edpa/ found at .edpa
 ✓ people.yaml — 2 members, 1.5 FTE, 60h/iteration
@@ -186,13 +186,13 @@ git -c user.email="you@example.com" -c user.name="You" commit -q -m "seed"
 ```bash
 mkdir -p .edpa/reports/iteration-PI-2026-1.1
 python3 .claude/edpa/scripts/engine.py \
-  --edpa-root .edpa --iteration PI-2026-1.1 --mode gates \
+  --edpa-root .edpa --iteration PI-2026-1.1 \
   --output .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
 ```
 
 ```
 ======================================================================
-EDPA 2.1.6 — Iteration PI-2026-1.1
+EDPA 2.5.1 — Iteration PI-2026-1.1
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -269,9 +269,8 @@ calculation in under a second.
 2. **System detects evidence** from GitHub (assignee, PR author, reviewer, committer, commenter)
 3. **Evidence maps to Contribution Weight** (owner=1.0, key=0.6, reviewer=0.25, consulted=0.15)
 4. **Score = JobSize x CW** for each (person, item) pair
-5. **Gates (default)**: each Initiative/Epic/Feature status transition becomes a mini-deliverable
-   with `effective_js = parent.js × gate_weight`. Stories still credited at Done. Run
-   `--mode simple` if your project does not record mid-life status transitions in git.
+5. **Scoring**: each Initiative/Epic/Feature status transition becomes a mini-deliverable
+   with `effective_js = parent.js × gate_weight`. Stories still credited at Done.
 6. **Hours = (Score / TotalScores) x Capacity** — proportional allocation
 7. **Invariant: Sum always equals declared capacity**
 
@@ -407,7 +406,7 @@ cp -r .claude/skills/* ~/.gemini/skills/
 
 | Document | Description |
 |----------|-------------|
-| [Methodology](docs/methodology.md) | Full EDPA v2.1.6 specification |
+| [Methodology](docs/methodology.md) | Full EDPA v2.5.1 specification |
 | [Quick Start](docs/quick-start.md) | 10-minute setup guide |
 | [Evidence Detection](docs/evidence-detection.md) | How GitHub signals map to CW |
 | [Dual-View](docs/dual-view.md) | Per-person vs per-item perspectives |

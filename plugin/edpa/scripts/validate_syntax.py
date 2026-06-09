@@ -64,6 +64,8 @@ DELIVERY_STATUSES = {
 # them. Setup docs flag this.
 LEGACY_STATUSES = {"Active", "Closed", "Accepted"}
 
+ROAM_STATUSES = {"resolved", "owned", "accepted", "mitigated"}
+
 ITEM_SCHEMA = {
     "Initiative": {
         "dir": "initiatives",
@@ -127,6 +129,14 @@ ITEM_SCHEMA = {
         "statuses": DELIVERY_STATUSES | LEGACY_STATUSES,
         "parent_required": False,
     },
+    "Event": {
+        "dir": "events",
+        "required": {"id", "type", "title", "status"},
+        "optional": {"parent", "js", "owner", "assignee", "contributors", "iteration",
+                     "depends_on", "created_at", "closed_at", "updated_at"},
+        "statuses": DELIVERY_STATUSES | LEGACY_STATUSES,
+        "parent_required": False,
+    },
 }
 
 # Mirror engine.EVIDENCE_ROLES — kept here so the validator stays
@@ -143,6 +153,7 @@ TYPE_PREFIXES = {
     "Defect": "D",
     "Task": "T",
     "Risk": "R",
+    "Event": "EV",
 }
 
 
@@ -353,6 +364,15 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
             f"{path}: status={status!r} is not valid for {expected_type}. "
             f"Allowed: {sorted(schema['statuses'])}"
         )
+
+    # roam_status enum (Risk only)
+    roam_status = data.get("roam_status")
+    if roam_status is not None and expected_type == "Risk":
+        if roam_status not in ROAM_STATUSES:
+            errors.append(
+                f"{path}: roam_status={roam_status!r} is not valid. "
+                f"Allowed: {sorted(ROAM_STATUSES)}"
+            )
 
     # JS sanity. Only Stories and Defects must have a positive estimate;
     # Initiatives / Epics / Features carry `js` as optional and frequently

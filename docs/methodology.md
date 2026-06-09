@@ -47,11 +47,13 @@ The model provides two complementary views of the same data:
 | **Capacity Registry Layer** | People's capacity, roles, FTE, availability | YAML/JSON config in repo |
 | **Evidence & Reporting Layer** | Frozen snapshots, timesheets, Excel, signatures | `.edpa/snapshots`, `.edpa/reports`, `.edpa/reports/signed` |
 
-### 3.2 GitHub as Source of Truth
+### 3.2 Source of Truth (V2)
 
-**GitHub IS source of truth for:** issue hierarchy, ownership, work status, PI/Iteration assignment, Job Size, WSJF inputs, review and merge trail, delivery audit trail.
+**Git + YAML IS source of truth for:** backlog item hierarchy, ownership, work status, PI/Iteration assignment, Job Size, WSJF inputs, delivery audit trail. Everything lives in `.edpa/backlog/**/*.md` (YAML frontmatter) and `.edpa/iterations/*.yaml`.
 
-**GitHub is NOT primary source of truth for:** hourly capacity, FTE records, derived hours for closed periods, signature status. These live in the Evidence & Reporting layer.
+**GitHub is optional:** PR/commit/review events are additional delivery evidence — they flow in via the contribution-sync CI workflow (`edpa-contribution-sync.yml`) and enrich `contributors[].signals[]`, but EDPA operates fully offline without them. No GitHub Project, no issue sync, no two-way coupling.
+
+**Not source of truth:** hourly capacity, FTE records, derived hours for closed periods, signature status. These live in the Evidence & Reporting layer.
 
 ---
 

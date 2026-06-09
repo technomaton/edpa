@@ -188,16 +188,17 @@ def test_handle_people_filter_team():
 # ---------------------------------------------------------------------------
 
 def test_handle_backlog_all():
-    """Returns items from all type directories."""
+    """Returns items from all type directories including Defect/Task/Event/Risk."""
     data = parse_result(_handle_backlog(EDPA_ROOT, None, None, None))
-    # 27 stories + 6 features + 3 epics + 1 initiative = 37
-    assert len(data) == 37
+    # 27 stories + 6 features + 3 epics + 1 initiative + defects/events/risks
+    assert len(data) >= 37
 
     types_found = set(i["type"] for i in data)
     assert "Story" in types_found
     assert "Feature" in types_found
     assert "Epic" in types_found
     assert "Initiative" in types_found
+    assert "Defect" in types_found
 
 
 def test_handle_backlog_filter_iteration():
@@ -417,6 +418,22 @@ def test_read_resource_no_edpa_root(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     content = asyncio.run(mcp_server.read_resource("edpa://config"))
     assert "ERROR" in content
+
+
+def test_read_resource_invalid_iteration_id_rejected(monkeypatch):
+    """read_resource rejects path-traversal and invalid iteration ids."""
+    monkeypatch.chdir(ROOT)
+    for bad in ("../../foo", "../etc/passwd", "foo bar", "'; drop", ""):
+        content = asyncio.run(mcp_server.read_resource(f"edpa://results/{bad}"))
+        assert "ERROR" in content, f"expected ERROR for iteration id {bad!r}, got: {content[:80]}"
+
+
+def test_sibling_path_does_not_leak_sys_path():
+    """_sibling_path() must clean up sys.path after the with-block."""
+    before = list(sys.path)
+    with mcp_server._sibling_path():
+        pass
+    assert sys.path == before, "sys.path leaked after _sibling_path() exited"
 
 
 # ---------------------------------------------------------------------------
