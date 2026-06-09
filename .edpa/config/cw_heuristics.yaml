@@ -1,0 +1,193 @@
+# EDPA CW Heuristics — single-source signal weights
+#
+# CW is computed in detect_contributors.py from these signal weights;
+# the engine consumes the resulting per-item-normalized cw values
+# directly, without any further role mapping or multi-signal
+# aggregation logic of its own.
+#
+# Mathematics:
+#   contribution_score[P, item] = Σ signal_weight × signal_fired(P, item)
+#   cw[P, item]                 = contribution_score[P, item]
+#                                 / Σ_persons contribution_score[*, item]
+#   → Σ_persons cw[*, item] = 1.0   (per-item invariant)
+#
+# Calibrate with `/edpa:calibrate` after collecting ≥20 ground-truth
+# CW records. Monte Carlo over the 5 signal weights, then Nelder-Mead
+# refinement around the best candidates. Lower MAD vs. ground truth
+# indicates a better calibration.
+
+# Schema version for this heuristics file (independent of methodology version).
+schema_version: "1.0"
+
+# ─────────────────────────────────────────────────────────────────────
+# EVIDENCE SIGNAL WEIGHTS
+# ─────────────────────────────────────────────────────────────────────
+#
+# Each weight controls how much that evidence type contributes to a
+# person's contribution_score on an item. Higher weight = more
+# influence. The values below are reasonable defaults derived from
+# the v1.0 Monte Carlo simulation; calibration will tune them against
+# real ground truth.
+#
+# Manual /contribute directives (`manual:*` signal types) carry the
+# user-supplied `weight:X` value verbatim — they're not re-weighted by
+# this table. Multiple /contribute lines for the same person on the
+# same surface stack additively.
+#
+signals:
+  assignee: 4.0             # GitHub issue assignee
+  pr_author: 3.4            # PR author referencing item
+  commit_author: 2.78        # Commit with item ID in branch/title/msg
+  pr_reviewer: 2.25          # PR review submitted (excluding self)
+  issue_comment: 1.14        # Comment on issue/PR (excluding bots)
+
+# ─────────────────────────────────────────────────────────────────────
+# GATE WEIGHTS — Feature / Epic / Initiative status transitions
+# ─────────────────────────────────────────────────────────────────────
+#
+# Each status transition on Feature, Epic, or Initiative parents is a
+# deliverable event the engine credits inside the iteration window.
+# Weights split the parent's Job Size across its lifecycle, so prep
+# work (LBC, decomposition, validation) is credited as it happens —
+# not only at terminal Done. Weights MUST sum to 1.0 per item type.
+# The gate event inherits the parent's contributors[] verbatim
+# (per-item shares are unchanged by the gate split).
+#
+# Stories stay Done-only and flow through the regular backlog scan;
+# they are never emitted as gate events.
+#
+gate_weights:
+  Feature:                          # 7 transitions across 8 SAFe statuses
+    "Funnel→Analyzing":         0.10  # LBC delivered
+    "Analyzing→Backlog":        0.05  # Decomposed, AC defined
+    "Backlog→Implementing":     0.05  # Sprint planning, breakdown
+    "Implementing→Validating":  0.50  # Code merged (the bulk of work)
+    "Validating→Deploying":     0.15  # QA sign-off, acceptance
+    "Deploying→Releasing":      0.05  # Deployed to prod
+    "Releasing→Done":           0.10  # Release verified, hypothesis proven
+
+  Epic:                             # 5 transitions across 6 portfolio statuses
+    "Funnel→Reviewing":         0.05  # Triage
+    "Reviewing→Analyzing":      0.10  # Accepted for LBC
+    "Analyzing→Ready":          0.25  # LBC approved, MVP scope set
+    "Ready→Implementing":       0.10  # Capacity allocated, kickoff
+    "Implementing→Done":        0.50  # MVP delivered, hypothesis tested
+
+  Initiative:                       # Same shape as Epic (portfolio level)
+    "Funnel→Reviewing":         0.05
+    "Reviewing→Analyzing":      0.10
+    "Analyzing→Ready":          0.25
+    "Ready→Implementing":       0.10
+    "Implementing→Done":        0.50
+
+# ─────────────────────────────────────────────────────────────────────
+# STORY ACTIVITY EVENTS (v2.1+) — in-flight Story credit
+# ─────────────────────────────────────────────────────────────────────
+#
+# Stories normally credit only at status=Done (full Story.js × cw).
+# That loses refinement / spillover work — a Story being analyzed and
+# decomposed across an iteration but not yet Done gets 0 hours, while
+# the work clearly happened.
+#
+# When a Story has yaml_edit signals in the iteration window but
+# hasn't reached Done, the engine emits a synthetic activity event
+# with job_size = story.js * credit_factor. The remaining
+# (1.0 - credit_factor) is reserved for the iteration when Done lands
+# (full Story.js × cw credit kicks in via the regular Done filter).
+#
+# Set credit_factor: 0 to disable in-flight Story credit entirely
+# (V2.0 behaviour — Done-only).
+#
+story_activity:
+  credit_factor: 0.40             # 40% of Story.js reserved for in-flight work
+
+# ─────────────────────────────────────────────────────────────────────
+# YAML EDIT SIGNALS (v1.17+) — structural deltas in .edpa/backlog/*.yaml
+# ─────────────────────────────────────────────────────────────────────
+# Every commit touching backlog YAML is a signal of work on that item.
+# Detection is purely structural — we count list bullets, top-level
+# blocks, scalar changes — never try to semantically classify content
+# (operator naming drift makes that brittle). Auditor reviewing per-
+# signal `ref` opens the commit and sees the actual diff.
+#
+# Caps prevent gaming:
+#   list_grow_cap_per_commit  — 100-AC spam yields max 10 weight
+#   lines_volume_cap          — multi-thousand-line dumps capped
+#   bulk_migration_discount   — bulk renames (rr→rr_oe) get ×0.1
+#   tool-generated commits    — auto-commits (sync, capacity_override)
+#                               and bot authors get 0 weight
+#
+yaml_edit_weights:
+  yaml_edit:create:                  5.0    # new file with +id+type+title
+  yaml_edit:block_add:               2.0    # per top-level nested block
+  yaml_edit:list_grow:               1.0    # per net `- ` bullet (capped)
+  yaml_edit:scalar_change:           0.5    # per top-level scalar set
+  yaml_edit:lines_volume_cap:        3.0    # max bonus from line volume
+  yaml_edit:lines_volume_divisor:   30      # +30 lines = +1.0 bonus
+  yaml_edit:contributors_rebalance:  0.3    # per new person added
+  yaml_edit:revert:                 -0.5    # per net-removed block
+
+  list_grow_cap_per_commit:        10       # max bullets credited per commit
+  bulk_migration_discount:          0.1     # multiplier for bulk renames
+
+# ─────────────────────────────────────────────────────────────────────
+# RULES
+# ─────────────────────────────────────────────────────────────────────
+rules:
+  - "All evidence signals contribute additively to contribution_score; no priority dominance"
+  - "cw is per-item normalized: Σ cw[*, item] = 1.0 (engine invariant)"
+  - "Manual /contribute directives stack as additional signals — they don't override auto-detection"
+  - "ALL commits are delivery evidence — including governance (.edpa/, config/)"
+  - "Stories at status=Done are credited; Feature/Epic/Initiative gate transitions are credited per gate_weight"
+  - "Role labels (Owner/Key/Reviewer/Consulted) are derived at display time from signal types; never stored"
+  - "yaml_edit signals are STRUCTURAL — count blocks/bullets/scalars; never semantically classify content"
+
+# ─────────────────────────────────────────────────────────────────────
+# PRINCIPLE: WORK = WORK
+# ─────────────────────────────────────────────────────────────────────
+# EDPA does not measure "code development" — it measures contribution
+# to delivery. A PM who updates the backlog, plans iterations, and
+# defines AC contributes via issue_comments + manual /contribute
+# directives + assignee signals. A Dev who writes code contributes via
+# commit_authors + pr_authors + assignee signals. Both flow through
+# the same signal aggregation; the signal weights determine how each
+# activity translates to cw share.
+#
+# Strategic-role bias correction (PM/BO/Arch under-weighting in Git):
+# EDPA addresses this purely through calibration. signal_weights get
+# tuned against ground truth that includes strategic-role
+# contributions, so the calibrator naturally finds weights that match
+# observed reality. Per-role signal multipliers may return as a
+# calibration extension if small-pilot calibration shows persistent
+# bias for strategic roles.
+
+# ─────────────────────────────────────────────────────────────────────
+# CALIBRATION METADATA — populated by /edpa:calibrate
+# ─────────────────────────────────────────────────────────────────────
+calibration:
+  method: "MC random-sample + coordinate descent"
+  monte_carlo:
+    scenarios: 1000
+    records: 31041
+  ground_truth_records: 0   # synthetic baseline; re-run with real data after first PI
+  mad_baseline: 0.0861
+  mad_calibrated: 0.0805
+  improvement_pct: 6.5
+  calibrated_at: "2026-05-08T18:37:24Z"
+  calibrated_by_version: "1.11.0"
+  notes: |
+    Synthetic Monte Carlo baseline (1000 scenarios,
+    31041 records). Ground truth was generated
+    procedurally from a model where signal counts probabilistically
+    reflect each person's true cw share with role-based bias.
+    Re-run /edpa:calibrate after first real PI close with team-confirmed
+    cw records to derive a real-data baseline.
+    Synthetic generator extends with 4 edge-case item flavors:
+    pm_driven (PM owner without commits), pair_programmed (2 near-equal
+    contributors), design_heavy (Arch consultant + dev impl + silent
+    reviewer), minimal (single owner). 60%% normal Dirichlet flavor +
+    40%% edge cases.
+
+    Weights post-calibration rescaled to set max signal weight = 4.0
+    (preserves cw ratios mod 2-decimal rounding; aligns auto weights
+    with manual /contribute weight: convention).
