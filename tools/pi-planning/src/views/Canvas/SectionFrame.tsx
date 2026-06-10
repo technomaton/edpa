@@ -9,6 +9,7 @@ import { InitiativeKanbanSection } from './sections/InitiativeKanbanSection';
 import { EpicKanbanSection } from './sections/EpicKanbanSection';
 import { FeatureKanbanSection } from './sections/FeatureKanbanSection';
 import { PortfolioDashboardSection } from './sections/PortfolioDashboardSection';
+import { GanttSection } from './sections/GanttSection';
 
 function SectionFrameInner({ data }: NodeProps) {
   const {
@@ -97,6 +98,12 @@ function SectionFrameInner({ data }: NodeProps) {
         {component === 'calendar' && (
           <CalendarSection
             pis={pis} project={project}
+            width={width} height={height}
+          />
+        )}
+        {component === 'gantt' && (
+          <GanttSection
+            items={items} pi={pi}
             width={width} height={height}
           />
         )}

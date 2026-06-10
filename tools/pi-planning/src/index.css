@@ -4103,3 +4103,95 @@ body {
   color: var(--t3);
   display: block;
 }
+
+/* ─── Gantt Timeline (F5) ──────────────────────────────────────────────── */
+.gantt-wrap {
+  background: #fff;
+  overflow: auto;
+  padding: 8px 12px;
+}
+
+.gantt-header-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.gantt-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t1);
+}
+
+.gantt-sub {
+  font-size: 11px;
+  color: var(--t3);
+}
+
+.gantt-svg {
+  display: block;
+  font-family: 'DM Sans Variable', system-ui, sans-serif;
+}
+
+.gantt-iter-label {
+  font-size: 11px;
+  fill: var(--t2);
+  font-weight: 600;
+}
+
+.gantt-feat-id {
+  font-size: 11px;
+  font-weight: 700;
+  dominant-baseline: middle;
+}
+
+.gantt-cell-label {
+  font-size: 10px;
+  fill: #fff;
+  font-weight: 700;
+  dominant-baseline: middle;
+}
+
+/* ─── WSJF Bubble Chart toggle (F5) ───────────────────────────────────── */
+.prio-view-toggle {
+  display: flex;
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.prio-toggle-btn {
+  background: none;
+  border: none;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--t2);
+  transition: background 0.15s;
+}
+
+.prio-toggle-btn:hover {
+  background: var(--s3);
+}
+
+.prio-toggle-btn--active {
+  background: var(--ac);
+  color: #fff;
+}
+
+/* ─── Velocity sparklines (F5) ────────────────────────────────────────── */
+.person-card__spark {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--s3);
+}
+
+.person-card__spark-label {
+  font-size: 10px;
+  color: var(--t3);
+  white-space: nowrap;
+}
