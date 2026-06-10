@@ -769,6 +769,29 @@ async def list_tools() -> list[Tool]:
                 "additionalProperties": False,
             },
         ),
+        Tool(
+            name="edpa_payroll_export",
+            description=(
+                "Generate a billable-hours CSV (and return the data as JSON) from engine "
+                "derived hours. Reads edpa_results.json + people.yaml (hourly_rate, currency "
+                "fields) + edpa.yaml (project.funding.registration → cost code). "
+                "Writes payroll-<iter>.csv to .edpa/reports/iteration-<id>/. "
+                "Requires /edpa:engine to have been run for the iteration first."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "iteration": {"type": "string",
+                                  "description": "Iteration ID, e.g. PI-2026-1.3 (required)"},
+                    "currency": {"type": "string",
+                                 "description": "Currency code override for rows without per-person currency (e.g. CZK, EUR, USD)"},
+                    "output": {"type": "string",
+                               "description": "Custom output CSV path (optional, default: reports/iteration-<id>/payroll-<id>.csv)"},
+                },
+                "required": ["iteration"],
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -844,6 +867,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_insights(edpa_root, arguments)
         elif name == "edpa_ai_attribution":
             return _handle_ai_attribution(edpa_root, arguments)
+        elif name == "edpa_payroll_export":
+            return _handle_payroll_export(edpa_root, arguments)
         logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception:
@@ -2010,6 +2035,33 @@ def _handle_ai_attribution(edpa_root: Path, args: dict) -> list[TextContent]:
     s = result.get("summary", {})
     logger.info("edpa_ai_attribution: iter=%s ai_ratio=%s",
                 iteration, s.get("ai_delivery_ratio"))
+    return _ok(result)
+
+
+def _handle_payroll_export(edpa_root: Path, args: dict) -> list[TextContent]:
+    iteration = args.get("iteration", "")
+    if not iteration:
+        return _err("iteration is required (e.g. PI-2026-1.3)")
+    currency = args.get("currency", "")
+    raw_output = args.get("output")
+    output_path = Path(raw_output) if raw_output else None
+
+    with _sibling_path():
+        try:
+            from payroll_export import export as run_export  # noqa: E402
+            result = run_export(
+                edpa_root=edpa_root,
+                iteration_id=iteration,
+                currency=currency,
+                output=output_path,
+            )
+        except FileNotFoundError as exc:
+            return _err(str(exc))
+        except ImportError as exc:
+            return _err(f"payroll_export module not available: {exc}")
+
+    logger.info("edpa_payroll_export: iter=%s rows=%s hours=%s",
+                iteration, result.get("rows"), result.get("total_hours"))
     return _ok(result)
 
 

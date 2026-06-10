@@ -78,8 +78,8 @@ def load_project_code(edpa_root: Path) -> str:
 
 def build_rows(results: dict, people_cfg: dict, project_code: str, currency: str) -> list[dict]:
     """Build one row per person from derived_reports + people config."""
-    # Build team lookup from capacity_config (also present in edpa_results.json)
-    cap_people = (results.get("capacity_config") or {}).get("people") or []
+    # Build team lookup from capacity_registry (engine v1.14+); capacity_config = legacy fallback
+    cap_people = (results.get("capacity_registry") or results.get("capacity_config") or {}).get("people") or []
     team_by_id = {p["id"]: p.get("team", "") for p in cap_people if isinstance(p, dict)}
 
     iteration_id = results.get("iteration", "")

@@ -193,3 +193,24 @@ def test_export_missing_edpa_yaml(workspace):
     out = Path(result["path"])
     rows = list(csv.DictReader(out.read_text(encoding="utf-8").splitlines()))
     assert all(r["code"] == "" for r in rows)
+
+
+def test_build_rows_reads_capacity_registry(workspace):
+    """Engine v1.14+ uses capacity_registry key (not capacity_config) in results JSON."""
+    # Simulate real engine output key
+    results_with_registry = {
+        "iteration": ITERATION_ID,
+        "capacity_registry": {
+            "people": [
+                {"id": "carol", "name": "Carol", "role": "QA", "team": "Gamma"},
+            ]
+        },
+        "derived_reports": [
+            {"person": "carol", "name": "Carol", "role": "QA",
+             "capacity": 30, "total_derived": 28.0},
+        ],
+    }
+    rows = build_rows(results_with_registry, {}, "", "")
+    carol = next(r for r in rows if r["person"] == "carol")
+    assert carol["team"] == "Gamma"
+    assert carol["hours"] == 28.0
