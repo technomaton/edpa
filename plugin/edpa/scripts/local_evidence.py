@@ -68,6 +68,10 @@ _CONTRIBUTE_RE = re.compile(
     r"/contribute\s+@([A-Za-z0-9_-]+)\s+weight:([0-9]+(?:\.[0-9]+)?)",
     re.IGNORECASE,
 )
+_AGENT_COAUTHOR_RE = re.compile(
+    r"^Co-[Aa]uthored-[Bb]y:\s+(Claude[^<\r\n]*)<[^>]*@anthropic\.com>",
+    re.MULTILINE,
+)
 
 PREFIX_TO_DIR = {
     "I": "initiatives", "E": "epics", "F": "features", "S": "stories",
@@ -226,6 +230,12 @@ def find_item_path(edpa_root: Path, item_id: str) -> Path | None:
 # ─── signal emission ───────────────────────────────────────────────────────
 
 
+def _normalize_agent_name(raw: str) -> str:
+    """'Claude Sonnet 4.6 ' → 'claude-sonnet-4-6'."""
+    normalized = re.sub(r"[\s.]+", "-", raw.strip()).lower()
+    return re.sub(r"-+", "-", normalized)
+
+
 def build_signals(commit: dict, items: list[str], person_id: str,
                   weights: dict[str, float]) -> list[dict]:
     """Build the list of (item_id, signal_dict) tuples for one commit."""
@@ -233,6 +243,13 @@ def build_signals(commit: dict, items: list[str], person_id: str,
     short = sha[:7]
     iso = _git(["log", "-1", "--format=%aI", sha]) or ""
     iso = iso.strip() or _git(["log", "-1", "--format=%aI"]) or ""
+
+    # Detect AI co-authors from Co-Authored-By: Claude ... <...@anthropic.com>
+    body = commit["body"] or ""
+    agent_names = [
+        _normalize_agent_name(m)
+        for m in _AGENT_COAUTHOR_RE.findall(body)
+    ]
 
     out: list[dict] = []
     for iid in items:
@@ -247,8 +264,21 @@ def build_signals(commit: dict, items: list[str], person_id: str,
                 "at": iso,
             },
         })
-        # 2. /contribute directives in commit body (additive override)
-        for login, w_str in _CONTRIBUTE_RE.findall(commit["body"] or ""):
+        # 2. agent_contribution — one signal per distinct AI co-author
+        for agent in dict.fromkeys(agent_names):  # deduplicate, preserve order
+            out.append({
+                "item_id": iid,
+                "signal": {
+                    "type": "agent_contribution",
+                    "agent": agent,
+                    "person": "_claude",
+                    "weight": weights.get("agent_contribution", 1.0),
+                    "ref": f"commit/{short}/agent/{agent}",
+                    "at": iso,
+                },
+            })
+        # 3. /contribute directives in commit body (additive override)
+        for login, w_str in _CONTRIBUTE_RE.findall(body):
             try:
                 w = float(w_str)
             except ValueError:

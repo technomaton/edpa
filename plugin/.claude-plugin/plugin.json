@@ -34,7 +34,8 @@
     "./commands/export.md",
     "./commands/explain.md",
     "./commands/metrics.md",
-    "./commands/insights.md"
+    "./commands/insights.md",
+    "./commands/ai-attribution.md"
   ],
   "agents": []
 }
