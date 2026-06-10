@@ -32,6 +32,8 @@ const ROAM_W = 800;
 const ROAM_H = 500;
 const PRIO_W = 900;
 const PRIO_H = 500;
+const GANTT_W = 2200;
+const GANTT_H = 500;
 const CALENDAR_W = 1800;
 const CALENDAR_H = 600;
 
@@ -145,8 +147,19 @@ function computeSections(teamIds: string[]): SectionDef[] {
     component: 'prioritization',
   });
 
+  // Gantt — below ROAM/Prioritization
+  const ganttY = bottomY + Math.max(ROAM_H, PRIO_H) + SECTION_GAP;
+  sections.push({
+    id: 'gantt',
+    label: 'Feature Gantt',
+    x: 0, y: ganttY,
+    width: GANTT_W, height: GANTT_H,
+    color: '#7c3aed',
+    component: 'gantt',
+  });
+
   // Calendar — bottom
-  const calY = bottomY + Math.max(ROAM_H, PRIO_H) + SECTION_GAP;
+  const calY = ganttY + GANTT_H + SECTION_GAP;
   sections.push({
     id: 'calendar',
     label: 'PI Calendar',
