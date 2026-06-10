@@ -88,9 +88,9 @@ def explain_person(
     """Generate a narrative markdown explaining one person's allocation."""
     iteration_id = results.get("iteration", "?")
 
-    # Find person in derived_reports
+    # Find person in people[] (engine output is keyed by `id`, not `person`)
     dr = next(
-        (r for r in (results.get("derived_reports") or []) if r["person"] == person_id),
+        (r for r in (results.get("people") or []) if r.get("id") == person_id),
         None,
     )
     if dr is None:
@@ -101,8 +101,8 @@ def explain_person(
     capacity = dr.get("capacity", 0)
     total_derived = dr.get("total_derived", 0)
 
-    # Collect this person's items from the flat items list
-    all_items = [i for i in (results.get("items") or []) if i.get("contributor") == person_id]
+    # This person's items are nested under their entry in people[].
+    all_items = list(dr.get("items") or [])
     if item_filter:
         all_items = [i for i in all_items if i["id"] == item_filter]
         if not all_items:
@@ -129,7 +129,7 @@ def explain_person(
         ]
         for it in all_items:
             lines.append(
-                f"| {it['id']} | {it['job_size']} "
+                f"| {it['id']} | {it['js']} "
                 f"| {it['cw']:.4f} | {it['score']:.4f} "
                 f"| {it['ratio']:.4f} | **{it['hours']}h** |"
             )
@@ -146,7 +146,7 @@ def explain_person(
         item_id = it["id"]
         meta = load_item_meta(edpa_root, item_id)
         title = meta.get("title", "")
-        js = it["job_size"]
+        js = it["js"]
         cw = it["cw"]
         score = it["score"]
         ratio = it["ratio"]
@@ -217,7 +217,10 @@ def explain_person(
 
     # ── Invariant footer ────────────────────────────────────────────────────
     if not item_filter:
-        inv_ok = abs(total_derived - capacity) <= 0.1 if capacity else True
+        # Prefer the engine's own per-person verdict; fall back to the local check.
+        inv_ok = dr.get(
+            "invariant_ok", abs(total_derived - capacity) <= 0.1 if capacity else True
+        )
         inv_sym = "✓" if inv_ok else "✗"
         lines += [
             "## Invariant",

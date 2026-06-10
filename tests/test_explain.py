@@ -19,26 +19,39 @@ from explain import explain_person, load_results  # noqa: E402
 
 ITERATION_ID = "PI-2026-1.1"
 
+# Mirrors the REAL engine output schema (engine.py writes `people[]` with each
+# person's items NESTED under their entry — key `js`, not a flat top-level
+# `items` keyed by `contributor`). Keep it that way: an earlier fictional
+# `derived_reports` fixture let explain.py ship broken (D-16). If you change the
+# engine's edpa_results.json shape, change this with it.
 RESULTS = {
     "iteration": ITERATION_ID,
-    "generated_at": "2026-06-09T00:00:00Z",
-    "capacity_config": {"people": [
-        {"id": "alice", "name": "Alice", "role": "Dev", "team": "Alpha"},
-    ]},
-    "derived_reports": [
-        {"person": "alice", "name": "Alice", "role": "Dev",
-         "capacity": 40, "total_derived": 40.0, "invariant_ok": True},
-        {"person": "bob", "name": "Bob", "role": "Arch",
-         "capacity": 20, "total_derived": 20.0, "invariant_ok": True},
+    "computed_at": "2026-06-09T00:00:00Z",
+    "methodology": "EDPA 2.6.0",
+    "planning_factor": 0.8,
+    "people": [
+        {
+            "id": "alice", "name": "Alice", "role": "Dev",
+            "capacity": 40, "total_derived": 40.0, "invariant_ok": True,
+            "items": [
+                {"id": "S-1", "level": "Story", "js": 5, "cw": 0.7, "rs": 1.0,
+                 "score": 3.5, "evidence": [], "ratio": 0.5833, "hours": 23.33},
+                {"id": "S-2", "level": "Story", "js": 4, "cw": 1.0, "rs": 1.0,
+                 "score": 4.0, "evidence": [], "ratio": 0.4167, "hours": 16.67},
+            ],
+        },
+        {
+            "id": "bob", "name": "Bob", "role": "Arch",
+            "capacity": 20, "total_derived": 20.0, "invariant_ok": True,
+            "items": [
+                {"id": "S-1", "level": "Story", "js": 5, "cw": 0.3, "rs": 1.0,
+                 "score": 1.5, "evidence": [], "ratio": 1.0, "hours": 20.0},
+            ],
+        },
     ],
-    "items": [
-        {"id": "S-1", "level": "Story", "job_size": 5, "contributor": "alice",
-         "cw": 0.7, "score": 3.5, "ratio": 0.5833, "hours": 23.33},
-        {"id": "S-2", "level": "Story", "job_size": 4, "contributor": "alice",
-         "cw": 1.0, "score": 4.0, "ratio": 0.4167, "hours": 16.67},
-        {"id": "S-1", "level": "Story", "job_size": 5, "contributor": "bob",
-         "cw": 0.3, "score": 1.5, "ratio": 1.0, "hours": 20.0},
-    ],
+    "team_total": 60.0,
+    "all_invariants_passed": True,
+    "gate_events": [],
 }
 
 STORY_WITH_SIGNALS = """\
