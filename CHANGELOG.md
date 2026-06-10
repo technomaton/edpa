@@ -1,5 +1,64 @@
 # Changelog
 
+## 2.6.0 — 2026-06-10 — BI analytics, AI attribution, payroll export
+
+Eight new capabilities from the P2 roadmap batch (PRs #70–#80):
+
+### Added
+
+- **AI-agent attribution** (`edpa_ai_attribution`, `/edpa:ai-attribution`) — detects
+  `Co-Authored-By: Claude … <…@anthropic.com>` trailers in commits via
+  `local_evidence.py` and emits `agent_contribution` signals; new `ai_attribution.py`
+  computes per-item and per-person human vs AI delivery ratio + `ai_delivery_ratio`
+  metric for the iteration. (#78)
+
+- **BI dashboard in PI planning board** — three new interactive views in the
+  pi-bundle SPA: WSJF Bubble Chart (toggle Table↔Chart in Prioritization, X=BV
+  Y=TC size∝√JS, hover tooltip), Velocity Sparklines (per-person JS trend per
+  iteration in People view), Feature Gantt (new canvas section, one row per
+  Feature, iteration columns, done/total progress bars). (#79)
+
+- **Payroll export MCP tool** (`edpa_payroll_export`, tool #26) — wraps the
+  existing `payroll_export.py` + `/edpa:export` command; reads engine derived
+  hours + `hourly_rate`/`currency` from `people.yaml` + project registration
+  code from `edpa.yaml` → billable-hours CSV for Xero/QuickBooks/grant reporting.
+  Also fixes `capacity_registry` key (was `capacity_config`) in `build_rows()`.
+  (#80)
+
+- **Mid-iteration anomaly detection** (`edpa_insights`, `/edpa:insights`) — four
+  anomaly classes: capacity overload, job-size creep, stalled stories (no git
+  activity > N days), critical-path blockers. (#74)
+
+- **PI confidence & predictability trending** (`edpa_pi_metrics`, `/edpa:metrics`)
+  — multi-PI velocity, confidence trend, predictability index, on-time delivery
+  ratio. (#70)
+
+- **Feature capacity rollup** on Program Board — progress bar (done/total stories)
+  and Σ JS label on every Feature card. (#75)
+
+- **Client-side filter & search** on PI board — team / status / text filters,
+  pure React, ✕ clear button. (#76)
+
+- **Property-based tests** for engine core invariants (Hypothesis, 10 tests ×
+  200 examples each). (#77)
+
+### Changed
+
+- MCP tool surface: **26 tools** (13 read + 13 write).
+- Plugin commands: **17 commands**.
+
+### Fixed
+
+- `payroll_export.py`: `build_rows()` used `capacity_config` key to resolve team;
+  real engine output (`edpa_results.json`) uses `capacity_registry` since v1.14.
+  Fixed with `capacity_registry` primary + `capacity_config` legacy fallback.
+
+### Tests
+
+853 passing (non-E2E).
+
+---
+
 ## 2.5.1 — 2026-06-09 — Fully-offline PI planning reports
 
 The generated `/edpa:pi-planning` HTML now makes **zero external requests**: the
