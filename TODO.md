@@ -174,7 +174,15 @@ PR body with a "merge candidate" note rather than auto-applying.
 
 ## v1.5 — Operational tooling
 
-### Skill side-effect testing via `claude -p` (P1, ~150 lines)
+### Skill side-effect testing via `claude -p` (P1, ~150 lines) — ✅ DONE (S-238)
+
+**Shipped** in `tests/test_skill_e2e.py` (opt-in marker `skill_e2e`:
+`EDPA_SKILL_E2E=1 pytest tests/test_skill_e2e.py`). Covers setup → add →
+close-iteration with outcome assertions against the **working-tree** plugin
+(`--plugin-dir`); Layer 3 of `docs/E2E-SKILLS-TEST-PLAN.md` Příloha D is now ✅.
+The spec below is kept for history but is **partly V1-stale** — its
+`issue_map.yaml` / `/edpa:sync push` / `gh project view` references were all
+removed in 2.0.0; the shipped harness asserts V2 local-first outcomes instead.
 
 Today: skill flows are validated only by the live walkthrough during
 release prep (and by manual kashealth onboarding). Layer 3 of the

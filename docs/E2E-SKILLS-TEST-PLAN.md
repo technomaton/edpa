@@ -864,27 +864,33 @@ each with a different right tool.
 | MCP tool dispatch from inside a skill (does it call `edpa_status` instead of `Bash + grep`?) | subprocess + stderr log inspection (the `call_tool name=…` lines) |
 | Regression on a known-good skill flow                     | recorded transcript + semantic diff (LLM nondeterminism makes exact-match brittle) |
 
-### `claude -p` pattern (outcome-based, runnable in CI)
+### `claude -p` pattern (outcome-based)
+
+**Implemented:** `tests/test_skill_e2e.py` (opt-in pytest marker `skill_e2e`).
+Run with `EDPA_SKILL_E2E=1 pytest tests/test_skill_e2e.py -v`.
+
+The harness drives the **working-tree** plugin (not whatever release is
+installed in `~/.claude/plugins`) so a repo regression is caught before it
+ships:
 
 ```bash
-TEST_DIR=$(mktemp -d)
-cd "$TEST_DIR"
-git init -q
-echo "# t" > README.md && git add -A && git commit -qm init
-curl -fsSL https://edpa.technomaton.com/install.sh | sh > /dev/null
+SANDBOX=$(mktemp -d); cd "$SANDBOX"
+git init -q && git commit -qm init --allow-empty
 
-# Drive Claude Code in non-interactive mode. Skill side-effects land on
-# disk and in the git audit trail; assertions read those, not the stdout.
-claude -p "/edpa:setup --with-hooks" --no-interactive
+# `-p` IS the non-interactive mode — there is NO `--no-interactive` flag.
+# `--plugin-dir` loads the repo under test; `bypassPermissions` lets the
+# skill's Bash run unattended. Side effects land on disk + in the git log;
+# assertions read those, never the (nondeterministic) stdout.
+CLAUDE="claude -p --plugin-dir /path/to/edpa/plugin \
+        --permission-mode bypassPermissions --output-format text"
 
-# Outcome assertions (local-first — no GitHub calls)
+$CLAUDE "/edpa:setup"
 test -d .edpa/engine/scripts                        # engine vendored
 test -f .edpa/config/id_counters.yaml               # ID allocator seeded
 test -f .edpa/config/cw_heuristics.yaml             # CW weights seeded
 
-claude -p "/edpa:add Story 'Demo' --parent F-1 --js 3 --iteration PI-2026-1.1" --no-interactive
-# A new Story file + a feat(...) commit should exist
-git log --oneline | grep -qE 'feat\(S-[0-9]+\):'    # auto-commit happened
+$CLAUDE "/edpa:add Story 'Demo' --parent F-1 --js 3"
+git log -1 --format=%s | grep -qE '^feat\(S-[0-9]+\):'   # auto-commit happened
 ```
 
 **Why outcome-based, not transcript-based:** the skill's *response*
@@ -948,11 +954,13 @@ reserves space for the transcript with PII redacted.
 |--------------------------------------|-------------------------------|---------------------------|
 | Unit (handler functions)             | pytest                         | ✅ in `test_mcp_server.py` |
 | Integration (MCP wire protocol)      | subprocess + JSON-RPC          | ✅ in `test_mcp_integration.py` |
-| Integration (skill side-effects)     | `claude -p` + outcome asserts | ❌ open — TODO            |
+| Integration (skill side-effects)     | `claude -p` + outcome asserts | ✅ in `test_skill_e2e.py` (opt-in) |
 | UX / prompt readability              | live walkthrough               | customer onboarding       |
 | Regression on recorded session       | transcript + semantic diff     | ❌ flaky; defer            |
 
-Layers 1–2 are CI-enforceable today. Layer 3 is the next thing to build.
+Layers 1–2 are CI-enforceable today. Layer 3 landed in `test_skill_e2e.py`
+(opt-in: `EDPA_SKILL_E2E=1` + `claude` on PATH — it spawns real Claude Code,
+so it auto-skips in default CI and runs locally / on a scheduled job).
 Layer 4 is human, by design — the goal is to keep its surface area small
 enough that one walkthrough per release covers it. Layer 5 (regression) is
 filed as undated; only worth doing once we have a stable enough skill set
