@@ -270,16 +270,17 @@ def test_list_tools():
     edpa_item_link_dep (dependencies), edpa_item_roam (ROAM), and the PI
     objectives tools (set / remove / confidence) added later.
     edpa_forecast_pi added in F1; edpa_pi_metrics added in E2; edpa_insights in F2;
-    edpa_ai_attribution in F4.
+    edpa_ai_attribution in F4; edpa_payroll_export in F3.
     """
     tools = asyncio.run(mcp_server.list_tools())
-    assert len(tools) == 25
+    assert len(tools) == 26
 
     names = {t.name for t in tools}
     expected_read = {"edpa_status", "edpa_iterations", "edpa_people",
                      "edpa_backlog", "edpa_item", "edpa_validate",
                      "edpa_flow_metrics", "edpa_pi_board", "edpa_forecast_pi",
-                     "edpa_pi_metrics", "edpa_insights", "edpa_ai_attribution"}
+                     "edpa_pi_metrics", "edpa_insights", "edpa_ai_attribution",
+                     "edpa_payroll_export"}
     expected_write = {"edpa_item_create", "edpa_item_update",
                       "edpa_item_transition", "edpa_item_link_parent",
                       "edpa_item_link_dep", "edpa_item_roam",

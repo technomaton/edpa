@@ -238,6 +238,7 @@ class TestToolsAdvertised:
                 "edpa_pi_metrics",
                 "edpa_insights",
                 "edpa_ai_attribution",
+                "edpa_payroll_export",
             }, f"Tool set drift: {names}"
 
     def test_edpa_item_requires_item_id(self, edpa_workspace):
