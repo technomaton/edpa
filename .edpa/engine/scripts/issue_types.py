@@ -484,7 +484,8 @@ def cmd_setup(args):
     expected_names = set(EDPA_TYPES.keys())
     missing = expected_names - final_names
     if missing and not dry_run:
-        print(f"  {color(f'Missing after setup: {", ".join(sorted(missing))}', C.WARN)}")
+        missing_str = ", ".join(sorted(missing))
+        print(f"  {color(f'Missing after setup: {missing_str}', C.WARN)}")
     elif not dry_run:
         print(f"  {color(f'Verified: all {len(expected_names)} EDPA types present', C.OK)}")
     print()

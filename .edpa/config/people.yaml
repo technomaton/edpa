@@ -7,6 +7,8 @@ project:
 people:
 - id: urbanek
   name: J. Urbanek
+  email: urbanek.jaroslav@gmail.com
+  github: jurby
   role: Arch
   team: CVUT
   fte: 0.5

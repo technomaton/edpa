@@ -486,15 +486,65 @@ def run_calibration(n_scenarios: int, seed: int, quick: bool = False) -> dict:
     }
 
 
-def apply_to_heuristics(report: dict, target: Path):
+def _read_current_weights(target: Path) -> dict[str, float]:
+    """Parse current signal weights from cw_heuristics.yaml.tmpl."""
+    import re
+    if not target.exists():
+        return {}
+    text = target.read_text(encoding="utf-8")
+    out: dict[str, float] = {}
+    in_signals = False
+    for line in text.splitlines():
+        if line.strip().startswith("signals:"):
+            in_signals = True
+            continue
+        if in_signals:
+            m = re.match(r"^\s+(\w+):\s*([\d.]+)", line)
+            if m:
+                out[m.group(1)] = float(m.group(2))
+            elif line.strip() and not line.startswith(" "):
+                break
+    return out
+
+
+def diff_weights(old: dict[str, float], new: dict[str, float]) -> list[str]:
+    """Return human-readable diff lines for signal weight changes."""
+    lines = []
+    for sig in SIGNAL_TYPES:
+        o = old.get(sig)
+        n = new.get(sig)
+        if o is None or n is None:
+            continue
+        delta = n - o
+        marker = "  " if abs(delta) < 0.01 else ("↑ " if delta > 0 else "↓ ")
+        lines.append(f"  {marker}{sig}: {o:.2f} → {n:.2f}  ({delta:+.3f})")
+    return lines
+
+
+def apply_to_heuristics(report: dict, target: Path, dry_run: bool = False):
     """Write calibrated weights into cw_heuristics.yaml.tmpl, preserving
-    the rest of the file and updating calibration metadata."""
+    the rest of the file and updating calibration metadata.
+
+    With dry_run=True: show the diff but do NOT write the file.
+    """
     if not target.exists():
         print(f"ERROR: target {target} not found", file=sys.stderr)
         sys.exit(2)
 
+    old_weights = _read_current_weights(target)
     text = target.read_text(encoding="utf-8")
     weights = report["calibrated_weights"]
+
+    # Show weight diff
+    print(f"\nWeight diff (old → new):")
+    for line in diff_weights(old_weights, weights):
+        print(line)
+    print(f"MAD: {report['baseline_mad']:.4f} → {report['calibrated_mad']:.4f}  "
+          f"({report['improvement_pct']:+.1f}%)")
+
+    if dry_run:
+        print(f"\n[dry-run] Would write to {target} — not written.")
+        return
 
     # Re-emit the signals: block (5 keys, fixed order)
     new_signals_block = (
@@ -517,13 +567,14 @@ def apply_to_heuristics(report: dict, target: Path):
     # Update calibration metadata
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    real_records = report.get("real_records", 0)
     calib_block = (
         f'calibration:\n'
         f'  method: "{report["method"]}"\n'
         f'  monte_carlo:\n'
         f'    scenarios: {report["n_scenarios"]}\n'
         f'    records: {report["n_records"]}\n'
-        f'  ground_truth_records: 0   # synthetic baseline; re-run with real data after first PI\n'
+        f'  ground_truth_records: {real_records}\n'
         f'  mad_baseline: {report["baseline_mad"]:.4f}\n'
         f'  mad_calibrated: {report["calibrated_mad"]:.4f}\n'
         f'  improvement_pct: {report["improvement_pct"]:.1f}\n'
@@ -548,6 +599,309 @@ def apply_to_heuristics(report: dict, target: Path):
     print(f"\n✓ Calibrated weights written to {target}")
 
 
+def commit_heuristics(target: Path, report: dict) -> bool:
+    """git add + git commit the heuristics template with a structured message.
+
+    Returns True on success, False if git is unavailable or the working tree
+    is inside a directory with no git repo.
+    """
+    import subprocess
+    mad_b = report["baseline_mad"]
+    mad_c = report["calibrated_mad"]
+    pct = report["improvement_pct"]
+    real = report.get("real_records", 0)
+    mode = "real-data blended" if real > 0 else "synthetic"
+
+    old_weights = _read_current_weights(target)
+    new_weights = report["calibrated_weights"]
+    diff_lines = diff_weights(old_weights, new_weights)
+    diff_summary = "  " + "\n  ".join(diff_lines) if diff_lines else "  (no changes)"
+
+    msg = (
+        f"chore(calibration): update CW weights "
+        f"(MAD {mad_b:.4f} → {mad_c:.4f}, {pct:+.1f}%)\n\n"
+        f"Mode: {mode}"
+        + (f" ({real} real records)" if real > 0 else "") + "\n"
+        f"Weight changes:\n{diff_summary}\n"
+    )
+
+    try:
+        subprocess.run(["git", "add", str(target)], check=True,
+                       capture_output=True)
+        subprocess.run(["git", "commit", "-m", msg], check=True,
+                       capture_output=True)
+        print(f"✓ Committed heuristics update: MAD {mad_b:.4f} → {mad_c:.4f}")
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        print(f"WARNING: git commit failed: {exc}", file=sys.stderr)
+        return False
+
+
+# ── Real-data calibration feedback loop ────────────────────────────────────
+
+# Inferred signal counts when a backlog item has no signals[] recorded.
+# Maps the `as:` role field to plausible signal mix (matches calibrator bands).
+_AS_TO_SIGNALS: dict[str, dict[str, int]] = {
+    "owner":    {"assignee": 1, "commit_author": 3, "pr_author": 1,
+                 "pr_reviewer": 0, "issue_comment": 0},
+    "key":      {"assignee": 0, "commit_author": 2, "pr_author": 1,
+                 "pr_reviewer": 0, "issue_comment": 1},
+    "reviewer": {"assignee": 0, "commit_author": 0, "pr_author": 0,
+                 "pr_reviewer": 1, "issue_comment": 0},
+    "consulted": {"assignee": 0, "commit_author": 0, "pr_author": 0,
+                  "pr_reviewer": 1, "issue_comment": 2},
+}
+_AS_DEFAULT_SIGNALS: dict[str, int] = {
+    "assignee": 0, "commit_author": 1, "pr_author": 0,
+    "pr_reviewer": 0, "issue_comment": 0,
+}
+
+
+def _count_signals(raw_signals: list[dict]) -> dict[str, int]:
+    """Count occurrences of each signal type in a signals[] list."""
+    counts = {s: 0 for s in SIGNAL_TYPES}
+    for sig in raw_signals:
+        t = sig.get("type", "")
+        if t in counts:
+            counts[t] += 1
+    return counts
+
+
+def _load_item_frontmatter(edpa_root: Path, item_id: str) -> dict | None:
+    """Read frontmatter from .edpa/backlog/**/<item_id>.md. Returns None if missing."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from _md_frontmatter import load_md
+    finally:
+        sys.path.pop(0)
+
+    for subdir in edpa_root.joinpath("backlog").iterdir() if \
+            edpa_root.joinpath("backlog").is_dir() else []:
+        candidate = subdir / f"{item_id}.md"
+        if candidate.is_file():
+            return load_md(candidate) or {}
+    return None
+
+
+def load_corrections(corrections_file: Path) -> list[dict]:
+    """Load correction records from the YAML file.
+
+    Each record must have: iteration, item, person, actual_cw.
+    Optional: note.
+    """
+    if not corrections_file.is_file():
+        return []
+    data = yaml.safe_load(corrections_file.read_text(encoding="utf-8")) or {}
+    return data.get("corrections", [])
+
+
+def build_real_contribution(
+    correction: dict,
+    edpa_root: Path,
+) -> SyntheticContribution | None:
+    """Build a SyntheticContribution from a team-confirmed correction.
+
+    Signal counts come from the item's contributors[].signals[] if present.
+    When absent (seed / demo data), infers counts from the contributor's
+    `as:` role field.  Returns None when the item or person is not found
+    in the backlog.
+    """
+    item_id = correction.get("item", "")
+    person_id = correction.get("person", "")
+    actual_cw = correction.get("actual_cw")
+
+    if not item_id or not person_id or actual_cw is None:
+        return None
+    try:
+        actual_cw = float(actual_cw)
+    except (TypeError, ValueError):
+        return None
+    if not (0.0 < actual_cw <= 1.0):
+        return None
+
+    fm = _load_item_frontmatter(edpa_root, item_id)
+    if fm is None:
+        return None
+
+    # Find the person in contributors[]
+    role = "Dev"
+    signal_counts: dict[str, int] | None = None
+    as_field: str | None = None
+    for c in (fm.get("contributors") or []):
+        if str(c.get("person", "")) == person_id:
+            role = str(c.get("role", "Dev"))
+            as_field = str(c.get("as", "")).lower()
+            raw_sigs = c.get("signals") or []
+            if raw_sigs:
+                signal_counts = _count_signals(raw_sigs)
+            break
+
+    if signal_counts is None:
+        # Infer from assignee field + as: role
+        inferred = dict(_AS_TO_SIGNALS.get(as_field or "", _AS_DEFAULT_SIGNALS))
+        # Bonus: if person is the item assignee, ensure assignee signal
+        if str(fm.get("assignee", "")) == person_id and inferred.get("assignee", 0) == 0:
+            inferred["assignee"] = 1
+        signal_counts = inferred
+
+    return SyntheticContribution(
+        person=person_id,
+        role=role,
+        item_id=item_id,
+        true_cw=actual_cw,
+        signal_counts=signal_counts,
+    )
+
+
+def load_real_corpus(
+    edpa_root: Path,
+    corrections_file: Path,
+) -> list[SyntheticScenario]:
+    """Convert correction records into SyntheticScenario objects.
+
+    Groups corrections by (iteration, item) so per-item normalization in
+    evaluate_mad() sees complete item sets.  Skips records that can't be
+    resolved (missing item or bad actual_cw).  Each unique (iteration) becomes
+    one SyntheticScenario; its team is inferred from the contributors found.
+    """
+    corrections = load_corrections(corrections_file)
+    if not corrections:
+        return []
+
+    # Group by iteration
+    by_iteration: dict[str, list[SyntheticContribution]] = {}
+    for rec in corrections:
+        iteration = rec.get("iteration", "unknown")
+        contrib = build_real_contribution(rec, edpa_root)
+        if contrib is not None:
+            by_iteration.setdefault(iteration, []).append(contrib)
+
+    scenarios = []
+    for iteration, contribs in by_iteration.items():
+        team = list({c.person: {"id": c.person, "role": c.role}
+                     for c in contribs}.values())
+        items = list(dict.fromkeys(c.item_id for c in contribs))
+        scenarios.append(SyntheticScenario(
+            team=team,
+            items=items,
+            contributions=contribs,
+        ))
+    return scenarios
+
+
+def blend_corpora(
+    real: list[SyntheticScenario],
+    synthetic: list[SyntheticScenario],
+    real_weight: int = 10,
+) -> list[SyntheticScenario]:
+    """Blend real and synthetic corpora.
+
+    Real records are repeated `real_weight` times so each confirmed
+    correction has proportionally more influence than one synthetic scenario.
+    """
+    return list(real) * real_weight + list(synthetic)
+
+
+def run_calibration_real_data(
+    edpa_root: Path,
+    corrections_file: Path,
+    n_scenarios: int,
+    seed: int,
+    quick: bool = False,
+    real_weight: int = 10,
+) -> dict:
+    """Calibration with real-data blending.
+
+    1. Loads team-confirmed corrections from corrections_file.
+    2. Generates a synthetic corpus (same parameters as the synthetic path).
+    3. Blends real + synthetic (real repeated real_weight times).
+    4. Runs the same MC → coordinate-descent pipeline on the blended corpus.
+    5. Returns a report dict that includes real_records, blend stats, and
+       a comparison of synthetic-only MAD vs blended MAD.
+    """
+    real_corpus = load_real_corpus(edpa_root, corrections_file)
+    n_real = sum(len(s.contributions) for s in real_corpus)
+
+    if n_real == 0:
+        print("WARNING: no real-data corrections found — falling back to "
+              "synthetic-only calibration.", file=sys.stderr)
+        report = run_calibration(n_scenarios, seed, quick=quick)
+        report["real_records"] = 0
+        report["mode"] = "synthetic-only (no corrections found)"
+        return report
+
+    print(f"Loaded {n_real} real-data correction records from {corrections_file}")
+
+    print(f"Generating {n_scenarios} synthetic scenarios (seed={seed})...")
+    synthetic_corpus = generate_corpus(n_scenarios, seed)
+    n_synthetic = sum(len(s.contributions) for s in synthetic_corpus)
+
+    blended = blend_corpora(real_corpus, synthetic_corpus, real_weight)
+    n_blended = sum(len(s.contributions) for s in blended)
+    print(f"  → blended corpus: {n_real} real (×{real_weight}) + "
+          f"{n_synthetic} synthetic = {n_blended} effective records")
+
+    defaults = {
+        "assignee": 4.0,
+        "pr_author": 3.4,
+        "commit_author": 2.78,
+        "pr_reviewer": 2.25,
+        "issue_comment": 1.14,
+    }
+    baseline_mad_synthetic, _ = evaluate_mad(synthetic_corpus, defaults)
+    baseline_mad_blended, _ = evaluate_mad(blended, defaults)
+    print(f"\nBaseline MAD — synthetic-only: {baseline_mad_synthetic:.4f}, "
+          f"blended: {baseline_mad_blended:.4f}")
+
+    n_samples = 200 if quick else 2000
+    print(f"\nPhase 1 — MC random sampling on blended corpus ({n_samples} samples)...")
+    mc_results = random_sample_phase(blended, n_samples, seed)
+    top_k = 5
+    for i, (mad, w) in enumerate(mc_results[:top_k], 1):
+        ws = " ".join(f"{s}={v:.2f}" for s, v in w.items())
+        print(f"  {i}. MAD={mad:.4f}  ({ws})")
+
+    print(f"\nPhase 2 — Coordinate descent refinement...")
+    refined = []
+    for i, (start_mad, start_weights) in enumerate(mc_results[:top_k], 1):
+        mad, weights = coordinate_descent(blended, start_weights)
+        print(f"  Cand {i}: {start_mad:.4f} → {mad:.4f}")
+        refined.append((mad, weights))
+    refined.sort(key=lambda x: x[0])
+
+    best_mad, best_weights = refined[0]
+    improvement_vs_baseline = (baseline_mad_blended - best_mad) / baseline_mad_blended * 100
+    improvement_vs_synthetic = (baseline_mad_synthetic - best_mad) / baseline_mad_synthetic * 100
+
+    print(f"\n{'═' * 60}")
+    print(f"Best calibrated weights (blended MAD = {best_mad:.4f}):")
+    for s, v in best_weights.items():
+        print(f"  {s}: {v:.3f}")
+    print(f"\nMAD vs blended baseline:   {baseline_mad_blended:.4f} → "
+          f"{best_mad:.4f} ({improvement_vs_baseline:+.1f}%)")
+    print(f"MAD vs synthetic baseline: {baseline_mad_synthetic:.4f} → "
+          f"{best_mad:.4f} ({improvement_vs_synthetic:+.1f}%)")
+    print(f"{'═' * 60}")
+
+    return {
+        "n_scenarios": n_scenarios,
+        "n_records": n_blended,
+        "real_records": n_real,
+        "real_weight": real_weight,
+        "seed": seed,
+        "baseline_weights": defaults,
+        "baseline_mad": baseline_mad_blended,
+        "baseline_mad_synthetic": baseline_mad_synthetic,
+        "calibrated_weights": best_weights,
+        "calibrated_mad": best_mad,
+        "improvement_pct": improvement_vs_baseline,
+        "improvement_vs_synthetic_pct": improvement_vs_synthetic,
+        "method": f"MC + coord-descent on blended corpus "
+                  f"({n_real} real ×{real_weight} + {n_synthetic} synthetic)",
+        "mode": "real-data blended",
+    }
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="EDPA v1.11 Monte Carlo signal-weight calibrator"
@@ -560,20 +914,49 @@ def main():
                     help="Smaller MC sample (200 instead of 2000) — faster, less accurate")
     ap.add_argument("--apply", action="store_true",
                     help="Write calibrated weights to plugin/edpa/templates/cw_heuristics.yaml.tmpl")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="Show what --apply would write (weight diff + MAD) without writing")
+    ap.add_argument("--commit", action="store_true",
+                    help="After --apply, git add + git commit with structured MAD-diff message")
     ap.add_argument("--report", type=Path, default=None,
                     help="Optional path to write JSON calibration report")
+    ap.add_argument("--real-data", action="store_true",
+                    help="Blend real-data corrections with synthetic corpus")
+    ap.add_argument("--corrections", type=Path, default=None,
+                    help="Path to calibration_corrections.yaml "
+                         "(default: .edpa/data/calibration_corrections.yaml)")
+    ap.add_argument("--edpa-root", type=Path, default=Path(".edpa"),
+                    help="Path to .edpa directory (used with --real-data)")
+    ap.add_argument("--real-weight", type=int, default=10,
+                    help="Repetition weight for real records vs synthetic (default 10)")
     args = ap.parse_args()
 
-    report = run_calibration(args.scenarios, args.seed, quick=args.quick)
+    if args.real_data:
+        corrections = args.corrections or (args.edpa_root / "data" / "calibration_corrections.yaml")
+        report = run_calibration_real_data(
+            edpa_root=args.edpa_root,
+            corrections_file=corrections,
+            n_scenarios=args.scenarios,
+            seed=args.seed,
+            quick=args.quick,
+            real_weight=args.real_weight,
+        )
+    else:
+        report = run_calibration(args.scenarios, args.seed, quick=args.quick)
 
     if args.report:
         args.report.write_text(json.dumps(report, indent=2, default=str),
                                encoding="utf-8")
         print(f"\n✓ Report written to {args.report}")
 
-    if args.apply:
-        target = Path(__file__).parent.parent / "templates" / "cw_heuristics.yaml.tmpl"
-        apply_to_heuristics(report, target)
+    target = Path(__file__).parent.parent / "templates" / "cw_heuristics.yaml.tmpl"
+
+    if args.dry_run:
+        apply_to_heuristics(report, target, dry_run=True)
+    elif args.apply:
+        apply_to_heuristics(report, target, dry_run=False)
+        if args.commit:
+            commit_heuristics(target, report)
 
 
 if __name__ == "__main__":

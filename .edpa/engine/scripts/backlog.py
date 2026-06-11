@@ -143,8 +143,9 @@ PREFIX_TO_DIR = {
     "F":  "features",
     "S":  "stories",
     "D":  "defects",
-    "T":  "stories",
+    "T":  "tasks",
     "EV": "events",
+    "R":  "risks",
 }
 
 TYPE_PREFIX = {
@@ -153,7 +154,9 @@ TYPE_PREFIX = {
     "Feature":    "F",
     "Story":      "S",
     "Defect":     "D",
+    "Task":       "T",
     "Event":      "EV",
+    "Risk":       "R",
 }
 
 # -- SAFe Status Workflows -----------------------------------------------------
@@ -199,7 +202,7 @@ def load_backlog(root):
     # Load all items from type directories. Items are stored as `.md`
     # files with YAML frontmatter + Markdown body (see _md_frontmatter).
     items = []
-    for type_dir in ["initiatives", "epics", "features", "stories", "defects"]:
+    for type_dir in ["initiatives", "epics", "features", "stories", "defects", "tasks", "events", "risks"]:
         dir_path = edpa / "backlog" / type_dir
         if dir_path.exists():
             for f in sorted(dir_path.glob("*.md")):
@@ -248,6 +251,10 @@ TYPE_TO_LEVEL = {
     "Epic": "Epic",
     "Feature": "Feature",
     "Story": "Story",
+    "Defect": "Defect",
+    "Task": "Task",
+    "Event": "Event",
+    "Risk": "Risk",
 }
 
 

@@ -5,8 +5,8 @@ a vygenerování reportů. EDPA V2 je **local-first**: `.edpa/backlog/**/*.md`
 (YAML frontmatter) je single source of truth, git je audit trail. GitHub je
 **volitelný** — žádný GitHub Project provisioning, žádná oboustranná synchronizace.
 
-**Verze plánu:** 2.1.x (2026-05-31)
-**Pokrývaná verze EDPA:** 2.1.x (vendored engine v `.edpa/engine/`, local-first backlog v `.md`,
+**Verze plánu:** 2.1.x (2026-05-31; revize odkazů 2026-06-11, platí pro V2 local-first 2.1+)
+**Pokrývaná verze EDPA:** 2.1+ (vendored engine v `.edpa/engine/`, local-first backlog v `.md`,
 evidence-driven engine, git hooks pro evidence, volitelný contribution-sync workflow)
 **Cílový stav po projití:** plugin nainstalovaný, engine vendorovaný do `.edpa/engine/`,
 lokální backlog naplněný, jeden uzavřený PI s reporty + frozen snapshotem.

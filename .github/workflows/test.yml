@@ -24,4 +24,13 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: pytest tests/ -m "not e2e" -q --tb=short
+        run: >
+          pytest tests/ -m "not e2e" -q --tb=short
+          --cov=plugin/edpa/scripts --cov-report=term-missing:skip-covered
+          --cov-report=xml
+
+      - name: Coverage summary
+        if: matrix.python-version == '3.12'
+        run: |
+          rate=$(python -c "import xml.etree.ElementTree as ET; print(f'{float(ET.parse(\"coverage.xml\").getroot().get(\"line-rate\", 0)) * 100:.1f}')")
+          echo "**pytest line coverage: ${rate}%**" >> "$GITHUB_STEP_SUMMARY"

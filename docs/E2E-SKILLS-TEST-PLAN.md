@@ -9,11 +9,12 @@ backend behavior; this plan tests the product surface — prompts, decision
 points, MCP tool dispatch, error messages users actually see. Both must
 pass for a release to be production-ready.
 
-**Verze plánu:** 2.1.x (2026-05-31, EDPA V2 local-first)
+**Verze plánu:** 2.1.x (2026-05-31, EDPA V2 local-first; revize odkazů 2026-06-11)
 **Pokrývá:** 5 skills (`edpa:setup`, `edpa:add`, `edpa:engine`,
-`edpa:reports`, `edpa:calibrate`) + 4 slash commands
-(`edpa:close-iteration`, `edpa:board`, `edpa:capacity`, `edpa:server`) + MCP server
-(14 tools, 3 resource families).
+`edpa:reports`, `edpa:autocalib`) + slash commands (`edpa:close-iteration`,
+`edpa:board`, `edpa:capacity`, `edpa:server`, … — aktuální seznam v
+`plugin/commands/`) + MCP server (aktuální tool surface viz `docs/mcp.md`,
+3 resource families).
 
 > **V2 is local-first.** `.edpa/backlog/**/*.md` is the source of truth and
 > git is the audit trail. There is **no** GitHub Project provisioning, **no**

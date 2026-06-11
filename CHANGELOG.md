@@ -1,5 +1,57 @@
 # Changelog
 
+## Unreleased
+
+Consolidation batch from the 2026-06-11 repo analysis (F-124: D-17, D-18,
+D-19, S-239..S-242):
+
+### Added
+
+- **`/edpa:reconcile` + `edpa_reconcile` MCP read tool (#27)** — reconciles
+  git delivery evidence against backlog status (`reconcile.py`, script-first).
+  Evidence = item IDs in commit subjects on the main branch (CC scope; body
+  mentions and auto-prefixed commits don't count). Suggests transitions:
+  release-tag containment or quiet ≥ stale-days → Done (`closed_at` from the
+  evidence commit), fresh evidence → Implementing; phantoms (Done, zero
+  evidence) are report-only. `--apply` / `--check` (CI gate) / `--json`.
+- **CI**: pytest coverage reporting in `test.yml`; nightly skill-E2E workflow
+  (`skill-e2e-nightly.yml`, gated on `ANTHROPIC_API_KEY` secret); explicit
+  Cache-Control for `/install.sh` (5 min) in `web/vercel.json`.
+- **Release drift guard**: `bump_version.py` pattern-stamps playbook / mcp.md /
+  RUNBOOK / edpa.yaml.tmpl (self-heals already-drifted files);
+  `test_version_consistent` now pins anchored version stamps in living docs +
+  the vendored `.edpa/engine/VERSION`.
+
+### Changed
+
+- **Dogfood backlog restructured (D-17)**: new `I-2 EDPA Platform Development`
+  initiative (E-13/E-14/E-15, F-121..F-124); 26 shipped-but-Funnel items
+  reconciled to Done with evidence-dated `closed_at`; PI-2026-1 metadata
+  closed (find_active_pi now returns PI-2026-2).
+- **mcp_server.py**: elif dispatch chain → `TOOL_HANDLERS` registry with a
+  registry↔schema parity test; shared `_yaml_io.py` loader replaces the
+  duplicated `load_yaml` in `engine.py` / `pi_close.py`.
+
+### Removed
+
+- Broken V1 workflows in `.github/` (`edpa-iteration-close.yml` referencing
+  the removed `.claude/edpa/` path, `collaborators-sync.yml` calling a
+  nonexistent script) and the 11-template V1 graveyard `plugin/edpa/workflows/`
+  shipped in every install.
+- `SETUP.md` (stale V1 duplicate of README/RUNBOOK) and
+  `docs/methodology-cs.md` (stub). `TODO.md` rewritten — forward backlog lives
+  in `.edpa/backlog/`.
+
+### Fixed
+
+- Docs rot: quick-start V1 "Projects sync" step → PR-signal CI, vendored-path
+  fixes, version drift across living docs (methodology 2.5.0, playbook 2.5.1,
+  RUNBOOK 2.3.0, mcp.md "v1.3.0-beta", `edpa.yaml.tmpl` "EDPA 2.2.1");
+  plugin/README command tree + tool tables now include the 2.6.0 additions
+  (insights, ai-attribution, pi_board, payroll) and reconcile.
+- `people.yaml`: maintainer email/github added so `local_evidence.py`
+  attributes maintainer commits (it was skipping them).
+
 ## 2.6.0 — 2026-06-10 — BI analytics, AI attribution, payroll export
 
 Eight new capabilities from the P2 roadmap batch (PRs #70–#80):

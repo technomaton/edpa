@@ -64,7 +64,7 @@ plugin/
 │   ├── engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
 │   ├── reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
 │   └── autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
-├── commands/                        # 16 slash commands, flat layout (no edpa/ subdir)
+├── commands/                        # slash commands, flat layout (no edpa/ subdir)
 │   ├── close-iteration.md           # → /edpa:close-iteration — capacity prep + engine + reports
 │   ├── board.md                     # → /edpa:board          — HTML Kanban snapshot
 │   ├── capacity.md                  # → /edpa:capacity       — per-iteration capacity overrides
@@ -79,9 +79,12 @@ plugin/
 │   ├── forecast.md                  # → /edpa:forecast       — Monte-Carlo PI completion forecast
 │   ├── export.md                    # → /edpa:export         — billable hours CSV (payroll / invoicing)
 │   ├── explain.md                   # → /edpa:explain        — allocation audit trail (signal → CW → hours)
-│   └── metrics.md                   # → /edpa:metrics        — PI predictability & confidence trending
+│   ├── metrics.md                   # → /edpa:metrics        — PI predictability & confidence trending
+│   ├── insights.md                  # → /edpa:insights       — mid-iteration anomaly detection
+│   ├── ai-attribution.md            # → /edpa:ai-attribution — human vs AI delivery ratio
+│   └── reconcile.md                 # → /edpa:reconcile      — git evidence vs backlog status drift
 └── edpa/
-    ├── scripts/                     # 32 Python modules
+    ├── scripts/                     # Python modules (engine, MCP server, evidence pipeline, analytics)
     │   ├── engine.py                # Core engine (Score, DerivedHours, invariants)
     │   ├── mcp_server.py            # MCP server for /edpa:status, /edpa:backlog, /edpa:iterations, /edpa:flow_metrics
     │   ├── calibrate_signals.py     # CW signal-weights calibrator (Monte Carlo + coordinate descent)
@@ -108,19 +111,10 @@ plugin/
     │   ├── edpa.yaml.tmpl           # → .edpa/config/edpa.yaml (project, cadence, naming)
     │   ├── cw_heuristics.yaml.tmpl  # → .edpa/config/cw_heuristics.yaml (signal + gate weights)
     │   └── github-workflows/        # edpa-contribution-sync.yml (installed by --with-ci) + edpa-collision-check.yml
-    └── workflows/                   # V1 GH-Projects-era Actions (vestigial); V2 install ships only templates/github-workflows/ above
-        ├── edpa-branch-check.yml          # PR branch naming enforcement
-        ├── edpa-iteration-close.yml       # Iteration close automation
-        ├── edpa-pi-close.yml              # PI close + report generation
-        ├── edpa-sync-projects-to-git.yml  # GH Projects → backlog YAMLs (every 30 min during business hours)
-        ├── edpa-sync-git-to-projects.yml  # Backlog YAMLs → GH Projects (push hook)
-        ├── edpa-validate-item.yml         # YAML schema validation on PR
-        ├── edpa-traceability-check.yml    # Parent-chain validation
-        ├── edpa-collaborators-sync.yml    # Auto-update people.yaml on collaborator change
-        ├── edpa-contributor-detect.yml    # Detect /contribute commands in PRs
-        ├── edpa-velocity-track.yml        # PI velocity history
-        └── edpa-wsjf-calculate.yml        # WSJF score on backlog
 ```
+
+(The V1 GH-Projects-era `workflows/` directory was removed in 2.7.0 — the V2
+install ships only `templates/github-workflows/` above.)
 
 ## Skills + commands at a glance
 
@@ -151,6 +145,8 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `/edpa:explain` | command | Explain one person's allocation (signal → CW → JS×CW → ratio → hours) |
 | `/edpa:metrics` | command | PI predictability & confidence trending — planned/delivered SP, avg velocity, team confidence votes |
 | `/edpa:insights` | command | Mid-iteration anomaly detection — capacity overload, job-size creep, stalled stories, critical-path blockers |
+| `/edpa:ai-attribution` | command | Human vs AI delivery ratio (Co-Authored-By trailers → agent_contribution signals) |
+| `/edpa:reconcile` | command | Git evidence vs backlog status drift — finds shipped-but-not-Done items, suggests transitions |
 
 ## Multi-developer setup — ID collision handling
 
@@ -207,6 +203,10 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 | `edpa_forecast_pi` | Monte-Carlo PI completion forecast — p20/p50/p80 bands, completion probability, scope recommendation |
 | `edpa_pi_metrics` | PI predictability & confidence trending — planned/delivered SP, predictability %, avg velocity, team confidence votes, objective completion. Writes `.edpa/reports/pi-metrics.json` |
 | `edpa_insights` | Mid-iteration anomaly detection — capacity overload, job-size creep, stalled stories, critical-path blockers. Writes `.edpa/reports/iteration-<iter>/insights.json` |
+| `edpa_pi_board` | Generate the self-contained PI planning HTML (program board, objectives, ROAM) |
+| `edpa_ai_attribution` | Human vs AI delivery ratio per item/person from `Co-Authored-By` trailers |
+| `edpa_payroll_export` | Billable-hours CSV from engine derived hours + `hourly_rate`/`currency` |
+| `edpa_reconcile` | Git evidence vs backlog status drift — suggests transitions (apply via `edpa_item_transition`) |
 
 **Write tools** (mutate `.edpa/backlog/` or `.edpa/iterations/` YAML; always commit after):
 
@@ -236,7 +236,7 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 ├── requirements.txt
 ├── hooks/hooks.json
 ├── skills/                           # 5 SKILL.md
-├── commands/                         # 14 slash commands (flat)
+├── commands/                         # slash commands (flat)
 └── edpa/                             # Python engine, schemas, templates, workflows
 
 .edpa/                                # Project data (created by install.sh / /edpa:setup)

@@ -5,7 +5,8 @@ read-only access to `.edpa/` project data — config, iterations, people,
 backlog — over the standard MCP `stdio` transport. Any MCP-aware client
 (Claude Code, Cursor, Codex CLI, custom Python/TS clients) can read it.
 
-**Production-ready as of v1.3.0-beta.** Validated handlers, schema-checked
+**Production-ready since v1.3.0-beta; current as of v2.6.0** (read + write
+tools — see the tool tables below). Validated handlers, schema-checked
 inputs, item-ID path-traversal guard, stderr logging, version-aware identity.
 
 ---
@@ -24,6 +25,19 @@ context tight and makes the data shape predictable.
 | `edpa_backlog`   | Backlog items from `.edpa/backlog/`                    | optional `iteration`, `type`, `status` |
 | `edpa_item`      | Detail for one item                                     | required `item_id` (e.g. `S-200`)  |
 | `edpa_flow_metrics` | Cycle time, throughput, open item age                | optional `iteration`, `level`      |
+| `edpa_validate`  | Iterations continuity + schema check                    | none                               |
+| `edpa_pi_board`  | Generate the self-contained PI planning HTML            | optional `pi`                      |
+
+Analytics read tools (2.6.0+):
+
+| Tool | Purpose |
+|---|---|
+| `edpa_forecast_pi` | Monte-Carlo PI completion forecast (p20/p50/p80) |
+| `edpa_pi_metrics` | Multi-PI velocity, confidence + predictability trend |
+| `edpa_insights` | Mid-iteration anomaly detection (overload, creep, stalled, blockers) |
+| `edpa_ai_attribution` | Human vs AI delivery ratio from `Co-Authored-By` trailers |
+| `edpa_payroll_export` | Billable-hours CSV from derived hours + `hourly_rate` |
+| `edpa_reconcile` | Git evidence vs backlog status drift — suggests transitions (2.7.0) |
 
 It also publishes resources for whole-file reads:
 
@@ -290,9 +304,9 @@ write tools) and re-run.
 
 ---
 
-## Production hardening (v1.3-beta)
+## Production hardening (history: v1.3-beta)
 
-What changed from the v1.0–v1.2 prototype:
+What changed from the v1.0–v1.2 prototype (kept as design rationale):
 
 1. **Portable plugin path.** `${CLAUDE_PLUGIN_ROOT}/...` instead of relative
    `.claude/edpa/...`. Working directory of the client no longer matters.

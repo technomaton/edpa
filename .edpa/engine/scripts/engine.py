@@ -67,29 +67,11 @@ VERSION = get_version()
 EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
 
 
-def load_yaml(path):
-    """Load a backlog file. Returns parsed content or None on failure.
-
-    Backlog items (`.md`) are parsed via ``_md_frontmatter.load_md`` so the
-    engine sees frontmatter fields plus a ``body`` key. Other files
-    (`.yaml`, e.g. iterations and config) are parsed via PyYAML.
-    """
-    try:
-        path_obj = Path(path) if not isinstance(path, Path) else path
-        if path_obj.suffix == ".md":
-            sys.path.insert(0, str(Path(__file__).resolve().parent))
-            try:
-                from _md_frontmatter import load_md as _load_md
-            finally:
-                sys.path.pop(0)
-            return _load_md(path_obj)
-        with open(path, encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except FileNotFoundError:
-        return None
-    except (yaml.YAMLError, OSError) as exc:
-        print(f"WARNING: load_yaml({path}) failed: {exc}", file=sys.stderr)
-        return None
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _yaml_io import load_yaml  # noqa: E402  (shared .md/.yaml loader, S-242)
+finally:
+    sys.path.pop(0)
 
 
 def gh_json(cmd):
@@ -1413,7 +1395,34 @@ def main():
                         help="Show EDPA setup status and exit")
     parser.add_argument("--demo", action="store_true",
                         help="Run with built-in sample data")
+    parser.add_argument("--explain", metavar="PERSON",
+                        help="Explain allocation for PERSON from already-computed results "
+                             "(requires --edpa-root and --iteration). Does not re-run engine.")
+    parser.add_argument("--explain-item", metavar="ITEM",
+                        help="With --explain: focus on a single item ID")
     args = parser.parse_args()
+
+    if args.explain:
+        # Delegate to explain.py — read-only, no engine re-run
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        try:
+            from explain import explain_person, load_results  # noqa: E402
+        finally:
+            pass
+        edpa_root = Path(args.edpa_root) if args.edpa_root else Path(".edpa")
+        if not args.iteration:
+            parser.error("--explain requires --iteration")
+        try:
+            results = load_results(edpa_root, args.iteration)
+        except FileNotFoundError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+        md = explain_person(results, args.explain, edpa_root, args.explain_item)
+        if md.startswith("ERROR:"):
+            print(md, file=sys.stderr)
+            sys.exit(1)
+        print(md)
+        sys.exit(0)
 
     if args.status:
         show_status(Path(args.edpa_root) if args.edpa_root else Path(".edpa"))
