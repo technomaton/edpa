@@ -81,6 +81,8 @@ PREFIX_TO_DIR = {
     "I": "initiatives",
     "T": "tasks",
     "D": "defects",
+    "EV": "events",
+    "R":  "risks",
 }
 
 # /contribute manual directive — additive signal, no role clause.

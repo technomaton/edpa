@@ -16,6 +16,7 @@ Environment:
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -126,6 +127,24 @@ def _safe_person_id(person_id: str) -> str | None:
     if not isinstance(person_id, str):
         return None
     return person_id if PERSON_ID_RE.match(person_id) else None
+
+
+@contextlib.contextmanager
+def _sibling_path():
+    """Temporarily add this file's directory to sys.path for sibling imports.
+
+    Uses try/finally to guarantee removal even if the import raises, preventing
+    the path from leaking into long-running MCP sessions.
+    """
+    sibling = str(Path(__file__).resolve().parent)
+    sys.path.insert(0, sibling)
+    try:
+        yield
+    finally:
+        try:
+            sys.path.remove(sibling)
+        except ValueError:
+            pass
 
 
 # Type metadata — single source of truth for write tools (mirrors
@@ -656,6 +675,123 @@ async def list_tools() -> list[Tool]:
                 "additionalProperties": False,
             },
         ),
+        Tool(
+            name="edpa_forecast_pi",
+            description=(
+                "Monte-Carlo PI completion forecast. Fits a velocity distribution "
+                "from the last N closed iterations and simulates remaining-iteration "
+                "delivery 1000×, returning p20/p50/p80 delivery bands, completion "
+                "probability, and a scope recommendation. Read-only — does not "
+                "modify any files."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pi": {"type": "string", "description": "PI ID, e.g. PI-2026-2"},
+                    "window": {"type": "integer", "minimum": 2, "maximum": 20,
+                               "description": "Velocity history window (default 3)"},
+                    "simulations": {"type": "integer", "minimum": 100, "maximum": 10000,
+                                    "description": "Monte-Carlo simulations (default 1000)"},
+                },
+                "required": ["pi"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_pi_metrics",
+            description=(
+                "PI confidence & predictability trending. Accumulates per-PI metrics: "
+                "planned vs delivered SP (predictability %), average team confidence "
+                "votes, objective completion ratio, and average velocity per iteration. "
+                "Returns a table of the last N PIs — ideal for Inspect&Adapt. "
+                "Also writes .edpa/reports/pi-metrics.json and pi-metrics.md. "
+                "Read-only with respect to backlog/iteration data."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "window": {"type": "integer", "minimum": 1, "maximum": 20,
+                               "description": "Number of most-recent PIs to include (default 5)"},
+                    "pi": {"type": "string",
+                           "description": "Limit to a single PI ID, e.g. PI-2026-1 (optional)"},
+                },
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_insights",
+            description=(
+                "Mid-iteration anomaly detection. Reads edpa_results.json + backlog items "
+                "+ git history and surfaces: capacity_overload (derived > threshold%), "
+                "job_size_creep (JS > threshold), stalled_story (in_progress, no git "
+                "activity > N days), critical_path_blocker (blocked by unfinished dep). "
+                "Returns JSON anomaly list + writes insights.json and insights-<iter>.md "
+                "to the reports directory. Read-only with respect to backlog data."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "iteration": {"type": "string",
+                                  "description": "Iteration ID, e.g. PI-2026-1.3 (required)"},
+                    "overload_threshold": {
+                        "type": "number", "minimum": 1.0, "maximum": 2.0,
+                        "description": "Capacity overload ratio, default 1.10 (110%)",
+                    },
+                    "js_threshold": {
+                        "type": "integer", "minimum": 1, "maximum": 100,
+                        "description": "JS above which job-size creep is flagged, default 8",
+                    },
+                    "stale_days": {
+                        "type": "integer", "minimum": 1, "maximum": 90,
+                        "description": "Days of git inactivity to flag as stalled, default 5",
+                    },
+                },
+                "required": ["iteration"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_ai_attribution",
+            description=(
+                "Human vs AI-agent delivery ratio for an iteration. Scans backlog items "
+                "for agent_contribution signals emitted by local_evidence.py when commits "
+                "carry Co-Authored-By: Claude … <…@anthropic.com> trailers. Returns a "
+                "per-item and per-person breakdown plus an iteration-wide ai_delivery_ratio. "
+                "Writes ai_attribution.json and ai-attribution-<iter>.md to the reports dir."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "iteration": {"type": "string",
+                                  "description": "Iteration ID, e.g. PI-2026-1.3 (required)"},
+                },
+                "required": ["iteration"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
+            name="edpa_payroll_export",
+            description=(
+                "Generate a billable-hours CSV (and return the data as JSON) from engine "
+                "derived hours. Reads edpa_results.json + people.yaml (hourly_rate, currency "
+                "fields) + edpa.yaml (project.funding.registration → cost code). "
+                "Writes payroll-<iter>.csv to .edpa/reports/iteration-<id>/. "
+                "Requires /edpa:engine to have been run for the iteration first."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "iteration": {"type": "string",
+                                  "description": "Iteration ID, e.g. PI-2026-1.3 (required)"},
+                    "currency": {"type": "string",
+                                 "description": "Currency code override for rows without per-person currency (e.g. CZK, EUR, USD)"},
+                    "output": {"type": "string",
+                               "description": "Custom output CSV path (optional, default: reports/iteration-<id>/payroll-<id>.csv)"},
+                },
+                "required": ["iteration"],
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -723,6 +859,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_pi_board(edpa_root, arguments)
         elif name == "edpa_people_upsert":
             return _handle_people_upsert(edpa_root, arguments)
+        elif name == "edpa_forecast_pi":
+            return _handle_forecast_pi(edpa_root, arguments)
+        elif name == "edpa_pi_metrics":
+            return _handle_pi_metrics(edpa_root, arguments)
+        elif name == "edpa_insights":
+            return _handle_insights(edpa_root, arguments)
+        elif name == "edpa_ai_attribution":
+            return _handle_ai_attribution(edpa_root, arguments)
+        elif name == "edpa_payroll_export":
+            return _handle_payroll_export(edpa_root, arguments)
         logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception:
@@ -740,8 +886,8 @@ def _handle_status(edpa_root: Path) -> list[TextContent]:
     config = load_yaml(edpa_root / "config" / "edpa.yaml") or {}
     people_cfg = load_yaml(edpa_root / "config" / "people.yaml") or {}
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _pi_loader import derive_pis, find_active_pi, split_diagnostics  # noqa: E402
+    with _sibling_path():
+        from _pi_loader import derive_pis, find_active_pi, split_diagnostics  # noqa: E402
 
     pis, diags = derive_pis(edpa_root)
     _, warnings = split_diagnostics(diags)
@@ -780,8 +926,8 @@ def _handle_status(edpa_root: Path) -> list[TextContent]:
 
 
 def _handle_iterations(edpa_root: Path, status_filter: str | None) -> list[TextContent]:
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _pi_loader import derive_pis, find_active_pi, split_diagnostics  # noqa: E402
+    with _sibling_path():
+        from _pi_loader import derive_pis, find_active_pi, split_diagnostics  # noqa: E402
 
     pis, diags = derive_pis(edpa_root)
     _, warnings = split_diagnostics(diags)
@@ -816,9 +962,9 @@ def _handle_validate(edpa_root: Path) -> list[TextContent]:
     """Run iteration + people validation, return structured report."""
     # Local import: keeps the optional helpers out of module-load path so the
     # MCP server can still start even if a plugin upgrade is mid-flight.
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _pi_loader import derive_pis, split_diagnostics  # noqa: E402
-    from _people_loader import validate_people  # noqa: E402
+    with _sibling_path():
+        from _pi_loader import derive_pis, split_diagnostics  # noqa: E402
+        from _people_loader import validate_people  # noqa: E402
 
     pis, iter_diags = derive_pis(edpa_root)
     people_diags = validate_people(edpa_root)
@@ -867,6 +1013,10 @@ def _handle_backlog(edpa_root: Path, iteration: str | None, type_filter: str | N
         "features": "Feature",
         "epics": "Epic",
         "initiatives": "Initiative",
+        "defects": "Defect",
+        "tasks": "Task",
+        "events": "Event",
+        "risks": "Risk",
     }
 
     items = []
@@ -986,6 +1136,8 @@ def _handle_flow_metrics(
     open_items: list[dict] = []
     skipped = 0
 
+    # flow_metrics intentionally covers only delivery-tracked types (Story,
+    # Feature, Epic, Initiative) — Task/Event/Risk have no derived hours.
     for dir_name, item_level in type_dirs.items():
         type_dir = backlog_dir / dir_name
         if not type_dir.exists():
@@ -1800,6 +1952,119 @@ def _handle_people_upsert(edpa_root: Path, args: dict) -> list[TextContent]:
     return _ok({"id": safe_id, "action": action, "fields": sorted(fields)})
 
 
+def _handle_forecast_pi(edpa_root: Path, args: dict) -> list[TextContent]:
+    pi = args.get("pi", "")
+    if not pi or not isinstance(pi, str):
+        return _err("pi is required (e.g. PI-2026-2)")
+    window = args.get("window", 3)
+    simulations = args.get("simulations", 1000)
+
+    with _sibling_path():
+        try:
+            from forecast import forecast_pi  # noqa: E402
+            result = forecast_pi(edpa_root, pi, window=window, simulations=simulations)
+        except ValueError as exc:
+            return _err(str(exc))
+        except ImportError as exc:
+            return _err(f"forecast module not available: {exc}")
+
+    logger.info("edpa_forecast_pi: pi=%s p50=%s prob=%s%%",
+                pi, result.get("p50"), result.get("completion_probability"))
+    return _ok(result)
+
+
+def _handle_pi_metrics(edpa_root: Path, args: dict) -> list[TextContent]:
+    window = args.get("window", 5)
+    pi = args.get("pi") or None
+
+    with _sibling_path():
+        try:
+            from pi_metrics import pi_metrics  # noqa: E402
+            result = pi_metrics(edpa_root, window=window, pi=pi)
+        except ImportError as exc:
+            return _err(f"pi_metrics module not available: {exc}")
+
+    logger.info("edpa_pi_metrics: pis=%s", len(result.get("pis", [])))
+    return _ok(result)
+
+
+def _handle_insights(edpa_root: Path, args: dict) -> list[TextContent]:
+    iteration = args.get("iteration", "")
+    if not iteration:
+        return _err("iteration is required (e.g. PI-2026-1.3)")
+    overload = float(args.get("overload_threshold", 1.10))
+    js_max = int(args.get("js_threshold", 8))
+    stale = int(args.get("stale_days", 5))
+
+    with _sibling_path():
+        try:
+            from insights import insights as run_insights  # noqa: E402
+            result = run_insights(
+                edpa_root=edpa_root,
+                iteration_id=iteration,
+                overload_threshold=overload,
+                js_threshold=js_max,
+                stale_days=stale,
+            )
+        except FileNotFoundError as exc:
+            return _err(str(exc))
+        except ImportError as exc:
+            return _err(f"insights module not available: {exc}")
+
+    logger.info("edpa_insights: iter=%s anomalies=%s", iteration, result.get("anomaly_count"))
+    return _ok(result)
+
+
+def _handle_ai_attribution(edpa_root: Path, args: dict) -> list[TextContent]:
+    iteration = args.get("iteration", "")
+    if not iteration:
+        return _err("iteration is required (e.g. PI-2026-1.3)")
+
+    with _sibling_path():
+        try:
+            from ai_attribution import ai_attribution as run_ai_attribution  # noqa: E402
+            result = run_ai_attribution(
+                edpa_root=edpa_root,
+                iteration_id=iteration,
+            )
+        except FileNotFoundError as exc:
+            return _err(str(exc))
+        except ImportError as exc:
+            return _err(f"ai_attribution module not available: {exc}")
+
+    s = result.get("summary", {})
+    logger.info("edpa_ai_attribution: iter=%s ai_ratio=%s",
+                iteration, s.get("ai_delivery_ratio"))
+    return _ok(result)
+
+
+def _handle_payroll_export(edpa_root: Path, args: dict) -> list[TextContent]:
+    iteration = args.get("iteration", "")
+    if not iteration:
+        return _err("iteration is required (e.g. PI-2026-1.3)")
+    currency = args.get("currency", "")
+    raw_output = args.get("output")
+    output_path = Path(raw_output) if raw_output else None
+
+    with _sibling_path():
+        try:
+            from payroll_export import export as run_export  # noqa: E402
+            result = run_export(
+                edpa_root=edpa_root,
+                iteration_id=iteration,
+                currency=currency,
+                output=output_path,
+            )
+        except FileNotFoundError as exc:
+            return _err(str(exc))
+        except ImportError as exc:
+            return _err(f"payroll_export module not available: {exc}")
+
+    logger.info("edpa_payroll_export: iter=%s rows=%s hours=%s",
+                iteration, result.get("rows"), result.get("total_hours"))
+    return _ok(result)
+
+
 # ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
@@ -1834,7 +2099,10 @@ async def read_resource(uri: str) -> str:
         path = edpa_root / "config" / "people.yaml"
     elif uri.startswith("edpa://results/"):
         it_id = uri.replace("edpa://results/", "")
-        path = edpa_root / "reports" / f"iteration-{it_id}" / "edpa_results.json"
+        safe = _safe_iteration_id(it_id)
+        if safe is None:
+            return f"ERROR: invalid iteration id: {it_id!r}"
+        path = edpa_root / "reports" / f"iteration-{safe}" / "edpa_results.json"
     else:
         return f"ERROR: Unknown resource URI: {uri}"
 

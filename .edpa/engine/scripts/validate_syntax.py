@@ -64,6 +64,8 @@ DELIVERY_STATUSES = {
 # them. Setup docs flag this.
 LEGACY_STATUSES = {"Active", "Closed", "Accepted"}
 
+ROAM_STATUSES = {"resolved", "owned", "accepted", "mitigated"}
+
 ITEM_SCHEMA = {
     "Initiative": {
         "dir": "initiatives",
@@ -127,6 +129,14 @@ ITEM_SCHEMA = {
         "statuses": DELIVERY_STATUSES | LEGACY_STATUSES,
         "parent_required": False,
     },
+    "Event": {
+        "dir": "events",
+        "required": {"id", "type", "title", "status"},
+        "optional": {"parent", "js", "owner", "assignee", "contributors", "iteration",
+                     "depends_on", "created_at", "closed_at", "updated_at"},
+        "statuses": DELIVERY_STATUSES | LEGACY_STATUSES,
+        "parent_required": False,
+    },
 }
 
 # Mirror engine.EVIDENCE_ROLES — kept here so the validator stays
@@ -143,6 +153,7 @@ TYPE_PREFIXES = {
     "Defect": "D",
     "Task": "T",
     "Risk": "R",
+    "Event": "EV",
 }
 
 
@@ -158,6 +169,42 @@ def _is_iteration_path(path: Path) -> bool:
     return (idx + 1 < len(parts)
             and parts[idx + 1] == "iterations"
             and path.suffix in YAML_EXTENSIONS)
+
+
+def _is_heuristics_path(path: Path) -> bool:
+    """True if path is a cw_heuristics.yaml (config or template)."""
+    return path.name in ("cw_heuristics.yaml", "cw_heuristics.yaml.tmpl")
+
+
+_CW_SIGNAL_NAMES = ("assignee", "pr_author", "commit_author",
+                    "pr_reviewer", "issue_comment")
+_CW_WEIGHT_MIN = 0.1
+_CW_WEIGHT_MAX = 8.0
+
+
+def validate_cw_heuristics(path: Path, data: dict) -> tuple[list[str], list[str]]:
+    """Validate signal weights in cw_heuristics.yaml are within [0.1, 8.0]."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    signals = (data or {}).get("signals", {})
+    if not isinstance(signals, dict):
+        errors.append(f"{path}: signals: must be a mapping")
+        return errors, warnings
+    for sig in _CW_SIGNAL_NAMES:
+        if sig not in signals:
+            warnings.append(f"{path}: signals.{sig} missing (will use default)")
+            continue
+        try:
+            val = float(signals[sig])
+        except (TypeError, ValueError):
+            errors.append(f"{path}: signals.{sig} is not a number: {signals[sig]!r}")
+            continue
+        if not (_CW_WEIGHT_MIN <= val <= _CW_WEIGHT_MAX):
+            errors.append(
+                f"{path}: signals.{sig} = {val:.3f} is outside valid range "
+                f"[{_CW_WEIGHT_MIN}, {_CW_WEIGHT_MAX}]"
+            )
+    return errors, warnings
 
 
 def _people_ids_for_iteration(path: Path) -> set[str] | None:
@@ -354,6 +401,15 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
             f"Allowed: {sorted(schema['statuses'])}"
         )
 
+    # roam_status enum (Risk only)
+    roam_status = data.get("roam_status")
+    if roam_status is not None and expected_type == "Risk":
+        if roam_status not in ROAM_STATUSES:
+            errors.append(
+                f"{path}: roam_status={roam_status!r} is not valid. "
+                f"Allowed: {sorted(ROAM_STATUSES)}"
+            )
+
     # JS sanity. Only Stories and Defects must have a positive estimate;
     # Initiatives / Epics / Features carry `js` as optional and frequently
     # land with `js: 0` meaning "no estimate yet at this hierarchy level".
@@ -549,6 +605,12 @@ def validate_yaml(path, *, content=None, strict=False):
             path, data, strict=strict)
         errors.extend(iter_errors)
         warnings.extend(iter_warnings)
+
+    # cw_heuristics.yaml: validate signal weight bounds [0.1, 8.0].
+    if data is not None and _is_heuristics_path(path):
+        h_errors, h_warnings = validate_cw_heuristics(path, data)
+        errors.extend(h_errors)
+        warnings.extend(h_warnings)
 
     return errors, warnings
 
