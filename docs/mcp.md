@@ -25,6 +25,19 @@ context tight and makes the data shape predictable.
 | `edpa_backlog`   | Backlog items from `.edpa/backlog/`                    | optional `iteration`, `type`, `status` |
 | `edpa_item`      | Detail for one item                                     | required `item_id` (e.g. `S-200`)  |
 | `edpa_flow_metrics` | Cycle time, throughput, open item age                | optional `iteration`, `level`      |
+| `edpa_validate`  | Iterations continuity + schema check                    | none                               |
+| `edpa_pi_board`  | Generate the self-contained PI planning HTML            | optional `pi`                      |
+
+Analytics read tools (2.6.0+):
+
+| Tool | Purpose |
+|---|---|
+| `edpa_forecast_pi` | Monte-Carlo PI completion forecast (p20/p50/p80) |
+| `edpa_pi_metrics` | Multi-PI velocity, confidence + predictability trend |
+| `edpa_insights` | Mid-iteration anomaly detection (overload, creep, stalled, blockers) |
+| `edpa_ai_attribution` | Human vs AI delivery ratio from `Co-Authored-By` trailers |
+| `edpa_payroll_export` | Billable-hours CSV from derived hours + `hourly_rate` |
+| `edpa_reconcile` | Git evidence vs backlog status drift — suggests transitions (2.7.0) |
 
 It also publishes resources for whole-file reads:
 

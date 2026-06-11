@@ -239,6 +239,8 @@ class TestToolsAdvertised:
                 "edpa_insights",
                 "edpa_ai_attribution",
                 "edpa_payroll_export",
+                # S-241
+                "edpa_reconcile",
             }, f"Tool set drift: {names}"
 
     def test_edpa_item_requires_item_id(self, edpa_workspace):

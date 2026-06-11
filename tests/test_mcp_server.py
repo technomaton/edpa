@@ -75,22 +75,23 @@ def test_find_edpa_root_missing(tmp_path, monkeypatch):
 def test_handle_status():
     """Returns correct project name, PI, team size, capacity, active iteration.
 
-    Iteration dates are read from .edpa/iterations/PI-2026-1.4.yaml — if
+    Iteration dates are read from .edpa/iterations/PI-2026-2.2.yaml — if
     that file's start/end dates change (e.g. when the cadence is
-    reshuffled), update the asserts below to match. The 1-week-iteration
-    schedule of PI-2026-1 was set in commit 0417727 (5×1 week instead of
-    the original 2×2 weeks)."""
+    reshuffled), update the asserts below to match. PI-2026-1 was closed
+    in D-17 (it had ended 2026-05-08 but stayed status:active, so
+    find_active_pi wrongly returned it — these asserts encoded that bug);
+    the active PI is PI-2026-2."""
     data = parse_result(_handle_status(EDPA_ROOT))
 
     assert data["project"] == "Medical Platform & Datovy e-shop"
-    assert data["current_pi"] == "PI-2026-1"
+    assert data["current_pi"] == "PI-2026-2"
     assert data["team_size"] == 9
     assert data["total_capacity_per_iteration"] == 400
-    assert data["active_iteration"] == "PI-2026-1.4"
-    assert data["active_iteration_start"] == "2026-04-27"
-    assert data["active_iteration_end"] == "2026-05-01"
+    assert data["active_iteration"] == "PI-2026-2.2"
+    assert data["active_iteration_start"] == "2026-05-18"
+    assert data["active_iteration_end"] == "2026-05-22"
     assert data["iterations_total"] == 5
-    assert data["iterations_closed"] == 3
+    assert data["iterations_closed"] == 1
     assert "cadence" in data
 
 
@@ -113,19 +114,17 @@ def test_handle_status_missing_config(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_handle_iterations_all():
-    """Returns all 5 iterations of the active PI.
-
-    end_date for iteration 1 reflects the 1-week cadence (commit
-    0417727 changed PI-2026-1 from 2×2 weeks to 5×1 week)."""
+    """Returns all 5 iterations of the active PI (PI-2026-2 after D-17
+    closed the ended-but-still-active PI-2026-1)."""
     data = parse_result(_handle_iterations(EDPA_ROOT, None))
     iters = data["iterations"]
     assert len(iters) == 5
     ids = [i["id"] for i in iters]
-    assert "PI-2026-1.1" in ids
-    assert "PI-2026-1.5" in ids
+    assert "PI-2026-2.1" in ids
+    assert "PI-2026-2.5" in ids
     # ISO date fields replace the legacy "dates" string.
-    assert iters[0]["start_date"] == "2026-04-06"
-    assert iters[0]["end_date"] == "2026-04-10"
+    assert iters[0]["start_date"] == "2026-05-11"
+    assert iters[0]["end_date"] == "2026-05-15"
 
 
 def test_handle_iterations_filter_active():
@@ -134,14 +133,14 @@ def test_handle_iterations_filter_active():
     iters = data["iterations"]
     assert len(iters) >= 1
     assert all(i["status"] == "active" for i in iters)
-    assert iters[0]["id"] == "PI-2026-1.4"
+    assert iters[0]["id"] == "PI-2026-2.2"
 
 
 def test_handle_iterations_filter_closed():
-    """Returns only closed iterations."""
+    """Returns only closed iterations (of the active PI-2026-2: just 2.1)."""
     data = parse_result(_handle_iterations(EDPA_ROOT, "closed"))
     iters = data["iterations"]
-    assert len(iters) == 3
+    assert len(iters) == 1
     assert all(i["status"] == "closed" for i in iters)
 
 
@@ -215,7 +214,7 @@ def test_handle_backlog_filter_type():
     assert all(i["type"] == "Story" for i in stories)
 
     features = parse_result(_handle_backlog(EDPA_ROOT, None, "Feature", None))
-    assert len(features) == 6
+    assert len(features) >= 10  # 6 demo + F-121..F-124 dogfood (I-2 split, D-17)
     assert all(i["type"] == "Feature" for i in features)
 
 
@@ -273,14 +272,14 @@ def test_list_tools():
     edpa_ai_attribution in F4; edpa_payroll_export in F3.
     """
     tools = asyncio.run(mcp_server.list_tools())
-    assert len(tools) == 26
+    assert len(tools) == 27
 
     names = {t.name for t in tools}
     expected_read = {"edpa_status", "edpa_iterations", "edpa_people",
                      "edpa_backlog", "edpa_item", "edpa_validate",
                      "edpa_flow_metrics", "edpa_pi_board", "edpa_forecast_pi",
                      "edpa_pi_metrics", "edpa_insights", "edpa_ai_attribution",
-                     "edpa_payroll_export"}
+                     "edpa_payroll_export", "edpa_reconcile"}
     expected_write = {"edpa_item_create", "edpa_item_update",
                       "edpa_item_transition", "edpa_item_link_parent",
                       "edpa_item_link_dep", "edpa_item_roam",
@@ -338,7 +337,7 @@ def test_call_tool_iterations_with_filter(monkeypatch):
     data = parse_result(result)
     iters = data["iterations"]
     assert len(iters) >= 1
-    assert iters[0]["id"] == "PI-2026-1.4"
+    assert iters[0]["id"] == "PI-2026-2.2"
 
 
 def test_call_tool_people_with_filter(monkeypatch):

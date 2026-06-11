@@ -792,6 +792,29 @@ async def list_tools() -> list[Tool]:
                 "additionalProperties": False,
             },
         ),
+        Tool(
+            name="edpa_reconcile",
+            description=(
+                "Reconcile git delivery evidence against backlog status. Walks the main "
+                "branch, extracts item IDs from commit subjects (CC scope; body mentions "
+                "and auto-prefixed commits do not count) and reports drift: items with "
+                "merged evidence still before Done — suggested transition + closed_at "
+                "from the latest evidence commit (release-tag containment or >= "
+                "stale_days of quiet => Done, fresh evidence => Implementing) — plus "
+                "Done items with zero evidence (phantoms, review-only). Read-only: "
+                "apply suggestions via edpa_item_transition, or reconcile.py --apply."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "branch": {"type": "string",
+                               "description": "Evidence branch (default: autodetect main/master)"},
+                    "stale_days": {"type": "integer", "minimum": 0,
+                                   "description": "Quiet days after last evidence before suggesting Done (default 3)"},
+                },
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -869,6 +892,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return _handle_ai_attribution(edpa_root, arguments)
         elif name == "edpa_payroll_export":
             return _handle_payroll_export(edpa_root, arguments)
+        elif name == "edpa_reconcile":
+            return _handle_reconcile(edpa_root, arguments)
         logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception:
@@ -2063,6 +2088,27 @@ def _handle_payroll_export(edpa_root: Path, args: dict) -> list[TextContent]:
     logger.info("edpa_payroll_export: iter=%s rows=%s hours=%s",
                 iteration, result.get("rows"), result.get("total_hours"))
     return _ok(result)
+
+
+def _handle_reconcile(edpa_root: Path, args: dict) -> list[TextContent]:
+    branch = args.get("branch") or None
+    stale_days = int(args.get("stale_days", 3))
+
+    with _sibling_path():
+        try:
+            from reconcile import build_report  # noqa: E402
+            report = build_report(edpa_root.parent, edpa_root,
+                                  branch=branch, stale_days=stale_days)
+        except ImportError as exc:
+            return _err(f"reconcile module not available: {exc}")
+        except (RuntimeError, SystemExit) as exc:
+            return _err(str(exc))
+
+    report["stuck"] = [{k: v for k, v in s.items() if k != "_path"}
+                       for s in report["stuck"]]
+    logger.info("edpa_reconcile: branch=%s stuck=%s phantoms=%s",
+                report["branch"], len(report["stuck"]), len(report["phantoms"]))
+    return _ok(report)
 
 
 # ---------------------------------------------------------------------------

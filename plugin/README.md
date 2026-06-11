@@ -79,9 +79,12 @@ plugin/
 │   ├── forecast.md                  # → /edpa:forecast       — Monte-Carlo PI completion forecast
 │   ├── export.md                    # → /edpa:export         — billable hours CSV (payroll / invoicing)
 │   ├── explain.md                   # → /edpa:explain        — allocation audit trail (signal → CW → hours)
-│   └── metrics.md                   # → /edpa:metrics        — PI predictability & confidence trending
+│   ├── metrics.md                   # → /edpa:metrics        — PI predictability & confidence trending
+│   ├── insights.md                  # → /edpa:insights       — mid-iteration anomaly detection
+│   ├── ai-attribution.md            # → /edpa:ai-attribution — human vs AI delivery ratio
+│   └── reconcile.md                 # → /edpa:reconcile      — git evidence vs backlog status drift
 └── edpa/
-    ├── scripts/                     # 32 Python modules
+    ├── scripts/                     # Python modules (engine, MCP server, evidence pipeline, analytics)
     │   ├── engine.py                # Core engine (Score, DerivedHours, invariants)
     │   ├── mcp_server.py            # MCP server for /edpa:status, /edpa:backlog, /edpa:iterations, /edpa:flow_metrics
     │   ├── calibrate_signals.py     # CW signal-weights calibrator (Monte Carlo + coordinate descent)
@@ -142,6 +145,8 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `/edpa:explain` | command | Explain one person's allocation (signal → CW → JS×CW → ratio → hours) |
 | `/edpa:metrics` | command | PI predictability & confidence trending — planned/delivered SP, avg velocity, team confidence votes |
 | `/edpa:insights` | command | Mid-iteration anomaly detection — capacity overload, job-size creep, stalled stories, critical-path blockers |
+| `/edpa:ai-attribution` | command | Human vs AI delivery ratio (Co-Authored-By trailers → agent_contribution signals) |
+| `/edpa:reconcile` | command | Git evidence vs backlog status drift — finds shipped-but-not-Done items, suggests transitions |
 
 ## Multi-developer setup — ID collision handling
 
@@ -198,6 +203,10 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 | `edpa_forecast_pi` | Monte-Carlo PI completion forecast — p20/p50/p80 bands, completion probability, scope recommendation |
 | `edpa_pi_metrics` | PI predictability & confidence trending — planned/delivered SP, predictability %, avg velocity, team confidence votes, objective completion. Writes `.edpa/reports/pi-metrics.json` |
 | `edpa_insights` | Mid-iteration anomaly detection — capacity overload, job-size creep, stalled stories, critical-path blockers. Writes `.edpa/reports/iteration-<iter>/insights.json` |
+| `edpa_pi_board` | Generate the self-contained PI planning HTML (program board, objectives, ROAM) |
+| `edpa_ai_attribution` | Human vs AI delivery ratio per item/person from `Co-Authored-By` trailers |
+| `edpa_payroll_export` | Billable-hours CSV from engine derived hours + `hourly_rate`/`currency` |
+| `edpa_reconcile` | Git evidence vs backlog status drift — suggests transitions (apply via `edpa_item_transition`) |
 
 **Write tools** (mutate `.edpa/backlog/` or `.edpa/iterations/` YAML; always commit after):
 
