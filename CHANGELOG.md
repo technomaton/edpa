@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased
+## 2.7.0 — 2026-06-11 — Reconcile tool, release drift guard, consolidation
 
 Consolidation batch from the 2026-06-11 repo analysis (F-124: D-17, D-18,
-D-19, S-239..S-242):
+D-19, S-239..S-242), merged as PR #81:
 
 ### Added
 

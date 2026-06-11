@@ -177,6 +177,15 @@ def main():
          r"current as of v\d+\.\d+\.\d+(?:-[\w.]+)?", f"current as of v{new}"),
         (REPO_ROOT / "docs/RUNBOOK.md",
          r"\(\d+ scripts, VERSION [^)]+\)", f"({n_scripts} scripts, VERSION {new})"),
+        # Setup-wizard generators embed the version in the YAML they emit
+        (REPO_ROOT / "web/src/pages/setup.astro",
+         r'version: "\d+\.\d+\.\d+"', f'version: "{new}"'),
+        (REPO_ROOT / "web/src/pages/setup.astro",
+         r'methodology: "EDPA [^"]+"', f'methodology: "EDPA {new}"'),
+        (REPO_ROOT / "web/src/pages/en/setup.astro",
+         r'version: "\d+\.\d+\.\d+"', f'version: "{new}"'),
+        (REPO_ROOT / "web/src/pages/en/setup.astro",
+         r'methodology: "EDPA [^"]+"', f'methodology: "EDPA {new}"'),
     ]
     marks = {"stamped": ("✓", "stamped"), "current": ("·", "already current"),
              "missing": ("⚠", "pattern not found — fix by hand")}

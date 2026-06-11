@@ -70,6 +70,10 @@ def test_version_consistent():
         ("docs/mcp.md", f"current as of v{version}"),
         ("docs/RUNBOOK.md", f"VERSION {version}"),
         ("plugin/edpa/templates/edpa.yaml.tmpl", f'methodology: "EDPA {version}"'),
+        ("web/src/pages/setup.astro", f'version: "{version}"'),
+        ("web/src/pages/setup.astro", f'methodology: "EDPA {version}"'),
+        ("web/src/pages/en/setup.astro", f'version: "{version}"'),
+        ("web/src/pages/en/setup.astro", f'methodology: "EDPA {version}"'),
     ]
     for rel, needle in stamps:
         if needle not in (ROOT / rel).read_text(encoding="utf-8"):
