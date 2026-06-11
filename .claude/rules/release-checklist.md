@@ -2,7 +2,7 @@
 
 When releasing a new EDPA version, complete ALL steps — do not consider the release done until every item is checked:
 
-1. **Version bump** — update `plugin/.claude-plugin/plugin.json` (single source of truth) AND `web/package.json` (must match, used by Vercel metadata)
+1. **Version bump** — run `python3 scripts/bump_version.py {version} --apply` (stamps plugin.json + web/package.json + README badge + methodology/playbook/mcp/RUNBOOK stamps + edpa.yaml.tmpl + SKILL examples). Then `pytest tests/test_consistency.py::test_version_consistent` must pass — it guards the same stamps. Re-vendor the repo's own engine: `python3 plugin/edpa/scripts/project_setup.py`
 2. **CHANGELOG.md** — add a new version entry describing all changes
 3. **Tests** — run `pytest tests/` and fix any failures before proceeding
 4. **Push** — push all changes to `main`

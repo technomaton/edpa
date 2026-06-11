@@ -13,14 +13,22 @@ Files that import from the sources of truth (no edit needed, automatic):
 
 Files that contain the version literally and need manual update (this
 script handles them):
-  - plugin/edpa/templates/edpa.yaml.tmpl       (`methodology: "EDPA X.Y.Z-tag"`)
+  - plugin/edpa/templates/edpa.yaml.tmpl (`methodology: "EDPA X.Y.Z"`, pattern-stamped)
   - plugin/skills/reports/SKILL.md       (example output blocks)
   - plugin/skills/setup/SKILL.md         (example output blocks)
   - docs/methodology.md                       (header line "Version X.Y.Z-tag — Month Year")
+  - docs/playbook.md                          (`**Verze:** EDPA X.Y.Z` + last-updated date)
+  - docs/mcp.md                               (`current as of vX.Y.Z`)
+  - docs/RUNBOOK.md                           (sample output `(N scripts, VERSION X.Y.Z)`)
   - README.md                                 (badge URL + demo block + version mentions)
   - CHANGELOG.md                              (existing entries are immutable; this script
                                                 ONLY warns if the bump target is missing
                                                 from CHANGELOG.md — does NOT add an entry)
+
+Pattern-stamped targets are replaced via regex, so they self-heal even when a
+file already drifted to an older version (literal old->new would miss it).
+`tests/test_consistency.py::test_version_consistent` guards the same stamps
+in CI, so drift fails the build instead of surviving a release.
 
 Usage:
     python scripts/bump_version.py 1.2.0-beta            # dry-run
@@ -68,6 +76,22 @@ def bump_literal(path: Path, old: str, new: str, apply: bool) -> int:
     if count and apply:
         path.write_text(text.replace(old, new))
     return count
+
+
+def bump_pattern(path: Path, pattern: str, replacement: str, apply: bool) -> str:
+    """Regex-stamp `replacement` over the first `pattern` match (drift-proof).
+
+    Returns "stamped" | "current" (match already equals replacement) | "missing".
+    """
+    text = path.read_text()
+    new_text, n = re.subn(pattern, replacement, text, count=1)
+    if not n:
+        return "missing"
+    if new_text == text:
+        return "current"
+    if apply:
+        path.write_text(new_text)
+    return "stamped"
 
 
 def bump_methodology_md(path: Path, new_version: str, apply: bool) -> bool:
@@ -131,7 +155,6 @@ def main():
 
     # 2. Literal references
     targets = [
-        REPO_ROOT / "plugin/edpa/templates/edpa.yaml.tmpl",
         REPO_ROOT / "plugin/skills/reports/SKILL.md",
         REPO_ROOT / "plugin/skills/setup/SKILL.md",
     ]
@@ -139,6 +162,28 @@ def main():
         n = bump_literal(t, old, new, args.apply)
         rel = t.relative_to(REPO_ROOT)
         print(f"  {'✓' if n else '·'} {rel}  ({n} replacement(s))")
+
+    # 2b. Pattern-stamped references (drift-proof: matches ANY previous version)
+    n_scripts = len(list((REPO_ROOT / "plugin/edpa/scripts").glob("*.py")))
+    pattern_targets = [
+        (REPO_ROOT / "plugin/edpa/templates/edpa.yaml.tmpl",
+         r'methodology: "EDPA [^"]+"', f'methodology: "EDPA {new}"'),
+        (REPO_ROOT / "docs/playbook.md",
+         r"\*\*Verze:\*\* EDPA \S+", f"**Verze:** EDPA {new}"),
+        (REPO_ROOT / "docs/playbook.md",
+         r"\*\*Posledni aktualizace:\*\* \d{4}-\d{2}-\d{2}",
+         f"**Posledni aktualizace:** {date.today().isoformat()}"),
+        (REPO_ROOT / "docs/mcp.md",
+         r"current as of v\d+\.\d+\.\d+(?:-[\w.]+)?", f"current as of v{new}"),
+        (REPO_ROOT / "docs/RUNBOOK.md",
+         r"\(\d+ scripts, VERSION [^)]+\)", f"({n_scripts} scripts, VERSION {new})"),
+    ]
+    marks = {"stamped": ("✓", "stamped"), "current": ("·", "already current"),
+             "missing": ("⚠", "pattern not found — fix by hand")}
+    for path, pat, repl in pattern_targets:
+        state = bump_pattern(path, pat, repl, args.apply)
+        mark, label = marks[state]
+        print(f"  {mark} {path.relative_to(REPO_ROOT)}  ({label})")
 
     # 3. README — badge + body
     readme = REPO_ROOT / "README.md"
@@ -159,8 +204,10 @@ def main():
     if args.apply:
         print("Done. Don't forget:")
         print("  1. Add a CHANGELOG.md entry for the new release")
-        print("  2. cd web && vercel build --prod && vercel deploy --prebuilt --prod")
-        print("  3. git commit + push")
+        print("  2. pytest tests/test_consistency.py::test_version_consistent")
+        print("  3. python3 plugin/edpa/scripts/project_setup.py  # re-vendor .edpa/engine")
+        print("  4. cd web && vercel build --prod && vercel deploy --prebuilt --prod")
+        print("  5. git commit + push")
     else:
         print("Dry-run. Re-run with --apply to write.")
     return 0

@@ -51,6 +51,43 @@ def test_version_consistent():
     if "VERSION" not in version_ts:
         errors.append("version.ts: no VERSION export found")
 
+    # web/package.json — must equal plugin.json (both are bump targets)
+    web_pkg = json.loads((ROOT / "web/package.json").read_text())
+    if web_pkg["version"] != version:
+        errors.append(f"web/package.json: {web_pkg['version']} != {version}")
+
+    # Living docs / templates — anchored version stamps must equal plugin.json.
+    # scripts/bump_version.py stamps the same patterns; this test makes drift
+    # fail CI instead of surviving a release (it did, three times, up to 2.6.0).
+    # Archive paths (CHANGELOG history, docs/v2/, docs/proposals/,
+    # docs/kashealth-pilot/) are intentionally NOT checked — snapshots may pin
+    # old versions.
+    badge_version = version.replace("-", "--")  # shields.io escapes '-' as '--'
+    stamps = [
+        ("README.md", f"EDPA-{badge_version}-"),
+        ("docs/methodology.md", f"**Version {version} "),
+        ("docs/playbook.md", f"**Verze:** EDPA {version}"),
+        ("docs/mcp.md", f"current as of v{version}"),
+        ("docs/RUNBOOK.md", f"VERSION {version}"),
+        ("plugin/edpa/templates/edpa.yaml.tmpl", f'methodology: "EDPA {version}"'),
+    ]
+    for rel, needle in stamps:
+        if needle not in (ROOT / rel).read_text(encoding="utf-8"):
+            errors.append(
+                f"{rel}: missing current-version stamp {needle!r} — drifted; "
+                f"run scripts/bump_version.py {version} --apply"
+            )
+
+    # Repo's own vendored engine must track the plugin version
+    vendored = ROOT / ".edpa/engine/VERSION"
+    if vendored.exists():
+        vendored_version = vendored.read_text(encoding="utf-8").strip()
+        if vendored_version != version:
+            errors.append(
+                f".edpa/engine/VERSION: {vendored_version} != {version} — "
+                f"run python3 plugin/edpa/scripts/project_setup.py to re-vendor"
+            )
+
     assert not errors, "Version mismatches:\n  " + "\n  ".join(errors)
 
 
