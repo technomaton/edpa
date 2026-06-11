@@ -64,7 +64,7 @@ plugin/
 │   ├── engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
 │   ├── reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
 │   └── autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
-├── commands/                        # 16 slash commands, flat layout (no edpa/ subdir)
+├── commands/                        # slash commands, flat layout (no edpa/ subdir)
 │   ├── close-iteration.md           # → /edpa:close-iteration — capacity prep + engine + reports
 │   ├── board.md                     # → /edpa:board          — HTML Kanban snapshot
 │   ├── capacity.md                  # → /edpa:capacity       — per-iteration capacity overrides
@@ -227,7 +227,7 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 ├── requirements.txt
 ├── hooks/hooks.json
 ├── skills/                           # 5 SKILL.md
-├── commands/                         # 14 slash commands (flat)
+├── commands/                         # slash commands (flat)
 └── edpa/                             # Python engine, schemas, templates, workflows
 
 .edpa/                                # Project data (created by install.sh / /edpa:setup)

@@ -5,7 +5,8 @@ read-only access to `.edpa/` project data — config, iterations, people,
 backlog — over the standard MCP `stdio` transport. Any MCP-aware client
 (Claude Code, Cursor, Codex CLI, custom Python/TS clients) can read it.
 
-**Production-ready as of v1.3.0-beta.** Validated handlers, schema-checked
+**Production-ready since v1.3.0-beta; current as of v2.6.0** (read + write
+tools — see the tool tables below). Validated handlers, schema-checked
 inputs, item-ID path-traversal guard, stderr logging, version-aware identity.
 
 ---
@@ -290,9 +291,9 @@ write tools) and re-run.
 
 ---
 
-## Production hardening (v1.3-beta)
+## Production hardening (history: v1.3-beta)
 
-What changed from the v1.0–v1.2 prototype:
+What changed from the v1.0–v1.2 prototype (kept as design rationale):
 
 1. **Portable plugin path.** `${CLAUDE_PLUGIN_ROOT}/...` instead of relative
    `.claude/edpa/...`. Working directory of the client no longer matters.

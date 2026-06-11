@@ -5,8 +5,8 @@ Get EDPA running in 10 minutes.
 ## Prerequisites
 
 - Python 3.10+ with `pyyaml` (`pip install pyyaml`)
-- A git repository for your project (local is fine; GitHub is only required if you want the optional Projects sync)
-- GitHub CLI (`gh`) authenticated (`gh auth login`) — only if you plan to enable the optional Projects sync
+- A git repository for your project (local is fine; GitHub is only needed for the optional PR-signal CI workflow)
+- GitHub CLI (`gh`) authenticated (`gh auth login`) — only if you enable that optional workflow
 
 ## Step 1: Install EDPA plugin
 
@@ -19,14 +19,15 @@ curl -fsSL https://edpa.technomaton.com/install.sh | sh
 
 **Option A: Interactive (recommended)**
 ```
-/edpa setup "My Project"
+/edpa:setup "My Project"
 ```
 
-**Option B: Manual**
+**Option B: Manual** (assumes `/edpa:setup` already vendored the engine into
+`.edpa/engine/` — or copy the templates from your plugin checkout)
 
 Copy and edit the capacity registry:
 ```bash
-cp plugin/edpa/templates/people.yaml.tmpl .edpa/config/people.yaml
+cp .edpa/engine/templates/people.yaml.tmpl .edpa/config/people.yaml
 ```
 
 Edit `.edpa/config/people.yaml` with your team:
@@ -53,8 +54,8 @@ people:
 
 Copy the heuristics (defaults work fine for most teams):
 ```bash
-cp plugin/edpa/templates/cw_heuristics.yaml.tmpl .edpa/config/cw_heuristics.yaml
-cp plugin/edpa/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml
+cp .edpa/engine/templates/cw_heuristics.yaml.tmpl .edpa/config/cw_heuristics.yaml
+cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml
 ```
 
 Edit `.edpa/config/edpa.yaml` with your project name.
@@ -63,27 +64,30 @@ Edit `.edpa/config/edpa.yaml` with your project name.
 
 Before using real data, run the built-in demo:
 ```bash
-python plugin/edpa/scripts/engine.py --demo
+python3 .edpa/engine/scripts/engine.py --demo
 ```
 
 You'll see a complete EDPA calculation with sample data, including per-person breakdown and invariant validation.
 
-## Step 4: (Optional) Set up GitHub Projects sync
+## Step 4: (Optional) Enable PR-signal CI
 
-V2.1 evidence comes from local git — you can skip this step entirely and the
-engine will still produce a complete derived timesheet. Enable Projects sync
-only when PMs/BOs want a board view of `.edpa/backlog/` items.
+V2 evidence comes from local git — you can skip this step entirely and the
+engine still produces a complete derived timesheet. Enable the optional
+`edpa-contribution-sync.yml` workflow only if you want PR-thread signals
+(`pr_reviewer`, `issue_comment`) materialized into `evidence[]` after merges:
 
-Follow [docs/github-setup.md](github-setup.md) to create custom fields (Job Size, Issue Type, etc.) on your GitHub Project.
-
-Or with Claude Code:
+```bash
+python3 .edpa/engine/scripts/project_setup.py --with-ci
 ```
-Set up EDPA governance for My Project
-```
+
+Token setup (one secret, ~5 minutes): see [edpa-token-setup.md](edpa-token-setup.md).
 
 ## Step 5: Start working
 
-Create issues with the provided templates (Epic, Feature, Story). Set Job Size on each.
+Create backlog items with `/edpa:add` (Initiative / Epic / Feature / Story / Defect), each with a Job Size:
+```
+/edpa:add Story "First story" --parent F-100 --js 5
+```
 
 Follow the branch naming convention:
 ```bash
@@ -96,12 +100,12 @@ After completing work items, close the iteration:
 
 With Claude Code:
 ```
-Close iteration PI-2026-1.1
+/edpa:close-iteration PI-2026-1.1
 ```
 
 Or manually:
 ```bash
-python plugin/edpa/scripts/engine.py \
+python3 .edpa/engine/scripts/engine.py \
   --edpa-root .edpa \
   --iteration PI-2026-1.1
 ```
