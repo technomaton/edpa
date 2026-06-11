@@ -1,8 +1,8 @@
 counters:
-  Defect: 16
-  Epic: 12
+  Defect: 19
+  Epic: 15
   Event: 2
-  Feature: 120
-  Initiative: 1
+  Feature: 124
+  Initiative: 2
   Risk: 3
-  Story: 238
+  Story: 242
