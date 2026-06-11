@@ -67,29 +67,11 @@ VERSION = get_version()
 EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
 
 
-def load_yaml(path):
-    """Load a backlog file. Returns parsed content or None on failure.
-
-    Backlog items (`.md`) are parsed via ``_md_frontmatter.load_md`` so the
-    engine sees frontmatter fields plus a ``body`` key. Other files
-    (`.yaml`, e.g. iterations and config) are parsed via PyYAML.
-    """
-    try:
-        path_obj = Path(path) if not isinstance(path, Path) else path
-        if path_obj.suffix == ".md":
-            sys.path.insert(0, str(Path(__file__).resolve().parent))
-            try:
-                from _md_frontmatter import load_md as _load_md
-            finally:
-                sys.path.pop(0)
-            return _load_md(path_obj)
-        with open(path, encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except FileNotFoundError:
-        return None
-    except (yaml.YAMLError, OSError) as exc:
-        print(f"WARNING: load_yaml({path}) failed: {exc}", file=sys.stderr)
-        return None
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _yaml_io import load_yaml  # noqa: E402  (shared .md/.yaml loader, S-242)
+finally:
+    sys.path.pop(0)
 
 
 def gh_json(cmd):

@@ -37,25 +37,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _sp_rollup import iteration_sp  # noqa: E402
 
 
+from _yaml_io import load_yaml as _shared_load_yaml  # noqa: E402
+
+
 def load_yaml(path: Path):
     """Returns parsed dict for `.yaml`, or frontmatter+body dict for `.md`.
 
-    Empty file → {}, missing/unparseable → None.
+    Empty file → {}, missing/unparseable → None. (Shared loader, S-242.)
     """
-    if not path.is_file():
-        return None
-    try:
-        if path.suffix == ".md":
-            sys.path.insert(0, str(Path(__file__).resolve().parent))
-            try:
-                from _md_frontmatter import load_md
-            finally:
-                sys.path.pop(0)
-            return load_md(path) or {}
-        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except (yaml.YAMLError, OSError) as exc:
-        print(f"WARNING: load_yaml({path}) failed: {exc}", file=sys.stderr)
-        return None
+    return _shared_load_yaml(path, empty_as_dict=True)
 
 
 def load_json(path: Path):

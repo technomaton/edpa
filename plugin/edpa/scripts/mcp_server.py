@@ -826,76 +826,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         logger.warning("call_tool name=%s: .edpa/ not found", name)
         return [TextContent(type="text", text="ERROR: .edpa/ directory not found. Run `/edpa setup` first.")]
 
-    try:
-        if name == "edpa_status":
-            return _handle_status(edpa_root)
-        elif name == "edpa_iterations":
-            return _handle_iterations(edpa_root, arguments.get("status"))
-        elif name == "edpa_people":
-            return _handle_people(edpa_root, arguments.get("team"))
-        elif name == "edpa_backlog":
-            return _handle_backlog(edpa_root, arguments.get("iteration"),
-                                   arguments.get("type"), arguments.get("status"))
-        elif name == "edpa_item":
-            raw_id = arguments.get("item_id", "")
-            safe_id = _safe_item_id(raw_id)
-            if safe_id is None:
-                logger.warning("edpa_item: rejected item_id=%r", raw_id)
-                return [TextContent(type="text",
-                                    text=f"ERROR: invalid item_id {raw_id!r}. "
-                                         "Expected pattern: <type-prefix>-<digits>, "
-                                         "e.g. S-200, F-12, I-1.")]
-            return _handle_item(edpa_root, safe_id)
-        elif name == "edpa_validate":
-            return _handle_validate(edpa_root)
-        elif name == "edpa_flow_metrics":
-            return _handle_flow_metrics(
-                edpa_root,
-                arguments.get("iteration"),
-                arguments.get("level"),
-            )
-        elif name == "edpa_item_create":
-            return _handle_item_create(edpa_root, arguments)
-        elif name == "edpa_item_update":
-            return _handle_item_update(edpa_root, arguments)
-        elif name == "edpa_item_transition":
-            return _handle_item_transition(edpa_root, arguments)
-        elif name == "edpa_item_link_parent":
-            return _handle_item_link_parent(edpa_root, arguments)
-        elif name == "edpa_item_link_dep":
-            return _handle_item_link_dep(edpa_root, arguments)
-        elif name == "edpa_item_roam":
-            return _handle_item_roam(edpa_root, arguments)
-        elif name == "edpa_objective_set":
-            return _handle_objective_set(edpa_root, arguments)
-        elif name == "edpa_objective_remove":
-            return _handle_objective_remove(edpa_root, arguments)
-        elif name == "edpa_confidence_vote":
-            return _handle_confidence_vote(edpa_root, arguments)
-        elif name == "edpa_iteration_create":
-            return _handle_iteration_create(edpa_root, arguments)
-        elif name == "edpa_iteration_close":
-            return _handle_iteration_close(edpa_root, arguments)
-        elif name == "edpa_pi_create":
-            return _handle_pi_create(edpa_root, arguments)
-        elif name == "edpa_pi_board":
-            return _handle_pi_board(edpa_root, arguments)
-        elif name == "edpa_people_upsert":
-            return _handle_people_upsert(edpa_root, arguments)
-        elif name == "edpa_forecast_pi":
-            return _handle_forecast_pi(edpa_root, arguments)
-        elif name == "edpa_pi_metrics":
-            return _handle_pi_metrics(edpa_root, arguments)
-        elif name == "edpa_insights":
-            return _handle_insights(edpa_root, arguments)
-        elif name == "edpa_ai_attribution":
-            return _handle_ai_attribution(edpa_root, arguments)
-        elif name == "edpa_payroll_export":
-            return _handle_payroll_export(edpa_root, arguments)
-        elif name == "edpa_reconcile":
-            return _handle_reconcile(edpa_root, arguments)
+    handler = TOOL_HANDLERS.get(name)
+    if handler is None:
         logger.warning("call_tool: unknown tool %s", name)
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
+    try:
+        return handler(edpa_root, arguments)
     except Exception:
         logger.exception("call_tool name=%s raised", name)
         return [TextContent(type="text",
@@ -2109,6 +2045,61 @@ def _handle_reconcile(edpa_root: Path, args: dict) -> list[TextContent]:
     logger.info("edpa_reconcile: branch=%s stuck=%s phantoms=%s",
                 report["branch"], len(report["stuck"]), len(report["phantoms"]))
     return _ok(report)
+
+
+def _dispatch_item(edpa_root: Path, args: dict) -> list[TextContent]:
+    """edpa_item entry: validates item_id before reaching the handler."""
+    raw_id = args.get("item_id", "")
+    safe_id = _safe_item_id(raw_id)
+    if safe_id is None:
+        logger.warning("edpa_item: rejected item_id=%r", raw_id)
+        return [TextContent(type="text",
+                            text=f"ERROR: invalid item_id {raw_id!r}. "
+                                 "Expected pattern: <type-prefix>-<digits>, "
+                                 "e.g. S-200, F-12, I-1.")]
+    return _handle_item(edpa_root, safe_id)
+
+
+# ---------------------------------------------------------------------------
+# Tool dispatch registry — the single dispatch source for call_tool().
+# Every tool advertised by list_tools() must have an entry here and vice
+# versa (pinned by test_tool_registry_matches_list_tools). All entries take
+# (edpa_root, arguments); thin lambdas adapt the legacy positional handlers.
+# ---------------------------------------------------------------------------
+
+TOOL_HANDLERS = {
+    # read tools
+    "edpa_status": lambda root, args: _handle_status(root),
+    "edpa_iterations": lambda root, args: _handle_iterations(root, args.get("status")),
+    "edpa_people": lambda root, args: _handle_people(root, args.get("team")),
+    "edpa_backlog": lambda root, args: _handle_backlog(
+        root, args.get("iteration"), args.get("type"), args.get("status")),
+    "edpa_item": _dispatch_item,
+    "edpa_validate": lambda root, args: _handle_validate(root),
+    "edpa_flow_metrics": lambda root, args: _handle_flow_metrics(
+        root, args.get("iteration"), args.get("level")),
+    "edpa_pi_board": _handle_pi_board,
+    "edpa_forecast_pi": _handle_forecast_pi,
+    "edpa_pi_metrics": _handle_pi_metrics,
+    "edpa_insights": _handle_insights,
+    "edpa_ai_attribution": _handle_ai_attribution,
+    "edpa_payroll_export": _handle_payroll_export,
+    "edpa_reconcile": _handle_reconcile,
+    # write tools
+    "edpa_item_create": _handle_item_create,
+    "edpa_item_update": _handle_item_update,
+    "edpa_item_transition": _handle_item_transition,
+    "edpa_item_link_parent": _handle_item_link_parent,
+    "edpa_item_link_dep": _handle_item_link_dep,
+    "edpa_item_roam": _handle_item_roam,
+    "edpa_objective_set": _handle_objective_set,
+    "edpa_objective_remove": _handle_objective_remove,
+    "edpa_confidence_vote": _handle_confidence_vote,
+    "edpa_iteration_create": _handle_iteration_create,
+    "edpa_iteration_close": _handle_iteration_close,
+    "edpa_pi_create": _handle_pi_create,
+    "edpa_people_upsert": _handle_people_upsert,
+}
 
 
 # ---------------------------------------------------------------------------

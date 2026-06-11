@@ -295,6 +295,18 @@ def test_list_tools():
         assert t.inputSchema, f"Tool {t.name} missing inputSchema"
 
 
+def test_tool_registry_matches_list_tools():
+    """TOOL_HANDLERS (dispatch) and list_tools() (advertised schemas) must
+    cover exactly the same names — a tool present in only one of them is
+    either unreachable or undocumented (S-242 dispatch-table refactor)."""
+    tools = asyncio.run(mcp_server.list_tools())
+    advertised = {t.name for t in tools}
+    assert advertised == set(mcp_server.TOOL_HANDLERS), (
+        "drift between list_tools() and TOOL_HANDLERS: "
+        f"only advertised={advertised - set(mcp_server.TOOL_HANDLERS)}, "
+        f"only dispatchable={set(mcp_server.TOOL_HANDLERS) - advertised}")
+
+
 # ---------------------------------------------------------------------------
 # list_resources (async)
 # ---------------------------------------------------------------------------
