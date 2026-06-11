@@ -108,19 +108,10 @@ plugin/
     │   ├── edpa.yaml.tmpl           # → .edpa/config/edpa.yaml (project, cadence, naming)
     │   ├── cw_heuristics.yaml.tmpl  # → .edpa/config/cw_heuristics.yaml (signal + gate weights)
     │   └── github-workflows/        # edpa-contribution-sync.yml (installed by --with-ci) + edpa-collision-check.yml
-    └── workflows/                   # V1 GH-Projects-era Actions (vestigial); V2 install ships only templates/github-workflows/ above
-        ├── edpa-branch-check.yml          # PR branch naming enforcement
-        ├── edpa-iteration-close.yml       # Iteration close automation
-        ├── edpa-pi-close.yml              # PI close + report generation
-        ├── edpa-sync-projects-to-git.yml  # GH Projects → backlog YAMLs (every 30 min during business hours)
-        ├── edpa-sync-git-to-projects.yml  # Backlog YAMLs → GH Projects (push hook)
-        ├── edpa-validate-item.yml         # YAML schema validation on PR
-        ├── edpa-traceability-check.yml    # Parent-chain validation
-        ├── edpa-collaborators-sync.yml    # Auto-update people.yaml on collaborator change
-        ├── edpa-contributor-detect.yml    # Detect /contribute commands in PRs
-        ├── edpa-velocity-track.yml        # PI velocity history
-        └── edpa-wsjf-calculate.yml        # WSJF score on backlog
 ```
+
+(The V1 GH-Projects-era `workflows/` directory was removed in 2.7.0 — the V2
+install ships only `templates/github-workflows/` above.)
 
 ## Skills + commands at a glance
 
