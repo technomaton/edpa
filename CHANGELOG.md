@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+
+- **Nightly skill-E2E workflow** (`skill-e2e-nightly.yml`, added in 2.7.0) —
+  owner decision (D-20): skill-driven E2E via headless `claude -p` is **local
+  validation**, not GitHub CI. No `ANTHROPIC_API_KEY` repo secret. The local
+  opt-in path is unchanged: `EDPA_SKILL_E2E=1 pytest -m skill_e2e`. The other
+  S-240 pieces (pytest coverage in `test.yml`, install.sh cache-control) stay.
+
 ## 2.7.0 — 2026-06-11 — Reconcile tool, release drift guard, consolidation
 
 Consolidation batch from the 2026-06-11 repo analysis (F-124: D-17, D-18,
