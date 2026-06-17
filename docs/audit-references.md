@@ -11,8 +11,6 @@ underlying GitHub state.
 
 | Signal type | `ref` format | Required IDs | Example |
 |-------------|--------------|--------------|---------|
-| `assignee` | `issue#<num>` | issue number | `issue#137` |
-| `pr_author` | `pr#<num>` | PR number | `pr#146` |
 | `commit_author` | `pr#<num>/commit/<sha>` | PR number, commit short-sha | `pr#146/commit/fa9f440` |
 | `pr_reviewer` | `pr#<num>/review/<review_id>` | PR number, review API id | `pr#146/review/2845102347` |
 | `issue_comment` | `issue#<num>/comment/<comment_id>` | issue number, comment API id | `issue#137/comment/c984712` |
@@ -27,25 +25,6 @@ full git commit ID); `gh` CLI accepts short SHAs in all relevant API
 calls.
 
 ## Per-signal verification commands
-
-### `assignee:#<num>` — issue assignee
-
-```bash
-gh issue view <num> --repo <org>/<repo> --json assignees
-# → { "assignees": [{ "login": "<expected_login>", ... }] }
-```
-
-URL: `https://github.com/<org>/<repo>/issues/<num>` (Assignees panel
-on right side)
-
-### `pr_author:pr#<num>` — PR author
-
-```bash
-gh pr view <num> --repo <org>/<repo> --json author
-# → { "author": { "login": "<expected_login>" } }
-```
-
-URL: `https://github.com/<org>/<repo>/pull/<num>` (header)
 
 ### `commit_author:pr#<num>/commit/<sha>` — commit author
 
@@ -125,8 +104,8 @@ detection time:
   detected_at: 2026-05-08T15:23:11Z
 ```
 
-(Default auto-detected weights for non-manual signals are: assignee=4.0,
-pr_author=3.4, commit_author=2.78, pr_reviewer=2.25, issue_comment=1.14.
+(Default auto-detected weights for non-manual signals are:
+commit_author=4.00, pr_reviewer=2.17, issue_comment=1.46.
 Manual `/contribute` weights are operator-supplied verbatim.)
 
 This is load-bearing for audit because GitHub does **not** preserve

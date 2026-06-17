@@ -9,18 +9,16 @@ resulting per-item-normalized `cw` values directly.
 
 | Signal type | Default weight | Source on GitHub | Reference format |
 |-------------|---------------|------------------|------------------|
-| `assignee` | **4.00** | Issue assignees | `issue#<num>` |
-| `pr_author` | **3.40** | PR author | `pr#<num>` |
-| `commit_author` | **2.78** | Commit authors in PR (excluding PR author) | `pr#<num>/commit/<sha>` |
-| `pr_reviewer` | **2.25** | PR reviews submitted | `pr#<num>/review/<id>` |
-| `issue_comment` | **1.14** | Issue / PR comments (excluding bots) | `issue#<num>/comment/<id>` |
+| `commit_author` | **4.00** | Commit authors (PR author + co-authors) | `pr#<num>/commit/<sha>` |
+| `pr_reviewer` | **2.17** | PR reviews submitted | `pr#<num>/review/<id>` |
+| `issue_comment` | **1.46** | Issue / PR comments (excluding bots) | `issue#<num>/comment/<id>` |
 | `manual:pr_body` | **explicit** | `/contribute @X weight:Y` in PR description | `pr#<num>/body` |
 | `manual:commit_message` | **explicit** | `/contribute` in commit message | `commit/<sha>/message` |
 | `manual:issue_body` | **explicit** | `/contribute` in issue description | `issue#<num>/body` |
 | `manual:issue_comment` | **explicit** | `/contribute` in issue comment | `issue#<num>/comment/<id>` |
 | `manual:pr_comment` | **explicit** | `/contribute` in PR-level comment | `pr#<num>/comment/<id>` |
 
-The 5 auto-detected signal weights live in
+The 3 auto-detected signal weights live in
 `.edpa/config/cw_heuristics.yaml` under the `signals:` block. They are
 calibrated by `/edpa:calibrate` against ground-truth CW records;
 manual `/contribute` weights are user-supplied per directive.
@@ -51,11 +49,11 @@ code".
 
 | Activity | Evidence? | How it shows up |
 |----------|-----------|-----------------|
-| Dev commits code (`src/`) | **YES** | `commit_author`, `pr_author` |
-| PM updates backlog (`.edpa/`) | **YES** | `commit_author` + likely `assignee` on planning issues |
+| Dev commits code (`src/`) | **YES** | `commit_author` |
+| PM updates backlog (`.edpa/`) | **YES** | `commit_author` on planning commits |
 | Arch edits config (`.edpa/config/`) | **YES** | `commit_author` + `pr_reviewer` on related items |
 | BO comments on Epic | **YES** | `issue_comment` + maybe `manual:issue_comment` |
-| QA writes tests (`tests/`) | **YES** | `commit_author`, `pr_author` |
+| QA writes tests (`tests/`) | **YES** | `commit_author` |
 
 Analytical and preparatory work (planning, specification,
 prioritization) is the **majority of project work**. A PM who spends 4
@@ -78,10 +76,9 @@ per-person `as: owner/key/reviewer/consulted` field. Role labels are
 
 | Signal type | Derived role |
 |-------------|--------------|
-| `assignee` | owner |
+| `commit_author` | owner |
 | `manual:*` | key (default for /contribute attributions) |
-| `pr_author` | key |
-| `commit_author`, `pr_reviewer` | reviewer |
+| `pr_reviewer` | reviewer |
 | `issue_comment` | consulted |
 
 A person who fires multiple signal types gets the **highest-priority

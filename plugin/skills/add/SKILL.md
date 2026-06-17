@@ -28,7 +28,7 @@ V2 local-first add. No `gh` calls.
    `_md_frontmatter.save_md`.
 5. `git commit -m "feat({ID}): <title>"`.
 
-PR-derived signals (pr_author, pr_reviewer, issue_comment) arrive
+PR-derived signals (pr_reviewer, issue_comment) arrive
 asynchronously via the CI workflow at
 `.github/workflows/edpa-contribution-sync.yml` — see
 `/edpa:setup --with-ci` and `docs/v2/decisions.md` ADR-012.

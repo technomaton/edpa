@@ -9,7 +9,7 @@ self-contained Monte Carlo + coordinate-descent optimizer that synthesizes
 its own corpus — no hand-recorded ground truth required.
 
 ```
-Target:     .edpa/config/cw_heuristics.yaml (signals: section, 5 weights)
+Target:     .edpa/config/cw_heuristics.yaml (signals: section, 3 weights)
 Metric:     mean_absolute_deviation (predicted cw vs synthetic true cw)
 Direction:  lower
 Optimizer:  .edpa/engine/scripts/calibrate_signals.py (LOCKED — agent must NOT edit)
@@ -29,16 +29,14 @@ prior, see "Re-run with real data" below — but that path is optional.
 
 ## v2 calibration target
 
-The optimizer tunes the **5 signal weights** in
+The optimizer tunes the **3 signal weights** in
 `cw_heuristics.yaml.signals`:
 
 ```yaml
 signals:
-  assignee: 4.0          # ← calibrate
-  pr_author: 3.4         # ← calibrate
-  commit_author: 2.78    # ← calibrate
-  pr_reviewer: 2.25      # ← calibrate
-  issue_comment: 1.14    # ← calibrate
+  commit_author: 4.00    # ← calibrate
+  pr_reviewer: 2.17      # ← calibrate
+  issue_comment: 1.46    # ← calibrate
 ```
 
 Manual `/contribute` weights are not calibrated — they're operator-
@@ -63,16 +61,15 @@ Script:         .edpa/engine/scripts/calibrate_signals.py (LOCKED)
 Metric:         mean_absolute_deviation(predicted_cw, true_cw)
                 where predicted_cw = Σ weight × signal_count, per-item normalized
 Direction:      lower
-Search space:   5D, each weight ∈ [0.1, 8.0]
-Defaults:       assignee 4.0, pr_author 3.4, commit_author 2.78,
-                pr_reviewer 2.25, issue_comment 1.14
+Search space:   3D, each weight ∈ [0.1, 8.0]
+Defaults:       commit_author 4.00, pr_reviewer 2.17, issue_comment 1.46
 ```
 
 ## Search strategy
 
 ```
 Phase 1 — Monte Carlo random sampling
-  - Sample weight vectors from [0.1, 8.0]^5 (default 2000 samples; 200 if --quick)
+  - Sample weight vectors from [0.1, 8.0]^3 (default 2000 samples; 200 if --quick)
   - Score MAD for each against the synthetic corpus
   - Keep the top 5 candidates by MAD
 
@@ -113,11 +110,15 @@ last calibration metadata, proposes a default run, and applies on confirmation.
 
 ## Safety constraints
 
-- **Agent MUST NOT edit `calibrate_signals.py`** — the synthetic corpus
-  generator and the MAD cost function live inside the same locked script
-  intentionally. Modifying the generator to favor a particular weight vector
-  gamifies the metric. The cost function takes only a candidate weight vector
-  and pure-reads `signal_count × weight` with per-item normalization.
+- **Agent MUST NOT edit `calibrate_signals.py` to game the metric** — the
+  synthetic corpus generator and the MAD cost function live inside the same
+  locked script intentionally. Modifying the generator to favor a particular
+  weight vector gamifies the metric. The cost function takes only a candidate
+  weight vector and pure-reads `signal_count × weight` with per-item
+  normalization. This lock is about *not gaming the optimizer*: structural
+  changes to the signal set or the corpus model are legitimate and deliberate —
+  they go through a reviewed PR (as the `assignee`/`pr_author` signal removal,
+  which took the search space from 5D to 3D, did).
 - **Bounds** — all signal weights in [0.1, 8.0]. Below 0.1 the signal
   effectively never fires; at the top of the range it dominates regardless of
   other evidence.
@@ -160,4 +161,4 @@ Full simulation with 2 PIs, 10 iterations, 7 team members, 510 commits:
 - Repository: [technomaton/edpa-simulation](https://github.com/technomaton/edpa-simulation)
 - Run: `python scripts/simulate.py --pi all --seed 42`
 - Calibration: `python3 .edpa/engine/scripts/calibrate_signals.py --scenarios 1000 --seed 42`
-  (5D Monte Carlo + coordinate descent, single-objective, synthetic corpus)
+  (3D Monte Carlo + coordinate descent, single-objective, synthetic corpus)

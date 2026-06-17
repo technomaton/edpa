@@ -70,8 +70,8 @@ Both flow through to alice's `contribution_score` and contribute
 
 ### Pair programming
 
-Bob is the PR author (gets `pr_author` signal automatically). Alice
-pair-programmed but didn't commit. In the PR body:
+Bob is the PR author — his commits give him `commit_author` signals
+automatically. Alice pair-programmed but didn't commit. In the PR body:
 
 ```
 Closes #137. Pair-programmed with @alice.
@@ -79,8 +79,8 @@ Closes #137. Pair-programmed with @alice.
 /contribute @alice weight:2.0
 ```
 
-Alice gets `manual:pr_body` weight 2.0 → roughly equal share with
-bob's `pr_author` (weight 2.0).
+Alice gets `manual:pr_body` weight 2.0, giving her a share alongside
+bob's auto-detected `commit_author` credit.
 
 ### Silent reviewer
 
@@ -136,7 +136,7 @@ After per-item normalization, alice gets ~86% share, bob gets ~14%.
 ### Don't try to "override" auto-detection
 
 In v1.11, manual directives **stack** with auto-detection — they
-don't override. If alice is already credited as `pr_author` (weight
+don't override. If alice is already credited as `commit_author` (weight
 2.0) and you write `/contribute @alice weight:0.5`, she gets 2.0 +
 0.5 = 2.5 contribution_score, not 0.5.
 
@@ -186,8 +186,8 @@ verification taxonomy.
 ## What about `/contribute` in EDPA's own engine output?
 
 EDPA does **not** post `/contribute` comments back to GitHub on
-behalf of detected contributors. Auto-detected signals (`assignee`,
-`pr_author`, `commit_author`, `pr_reviewer`, `issue_comment`) flow
+behalf of detected contributors. Auto-detected signals
+(`commit_author`, `pr_reviewer`, `issue_comment`) flow
 directly into `contributors[]` without round-tripping through GitHub.
 Only operator-written directives become `manual:*` signals.
 

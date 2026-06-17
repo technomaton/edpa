@@ -283,13 +283,13 @@ def test_load_signal_weights_overrides_from_config(tmp_path):
     edpa_root = tmp_path / ".edpa"
     (edpa_root / "config").mkdir(parents=True)
     (edpa_root / "config" / "cw_heuristics.yaml").write_text(yaml.safe_dump({
-        "signals": {"assignee": 5.0, "issue_comment": 1.0},
+        "signals": {"commit_author": 5.0, "issue_comment": 1.0},
     }))
     weights = dc.load_signal_weights(edpa_root)
-    assert weights["assignee"] == 5.0
+    assert weights["commit_author"] == 5.0
     assert weights["issue_comment"] == 1.0
     # Non-overridden keys keep defaults
-    assert weights["pr_author"] == dc.DEFAULT_SIGNAL_WEIGHTS["pr_author"]
+    assert weights["pr_reviewer"] == dc.DEFAULT_SIGNAL_WEIGHTS["pr_reviewer"]
 
 
 def test_load_people_map(tmp_path):

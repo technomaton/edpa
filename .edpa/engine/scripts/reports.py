@@ -38,9 +38,7 @@ from pathlib import Path
 # role label, used only for human-readable rendering (timesheets, team
 # rollup). Engine math doesn't see roles — only cw values.
 SIGNAL_TO_ROLE = {
-    "assignee": "owner",
-    "pr_author": "key",
-    "commit_author": "reviewer",
+    "commit_author": "owner",
     "pr_reviewer": "reviewer",
     "issue_comment": "consulted",
 }
@@ -51,9 +49,9 @@ SIGNAL_TO_ROLE = {
 _MANUAL_DEFAULT_ROLE = "key"
 
 # Priority order for breaking ties when multiple signal types fire.
-# Highest priority on the left: assignee dominates pr_author dominates
-# commit_author etc. This matches the v1.10 role hierarchy that audit
-# auditors are familiar with.
+# Highest priority on the left: commit authorship (owner) dominates a
+# manual /contribute attribution (key), which dominates a review
+# (reviewer), which dominates a comment (consulted).
 _ROLE_PRIORITY = ["owner", "key", "reviewer", "consulted"]
 
 

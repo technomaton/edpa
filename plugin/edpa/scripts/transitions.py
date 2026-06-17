@@ -227,8 +227,8 @@ def detect_transitions(edpa_root: Path, since: datetime = None, until: datetime 
         # status flips when a human moves a card on the GitHub Project
         # board; the gate-event credit must go to that human, not to
         # the bot that mirrored the change into the YAML. detect_-
-        # contributors will pick up the human via assignee/pr_author
-        # /commit_author signals on the related Story/Defect.
+        # contributors will pick up the human via commit_author
+        # signals on the related Story/Defect.
         if is_bot_author(cur_author):
             continue
 

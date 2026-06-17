@@ -153,21 +153,14 @@ def test_empty_items_no_crash():
 
 
 def test_signal_weight_ordering():
-    """v1.11: signal weights should follow the role-implied hierarchy
-    (assignee/owner > pr_author/key > commit_author/reviewer >
-    issue_comment/consulted). Calibration may shuffle within each
-    band but the gross ordering should hold."""
+    """Signal weights should follow the role-implied hierarchy
+    (commit_author > pr_reviewer > issue_comment). Calibration may
+    shuffle within each band but the gross ordering should hold.
+    (The assignee and pr_author signals were removed — see CHANGELOG.)"""
     capacity, heuristics, items = generate_demo_data()
     sw = heuristics["signals"]
-    assert sw["assignee"] >= sw["pr_author"], (
-        f"assignee ({sw['assignee']}) should >= pr_author ({sw['pr_author']})"
-    )
-    assert sw["pr_author"] >= sw["commit_author"], (
-        f"pr_author ({sw['pr_author']}) should >= commit_author ({sw['commit_author']})"
-    )
-    # commit_author and pr_reviewer often calibrate close — allow tie
-    assert sw["commit_author"] >= sw["pr_reviewer"] - 0.5, (
-        f"commit_author ({sw['commit_author']}) should be near pr_reviewer ({sw['pr_reviewer']})"
+    assert sw["commit_author"] >= sw["pr_reviewer"], (
+        f"commit_author ({sw['commit_author']}) should >= pr_reviewer ({sw['pr_reviewer']})"
     )
     assert sw["pr_reviewer"] >= sw["issue_comment"], (
         f"pr_reviewer ({sw['pr_reviewer']}) should >= issue_comment ({sw['issue_comment']})"

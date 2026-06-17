@@ -92,9 +92,9 @@ Apply threshold: `evidence_score >= heuristics.evidence_threshold` → relevant.
 
 Derive CW from highest signal:
 ```
-assignee → owner (1.0)
-contribute_command or pr_author → key (0.6)
-commit_author or pr_reviewer → reviewer (0.25)
+commit_author → owner (1.0)
+contribute_command → key (0.6)
+pr_reviewer → reviewer (0.25)
 issue_comment → consulted (0.15)
 ```
 

@@ -48,19 +48,13 @@ Each revision includes: reason for correction, diff from previous, timestamp, au
       "contributors": [
         {
           "person": "turyna",
-          "cw": 0.589,
-          "contribution_score": 8.28,
+          "cw": 0.419,
+          "contribution_score": 5.50,
           "signals": [
-            {
-              "type": "assignee",
-              "ref": "issue#137",
-              "weight": 4.00,
-              "detected_at": "2026-05-08T15:23:11Z"
-            },
             {
               "type": "commit_author",
               "ref": "pr#146/commit/fa9f440",
-              "weight": 2.78,
+              "weight": 4.00,
               "detected_at": "2026-05-08T15:23:11Z"
             },
             {
@@ -74,23 +68,21 @@ Each revision includes: reason for correction, diff from previous, timestamp, au
         },
         {
           "person": "mtury",
-          "cw": 0.330,
-          "contribution_score": 4.65,
+          "cw": 0.470,
+          "contribution_score": 6.17,
           "signals": [
-            {"type": "pr_author", "ref": "pr#146", "weight": 3.40,
+            {"type": "commit_author", "ref": "pr#146/commit/6b5b69c", "weight": 4.00,
              "detected_at": "2026-05-08T15:23:11Z"},
-            {"type": "commit_author", "ref": "pr#146/commit/6b5b69c", "weight": 2.78,
-             "detected_at": "2026-05-08T15:23:11Z"},
-            {"type": "pr_reviewer", "ref": "pr#146/review/2845102347", "weight": 2.25,
+            {"type": "pr_reviewer", "ref": "pr#146/review/2845102347", "weight": 2.17,
              "detected_at": "2026-05-08T15:23:11Z"}
           ]
         },
         {
           "person": "jurby",
-          "cw": 0.081,
-          "contribution_score": 1.14,
+          "cw": 0.111,
+          "contribution_score": 1.46,
           "signals": [
-            {"type": "issue_comment", "ref": "issue#137/comment/c984712", "weight": 1.14,
+            {"type": "issue_comment", "ref": "issue#137/comment/c984712", "weight": 1.46,
              "detected_at": "2026-05-08T15:23:11Z"}
           ]
         }
@@ -122,8 +114,7 @@ Note the v1.11 structure:
   resolvable `ref` for each evidence source. Two collectors feed
   this list:
   - **`detect_contributors.py`** (v1.11) — PR/issue API surfaces:
-    `pr_author`, `pr_reviewer`, `commit_author`, `assignee`,
-    `issue_comment`, `manual:*`.
+    `commit_author`, `pr_reviewer`, `issue_comment`, `manual:*`.
   - **`yaml_edit_signals.py`** (v1.17) — git diff over
     `.edpa/backlog/<typ>/<id>.yaml` per iteration window:
     `yaml_edit:create`, `yaml_edit:block_add`, `yaml_edit:list_grow`,

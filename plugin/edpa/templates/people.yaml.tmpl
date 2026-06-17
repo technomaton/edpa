@@ -104,20 +104,24 @@ people:
 #   iteration: PI-2026-1.3
 #   contributors:
 #     - person: bob-dev          # must match people[].id above
-#       cw: 0.65                 # per-item share (Σ across persons = 1.0)
-#       contribution_score: 6.78 # raw sum of signal weights (audit input)
+#       cw: 0.62                 # per-item share (Σ across persons = 1.0)
+#       contribution_score: 8.34 # raw sum of signal weights (audit input)
 #       signals:
-#         - type: assignee
-#           ref: issue#137
-#           weight: 4.00
+#         - type: commit_author
+#           ref: pr#146/commit/aa1
+#           weight: 2.78
 #           detected_at: 2026-05-08T15:23:11Z
-#         - type: pr_author
-#           ref: pr#146
-#           weight: 3.40
+#         - type: commit_author
+#           ref: pr#146/commit/aa2
+#           weight: 2.78
+#           detected_at: 2026-05-08T15:23:11Z
+#         - type: commit_author
+#           ref: pr#146/commit/aa3
+#           weight: 2.78
 #           detected_at: 2026-05-08T15:23:11Z
 #     - person: carol-qa
-#       cw: 0.35
-#       contribution_score: 3.65
+#       cw: 0.38
+#       contribution_score: 5.03
 #       signals:
 #         - type: pr_reviewer
 #           ref: pr#146/review/r2
@@ -125,9 +129,7 @@ people:
 #           detected_at: 2026-05-08T15:23:11Z
 #         - type: commit_author
 #           ref: pr#146/commit/abc
-#           weight: 2.78    # contribution_score adds these two: 2.25 + 2.78 → wait
-#           # actually 2.25 + 2.78 = 5.03 ≠ 3.65 (illustrative only — real
-#           # detect output is internally consistent)
+#           weight: 2.78    # Σ = 2.25 + 2.78 = 5.03; cw = 5.03 / (8.34 + 5.03) = 0.38
 #
 # Manual contribution attribution:
 #   Add `/contribute @<person-id> weight:<float>` in PR body, commit

@@ -1015,7 +1015,7 @@ def cmd_add(root, backlog, args):
        structured field — engine/CI materialize it).
     5. ``git add`` + ``git commit -m "feat({ID}): {title}"``.
 
-    PR-derived signals (pr_author, pr_reviewer, issue_comment) arrive
+    PR-derived signals (pr_reviewer, issue_comment) arrive
     asynchronously via the CI workflow at
     ``.github/workflows/edpa-contribution-sync.yml`` (see
     ``sync_pr_contributions.py``) — not handled here.

@@ -378,8 +378,10 @@ def test_real_github_pr_roundtrip(tmp_path: Path) -> None:
       3. Opens a PR via ``gh pr create`` whose title references S-1.
       4. Merges the PR via ``gh pr merge --squash``.
       5. Polls for the contribution-sync workflow run to complete.
-      6. Pulls and asserts ``.edpa/backlog/stories/S-1.md`` now has
-         a ``evidence[]`` entry with type ``pr_author``.
+      6. Pulls and asserts the contribution-sync workflow committed
+         evidence, and that no removed ``pr_author`` signal is
+         materialized (the PR author is credited locally via
+         ``commit_author``, not by CI).
 
     Slow (~3 min); skipped by default. Opt-in via ``pytest -m e2e``.
     """
@@ -459,5 +461,8 @@ def test_real_github_pr_roundtrip(tmp_path: Path) -> None:
 
     s1 = load_md(work / ".edpa/backlog/stories/S-1.md")
     sigs = s1.get("evidence", [])
-    refs = {s.get("ref") for s in sigs}
-    assert f"PR#{pr_num}:author" in refs, f"missing pr_author signal: {sigs}"
+    # pr_author was removed — the CI workflow emits only pr_reviewer/
+    # issue_comment; the PR author is credited locally via commit_author.
+    assert not any(s.get("type") == "pr_author" for s in sigs), (
+        f"pr_author signal should no longer be materialized: {sigs}"
+    )

@@ -12,7 +12,7 @@
 #   → Σ_persons cw[*, item] = 1.0   (per-item invariant)
 #
 # Calibrate with `/edpa:calibrate` after collecting ≥20 ground-truth
-# CW records. Monte Carlo over the 5 signal weights, then Nelder-Mead
+# CW records. Monte Carlo over the 3 signal weights, then Nelder-Mead
 # refinement around the best candidates. Lower MAD vs. ground truth
 # indicates a better calibration.
 
@@ -35,11 +35,9 @@ schema_version: "1.0"
 # same surface stack additively.
 #
 signals:
-  assignee: 4.0             # GitHub issue assignee
-  pr_author: 3.4            # PR author referencing item
-  commit_author: 2.78        # Commit with item ID in branch/title/msg
-  pr_reviewer: 2.25          # PR review submitted (excluding self)
-  issue_comment: 1.14        # Comment on issue/PR (excluding bots)
+  commit_author: 4.00        # Commit with item ID in branch/title/msg
+  pr_reviewer: 2.17          # PR review submitted (excluding self)
+  issue_comment: 1.46        # Comment on issue/PR (excluding bots)
 
 # ─────────────────────────────────────────────────────────────────────
 # GATE WEIGHTS — Feature / Epic / Initiative status transitions

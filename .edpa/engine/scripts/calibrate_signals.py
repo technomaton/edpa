@@ -2,14 +2,16 @@
 """
 EDPA Monte Carlo signal-weight calibrator.
 
-Search space: 5D (assignee, pr_author, commit_author, pr_reviewer,
-issue_comment) signal weights from cw_heuristics.yaml.signals.
+Search space: 3D (commit_author, pr_reviewer, issue_comment) signal
+weights from cw_heuristics.yaml.signals. (The GitHub-issue ``assignee``
+and ``pr_author`` signals were removed — they never fired in the
+local-first flow; commit_author covers PR/commit authorship.)
 
 Procedure:
   1. Generate N synthetic team×iteration scenarios with known "true"
      cw shares per (person, item) and plausible Git-signal patterns
-     reflecting those shares (owner has assignee+commits, reviewer
-     has pr_reviewer, consulted has issue_comment, etc., with noise).
+     reflecting those shares (owner has many commits, reviewer has
+     pr_reviewer, consulted has issue_comment, etc., with noise).
   2. For each candidate weight vector:
        For each (person, item) record in synthetic data:
          contribution_score = Σ signal_weight × signal_count_for_person
@@ -28,8 +30,8 @@ The synthetic ground truth is built from:
     summing to 1.0 with role-based bias (owner > key > reviewer >
     consulted)
   - Per (person, item, true_cw): emit plausible signal mix:
-      true_cw >= 0.5:   assignee + 1-3 commits + pr_author (high prob)
-      0.3 <= cw < 0.5:  pr_author + 1-2 commits, sometimes assignee
+      true_cw >= 0.5:   3-6 commits (+ occasional comment)
+      0.3 <= cw < 0.5:  1-3 commits (+ occasional comment)
       0.15 <= cw < 0.3: pr_reviewer + maybe commit, sometimes comment
       cw < 0.15:        issue_comment only
   - Adds noise: swap signals between persons with low probability,
@@ -80,8 +82,7 @@ except ImportError:
 # ── Synthetic ground-truth generator ───────────────────────────────────────
 
 
-SIGNAL_TYPES = ["assignee", "pr_author", "commit_author", "pr_reviewer",
-                "issue_comment"]
+SIGNAL_TYPES = ["commit_author", "pr_reviewer", "issue_comment"]
 ROLES = ["Dev", "Arch", "PM", "QA", "DevSecOps"]
 
 
@@ -108,7 +109,7 @@ def generate_signals(true_cw: float, role: str, rng: random.Random,
     item is `true_cw`. Roles bias which signals fire (Dev commits,
     PM comments, Arch reviews). `edge_case` injects atypical patterns:
 
-      - 'pm_driven_owner': PM is assignee but has no commits; their
+      - 'pm_driven_owner': PM owns scope but has no commits; their
         work shows up as issue_comments + maybe pr_reviewer (specs,
         AC reviews). Models items where PM owns scope, devs implement.
       - 'silent_reviewer': contributor has only pr_reviewer (no
@@ -125,10 +126,9 @@ def generate_signals(true_cw: float, role: str, rng: random.Random,
     signals: dict[str, int] = {s: 0 for s in SIGNAL_TYPES}
 
     if edge_case == "pm_driven_owner":
-        # PM as assignee/owner without commits — their work is in
+        # PM owns scope without commits — their work is in
         # specifications, AC, and issue discussions.
-        signals["assignee"] += 1
-        signals["issue_comment"] += rng.randint(2, 5)
+        signals["issue_comment"] += rng.randint(3, 6)
         signals["pr_reviewer"] += rng.choices([0, 1], weights=[0.5, 0.5])[0]
         return signals
 
@@ -140,8 +140,7 @@ def generate_signals(true_cw: float, role: str, rng: random.Random,
 
     if edge_case == "pair_partner":
         # Pair-programmed with the owner — full commit participation,
-        # often co-authored PR, but not the assignee.
-        signals["pr_author"] += rng.choices([0, 1], weights=[0.4, 0.6])[0]
+        # authorship split across both partners' commits.
         signals["commit_author"] += rng.randint(2, 4)
         signals["issue_comment"] += rng.randint(0, 1)
         return signals
@@ -158,16 +157,12 @@ def generate_signals(true_cw: float, role: str, rng: random.Random,
 
     # Owner band (cw >= 0.5)
     if true_cw >= 0.5:
-        signals["assignee"] += 1
-        signals["pr_author"] += rng.choices([0, 1], weights=[0.2, 0.8])[0]
-        signals["commit_author"] += rng.randint(2, 5)
+        signals["commit_author"] += rng.randint(3, 6)
         signals["issue_comment"] += rng.randint(0, 2)
 
     # Key band (0.3 <= cw < 0.5)
     elif true_cw >= 0.3:
-        signals["pr_author"] += rng.choices([0, 1], weights=[0.3, 0.7])[0]
         signals["commit_author"] += rng.randint(1, 3)
-        signals["assignee"] += rng.choices([0, 1], weights=[0.7, 0.3])[0]
         signals["issue_comment"] += rng.randint(0, 2)
 
     # Reviewer band (0.15 <= cw < 0.3)
@@ -303,13 +298,15 @@ def generate_scenario(scenario_id: int, rng: random.Random) -> SyntheticScenario
                 continue
 
         if flavor == "minimal":
-            # Single owner + maybe 1 small reviewer
+            # Single owner, optionally one small reviewer (cw sums to 1.0)
             owner = rng.choice(team)
+            add_reviewer = team_size >= 2 and rng.random() < 0.5
+            owner_cw = 0.85 if add_reviewer else 1.0
             contributions.append(SyntheticContribution(
-                person=owner["id"], role=owner["role"], item_id=item_id, true_cw=0.85,
-                signal_counts=generate_signals(0.85, owner["role"], rng),
+                person=owner["id"], role=owner["role"], item_id=item_id, true_cw=owner_cw,
+                signal_counts=generate_signals(owner_cw, owner["role"], rng),
             ))
-            if team_size >= 2 and rng.random() < 0.5:
+            if add_reviewer:
                 rest = [p for p in team if p != owner]
                 rev = rng.choice(rest)
                 contributions.append(SyntheticContribution(
@@ -424,6 +421,25 @@ def coordinate_descent(corpus, start_weights: dict[str, float],
 # ── Driver ─────────────────────────────────────────────────────────────────
 
 
+def _rescale_to_anchor(weights: dict[str, float],
+                       anchor: float = 4.0) -> dict[str, float]:
+    """Scale all weights so the max equals ``anchor``.
+
+    Per-item cw normalization is scale-invariant — multiplying every
+    weight by a positive constant leaves every predicted cw, and thus
+    the MAD, unchanged. This picks a human-readable canonical
+    representative inside the [0.1, 8.0] band, aligned with the manual
+    /contribute ``weight:`` convention. With only 3 normalized signals
+    the optimizer's raw output can drift above 8.0; this keeps the
+    shipped weights in range without changing the calibration.
+    """
+    mx = max(weights.values()) if weights else 0.0
+    if mx <= 0:
+        return dict(weights)
+    factor = anchor / mx
+    return {s: round(w * factor, 3) for s, w in weights.items()}
+
+
 def run_calibration(n_scenarios: int, seed: int, quick: bool = False) -> dict:
     """End-to-end: generate corpus, baseline, MC sample, refine, return report."""
     print(f"Generating {n_scenarios} synthetic scenarios (seed={seed})...")
@@ -431,11 +447,12 @@ def run_calibration(n_scenarios: int, seed: int, quick: bool = False) -> dict:
     n_records = sum(len(s.contributions) for s in corpus)
     print(f"  → {n_records} (person, item) records across {n_scenarios} scenarios")
 
-    # Baseline = current cw_heuristics defaults (v1.11 edge-case-trained).
-    # Calibration runs measure improvement over the current shipped values.
+    # Baseline = the carried-over 3-signal survivor weights (the pre-
+    # re-tune reference after the assignee/pr_author signals were
+    # dropped). The reported improvement_pct is the re-tune's gain over
+    # this baseline; the shipped weights themselves are the rescaled
+    # calibrated vector written by --apply.
     defaults = {
-        "assignee": 4.0,
-        "pr_author": 3.4,
         "commit_author": 2.78,
         "pr_reviewer": 2.25,
         "issue_comment": 1.14,
@@ -463,6 +480,7 @@ def run_calibration(n_scenarios: int, seed: int, quick: bool = False) -> dict:
     refined.sort(key=lambda x: x[0])
 
     best_mad, best_weights = refined[0]
+    best_weights = _rescale_to_anchor(best_weights)
     improvement = (baseline_mad - best_mad) / baseline_mad * 100
 
     print(f"\n{'═' * 60}")
@@ -546,11 +564,9 @@ def apply_to_heuristics(report: dict, target: Path, dry_run: bool = False):
         print(f"\n[dry-run] Would write to {target} — not written.")
         return
 
-    # Re-emit the signals: block (5 keys, fixed order)
+    # Re-emit the signals: block (3 keys, fixed order)
     new_signals_block = (
         "signals:\n"
-        f"  assignee: {weights['assignee']:.2f}             # GitHub issue assignee\n"
-        f"  pr_author: {weights['pr_author']:.2f}            # PR author referencing item\n"
         f"  commit_author: {weights['commit_author']:.2f}        # Commit with item ID in branch/title/msg\n"
         f"  pr_reviewer: {weights['pr_reviewer']:.2f}          # PR review submitted (excluding self)\n"
         f"  issue_comment: {weights['issue_comment']:.2f}        # Comment on issue/PR (excluding bots)\n"
@@ -642,18 +658,13 @@ def commit_heuristics(target: Path, report: dict) -> bool:
 # Inferred signal counts when a backlog item has no signals[] recorded.
 # Maps the `as:` role field to plausible signal mix (matches calibrator bands).
 _AS_TO_SIGNALS: dict[str, dict[str, int]] = {
-    "owner":    {"assignee": 1, "commit_author": 3, "pr_author": 1,
-                 "pr_reviewer": 0, "issue_comment": 0},
-    "key":      {"assignee": 0, "commit_author": 2, "pr_author": 1,
-                 "pr_reviewer": 0, "issue_comment": 1},
-    "reviewer": {"assignee": 0, "commit_author": 0, "pr_author": 0,
-                 "pr_reviewer": 1, "issue_comment": 0},
-    "consulted": {"assignee": 0, "commit_author": 0, "pr_author": 0,
-                  "pr_reviewer": 1, "issue_comment": 2},
+    "owner":    {"commit_author": 4, "pr_reviewer": 0, "issue_comment": 0},
+    "key":      {"commit_author": 2, "pr_reviewer": 0, "issue_comment": 1},
+    "reviewer": {"commit_author": 0, "pr_reviewer": 1, "issue_comment": 0},
+    "consulted": {"commit_author": 0, "pr_reviewer": 1, "issue_comment": 2},
 }
 _AS_DEFAULT_SIGNALS: dict[str, int] = {
-    "assignee": 0, "commit_author": 1, "pr_author": 0,
-    "pr_reviewer": 0, "issue_comment": 0,
+    "commit_author": 1, "pr_reviewer": 0, "issue_comment": 0,
 }
 
 
@@ -737,12 +748,8 @@ def build_real_contribution(
             break
 
     if signal_counts is None:
-        # Infer from assignee field + as: role
-        inferred = dict(_AS_TO_SIGNALS.get(as_field or "", _AS_DEFAULT_SIGNALS))
-        # Bonus: if person is the item assignee, ensure assignee signal
-        if str(fm.get("assignee", "")) == person_id and inferred.get("assignee", 0) == 0:
-            inferred["assignee"] = 1
-        signal_counts = inferred
+        # Infer from the contributor's as: role
+        signal_counts = dict(_AS_TO_SIGNALS.get(as_field or "", _AS_DEFAULT_SIGNALS))
 
     return SyntheticContribution(
         person=person_id,
@@ -842,8 +849,6 @@ def run_calibration_real_data(
           f"{n_synthetic} synthetic = {n_blended} effective records")
 
     defaults = {
-        "assignee": 4.0,
-        "pr_author": 3.4,
         "commit_author": 2.78,
         "pr_reviewer": 2.25,
         "issue_comment": 1.14,
@@ -870,6 +875,7 @@ def run_calibration_real_data(
     refined.sort(key=lambda x: x[0])
 
     best_mad, best_weights = refined[0]
+    best_weights = _rescale_to_anchor(best_weights)
     improvement_vs_baseline = (baseline_mad_blended - best_mad) / baseline_mad_blended * 100
     improvement_vs_synthetic = (baseline_mad_synthetic - best_mad) / baseline_mad_synthetic * 100
 

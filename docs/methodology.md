@@ -128,11 +128,9 @@ weights sum into `contribution_score`, which normalizes to per-item
 
 | Signal type | Default weight | Source | Auditor `ref` |
 |-------------|---------------:|--------|---------------|
-| `assignee` | 4.00 | Issue assignees | `issue#<num>` |
-| `pr_author` | 3.40 | PR author | `pr#<num>` |
-| `commit_author` | 2.78 | PR commit author (excl. PR author) | `pr#<num>/commit/<sha>` |
-| `pr_reviewer` | 2.25 | PR reviews submitted | `pr#<num>/review/<id>` |
-| `issue_comment` | 1.14 | Issue/PR comments (excl. bots) | `issue#<num>/comment/<id>` |
+| `commit_author` | 4.00 | Commit author (PR commit or local commit) | `pr#<num>/commit/<sha>` |
+| `pr_reviewer` | 2.17 | PR reviews submitted | `pr#<num>/review/<id>` |
+| `issue_comment` | 1.46 | Issue/PR comments (excl. bots) | `issue#<num>/comment/<id>` |
 | `manual:pr_body` | explicit | `/contribute` in PR description | `pr#<num>/body` |
 | `manual:commit_message` | explicit | `/contribute` in commit message | `commit/<sha>/message` |
 | `manual:issue_body` | explicit | `/contribute` in issue description | `issue#<num>/body` |
@@ -309,27 +307,27 @@ read the same per-(person, item) hour value.
 ### 6.4 Example: Story S-200 (JobSize = 8)
 
 Detected signals:
-- turyna: assignee (4) + commit_author (1) + manual:pr_body weight=2 → score 7
-- tuma: pr_author (2) + commit_author (1) + pr_reviewer (1) → score 4
-- urbanek: issue_comment (0.5) → score 0.5
+- turyna: commit_author (×2 = 8) + manual:pr_body weight=2 → score 10
+- tuma: commit_author (4) + pr_reviewer (2.17) → score 6.17
+- urbanek: issue_comment (1.46) → score 1.46
 
-Σ score on S-200 = 11.5
+Σ score on S-200 = 17.63
 
 | Contributor | Signals | contribution_score | cw (share) |
 |---|---|---:|---:|
-| Turyna | assignee + commit + manual | 7.0 | **0.609** |
-| Tuma | pr_author + commit + pr_reviewer | 4.0 | **0.348** |
-| Urbanek | issue_comment | 0.5 | **0.043** |
-| **Σ** | | **11.5** | **1.000** |
+| Turyna | 2× commit + manual | 10.0 | **0.567** |
+| Tuma | commit + pr_reviewer | 6.17 | **0.350** |
+| Urbanek | issue_comment | 1.46 | **0.083** |
+| **Σ** | | **17.63** | **1.000** |
 
 **Per-person view** (each from their own capacity, assuming S-200 is
 their only item this iteration):
 
 | Contributor | JS × cw | Capacity | Hours on S-200 |
 |---|---:|---:|---:|
-| Turyna | 8 × 0.609 = 4.87 | 60h | 60.0h (sole item) |
-| Tuma | 8 × 0.348 = 2.78 | 80h | 80.0h (sole item) |
-| Urbanek | 8 × 0.043 = 0.35 | 40h | 40.0h (sole item) |
+| Turyna | 8 × 0.567 = 4.54 | 60h | 60.0h (sole item) |
+| Tuma | 8 × 0.350 = 2.80 | 80h | 80.0h (sole item) |
+| Urbanek | 8 × 0.083 = 0.66 | 40h | 40.0h (sole item) |
 
 (In real iterations each person has multiple items; ratio
 normalization across items spreads their capacity proportionally to

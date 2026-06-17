@@ -76,11 +76,11 @@ class TestGenerateSignals:
                     f"negative signal for cw={true_cw} role={role}: {sigs}"
                 )
 
-    def test_high_cw_owner_gets_assignee(self):
-        # Owner band (>= 0.5): assignee should always be set
+    def test_high_cw_owner_gets_commits(self):
+        # Owner band (>= 0.5): commit_author should always be set
         rng = self._rng(42)
         hits = sum(
-            generate_signals(0.75, "Dev", rng)["assignee"] > 0
+            generate_signals(0.75, "Dev", rng)["commit_author"] > 0
             for _ in range(20)
         )
         assert hits == 20
@@ -88,8 +88,8 @@ class TestGenerateSignals:
     def test_edge_case_pm_driven_owner(self):
         rng = self._rng(0)
         sigs = generate_signals(0.5, "PM", rng, edge_case="pm_driven_owner")
-        assert sigs["assignee"] == 1
-        assert sigs["issue_comment"] >= 2
+        assert sigs["commit_author"] == 0
+        assert sigs["issue_comment"] >= 3
 
     def test_edge_case_silent_reviewer_no_commits(self):
         rng = self._rng(0)
@@ -204,8 +204,7 @@ class TestEvaluateMad:
 
     def test_mad_finite_with_default_weights(self):
         defaults = {
-            "assignee": 4.0, "pr_author": 3.4, "commit_author": 2.78,
-            "pr_reviewer": 2.25, "issue_comment": 1.14,
+            "commit_author": 2.78, "pr_reviewer": 2.25, "issue_comment": 1.14,
         }
         corpus = _minimal_corpus(30, seed=3)
         mad, _ = evaluate_mad(corpus, defaults)
@@ -381,9 +380,6 @@ contributors:
       - type: commit_author
         ref: abc2
         weight: 2.78
-      - type: assignee
-        ref: S-1
-        weight: 4.0
   - person: bob
     cw: 0.20
     as: reviewer
@@ -434,12 +430,12 @@ class TestCountSignals:
         raw = [
             {"type": "commit_author", "ref": "a"},
             {"type": "commit_author", "ref": "b"},
-            {"type": "assignee", "ref": "S-1"},
+            {"type": "pr_reviewer", "ref": "S-1"},
         ]
         counts = _count_signals(raw)
         assert counts["commit_author"] == 2
-        assert counts["assignee"] == 1
-        assert counts["pr_reviewer"] == 0
+        assert counts["pr_reviewer"] == 1
+        assert counts["issue_comment"] == 0
 
     def test_ignores_unknown_types(self):
         raw = [{"type": "unknown_signal"}, {"type": "commit_author", "ref": "x"}]
@@ -474,15 +470,15 @@ class TestBuildRealContribution:
         assert c is not None
         assert c.true_cw == pytest.approx(0.70)
         assert c.signal_counts["commit_author"] == 2
-        assert c.signal_counts["assignee"] == 1
+        assert c.signal_counts["pr_reviewer"] == 0
 
     def test_infers_signals_when_none(self, corrections_workspace):
         rec = {"iteration": "PI-2026-1", "item": "S-2",
                "person": "alice", "actual_cw": 1.0}
         c = build_real_contribution(rec, corrections_workspace)
         assert c is not None
-        # Inferred from as: owner + assignee
-        assert c.signal_counts["assignee"] >= 1
+        # Inferred from as: owner → commit_author signals
+        assert c.signal_counts["commit_author"] >= 1
 
     def test_missing_item_returns_none(self, corrections_workspace):
         rec = {"item": "S-999", "person": "alice", "actual_cw": 0.5}

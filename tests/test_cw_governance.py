@@ -38,8 +38,6 @@ from validate_syntax import (  # noqa: E402
 
 MINIMAL_HEURISTICS = """\
 signals:
-  assignee: 4.00             # GitHub issue assignee
-  pr_author: 3.40            # PR author referencing item
   commit_author: 2.78        # Commit with item ID in branch/title/msg
   pr_reviewer: 2.25          # PR review submitted (excluding self)
   issue_comment: 1.14        # Comment on issue/PR (excluding bots)
@@ -69,8 +67,6 @@ SAMPLE_REPORT = {
     "baseline_weights": {s: 1.0 for s in SIGNAL_TYPES},
     "baseline_mad": 0.0861,
     "calibrated_weights": {
-        "assignee": 4.23,
-        "pr_author": 3.38,
         "commit_author": 2.80,
         "pr_reviewer": 2.20,
         "issue_comment": 1.10,
@@ -95,8 +91,8 @@ def heuristics_file(tmp_path):
 
 def test_read_current_weights(heuristics_file):
     w = _read_current_weights(heuristics_file)
-    assert w["assignee"] == pytest.approx(4.00)
     assert w["commit_author"] == pytest.approx(2.78)
+    assert w["pr_reviewer"] == pytest.approx(2.25)
 
 
 def test_read_current_weights_missing_file(tmp_path):
@@ -108,20 +104,17 @@ def test_read_current_weights_missing_file(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_diff_weights_shows_changes():
-    old = {"assignee": 4.0, "pr_author": 3.4, "commit_author": 2.78,
-           "pr_reviewer": 2.25, "issue_comment": 1.14}
-    new = {"assignee": 4.23, "pr_author": 3.38, "commit_author": 2.80,
-           "pr_reviewer": 2.20, "issue_comment": 1.10}
+    old = {"commit_author": 2.78, "pr_reviewer": 2.25, "issue_comment": 1.14}
+    new = {"commit_author": 2.80, "pr_reviewer": 2.20, "issue_comment": 1.10}
     lines = diff_weights(old, new)
-    assert len(lines) == 5
-    assert any("assignee" in l for l in lines)
+    assert len(lines) == 3
+    assert any("commit_author" in l for l in lines)
     assert any("↑" in l for l in lines)  # at least one increase
     assert any("↓" in l for l in lines)  # at least one decrease
 
 
 def test_diff_weights_no_change():
-    same = {"assignee": 4.0, "pr_author": 3.4, "commit_author": 2.78,
-            "pr_reviewer": 2.25, "issue_comment": 1.14}
+    same = {"commit_author": 2.78, "pr_reviewer": 2.25, "issue_comment": 1.14}
     lines = diff_weights(same, same)
     assert all("  " in l for l in lines)  # all "no-change" marker
 
@@ -146,14 +139,14 @@ def test_dry_run_prints_diff(heuristics_file, capsys):
     apply_to_heuristics(SAMPLE_REPORT, heuristics_file, dry_run=True)
     out = capsys.readouterr().out
     assert "dry-run" in out.lower()
-    assert "assignee" in out
+    assert "commit_author" in out
 
 
 def test_apply_writes_new_weights(heuristics_file, capsys):
     apply_to_heuristics(SAMPLE_REPORT, heuristics_file, dry_run=False)
     w = _read_current_weights(heuristics_file)
-    assert w["assignee"] == pytest.approx(4.23)
     assert w["commit_author"] == pytest.approx(2.80)
+    assert w["pr_reviewer"] == pytest.approx(2.20)
 
 
 def test_apply_missing_target(tmp_path, capsys):
@@ -221,8 +214,8 @@ def test_is_heuristics_path_other():
 def test_valid_weights_no_errors(tmp_path):
     errors, warnings = validate_cw_heuristics(
         tmp_path / "cw_heuristics.yaml",
-        {"signals": {"assignee": 4.0, "pr_author": 3.4, "commit_author": 2.78,
-                     "pr_reviewer": 2.25, "issue_comment": 1.14}},
+        {"signals": {"commit_author": 2.78, "pr_reviewer": 2.25,
+                     "issue_comment": 1.14}},
     )
     assert errors == []
     assert warnings == []
@@ -231,38 +224,38 @@ def test_valid_weights_no_errors(tmp_path):
 def test_weight_below_minimum(tmp_path):
     errors, _ = validate_cw_heuristics(
         tmp_path / "cw_heuristics.yaml",
-        {"signals": {"assignee": 0.05, "pr_author": 3.4, "commit_author": 2.78,
-                     "pr_reviewer": 2.25, "issue_comment": 1.14}},
+        {"signals": {"commit_author": 0.05, "pr_reviewer": 2.25,
+                     "issue_comment": 1.14}},
     )
-    assert any("assignee" in e for e in errors)
+    assert any("commit_author" in e for e in errors)
     assert any("0.1" in e for e in errors)
 
 
 def test_weight_above_maximum(tmp_path):
     errors, _ = validate_cw_heuristics(
         tmp_path / "cw_heuristics.yaml",
-        {"signals": {"assignee": 9.0, "pr_author": 3.4, "commit_author": 2.78,
-                     "pr_reviewer": 2.25, "issue_comment": 1.14}},
+        {"signals": {"commit_author": 9.0, "pr_reviewer": 2.25,
+                     "issue_comment": 1.14}},
     )
-    assert any("assignee" in e for e in errors)
+    assert any("commit_author" in e for e in errors)
     assert any("8.0" in e for e in errors)
 
 
 def test_missing_signal_key_is_warning(tmp_path):
     _, warnings = validate_cw_heuristics(
         tmp_path / "cw_heuristics.yaml",
-        {"signals": {"assignee": 4.0}},
+        {"signals": {"commit_author": 2.78}},
     )
-    assert any("pr_author" in w for w in warnings)
+    assert any("pr_reviewer" in w for w in warnings)
 
 
 def test_non_numeric_weight_is_error(tmp_path):
     errors, _ = validate_cw_heuristics(
         tmp_path / "cw_heuristics.yaml",
-        {"signals": {"assignee": "high", "pr_author": 3.4, "commit_author": 2.78,
-                     "pr_reviewer": 2.25, "issue_comment": 1.14}},
+        {"signals": {"commit_author": "high", "pr_reviewer": 2.25,
+                     "issue_comment": 1.14}},
     )
-    assert any("assignee" in e for e in errors)
+    assert any("commit_author" in e for e in errors)
 
 
 def test_signals_not_mapping_is_error(tmp_path):
@@ -276,9 +269,9 @@ def test_signals_not_mapping_is_error(tmp_path):
 def test_validate_file_heuristics(tmp_path):
     f = tmp_path / "cw_heuristics.yaml"
     f.write_text(
-        "signals:\n  assignee: 99.0\n  pr_author: 3.4\n"
-        "  commit_author: 2.78\n  pr_reviewer: 2.25\n  issue_comment: 1.14\n",
+        "signals:\n  commit_author: 99.0\n"
+        "  pr_reviewer: 2.25\n  issue_comment: 1.14\n",
         encoding="utf-8",
     )
     errors, _ = validate_file(f)
-    assert any("assignee" in e for e in errors)
+    assert any("commit_author" in e for e in errors)

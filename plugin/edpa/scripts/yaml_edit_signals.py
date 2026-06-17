@@ -68,9 +68,9 @@ TRACKED_DIRS = ("initiatives", "epics", "features", "stories", "defects", "tasks
 
 # Default signal weights. Calibration tunes these via /edpa:calibrate
 # against ground truth. Initial values are conservative round numbers
-# anchored to the existing detect_contributors weights (assignee=4.0,
-# pr_author=3.4, commit_author=2.78) — yaml_edit:create is comparable
-# in effort to commit_author for a meaningful PR.
+# anchored to the existing detect_contributors weights
+# (commit_author=2.78) — yaml_edit:create is comparable in effort to
+# commit_author for a meaningful PR.
 DEFAULT_WEIGHTS = {
     "yaml_edit:create": 5.0,
     "yaml_edit:block_add": 2.0,

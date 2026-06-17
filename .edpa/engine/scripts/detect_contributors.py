@@ -6,9 +6,7 @@ Collects ALL evidence signals for an item (issue + linked PRs) and computes
 the final `contributors[]` block with per-item-normalized CW shares.
 
 Signal types collected:
-  - assignee              ← issue assignee
-  - pr_author             ← PR author
-  - commit_author         ← PR commit author (excl. PR author)
+  - commit_author         ← commit author (PR commit or local commit)
   - pr_reviewer           ← PR review submitted
   - issue_comment         ← comment on issue
   - manual:pr_body        ← /contribute @X weight:Y in PR description
@@ -61,16 +59,14 @@ except ImportError:
 # ─── Constants ──────────────────────────────────────────────────────────────
 
 # Default signal weights (overridden by .edpa/config/cw_heuristics.yaml).
-# v1.11 baseline from Monte Carlo + edge-case-extended synthetic generator
-# (1000 scenarios, 32k records, 5 candidates converged to MAD 0.0805).
-# Rescaled to anchor max signal = 4.0 for human-readable scale aligned
-# with manual /contribute weight convention.
+# Synthetic Monte Carlo baseline over the 3 signal types that fire in the
+# local-first flow. The GitHub-issue ``assignee`` and ``pr_author`` signals
+# were dropped — they were sourced from GH issues/PRs and never fired in the
+# local-first default; commit_author covers PR/commit authorship.
 DEFAULT_SIGNAL_WEIGHTS = {
-    "assignee": 4.0,
-    "pr_author": 3.4,
-    "commit_author": 2.78,
-    "pr_reviewer": 2.25,
-    "issue_comment": 1.14,
+    "commit_author": 4.00,
+    "pr_reviewer": 2.17,
+    "issue_comment": 1.46,
 }
 
 # Map item-id prefix → backlog directory under .edpa/backlog/
@@ -210,7 +206,7 @@ def load_signal_weights(edpa_root: Path) -> dict[str, float]:
     """Load signal weights from .edpa/config/cw_heuristics.yaml.
 
     Falls back to DEFAULT_SIGNAL_WEIGHTS when missing or unparseable.
-    The `signals:` block at the top level holds the 5 base weights.
+    The `signals:` block at the top level holds the 3 base weights.
     Manual directives (`manual:*` types) carry the user-supplied
     `weight:X` value verbatim — they're not weighted by heuristics.
     """
@@ -270,9 +266,9 @@ def read_evidence(item_path: Path) -> list[dict]:
     """Read materialized PR/local signals from an item's YAML ``evidence[]``.
 
     V2.1 ADR-012 rename (was ``ci_signals[]`` in V2.0): the block holds
-    deterministic event-derived signals (pr_author, pr_reviewer,
-    issue_comment from CI; commit_author, yaml_edit:* from local hooks
-    in V2.1+). Returns the entries shaped like ``_signal()`` output so
+    deterministic event-derived signals (pr_reviewer, issue_comment
+    from CI; commit_author, yaml_edit:* from local hooks in V2.1+).
+    Returns the entries shaped like ``_signal()`` output so
     the aggregator can mix them with any remaining live collectors.
 
     Backward compatible: if the YAML still has the legacy
@@ -337,26 +333,6 @@ def _excerpt_for(text: str, login: str) -> str:
     return ""
 
 
-def collect_assignee_signals(repo: str, issue_num: int,
-                             weight: float) -> list[dict]:
-    """Issue assignees → assignee signal per assignee."""
-    issue = run_gh(["issue", "view", str(issue_num), "--json", "assignees"],
-                   repo=repo)
-    if not issue:
-        return []
-    out: list[dict] = []
-    for a in issue.get("assignees", []) or []:
-        login = a.get("login", "")
-        if login:
-            out.append(_signal(
-                stype="assignee",
-                ref=f"issue#{issue_num}",
-                login=login,
-                weight=weight,
-            ))
-    return out
-
-
 def collect_pr_signals(repo: str, pr_num: int,
                        weights: dict[str, float]) -> list[dict]:
     """PR author + commit authors + reviewers + manual directives in body
@@ -370,22 +346,13 @@ def collect_pr_signals(repo: str, pr_num: int,
     pr_author = (pr.get("author") or {}).get("login", "")
     pr_body = pr.get("body", "") or ""
 
-    # 1. PR author
-    if pr_author:
-        out.append(_signal(
-            stype="pr_author",
-            ref=f"pr#{pr_num}",
-            login=pr_author,
-            weight=weights["pr_author"],
-        ))
-
-    # 2. Commit authors (exclude PR author to avoid double-count)
+    # 1. Commit authors (PR author included — credited via their commits)
     seen_commit_authors: set[str] = set()
     for c in pr.get("commits", []) or []:
         sha = (c.get("oid") or "")[:7]  # short sha for ref readability
         for a in c.get("authors", []) or []:
             login = a.get("login", "")
-            if login and login != pr_author:
+            if login:
                 key = (login, sha)
                 if key in seen_commit_authors:
                     continue
@@ -397,7 +364,7 @@ def collect_pr_signals(repo: str, pr_num: int,
                     weight=weights["commit_author"],
                 ))
 
-        # 3. Manual /contribute in commit message
+        # 2. Manual /contribute in commit message
         msg = (c.get("messageHeadline") or "") + "\n" + (c.get("messageBody") or "")
         for login, w in parse_contribute_directives(msg).items():
             out.append(_signal(
@@ -408,7 +375,7 @@ def collect_pr_signals(repo: str, pr_num: int,
                 excerpt=_excerpt_for(msg, login),
             ))
 
-    # 4. PR reviewers
+    # 3. PR reviewers
     seen_reviews: set[tuple[str, str]] = set()
     for r in pr.get("reviews", []) or []:
         rid = str(r.get("id", ""))
@@ -423,7 +390,7 @@ def collect_pr_signals(repo: str, pr_num: int,
                 weight=weights["pr_reviewer"],
             ))
 
-    # 5. Manual /contribute in PR body
+    # 4. Manual /contribute in PR body
     for login, w in parse_contribute_directives(pr_body).items():
         out.append(_signal(
             stype="manual:pr_body",
@@ -653,7 +620,6 @@ def process_item(edpa_root: Path, repo: str, item_id: str,
     # hatch for local debug).
     signals.extend(read_evidence(item_path))
     if issue_num:
-        signals.extend(collect_assignee_signals(repo, issue_num, weights["assignee"]))
         signals.extend(collect_issue_signals(repo, issue_num, weights))
     for pr_num in sorted(set(pr_nums)):
         signals.extend(collect_pr_signals(repo, pr_num, weights))

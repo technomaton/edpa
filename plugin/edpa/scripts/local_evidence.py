@@ -13,10 +13,8 @@ hook on every commit and emits the signals that don't need GH:
 
 What it does NOT emit (those still come from the optional CI workflow):
 
-  - ``pr_author``     — PR doesn't exist at commit time
   - ``pr_reviewer``   — review is a GH-side action
   - ``issue_comment`` — comment thread lives in GH issues
-  - ``assignee``      — GH issue field
 
 Item attribution sources (in order of precedence):
 

@@ -309,9 +309,9 @@ contributors:             # who actually delivered the work
 
 `contributors[].as` is **not** the human job role (Dev/Arch/QA/PM —
 that lives in `people[].role`). It's the **evidence role** the engine
-uses to map the contributor to a GitHub signal: `owner` ≈ assignee,
-`key` ≈ PR author, `reviewer` ≈ PR reviewer, `consulted` ≈
-issue commenter. Anything outside that enum produces zero evidence
+uses to map the contributor to an evidence signal: `owner` ≈ commit
+author, `key` ≈ manual `/contribute`, `reviewer` ≈ PR reviewer,
+`consulted` ≈ issue commenter. Anything outside that enum produces zero evidence
 and triggers a clear `WARN: 0 evidence pairs derived from N
 contributor entries` at engine startup.
 

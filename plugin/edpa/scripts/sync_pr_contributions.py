@@ -69,11 +69,10 @@ PREFIX_TO_DIR = {
 # Recognized EDPA item refs in PR title/body/branch.
 _ITEM_REF_RE = re.compile(r"\b([A-Z]{1,3}-\d{1,9})\b")
 
-# Defaults if cw_heuristics.yaml is missing.
+# Defaults if cw_heuristics.yaml is missing. This script emits the
+# GH-side signals (pr_reviewer, issue_comment); commit_author is
+# emitted locally by local_evidence.py.
 DEFAULT_WEIGHTS = {
-    # V2.1: pr_author + assignee are NOT emitted by this script —
-    # commit_author from local_evidence.py covers them. Listed here only
-    # for callers who fork the script with a custom emitter.
     "pr_reviewer": 2.25,
     "issue_comment": 1.14,
 }

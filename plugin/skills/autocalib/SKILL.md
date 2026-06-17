@@ -19,8 +19,8 @@ disable-model-invocation: false
 
 ## What this does
 
-Optimizes the five **signal weights** (`assignee`, `pr_author`, `commit_author`,
-`pr_reviewer`, `issue_comment`) in `plugin/edpa/templates/cw_heuristics.yaml.tmpl`
+Optimizes the three **signal weights** (`commit_author`, `pr_reviewer`,
+`issue_comment`) in `plugin/edpa/templates/cw_heuristics.yaml.tmpl`
 against a synthetic corpus generated procedurally. The engine consumes those
 weights directly — there is no `role_weights` or `role_overrides` block any
 more (both were dropped in v1.11; see `plugin/edpa/scripts/engine.py:864`).
@@ -48,8 +48,8 @@ candidate back into the template when `--apply` is passed.
    Last calibration:
      method:        MC random-sample + coordinate descent
      scenarios:     1000   records: 31041
-     baseline MAD:  0.0861
-     calibrated:    0.0805 (+6.5%)
+     baseline MAD:  0.0889
+     calibrated:    0.0869 (+2.2%)
      version:       1.11.0
      timestamp:     2026-05-08T18:37:24Z
    ```
@@ -83,9 +83,8 @@ Metric:         mean_absolute_deviation(predicted_cw, true_cw)
 Direction:      lower
 Phases:         (1) MC random sampling   default 2000 samples (200 if --quick)
                 (2) coordinate descent   refines top-5 candidates
-Search space:   5D, each weight ∈ [0.1, 8.0]
-Defaults:       assignee 4.0, pr_author 3.4, commit_author 2.78,
-                pr_reviewer 2.25, issue_comment 1.14
+Search space:   3D, each weight ∈ [0.1, 8.0]
+Defaults:       commit_author 4.00, pr_reviewer 2.17, issue_comment 1.46
 ```
 
 **CRITICAL: never edit `calibrate_signals.py`.** The synthetic corpus generator
@@ -115,17 +114,17 @@ Expected stdout (abridged):
 ```
 Generating 1000 synthetic scenarios (seed=42)...
   → 31041 (person, item) records across 1000 scenarios
-Baseline (v1.11 shipped defaults): MAD = 0.0861
+Baseline (shipped defaults): MAD = 0.0889
 Phase 1 — Monte Carlo random sampling (2000 samples)...
   Top 5 candidates by MAD: ...
 Phase 2 — Coordinate descent refinement...
-  Cand 1: 0.0820 → 0.0805 after refinement
+  Cand 1: 0.0881 → 0.0869 after refinement
   ...
-Best calibrated weights (MAD = 0.0805):
-  assignee: 4.00
-  pr_author: 3.40
-  ...
-MAD improvement: 0.0861 → 0.0805 (+6.5%)
+Best calibrated weights (MAD = 0.0869):
+  commit_author: 4.00
+  pr_reviewer: 2.17
+  issue_comment: 1.46
+MAD improvement: 0.0889 → 0.0869 (+2.2%)
 ```
 
 ### Step 2 — Report

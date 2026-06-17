@@ -313,8 +313,8 @@ for the per-step contract.
 
 ## 5. `/edpa:autocalib` — auto-calibrate CW signal weights
 
-**Purpose:** optimize the 5 signal weights (`assignee`, `pr_author`,
-`commit_author`, `pr_reviewer`, `issue_comment`) in
+**Purpose:** optimize the 3 signal weights (`commit_author`,
+`pr_reviewer`, `issue_comment`) in
 `.edpa/config/cw_heuristics.yaml` using Monte Carlo + coordinate descent
 against a synthetic corpus (always available) or blended with team-confirmed
 corrections from a closed PI retrospective.

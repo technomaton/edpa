@@ -176,8 +176,7 @@ def _is_heuristics_path(path: Path) -> bool:
     return path.name in ("cw_heuristics.yaml", "cw_heuristics.yaml.tmpl")
 
 
-_CW_SIGNAL_NAMES = ("assignee", "pr_author", "commit_author",
-                    "pr_reviewer", "issue_comment")
+_CW_SIGNAL_NAMES = ("commit_author", "pr_reviewer", "issue_comment")
 _CW_WEIGHT_MIN = 0.1
 _CW_WEIGHT_MAX = 8.0
 

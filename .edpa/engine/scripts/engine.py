@@ -496,7 +496,7 @@ def load_backlog_items(edpa_root, iteration_id=None):
     """Read .edpa/backlog/ YAML files and convert to engine item format.
 
     Each backlog YAML has: id, type, title, js, status, assignee, contributors
-    Engine expects: id, level, job_size, assignees, body, pr_author, commit_authors, pr_reviewers, commenters
+    Engine expects: id, level, job_size, assignees, contributors
 
     Args:
         edpa_root: Path to .edpa/ directory
@@ -632,10 +632,10 @@ def load_backlog_items(edpa_root, iteration_id=None):
                 })
                 evidence_pairs_total += 1
 
-            # Top-level assignees are still tracked for the snapshot
-            # but no longer feed evidence detection (assignee evidence
-            # is now collected by detect_contributors and lives in
-            # contributors[].signals).
+            # Top-level assignees are tracked for the snapshot only —
+            # they do not feed evidence detection or scoring. (The
+            # assignee signal was removed; CW comes from commit / review
+            # / comment evidence in contributors[].signals.)
             assignees = []
             top_assignees = data.get("assignees") or []
             if isinstance(top_assignees, list):
@@ -952,45 +952,46 @@ def generate_demo_data():
 
     heuristics = {
         "version": "2.2",
-        # v1.11 heuristics — flat signal weights (no role_overrides or
-        # role_weights; those were dropped). Calibrated baseline from
-        # MC + edge-case-extended generator (1000 scenarios), rescaled
-        # to anchor max signal = 4.0.
-        "signals": {"assignee": 4.0, "pr_author": 3.4, "commit_author": 2.78,
-                    "pr_reviewer": 2.25, "issue_comment": 1.14},
+        # Flat signal weights (no role_overrides or role_weights; those
+        # were dropped). The GitHub-issue ``assignee`` and ``pr_author``
+        # signals were removed — local-first attribution rests on
+        # commit_author, pr_reviewer and issue_comment.
+        "signals": {"commit_author": 2.78, "pr_reviewer": 2.25,
+                    "issue_comment": 1.14},
     }
 
-    # v1.11 demo items: contributors[] with pre-computed cw shares
-    # (per-item, Σ = 1.0). Engine reads these directly. The cw values
-    # below are illustrative — reflect what detect_contributors.py
-    # would produce given the assignee + PR author + commit + review +
-    # comment signals listed under signals[] for each contributor.
+    # Demo items: contributors[] with pre-computed cw shares (per-item,
+    # Σ = 1.0). Engine reads these directly. The cw values below are
+    # illustrative — they reflect what detect_contributors.py would
+    # produce from the commit / review / comment signals listed under
+    # signals[] for each contributor (owners dominate via more commits;
+    # a PM with no commits is credited through issue_comments).
     items = [
-        # S-101: bob owns + commits, carol co-commits, alice-arch reviews
+        # S-101: bob owns via commits, carol co-commits, alice-arch reviews
         {"id": "S-101", "level": "Story", "job_size": 5,
          "assignees": [{"login": "bob"}],
          "contributors": [
-             {"person": "bob", "cw": 0.65, "contribution_score": 9.18,
-              "signals": [{"type": "assignee", "ref": "issue#101", "weight": 4.00},
-                          {"type": "pr_author", "ref": "pr#1", "weight": 3.40},
-                          {"type": "commit_author", "ref": "pr#1/commit/aa1", "weight": 2.78}]},
-             {"person": "carol", "cw": 0.20, "contribution_score": 2.78,
-              "signals": [{"type": "commit_author", "ref": "pr#1/commit/aa2", "weight": 2.78}]},
-             {"person": "alice-arch", "cw": 0.16, "contribution_score": 2.25,
+             {"person": "bob", "cw": 0.624, "contribution_score": 8.34,
+              "signals": [{"type": "commit_author", "ref": "S-101/commit/aa1", "weight": 2.78},
+                          {"type": "commit_author", "ref": "S-101/commit/aa2", "weight": 2.78},
+                          {"type": "commit_author", "ref": "S-101/commit/aa3", "weight": 2.78}]},
+             {"person": "carol", "cw": 0.208, "contribution_score": 2.78,
+              "signals": [{"type": "commit_author", "ref": "S-101/commit/aa4", "weight": 2.78}]},
+             {"person": "alice-arch", "cw": 0.168, "contribution_score": 2.25,
               "signals": [{"type": "pr_reviewer", "ref": "pr#1/review/r1", "weight": 2.25}]},
          ]},
-        # S-102: carol owns; alice-arch consulted via /contribute manual
+        # S-102: carol owns via commits; bob co-commits + reviews; alice-arch consulted (manual + comment)
         {"id": "S-102", "level": "Story", "job_size": 8,
          "assignees": [{"login": "carol"}],
          "contributors": [
-             {"person": "carol", "cw": 0.60, "contribution_score": 10.18,
-              "signals": [{"type": "assignee", "ref": "issue#102", "weight": 4.00},
-                          {"type": "pr_author", "ref": "pr#2", "weight": 3.40},
-                          {"type": "commit_author", "ref": "pr#2/commit/bb1", "weight": 2.78}]},
-             {"person": "bob", "cw": 0.27, "contribution_score": 4.65,
+             {"person": "carol", "cw": 0.538, "contribution_score": 8.34,
+              "signals": [{"type": "commit_author", "ref": "S-102/commit/bb1", "weight": 2.78},
+                          {"type": "commit_author", "ref": "S-102/commit/bb2", "weight": 2.78},
+                          {"type": "commit_author", "ref": "S-102/commit/bb3", "weight": 2.78}]},
+             {"person": "bob", "cw": 0.324, "contribution_score": 5.03,
               "signals": [{"type": "pr_reviewer", "ref": "pr#2/review/r2", "weight": 2.25},
-                          {"type": "commit_author", "ref": "pr#2/commit/bb2", "weight": 2.78}]},
-             {"person": "alice-arch", "cw": 0.13, "contribution_score": 2.14,
+                          {"type": "commit_author", "ref": "S-102/commit/bb4", "weight": 2.78}]},
+             {"person": "alice-arch", "cw": 0.138, "contribution_score": 2.14,
               "signals": [{"type": "manual:pr_body", "ref": "pr#2/body",
                            "excerpt": "/contribute @alice-arch weight:0.6", "weight": 0.60},
                           {"type": "issue_comment", "ref": "issue#102/comment/c1", "weight": 1.14},
@@ -1000,46 +1001,49 @@ def generate_demo_data():
         {"id": "S-103", "level": "Story", "job_size": 3,
          "assignees": [{"login": "bob"}],
          "contributors": [
-             {"person": "bob", "cw": 0.83, "contribution_score": 10.18,
-              "signals": [{"type": "assignee", "ref": "issue#103", "weight": 4.00},
-                          {"type": "pr_author", "ref": "pr#3", "weight": 3.40},
-                          {"type": "commit_author", "ref": "pr#3/commit/cc1", "weight": 2.78}]},
-             {"person": "alice-arch", "cw": 0.17, "contribution_score": 2.25,
+             {"person": "bob", "cw": 0.787, "contribution_score": 8.34,
+              "signals": [{"type": "commit_author", "ref": "S-103/commit/cc1", "weight": 2.78},
+                          {"type": "commit_author", "ref": "S-103/commit/cc2", "weight": 2.78},
+                          {"type": "commit_author", "ref": "S-103/commit/cc3", "weight": 2.78}]},
+             {"person": "alice-arch", "cw": 0.213, "contribution_score": 2.25,
               "signals": [{"type": "pr_reviewer", "ref": "pr#3/review/r3", "weight": 2.25}]},
          ]},
-        # F-10: alice-pm leads the feature, devs are commenters
+        # F-10: alice-pm leads the feature via issue comments (no commits), devs comment too
         {"id": "F-10", "level": "Feature", "job_size": 13,
          "assignees": [{"login": "alice-pm"}],
          "contributors": [
-             {"person": "alice-pm", "cw": 0.69, "contribution_score": 5.14,
-              "signals": [{"type": "assignee", "ref": "issue#10", "weight": 4.00},
-                          {"type": "issue_comment", "ref": "issue#10/comment/c1", "weight": 1.14}]},
-             {"person": "bob", "cw": 0.155, "contribution_score": 1.14,
-              "signals": [{"type": "issue_comment", "ref": "issue#10/comment/c2", "weight": 1.14}]},
-             {"person": "carol", "cw": 0.155, "contribution_score": 1.14,
-              "signals": [{"type": "issue_comment", "ref": "issue#10/comment/c3", "weight": 1.14}]},
+             {"person": "alice-pm", "cw": 0.60, "contribution_score": 3.42,
+              "signals": [{"type": "issue_comment", "ref": "issue#10/comment/c1", "weight": 1.14},
+                          {"type": "issue_comment", "ref": "issue#10/comment/c2", "weight": 1.14},
+                          {"type": "issue_comment", "ref": "issue#10/comment/c3", "weight": 1.14}]},
+             {"person": "bob", "cw": 0.20, "contribution_score": 1.14,
+              "signals": [{"type": "issue_comment", "ref": "issue#10/comment/c4", "weight": 1.14}]},
+             {"person": "carol", "cw": 0.20, "contribution_score": 1.14,
+              "signals": [{"type": "issue_comment", "ref": "issue#10/comment/c5", "weight": 1.14}]},
          ]},
-        # S-104: carol owns, bob co-commits, alice-arch reviews
+        # S-104: carol owns via commits, bob co-commits, alice-arch reviews
         {"id": "S-104", "level": "Story", "job_size": 5,
          "assignees": [{"login": "carol"}],
          "contributors": [
-             {"person": "carol", "cw": 0.65, "contribution_score": 9.18,
-              "signals": [{"type": "assignee", "ref": "issue#104", "weight": 4.00},
-                          {"type": "pr_author", "ref": "pr#4", "weight": 3.40},
-                          {"type": "commit_author", "ref": "pr#4/commit/dd1", "weight": 2.78}]},
-             {"person": "bob", "cw": 0.20, "contribution_score": 2.78,
-              "signals": [{"type": "commit_author", "ref": "pr#4/commit/dd2", "weight": 2.78}]},
-             {"person": "alice-arch", "cw": 0.16, "contribution_score": 2.25,
+             {"person": "carol", "cw": 0.624, "contribution_score": 8.34,
+              "signals": [{"type": "commit_author", "ref": "S-104/commit/dd1", "weight": 2.78},
+                          {"type": "commit_author", "ref": "S-104/commit/dd2", "weight": 2.78},
+                          {"type": "commit_author", "ref": "S-104/commit/dd3", "weight": 2.78}]},
+             {"person": "bob", "cw": 0.208, "contribution_score": 2.78,
+              "signals": [{"type": "commit_author", "ref": "S-104/commit/dd4", "weight": 2.78}]},
+             {"person": "alice-arch", "cw": 0.168, "contribution_score": 2.25,
               "signals": [{"type": "pr_reviewer", "ref": "pr#4/review/r4", "weight": 2.25}]},
          ]},
-        # E-10: alice-pm leads epic, bob comments
+        # E-10: alice-pm leads epic via comments, bob comments
         {"id": "E-10", "level": "Epic", "job_size": 21,
          "assignees": [{"login": "alice-pm"}],
          "contributors": [
-             {"person": "alice-pm", "cw": 0.78, "contribution_score": 4.00,
-              "signals": [{"type": "assignee", "ref": "issue#e10", "weight": 4.00}]},
-             {"person": "bob", "cw": 0.22, "contribution_score": 1.14,
-              "signals": [{"type": "issue_comment", "ref": "issue#e10/comment/c1", "weight": 1.14}]},
+             {"person": "alice-pm", "cw": 0.75, "contribution_score": 3.42,
+              "signals": [{"type": "issue_comment", "ref": "issue#e10/comment/c1", "weight": 1.14},
+                          {"type": "issue_comment", "ref": "issue#e10/comment/c2", "weight": 1.14},
+                          {"type": "issue_comment", "ref": "issue#e10/comment/c3", "weight": 1.14}]},
+             {"person": "bob", "cw": 0.25, "contribution_score": 1.14,
+              "signals": [{"type": "issue_comment", "ref": "issue#e10/comment/c4", "weight": 1.14}]},
          ]},
     ]
 

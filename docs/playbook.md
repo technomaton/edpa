@@ -241,11 +241,9 @@ EDPA V2 je **evidence-driven**: `cw[osoba, item] = contribution_score / Σ contr
 
 | Signal | Vaha | Popis |
 |--------|------|-------|
-| `assignee` | 4.00 | GitHub issue assignee / owner |
-| `pr_author` | 3.40 | Autor PR referujici item |
-| `commit_author` | 2.78 | Commit s ID v branchi/title/zprave |
-| `pr_reviewer` | 2.25 | Odeslany PR review (mimo self) |
-| `issue_comment` | 1.14 | Komentar na issue/PR (mimo boty) |
+| `commit_author` | 4.00 | Commit s ID v branchi/title/zprave (PR commit nebo lokalni) |
+| `pr_reviewer` | 2.17 | Odeslany PR review (mimo self) |
+| `issue_comment` | 1.46 | Komentar na issue/PR (mimo boty) |
 
 Rolove vahy prispevatelu (`--contributor PERSON:ROLE:CW`) -- owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; `evidence_threshold` 1.0. `cw_heuristics.yaml` navic obsahuje `gate_weights` pro Feature/Epic/Initiative -- status transition na rodici rozdeluje jeho Job Size napric lifecyclem (souc = 1.0 per typ).
 
@@ -976,11 +974,9 @@ EDPA je evidence-driven. `cw[osoba, item] = contribution_score / Σ_osoby contri
 
 | Signal | Vaha | Zdroj |
 |--------|------|-------|
-| `assignee` | 4.00 | issue assignee |
-| `pr_author` | 3.40 | autor PR referujici item |
-| `commit_author` | 2.78 | commit s ID (lokalni git, post-commit hook) |
-| `pr_reviewer` | 2.25 | odeslany PR review (mimo self) |
-| `issue_comment` | 1.14 | komentar na issue/PR (mimo boty) |
+| `commit_author` | 4.00 | commit s ID (lokalni git, post-commit hook) |
+| `pr_reviewer` | 2.17 | odeslany PR review (mimo self) |
+| `issue_comment` | 1.46 | komentar na issue/PR (mimo boty) |
 
 Lokalni signaly (`commit_author`, `yaml_edit`, gate transitions) cte engine primo z gitu/YAMLu. PR-thread signaly (`pr_reviewer`, `issue_comment`) prichazeji jen pres volitelny contribution-sync. Manualni `/contribute @person weight:X` (nebo `--contributor`) nese vahu verbatim.
 
@@ -1146,7 +1142,7 @@ PR-thread signaly (`pr_reviewer`, `issue_comment`) se do `evidence[]` dostanou j
 | **RR-OE** | Risk Reduction & Opportunity Enablement -- snizeni rizika / odemceni prilezitosti (CLI flag `--rr-oe`, legacy alias `--rr`) |
 | **WSJF** | Weighted Shortest Job First = (BV+TC+RR-OE)/JS |
 | **CW** | Contribution Weight -- vaha prispevku (0.0 - 1.0); per-item `Σ cw = 1.0` |
-| **Signal** | Doklad prispevku z gitu/PR (assignee, pr_author, commit_author, pr_reviewer, issue_comment) s vahou |
+| **Signal** | Doklad prispevku z gitu/PR (commit_author, pr_reviewer, issue_comment) s vahou |
 | **MAD** | Mean Absolute Deviation -- prumerna absolutni odchylka (metrika kalibrace) |
 | **Evidence** | `evidence[]` na itemu -- agregovane signaly; `detect_contributors.py` z nich pocita `contributors[]` |
 | **Gate** | Status transition na Feature/Epic/Initiative; rozdeluje rodicovsky JS pres `gate_weights` |
