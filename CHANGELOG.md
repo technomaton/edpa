@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.8.1 — 2026-06-17 — PI calendar multi-year fix
+
+### Fixed
+
+- **PI Calendar collapsed every PI onto the current year (D-22).** The
+  `/edpa:pi-planning` board's calendar painted iterations from other years
+  onto the current year's grid (e.g. PI-2027 iterations landed on the 2026
+  months). Root cause: `pi_planning.load_pis` emitted iteration dates only as
+  the pretty `D.M.` string (year dropped), and the calendar's date parser
+  fell back to the current year for that year-less input. Fix: `load_pis` now
+  also emits authoritative ISO `start_date`/`end_date` per iteration (the
+  pretty `dates` string is unchanged, so the other views render identically);
+  the calendar uses the ISO fields for year-safe date math and groups months
+  into one labeled block per year (the header shows the year range). Spans
+  `pi_planning.py`, the TS sources (`types/edpa.ts`, `server/yaml-store.ts`,
+  `views/Calendar/Calendar.tsx`) and the rebuilt vendored `pi-bundle.html`.
+  5 regression tests in `test_pi_planning_dates.py`.
+
 ## 2.8.0 — 2026-06-17 — Drop dead assignee + pr_author evidence signals
 
 ### Removed
