@@ -1,6 +1,29 @@
 # Changelog
 
-## Unreleased
+## 2.7.1 — 2026-06-17 — Windows cp1252 console crash fix
+
+### Fixed
+
+- **Windows cp1252 console crash (D-21)** — `pi_planning.py --open` wrote the
+  full PI report, then exited 1 on `print("✓ …")`: `UnicodeEncodeError` on a
+  legacy cp1250/cp1252 Windows console. The `_console` UTF-8 guard (2.1.9) was
+  missing from three entry points — `pi_planning.py` (`✓`), `reconcile.py`
+  (`—`), `transitions.py` (`∅`). Added the lazy, `ImportError`-guarded
+  `import _console` to each `main()` (lazy because `mcp_server` imports
+  `pi_planning`/`reconcile` and must keep JSON-RPC stdout pristine; mirrors
+  `create_pi.py`).
+- **`pi_planning.py --open` on Windows** never opened the browser:
+  `subprocess.run(["start", path])` fails because `start` is a `cmd` builtin,
+  not an executable (`FileNotFoundError`, swallowed by the bare `except`). Now
+  `os.startfile` on Windows / `open` (macOS) / `xdg-open` (Linux).
+
+### Added
+
+- **Console-glyph guard test** (`test_console.py`) — AST-walks every entry
+  point and fails if one `print()`s a non-ASCII glyph without importing
+  `_console` (`mcp_server` exempt: its glyphs live in JSON-RPC tool
+  descriptions, framed UTF-8 by the SDK). Closes the gap that
+  `test_encoding_hygiene` (file-I/O encoding only) left open.
 
 ### Removed
 

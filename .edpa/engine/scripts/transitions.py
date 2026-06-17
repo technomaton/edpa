@@ -254,6 +254,10 @@ def annotate_with_iterations(edpa_root: Path, transitions):
 
 
 def main():
+    try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250) — CLI only
+        import _console  # noqa: F401
+    except ImportError:
+        pass
     parser = argparse.ArgumentParser(description="EDPA Transition Detector")
     parser.add_argument("--edpa-root", default=".edpa", type=Path)
     parser.add_argument(

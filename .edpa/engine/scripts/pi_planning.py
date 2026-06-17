@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import os
 import platform
 import re
 import subprocess
@@ -312,6 +313,10 @@ def generate_pi_board(
 
 
 def main() -> None:
+    try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250) — CLI only
+        import _console  # noqa: F401
+    except ImportError:
+        pass
     ap = argparse.ArgumentParser(description="EDPA PI Planning — self-contained overview HTML")
     ap.add_argument("--pi", help="PI id (default: planning > active > first)")
     ap.add_argument("--bundle", help="Path to the prebuilt single-file bundle")
@@ -336,9 +341,17 @@ def main() -> None:
     )
 
     if args.open:
-        opener = {"Darwin": "open", "Windows": "start"}.get(platform.system(), "xdg-open")
+        target = str(result["path"])
+        system = platform.system()
         try:
-            subprocess.run([opener, str(result["path"])], check=False)
+            if system == "Windows":
+                # `start` is a cmd builtin, not an executable — subprocess.run(["start",
+                # …]) raises FileNotFoundError. os.startfile is the documented Windows API.
+                os.startfile(target)  # type: ignore[attr-defined]  # Windows-only, guarded
+            elif system == "Darwin":
+                subprocess.run(["open", target], check=False)
+            else:
+                subprocess.run(["xdg-open", target], check=False)
         except Exception:  # pragma: no cover
             pass
 
