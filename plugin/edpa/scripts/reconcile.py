@@ -225,6 +225,10 @@ def render_text(report: dict) -> str:
 
 
 def main() -> int:
+    try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250) — CLI only
+        import _console  # noqa: F401
+    except ImportError:
+        pass
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--edpa-root", default=None,
                     help="Path to .edpa/ (default: <repo>/.edpa)")
