@@ -196,13 +196,11 @@ Guarantee: &#x2211; shares = 100%</div>
 <div class="s-h1 fade d1">Automatic contributor detection</div>
 <div class="cols fade d2">
 <div class="col">
-<table><thead><tr><th>Signal</th><th>Source</th><th style="text-align:right">CW</th></tr></thead><tbody>
-<tr><td>Item assignee</td><td style="color:var(--cy)">CI</td><td style="text-align:right;color:var(--gn)">1.0</td></tr>
-<tr><td><code>/contribute</code> command</td><td style="color:var(--gn)">git</td><td style="text-align:right;color:var(--cy)">0.6</td></tr>
-<tr><td>PR author &#x2192; item</td><td style="color:var(--cy)">CI</td><td style="text-align:right;color:var(--cy)">0.6</td></tr>
-<tr><td>Commit with S-/F-/E-XXX</td><td style="color:var(--gn)">git</td><td style="text-align:right;color:var(--yl)">0.25</td></tr>
-<tr><td>PR reviewer</td><td style="color:var(--cy)">CI</td><td style="text-align:right;color:var(--yl)">0.25</td></tr>
-<tr><td>Issue comment</td><td style="color:var(--cy)">CI</td><td style="text-align:right;color:var(--or)">0.15</td></tr>
+<table><thead><tr><th>Signal</th><th>Source</th><th style="text-align:right">Weight</th></tr></thead><tbody>
+<tr><td>Commit with S-/F-/E-XXX</td><td style="color:var(--gn)">git</td><td style="text-align:right;color:var(--gn)">4.00</td></tr>
+<tr><td>PR reviewer</td><td style="color:var(--cy)">CI</td><td style="text-align:right;color:var(--cy)">2.17</td></tr>
+<tr><td>Issue comment</td><td style="color:var(--cy)">CI</td><td style="text-align:right;color:var(--or)">1.46</td></tr>
+<tr><td><code>/contribute</code> command</td><td style="color:var(--gn)">git</td><td style="text-align:right;color:var(--ac2)">explicit</td></tr>
 </tbody></table>
 <div style="margin-top:6px;font-size:10px;color:var(--t3)"><b style="color:var(--gn)">git</b> = local hook (always) &middot; <b style="color:var(--cy)">CI</b> = optional contribution-sync workflow</div>
 </div>
@@ -293,7 +291,7 @@ Loop:
 </div>
 <div class="col">
 <div class="sc g" style="margin-bottom:8px"><div class="sc-t">Benefit</div><div class="sc-l">MAD reduction: <b>6.5%</b>. More accurate reports without manual discussion at retro.</div></div>
-<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Monte Carlo validation</div><div class="sc-l">1,000 scenarios, 31,041 records. Calibrates 5 signal weights (assignee, pr_author, commit_author, pr_reviewer, issue_comment).</div></div>
+<div class="sc c" style="margin-bottom:8px"><div class="sc-t">Monte Carlo validation</div><div class="sc-l">1,000 scenarios, 31,041 records. Calibrates 3 signal weights (commit_author, pr_reviewer, issue_comment).</div></div>
 <div class="sc o" style="margin-bottom:8px"><div class="sc-t">Safety</div><div class="sc-l">Agent <b>must not edit the calibrator</b> (calibrate_signals.py). Synthetic corpus + MAD cost function live in one file — separation by structure.</div></div>
 <div class="sc a"><div class="sc-t">Real-data phase</div><div class="sc-l">Synthetic MC runs anytime. Real-data adapter (from PI retro) only after the 1st closed PI.</div></div>
 </div></div>`,

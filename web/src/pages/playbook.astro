@@ -73,8 +73,8 @@ gh auth status</code></pre>
       reporty (sloupec v timesheetu, Excel exporty) a vstup do
       syntetického kalibračního korpusu. Engine signal weights se
       aplikují bez ohledu na roli osoby &mdash;
-      <code>assignee=4.0</code>, <code>pr_author=3.4</code>,
-      <code>commit_author=2.78</code>, atd. jdou každému stejně.
+      <code>commit_author=4.00</code>, <code>pr_reviewer=2.17</code>,
+      <code>issue_comment=1.46</code>, atd. jdou každému stejně.
     </p>
   </section>
 
@@ -212,18 +212,16 @@ naming:
           <tr><th>Signál</th><th>Váha</th><th>Popis</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>assignee</code></td><td>4.00</td><td>GitHub issue assignee / owner</td></tr>
-          <tr><td><code>pr_author</code></td><td>3.40</td><td>Autor PR referující item</td></tr>
-          <tr><td><code>commit_author</code></td><td>2.78</td><td>Commit s ID v branchi/title/zprávě</td></tr>
-          <tr><td><code>pr_reviewer</code></td><td>2.25</td><td>Odeslaný PR review (mimo self)</td></tr>
-          <tr><td><code>issue_comment</code></td><td>1.14</td><td>Komentář na issue/PR (mimo boty)</td></tr>
+          <tr><td><code>commit_author</code></td><td>4.00</td><td>Commit s ID v branchi/title/zprávě</td></tr>
+          <tr><td><code>pr_reviewer</code></td><td>2.17</td><td>Odeslaný PR review (mimo self)</td></tr>
+          <tr><td><code>issue_comment</code></td><td>1.46</td><td>Komentář na issue/PR (mimo boty)</td></tr>
         </tbody>
       </table>
     </div>
 
     <p>Rolové váhy přispěvatelů (<code>--contributor PERSON:ROLE:CW</code>) — owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0. <code>cw_heuristics.yaml</code> navíc obsahuje <code>gate_weights</code> pro Feature/Epic/Initiative — status transition na rodiči rozděluje jeho Job Size napříč lifecyclem (součet = 1.0 per typ).</p>
 
-    <p>Kalibrace přes <code>/edpa:calibrate</code> — Monte Carlo random sampling + coordinate descent přes 5D prostor signálových vah proti syntetickému korpusu. Detail viz sekce <a href="#architektura">Architektura</a>.</p>
+    <p>Kalibrace přes <code>/edpa:calibrate</code> — Monte Carlo random sampling + coordinate descent přes 3D prostor signálových vah proti syntetickému korpusu. Detail viz sekce <a href="#architektura">Architektura</a>.</p>
 
     <h3>1.5 Nakonfigurovat iterace (iterations/)</h3>
     <p>PI a iterace žijí v <code>.edpa/iterations/</code> jako samostatné soubory:</p>
@@ -444,7 +442,7 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
     <div class="card">
       <pre><code>Score        = JobSize &times; CW
 DerivedHours = (Score / &Sigma;Scores) &times; Capacity</code></pre>
-      <p style="margin-top:8px;">CW je per-item normalizovaný podíl (&Sigma; přes osoby na itemu = 1.0), počítaný v <code>detect_contributors.py</code> z evidence (assignee, PR author/reviewer, commit author, issue comment, <code>/contribute</code> direktivy). Engine konzumuje CW verbatim.</p>
+      <p style="margin-top:8px;">CW je per-item normalizovaný podíl (&Sigma; přes osoby na itemu = 1.0), počítaný v <code>detect_contributors.py</code> z evidence (commit author, PR reviewer, issue comment, <code>/contribute</code> direktivy). Engine konzumuje CW verbatim.</p>
     </div>
 
     <p><strong>Invarianty</strong> (engine automaticky kontroluje):</p>
@@ -858,11 +856,9 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
           <tr><th>Signál</th><th style="text-align:right">Váha</th><th>Zdroj</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>assignee</code></td><td style="text-align:right">4.00</td><td>issue assignee</td></tr>
-          <tr><td><code>pr_author</code></td><td style="text-align:right">3.40</td><td>autor PR referující item</td></tr>
-          <tr><td><code>commit_author</code></td><td style="text-align:right">2.78</td><td>commit s ID (lokální git, post-commit hook)</td></tr>
-          <tr><td><code>pr_reviewer</code></td><td style="text-align:right">2.25</td><td>odeslaný PR review (mimo self)</td></tr>
-          <tr><td><code>issue_comment</code></td><td style="text-align:right">1.14</td><td>komentář na issue/PR (mimo boty)</td></tr>
+          <tr><td><code>commit_author</code></td><td style="text-align:right">4.00</td><td>commit s ID (lokální git, post-commit hook)</td></tr>
+          <tr><td><code>pr_reviewer</code></td><td style="text-align:right">2.17</td><td>odeslaný PR review (mimo self)</td></tr>
+          <tr><td><code>issue_comment</code></td><td style="text-align:right">1.46</td><td>komentář na issue/PR (mimo boty)</td></tr>
         </tbody>
       </table>
     </div>
@@ -1000,7 +996,7 @@ cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml</code></pre>
           <tr><td><strong>RR-OE</strong></td><td>Risk Reduction &amp; Opportunity Enablement — snížení rizika / odemčení příležitostí (CLI flag <code>--rr-oe</code>, legacy alias <code>--rr</code>)</td></tr>
           <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR-OE)/JS</td></tr>
           <tr><td><strong>CW</strong></td><td>Contribution Weight — váha příspěvku (0.0 - 1.0); per-item <code>Σ cw = 1.0</code></td></tr>
-          <tr><td><strong>Signal</strong></td><td>Doklad příspěvku z gitu/PR (assignee, pr_author, commit_author, pr_reviewer, issue_comment) s váhou</td></tr>
+          <tr><td><strong>Signal</strong></td><td>Doklad příspěvku z gitu/PR (commit_author, pr_reviewer, issue_comment) s váhou</td></tr>
           <tr><td><strong>MAD</strong></td><td>Mean Absolute Deviation — průměrná absolutní odchylka (metrika kalibrace)</td></tr>
           <tr><td><strong>Evidence</strong></td><td><code>evidence[]</code> na itemu — agregované signály; <code>detect_contributors.py</code> z nich počítá <code>contributors[]</code></td></tr>
           <tr><td><strong>Gate</strong></td><td>Status transition na Feature/Epic/Initiative; rozděluje rodičovský JS přes <code>gate_weights</code></td></tr>

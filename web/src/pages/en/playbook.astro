@@ -71,8 +71,8 @@ gh auth status</code></pre>
       label used for reports (timesheet column, Excel exports) and as
       input to the synthetic calibration corpus. Engine signal weights
       apply uniformly regardless of a person's role &mdash;
-      <code>assignee=4.0</code>, <code>pr_author=3.4</code>,
-      <code>commit_author=2.78</code>, etc. are the same for everyone.
+      <code>commit_author=4.00</code>, <code>pr_reviewer=2.17</code>,
+      <code>issue_comment=1.46</code>, etc. are the same for everyone.
     </p>
   </section>
 
@@ -211,11 +211,9 @@ naming:
           <tr><th>Signal</th><th>Weight</th><th>Meaning</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>assignee</code></td><td>4.00</td><td>GitHub issue assignee / owner</td></tr>
-          <tr><td><code>pr_author</code></td><td>3.40</td><td>PR author referencing the item</td></tr>
-          <tr><td><code>commit_author</code></td><td>2.78</td><td>Commit with the ID in branch, title, or message</td></tr>
-          <tr><td><code>pr_reviewer</code></td><td>2.25</td><td>PR review submitted (excluding self)</td></tr>
-          <tr><td><code>issue_comment</code></td><td>1.14</td><td>Issue/PR comment (excluding bots)</td></tr>
+          <tr><td><code>commit_author</code></td><td>4.00</td><td>Commit with the ID in branch, title, or message</td></tr>
+          <tr><td><code>pr_reviewer</code></td><td>2.17</td><td>PR review submitted (excluding self)</td></tr>
+          <tr><td><code>issue_comment</code></td><td>1.46</td><td>Issue/PR comment (excluding bots)</td></tr>
         </tbody>
       </table>
     </div>
@@ -442,7 +440,7 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
     <div class="card">
       <pre><code>Score        = JobSize &times; CW
 DerivedHours = (Score / &Sigma;Scores) &times; Capacity</code></pre>
-      <p style="margin-top:8px;">CW is a per-item normalized share (&Sigma; across persons on an item = 1.0), computed in <code>detect_contributors.py</code> from evidence (assignee, PR author/reviewer, commit author, issue comment, <code>/contribute</code> directives). The engine consumes CW verbatim.</p>
+      <p style="margin-top:8px;">CW is a per-item normalized share (&Sigma; across persons on an item = 1.0), computed in <code>detect_contributors.py</code> from evidence (commit author, PR reviewer, issue comment, <code>/contribute</code> directives). The engine consumes CW verbatim.</p>
     </div>
 
     <p><strong>Invariants</strong> (engine checks automatically):</p>
@@ -862,11 +860,9 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
           <tr><th>Signal</th><th style="text-align:right">Weight</th><th>Source</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>assignee</code></td><td style="text-align:right">4.00</td><td>issue assignee</td></tr>
-          <tr><td><code>pr_author</code></td><td style="text-align:right">3.40</td><td>PR author referencing the item</td></tr>
-          <tr><td><code>commit_author</code></td><td style="text-align:right">2.78</td><td>commit with the ID (local git, post-commit hook)</td></tr>
-          <tr><td><code>pr_reviewer</code></td><td style="text-align:right">2.25</td><td>PR review submitted (excluding self)</td></tr>
-          <tr><td><code>issue_comment</code></td><td style="text-align:right">1.14</td><td>issue/PR comment (excluding bots)</td></tr>
+          <tr><td><code>commit_author</code></td><td style="text-align:right">4.00</td><td>commit with the ID (local git, post-commit hook)</td></tr>
+          <tr><td><code>pr_reviewer</code></td><td style="text-align:right">2.17</td><td>PR review submitted (excluding self)</td></tr>
+          <tr><td><code>issue_comment</code></td><td style="text-align:right">1.46</td><td>issue/PR comment (excluding bots)</td></tr>
         </tbody>
       </table>
     </div>
@@ -1005,7 +1001,7 @@ cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml</code></pre>
           <tr><td><strong>RR-OE</strong></td><td>Risk Reduction &amp; Opportunity Enablement (CLI flag <code>--rr-oe</code>, legacy alias <code>--rr</code>)</td></tr>
           <tr><td><strong>WSJF</strong></td><td>Weighted Shortest Job First = (BV+TC+RR-OE)/JS</td></tr>
           <tr><td><strong>CW</strong></td><td>Contribution Weight — per-item share (0.0 - 1.0); per-item <code>Σ cw = 1.0</code></td></tr>
-          <tr><td><strong>Signal</strong></td><td>Proof of contribution from git/PR (assignee, pr_author, commit_author, pr_reviewer, issue_comment) with a weight</td></tr>
+          <tr><td><strong>Signal</strong></td><td>Proof of contribution from git/PR (commit_author, pr_reviewer, issue_comment) with a weight</td></tr>
           <tr><td><strong>MAD</strong></td><td>Mean Absolute Deviation (calibration metric)</td></tr>
           <tr><td><strong>Evidence</strong></td><td><code>evidence[]</code> on an item — aggregated signals; <code>detect_contributors.py</code> computes <code>contributors[]</code> from them</td></tr>
           <tr><td><strong>Gate</strong></td><td>Status transition on a Feature/Epic/Initiative; distributes the parent JS via <code>gate_weights</code></td></tr>

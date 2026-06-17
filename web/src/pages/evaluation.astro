@@ -69,36 +69,26 @@ const categories = [
     color: 'cy',
     cardClass: 'cyan',
     description: 'Ověření detekce GitHub signálů a additivní agregace do contribution_score. Signály se sčítají, výsledné CW je per-item normalizovaný podíl (Σ napříč osobami = 1.0 na položce).',
-    expandedCount: 5,
+    expandedCount: 3,
     tests: [
       {
-        name: 'test_assignee_signal',
-        description: 'GitHub issue assignee přidá váhu signals.assignee (default 4.0) do contribution_score.',
-        expected: 'assignee → +4.0 do score',
-      },
-      {
-        name: 'test_pr_author_signal',
-        description: 'Autor merged PR referencujícího item přidá váhu signals.pr_author (default 3.4).',
-        expected: 'pr_author → +3.4 do score',
-      },
-      {
         name: 'test_commit_author_signal',
-        description: 'Commit s S-XXX/F-XXX/E-XXX/I-XXX v branchi/zprávě přidá signals.commit_author (default 2.78).',
-        expected: 'commit_author → +2.78 do score',
+        description: 'Commit s S-XXX/F-XXX/E-XXX/I-XXX v branchi/zprávě přidá signals.commit_author (default 4.00).',
+        expected: 'commit_author → +4.00 do score',
       },
       {
         name: 'test_pr_reviewer_signal',
-        description: 'Schválený PR review (vyjma self) přidá signals.pr_reviewer (default 2.25).',
-        expected: 'pr_reviewer → +2.25 do score',
+        description: 'Schválený PR review (vyjma self) přidá signals.pr_reviewer (default 2.17).',
+        expected: 'pr_reviewer → +2.17 do score',
       },
       {
         name: 'test_issue_comment_signal',
-        description: 'Komentář na issue/PR (boti vyloučeni) přidá signals.issue_comment (default 1.14).',
-        expected: 'issue_comment → +1.14 do score',
+        description: 'Komentář na issue/PR (boti vyloučeni) přidá signals.issue_comment (default 1.46).',
+        expected: 'issue_comment → +1.46 do score',
       },
       {
         name: 'test_signals_aggregate_additively',
-        description: 'Když má osoba assignee + commit + comment, váhy se sečtou (4.0 + 2.78 + 1.14 = 7.92), žádný highest-wins.',
+        description: 'Když má osoba commit + review + comment, váhy se sečtou (4.00 + 2.17 + 1.46 = 7.63), žádný highest-wins.',
         expected: 'Σ fired signal_weights, ne max',
       },
       {
@@ -144,8 +134,8 @@ const categories = [
     tests: [
       {
         name: 'test_signal_weight_ordering',
-        description: 'Hierarchie: assignee > pr_author > commit_author ≈ pr_reviewer > issue_comment.',
-        expected: 'sw.assignee >= sw.pr_author >= sw.commit_author ≥ sw.pr_reviewer ≥ sw.issue_comment',
+        description: 'Hierarchie: commit_author > pr_reviewer > issue_comment.',
+        expected: 'sw.commit_author >= sw.pr_reviewer >= sw.issue_comment',
       },
       {
         name: 'test_per_item_cw_normalization',
@@ -159,33 +149,23 @@ const categories = [
       },
       {
         name: 'test_no_role_overrides_in_heuristics',
-        description: 'Kalibrace běží na 5 signálových vahách.',
+        description: 'Kalibrace běží na 3 signálových vahách.',
         expected: 'cw_heuristics.yaml.role_overrides not present',
       },
       {
-        name: 'test_signal_weights_assignee',
-        description: 'Signál assignee musí mít signal weight 4.0 v cw_heuristics.yaml.',
-        expected: 'signals.assignee = 4.0',
-      },
-      {
-        name: 'test_signal_weights_pr_author',
-        description: 'Signál pr_author musí mít signal weight 3.4 v cw_heuristics.yaml.',
-        expected: 'signals.pr_author = 3.4',
-      },
-      {
         name: 'test_signal_weights_commit',
-        description: 'Signál commit_author musí mít signal weight 2.78 v cw_heuristics.yaml.',
-        expected: 'signals.commit_author = 2.78',
+        description: 'Signál commit_author musí mít signal weight 4.00 v cw_heuristics.yaml.',
+        expected: 'signals.commit_author = 4.00',
       },
       {
         name: 'test_signal_weights_pr_reviewer',
-        description: 'Signál pr_reviewer musí mít signal weight 2.25 v cw_heuristics.yaml.',
-        expected: 'signals.pr_reviewer = 2.25',
+        description: 'Signál pr_reviewer musí mít signal weight 2.17 v cw_heuristics.yaml.',
+        expected: 'signals.pr_reviewer = 2.17',
       },
       {
         name: 'test_signal_weights_issue_comment',
-        description: 'Signál issue_comment musí mít signal weight 1.14 v cw_heuristics.yaml.',
-        expected: 'signals.issue_comment = 1.14',
+        description: 'Signál issue_comment musí mít signal weight 1.46 v cw_heuristics.yaml.',
+        expected: 'signals.issue_comment = 1.46',
       },
       {
         name: 'test_signals_aggregate_additively',
@@ -774,7 +754,7 @@ import { VERSION } from '../lib/version';
             <tr><td><strong>Metric</strong></td><td>MAD (Mean Absolute Deviation) na MC korpusu</td></tr>
             <tr><td><strong>Direction</strong></td><td>lower is better</td></tr>
             <tr><td><strong>Budget</strong></td><td>2000 MC samples + coordinate descent top-5 (~10s)</td></tr>
-            <tr><td><strong>Search space</strong></td><td>5D signal weights, každá v [0.1, 8.0]</td></tr>
+            <tr><td><strong>Search space</strong></td><td>3D signal weights, každá v [0.1, 8.0]</td></tr>
             <tr><td><strong>Kalibrátor</strong></td><td><code>calibrate_signals.py</code> (LOCKED)</td></tr>
           </tbody>
         </table>
@@ -798,8 +778,8 @@ import { VERSION } from '../lib/version';
         <li>Skript provede:
           <ol class="loop-substeps">
             <li>Vygeneruje synthetic Monte Carlo korpus (1 000 scénářů × ~31 k záznamů) procedurálně z modelu, kde signal counts pravděpodobnostně reflektují true cw share</li>
-            <li>Spočítá MAD baseline proti shipped defaults (assignee=4.00, pr_author=3.40, …)</li>
-            <li><strong>Fáze 1 — random sampling:</strong> 2000 náhodných weight vektorů v 5D prostoru [0.1, 8.0], seřadí podle MAD</li>
+            <li>Spočítá MAD baseline proti shipped defaults (commit_author=4.00, pr_reviewer=2.17, issue_comment=1.46)</li>
+            <li><strong>Fáze 1 — random sampling:</strong> 2000 náhodných weight vektorů ve 3D prostoru [0.1, 8.0], seřadí podle MAD</li>
             <li><strong>Fáze 2 — coordinate descent:</strong> refinuje top-5 kandidátů, pro každý signal zkusí ±step, halves step na no-improvement</li>
             <li>Vrátí best calibrated weights + MAD improvement %</li>
             <li>S <code>--apply</code> přepíše <code>cw_heuristics.yaml.tmpl</code> + obnoví <code>calibration:</code> metadata</li>
@@ -823,7 +803,7 @@ import { VERSION } from '../lib/version';
           <tr><th>Experimenty</th><th>Focus</th><th>Parametry</th></tr>
         </thead>
         <tbody>
-          <tr><td>1&ndash;30</td><td>signal weights (Monte Carlo)</td><td>5 parametrů, random sampling</td></tr>
+          <tr><td>1&ndash;30</td><td>signal weights (Monte Carlo)</td><td>3 parametry, random sampling</td></tr>
           <tr><td>31&ndash;50</td><td>signal weights (Nelder-Mead refinement)</td><td>local descent kolem MC top-K</td></tr>
         </tbody>
       </table>
@@ -846,9 +826,9 @@ import { VERSION } from '../lib/version';
             <tr><th>Dominant signal</th><th>Display role</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>assignee</code></td><td><strong>owner</strong></td></tr>
-            <tr><td><code>pr_author</code> / <code>manual:*</code></td><td><strong>key</strong></td></tr>
-            <tr><td><code>commit_author</code> / <code>pr_reviewer</code></td><td><strong>reviewer</strong></td></tr>
+            <tr><td><code>commit_author</code></td><td><strong>owner</strong></td></tr>
+            <tr><td><code>manual:*</code></td><td><strong>key</strong></td></tr>
+            <tr><td><code>pr_reviewer</code></td><td><strong>reviewer</strong></td></tr>
             <tr><td><code>issue_comment</code></td><td><strong>consulted</strong></td></tr>
           </tbody>
         </table>
@@ -861,11 +841,9 @@ import { VERSION } from '../lib/version';
             <tr><th>Signal</th><th style="text-align:right">Score</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>assignee</code></td><td style="text-align:right;color:var(--gn)">4.00</td></tr>
-            <tr><td><code>pr_author</code></td><td style="text-align:right;color:var(--cy)">3.40</td></tr>
-            <tr><td><code>commit_author</code></td><td style="text-align:right;color:var(--yl)">2.78</td></tr>
-            <tr><td><code>pr_reviewer</code></td><td style="text-align:right;color:var(--yl)">2.25</td></tr>
-            <tr><td><code>issue_comment</code></td><td style="text-align:right;color:var(--or)">1.14</td></tr>
+            <tr><td><code>commit_author</code></td><td style="text-align:right;color:var(--gn)">4.00</td></tr>
+            <tr><td><code>pr_reviewer</code></td><td style="text-align:right;color:var(--cy)">2.17</td></tr>
+            <tr><td><code>issue_comment</code></td><td style="text-align:right;color:var(--or)">1.46</td></tr>
             <tr><td><code>manual:*</code> (/contribute)</td><td style="text-align:right;color:var(--ac2)">explicit</td></tr>
           </tbody>
         </table>

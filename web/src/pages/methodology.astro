@@ -64,7 +64,7 @@ import { VERSION } from '../lib/version';
           <tr><td><strong>Job Size (JS)</strong></td><td>Relativní odhad velikosti work itemu. Modifikovaná Fibonacci podle WSJF (SAFe 6).</td><td>1, 2, 3, 5, 8, 13, 20, 40, 100</td></tr>
           <tr><td><strong>WSJF</strong></td><td>Prioritizační skóre: (BV + TC + RR&amp;OE) / JS</td><td>Per úroveň nezávisle</td></tr>
           <tr><td><strong>CW</strong></td><td>Contribution Weight — per-item normalizovaný podíl osoby na itemu (Σ napříč osobami = 1.0 na položce).</td><td>0&ndash;1.0</td></tr>
-          <tr><td><strong>Signal Weight</strong></td><td>Váha jednoho typu evidence signálu (<code>assignee</code>, <code>pr_author</code>, <code>commit_author</code>, <code>pr_reviewer</code>, <code>issue_comment</code>), kterou agreguje <code>detect_contributors.py</code>. V configu pod klíčem <code>signals.*</code>.</td><td><code>cw_heuristics.yaml</code></td></tr>
+          <tr><td><strong>Signal Weight</strong></td><td>Váha jednoho typu evidence signálu (<code>commit_author</code>, <code>pr_reviewer</code>, <code>issue_comment</code>), kterou agreguje <code>detect_contributors.py</code>. V configu pod klíčem <code>signals.*</code>.</td><td><code>cw_heuristics.yaml</code></td></tr>
           <tr><td><strong>Contribution Score</strong></td><td>Σ vah fired signálů per (osoba, item). Vstup do per-item normalizace. V kódu jako <code>contribution_score</code>.</td><td>Automaticky</td></tr>
           <tr><td><strong>Derived Hours</strong></td><td>Odvozené hodiny, výstup modelu.</td><td>Po Iteration Close</td></tr>
         </tbody>
@@ -184,11 +184,9 @@ Počítá se per úroveň nezávisle.</div>
           <tr><th>GitHub signal</th><th style="text-align:right">Signal weight</th><th>Detekce</th></tr>
         </thead>
         <tbody>
-          <tr><td>Assignee na issue</td><td style="text-align:right;color:var(--gn)">4.0</td><td>GitHub issue assignee</td></tr>
-          <tr><td>PR author</td><td style="text-align:right;color:var(--cy)">3.4</td><td>Autor PR referencujícího item</td></tr>
-          <tr><td>Commit author</td><td style="text-align:right;color:var(--yl)">2.78</td><td>Commit s S-/F-/E-/I-XXX v branchi/zprávě</td></tr>
-          <tr><td>PR reviewer</td><td style="text-align:right;color:var(--yl)">2.25</td><td>Schválený PR review (vyjma self)</td></tr>
-          <tr><td>Issue / PR comment</td><td style="text-align:right;color:var(--or)">1.14</td><td>Komentář (boti vyloučeni)</td></tr>
+          <tr><td>Commit author</td><td style="text-align:right;color:var(--gn)">4.00</td><td>Commit s S-/F-/E-/I-XXX v branchi/zprávě</td></tr>
+          <tr><td>PR reviewer</td><td style="text-align:right;color:var(--yl)">2.17</td><td>Schválený PR review (vyjma self)</td></tr>
+          <tr><td>Issue / PR comment</td><td style="text-align:right;color:var(--or)">1.46</td><td>Komentář (boti vyloučeni)</td></tr>
           <tr><td><code>/contribute @osoba weight:X</code></td><td style="text-align:right;color:var(--ac2)">explicit</td><td>Manuální additivní signál — váha X z direktivy</td></tr>
         </tbody>
       </table>

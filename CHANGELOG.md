@@ -1,5 +1,46 @@
 # Changelog
 
+## 2.8.0 — 2026-06-17 — Drop dead assignee + pr_author evidence signals
+
+### Removed
+
+- **`assignee` and `pr_author` evidence signals (F-125)** — both were
+  sourced from GitHub issues/PRs and never fired in EDPA's local-first
+  default flow: `detect_contributors.run_gh` is a no-op without
+  `EDPA_USE_GH=1`, and the close-iteration path passes an empty
+  issue_map. `commit_author` already credits the PR author's commits
+  locally, so `pr_author` was redundant. Removed end-to-end —
+  `collect_assignee_signals` + its call site, the `pr_author` signal
+  emission, and the PR-author exclusion from `commit_author` (the PR
+  author now keeps credit via their own commits). The
+  `cw_heuristics.yaml` `signals:` block is now **3 keys**
+  (`commit_author`, `pr_reviewer`, `issue_comment`); `validate_syntax`
+  no longer expects the two removed names.
+
+### Changed
+
+- **Re-calibrated signal weights** — `commit_author` 4.00 /
+  `pr_reviewer` 2.17 / `issue_comment` 1.46 (was assignee 4.0 /
+  pr_author 3.4 / commit_author 2.78 / pr_reviewer 2.25 /
+  issue_comment 1.14). Synthetic Monte-Carlo MAD 0.0889 → 0.0869.
+- **Role-label derivation** — `commit_author` → owner (was
+  `assignee` → owner; `pr_author` → key is gone); `manual:*` → key,
+  `pr_reviewer` → reviewer, `issue_comment` → consulted.
+- **Calibrator is now 3D** — `calibrate_signals.py` search space dropped
+  from 5 to 3 weights; synthetic-corpus bands and edge cases reworked
+  (PM-owner credited via issue_comments; owners via more commits). Added
+  `_rescale_to_anchor`: with only 3 per-item-normalized signals the MAD
+  is scale-invariant, so the optimizer's raw vector is normalized to
+  max = 4.0 to stay inside the documented [0.1, 8.0] band.
+
+### Migration
+
+- Projects with a custom `.edpa/config/cw_heuristics.yaml` keep working —
+  leftover `assignee`/`pr_author` weights are ignored. Copy the new
+  `cw_heuristics.yaml.tmpl` `signals:` block (or re-run `/edpa:setup`) to
+  converge on the 3-signal shape, then `/edpa:autocalib` to re-derive
+  weights against your own data.
+
 ## 2.7.1 — 2026-06-17 — Windows cp1252 console crash fix
 
 ### Fixed

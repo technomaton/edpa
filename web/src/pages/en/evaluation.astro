@@ -69,36 +69,26 @@ const categories = [
     color: 'cy',
     cardClass: 'cyan',
     description: 'Verification of GitHub signal detection and additive aggregation into contribution_score. Signals add up; the resulting CW is the per-item normalized share (Σ across persons = 1.0 per item).',
-    expandedCount: 5,
+    expandedCount: 3,
     tests: [
       {
-        name: 'test_assignee_signal',
-        description: 'GitHub issue assignee adds signals.assignee weight (default 4.0) to contribution_score.',
-        expected: 'assignee → +4.0 to score',
-      },
-      {
-        name: 'test_pr_author_signal',
-        description: 'Author of a merged PR referencing the item adds signals.pr_author (default 3.4).',
-        expected: 'pr_author → +3.4 to score',
-      },
-      {
         name: 'test_commit_author_signal',
-        description: 'Commit with S-XXX/F-XXX/E-XXX/I-XXX in branch/message adds signals.commit_author (default 2.78).',
-        expected: 'commit_author → +2.78 to score',
+        description: 'Commit with S-XXX/F-XXX/E-XXX/I-XXX in branch/message adds signals.commit_author (default 4.00).',
+        expected: 'commit_author → +4.00 to score',
       },
       {
         name: 'test_pr_reviewer_signal',
-        description: 'Submitted PR review (excluding self) adds signals.pr_reviewer (default 2.25).',
-        expected: 'pr_reviewer → +2.25 to score',
+        description: 'Submitted PR review (excluding self) adds signals.pr_reviewer (default 2.17).',
+        expected: 'pr_reviewer → +2.17 to score',
       },
       {
         name: 'test_issue_comment_signal',
-        description: 'Issue/PR comment (bots excluded) adds signals.issue_comment (default 1.14).',
-        expected: 'issue_comment → +1.14 to score',
+        description: 'Issue/PR comment (bots excluded) adds signals.issue_comment (default 1.46).',
+        expected: 'issue_comment → +1.46 to score',
       },
       {
         name: 'test_signals_aggregate_additively',
-        description: 'When a person has assignee + commit + comment, weights sum (4.0 + 2.78 + 1.14 = 7.92); there is no highest-wins.',
+        description: 'When a person has commit + review + comment, weights sum (4.00 + 2.17 + 1.46 = 7.63); there is no highest-wins.',
         expected: 'Σ fired signal_weights, not max',
       },
       {
@@ -144,8 +134,8 @@ const categories = [
     tests: [
       {
         name: 'test_signal_weight_ordering',
-        description: 'Hierarchy: assignee > pr_author > commit_author ≈ pr_reviewer > issue_comment.',
-        expected: 'sw.assignee >= sw.pr_author >= sw.commit_author ≥ sw.pr_reviewer ≥ sw.issue_comment',
+        description: 'Hierarchy: commit_author > pr_reviewer > issue_comment.',
+        expected: 'sw.commit_author >= sw.pr_reviewer >= sw.issue_comment',
       },
       {
         name: 'test_per_item_cw_normalization',
@@ -159,33 +149,23 @@ const categories = [
       },
       {
         name: 'test_no_role_overrides_in_heuristics',
-        description: 'Calibration runs on 5 signal weights.',
+        description: 'Calibration runs on 3 signal weights.',
         expected: 'cw_heuristics.yaml.role_overrides not present',
       },
       {
-        name: 'test_signal_weights_assignee',
-        description: 'Assignee signal must have signal weight 4.0 in cw_heuristics.yaml.',
-        expected: 'signals.assignee = 4.0',
-      },
-      {
-        name: 'test_signal_weights_pr_author',
-        description: 'PR author signal must have signal weight 3.4 in cw_heuristics.yaml.',
-        expected: 'signals.pr_author = 3.4',
-      },
-      {
         name: 'test_signal_weights_commit',
-        description: 'Commit author signal must have signal weight 2.78 in cw_heuristics.yaml.',
-        expected: 'signals.commit_author = 2.78',
+        description: 'Commit author signal must have signal weight 4.00 in cw_heuristics.yaml.',
+        expected: 'signals.commit_author = 4.00',
       },
       {
         name: 'test_signal_weights_pr_reviewer',
-        description: 'PR reviewer signal must have signal weight 2.25 in cw_heuristics.yaml.',
-        expected: 'signals.pr_reviewer = 2.25',
+        description: 'PR reviewer signal must have signal weight 2.17 in cw_heuristics.yaml.',
+        expected: 'signals.pr_reviewer = 2.17',
       },
       {
         name: 'test_signal_weights_issue_comment',
-        description: 'Issue comment signal must have signal weight 1.14 in cw_heuristics.yaml.',
-        expected: 'signals.issue_comment = 1.14',
+        description: 'Issue comment signal must have signal weight 1.46 in cw_heuristics.yaml.',
+        expected: 'signals.issue_comment = 1.46',
       },
       {
         name: 'test_signals_aggregate_additively',
@@ -763,7 +743,7 @@ import { VERSION } from '../../lib/version';
             <tr><td><strong>Metric</strong></td><td>MAD (Mean Absolute Deviation) on the MC corpus</td></tr>
             <tr><td><strong>Direction</strong></td><td>lower is better</td></tr>
             <tr><td><strong>Budget</strong></td><td>2000 MC samples + coordinate descent on top-5 (~10s)</td></tr>
-            <tr><td><strong>Search space</strong></td><td>5D signal weights, each in [0.1, 8.0]</td></tr>
+            <tr><td><strong>Search space</strong></td><td>3D signal weights, each in [0.1, 8.0]</td></tr>
             <tr><td><strong>Calibrator</strong></td><td><code>calibrate_signals.py</code> (LOCKED)</td></tr>
           </tbody>
         </table>
@@ -787,8 +767,8 @@ import { VERSION } from '../../lib/version';
         <li>The script will:
           <ol class="loop-substeps">
             <li>Generate a synthetic Monte Carlo corpus (1,000 scenarios × ~31k records) procedurally from a model where signal counts probabilistically reflect each person's true cw share</li>
-            <li>Compute baseline MAD against shipped defaults (assignee=4.00, pr_author=3.40, …)</li>
-            <li><strong>Phase 1 — random sampling:</strong> 2000 random weight vectors in the 5D space [0.1, 8.0], sorted by MAD</li>
+            <li>Compute baseline MAD against shipped defaults (commit_author=4.00, pr_reviewer=2.17, issue_comment=1.46)</li>
+            <li><strong>Phase 1 — random sampling:</strong> 2000 random weight vectors in the 3D space [0.1, 8.0], sorted by MAD</li>
             <li><strong>Phase 2 — coordinate descent:</strong> refines the top-5 candidates, tries ±step per signal, halves step on no-improvement</li>
             <li>Return best calibrated weights + MAD improvement %</li>
             <li>With <code>--apply</code>, rewrite <code>cw_heuristics.yaml.tmpl</code> + refresh the <code>calibration:</code> metadata</li>
@@ -812,7 +792,7 @@ import { VERSION } from '../../lib/version';
           <tr><th>Experiments</th><th>Focus</th><th>Parameters</th></tr>
         </thead>
         <tbody>
-          <tr><td>1&ndash;30</td><td>signal weights (Monte Carlo)</td><td>5 parameters, random sampling</td></tr>
+          <tr><td>1&ndash;30</td><td>signal weights (Monte Carlo)</td><td>3 parameters, random sampling</td></tr>
           <tr><td>31&ndash;50</td><td>signal weights (Nelder-Mead refinement)</td><td>local descent around MC top-K</td></tr>
         </tbody>
       </table>
@@ -835,9 +815,9 @@ import { VERSION } from '../../lib/version';
             <tr><th>Dominant signal</th><th>Display role</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>assignee</code></td><td><strong>owner</strong></td></tr>
-            <tr><td><code>pr_author</code> / <code>manual:*</code></td><td><strong>key</strong></td></tr>
-            <tr><td><code>commit_author</code> / <code>pr_reviewer</code></td><td><strong>reviewer</strong></td></tr>
+            <tr><td><code>commit_author</code></td><td><strong>owner</strong></td></tr>
+            <tr><td><code>manual:*</code></td><td><strong>key</strong></td></tr>
+            <tr><td><code>pr_reviewer</code></td><td><strong>reviewer</strong></td></tr>
             <tr><td><code>issue_comment</code></td><td><strong>consulted</strong></td></tr>
           </tbody>
         </table>
@@ -850,11 +830,9 @@ import { VERSION } from '../../lib/version';
             <tr><th>Signal</th><th style="text-align:right">Score</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>assignee</code></td><td style="text-align:right;color:var(--gn)">4.00</td></tr>
-            <tr><td><code>pr_author</code></td><td style="text-align:right;color:var(--cy)">3.40</td></tr>
-            <tr><td><code>commit_author</code></td><td style="text-align:right;color:var(--yl)">2.78</td></tr>
-            <tr><td><code>pr_reviewer</code></td><td style="text-align:right;color:var(--yl)">2.25</td></tr>
-            <tr><td><code>issue_comment</code></td><td style="text-align:right;color:var(--or)">1.14</td></tr>
+            <tr><td><code>commit_author</code></td><td style="text-align:right;color:var(--gn)">4.00</td></tr>
+            <tr><td><code>pr_reviewer</code></td><td style="text-align:right;color:var(--cy)">2.17</td></tr>
+            <tr><td><code>issue_comment</code></td><td style="text-align:right;color:var(--or)">1.46</td></tr>
             <tr><td><code>manual:*</code> (/contribute)</td><td style="text-align:right;color:var(--ac2)">explicit</td></tr>
           </tbody>
         </table>
