@@ -208,6 +208,8 @@ function loadPisFromIterationsDir(edpaRoot: string): PIConfig[] {
     iterByPi[piId].push({
       id: it.id as string,
       dates: formatIterationDates(it.start_date, it.end_date),
+      start_date: isoDate(it.start_date),
+      end_date: isoDate(it.end_date),
       status: (it.status as Iteration['status']) || 'planned',
       type: (it.type as string | undefined),
     });
@@ -264,6 +266,20 @@ function formatIterationDates(start: unknown, end: unknown): string {
     return String(v);
   };
   return `${fmt(start)}–${fmt(end)}`;
+}
+
+// ISO `YYYY-MM-DD` — keeps the authoritative year the pretty `dates` drops,
+// so the calendar maps iterations onto the correct year (mirror _iso_date).
+function isoDate(v: unknown): string | undefined {
+  const p2 = (n: number) => (n < 10 ? '0' + n : '' + n);
+  if (v instanceof Date) {
+    return `${v.getUTCFullYear()}-${p2(v.getUTCMonth() + 1)}-${p2(v.getUTCDate())}`;
+  }
+  if (typeof v === 'string') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  }
+  return undefined;
 }
 
 export function nextId(edpaRoot: string, type: string): string {

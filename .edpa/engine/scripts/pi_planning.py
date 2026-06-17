@@ -119,6 +119,22 @@ def format_iteration_dates(start, end) -> str:
     return f"{_fmt_date(start)}–{_fmt_date(end)}"
 
 
+def _iso_date(v) -> str:
+    """`YYYY-MM-DD` for year-safe date math in the calendar (mirror isoDate).
+
+    The pretty ``dates`` string drops the year (``D.M.``), which made the
+    calendar collapse every PI onto the current year. These ISO fields keep
+    the authoritative year so iterations land on the correct year's grid.
+    """
+    if isinstance(v, (datetime.datetime, datetime.date)):
+        return f"{v.year:04d}-{v.month:02d}-{v.day:02d}"
+    if isinstance(v, str):
+        m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", v)
+        if m:
+            return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    return ""
+
+
 def load_pis(root: Path) -> list[dict]:
     """iterations/*.yaml → PIConfig[] (mirror loadPisFromIterationsDir)."""
     iter_dir = root / ".edpa" / "iterations"
@@ -146,6 +162,8 @@ def load_pis(root: Path) -> list[dict]:
         iter_by_pi.setdefault(pid, []).append({
             "id": it.get("id"),
             "dates": format_iteration_dates(it.get("start_date"), it.get("end_date")),
+            "start_date": _iso_date(it.get("start_date")),
+            "end_date": _iso_date(it.get("end_date")),
             "status": it.get("status") or "planned",
             "type": it.get("type"),
         })

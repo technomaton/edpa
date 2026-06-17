@@ -65,7 +65,9 @@ export interface Team {
 
 export interface Iteration {
   id: string;
-  dates: string;
+  dates: string;          // pretty `D.M.–D.M.` for display (year dropped)
+  start_date?: string;    // ISO `YYYY-MM-DD` — authoritative, year-safe date math
+  end_date?: string;      // ISO `YYYY-MM-DD`
   status: 'planned' | 'active' | 'closed';
   type?: string;
 }

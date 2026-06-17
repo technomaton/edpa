@@ -26,6 +26,16 @@ function parseDateRange(dates: string): { start: Date; end: Date } {
   return { start: startDate, end: endDate };
 }
 
+// Year-safe iteration range. Prefer the ISO `start_date`/`end_date` fields
+// (which carry the real year) over the pretty `dates` string, whose `D.M.`
+// format drops the year and would collapse every PI onto the current year.
+function iterRange(iter: { dates: string; start_date?: string; end_date?: string }): { start: Date; end: Date } {
+  if (iter.start_date && iter.end_date) {
+    return { start: parseDate(iter.start_date), end: parseDate(iter.end_date) };
+  }
+  return parseDateRange(iter.dates);
+}
+
 function dateToStr(d: Date): string {
   return ds(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
@@ -94,7 +104,7 @@ function buildMaps(pis: PIConfig[]) {
 
   pis.forEach((pi, piIdx) => {
     pi.iterations.forEach((iter, iterIdx) => {
-      const { start, end } = parseDateRange(iter.dates);
+      const { start, end } = iterRange(iter);
       if (!minDate || start < minDate) minDate = new Date(start);
       if (!maxDate || end > maxDate) maxDate = new Date(end);
 
@@ -313,13 +323,21 @@ export function Calendar() {
     return result;
   }, [minDate, maxDate]);
 
-  // Group by quarters (3 months each) — displayed as columns
-  const quarters = useMemo(() => {
-    const qs: { year: number; month: number; label: string }[][] = [];
-    for (let i = 0; i < months.length; i += 3) {
-      qs.push(months.slice(i, i + 3));
+  // Group months by year, then chunk each year into quarter-columns. A
+  // multi-year PI set renders one labeled block per year instead of
+  // collapsing every year under a single (wrong) heading.
+  const years = useMemo(() => {
+    const byYear = new Map<number, { year: number; month: number; label: string }[]>();
+    for (const m of months) {
+      const arr = byYear.get(m.year) || [];
+      arr.push(m);
+      byYear.set(m.year, arr);
     }
-    return qs;
+    return [...byYear.entries()].map(([year, yMonths]) => {
+      const quarters: { year: number; month: number; label: string }[][] = [];
+      for (let i = 0; i < yMonths.length; i += 3) quarters.push(yMonths.slice(i, i + 3));
+      return { year, quarters };
+    });
   }, [months]);
 
   return (
@@ -329,7 +347,12 @@ export function Calendar() {
         <div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span style={{ fontSize: 40, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>
-              {minDate?.getFullYear() || 2026}
+              {(() => {
+                const lo = minDate?.getFullYear();
+                const hi = maxDate?.getFullYear();
+                if (!lo) return 2026;
+                return hi && hi !== lo ? `${lo}–${hi}` : lo;
+              })()}
             </span>
           </div>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b' }}>
@@ -368,29 +391,40 @@ export function Calendar() {
         ))}
       </div>
 
-      {/* Quarterly grid — quarters as columns, 3 months per column */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${quarters.length}, 1fr)`,
-        gap: 16,
-        alignItems: 'start',
-      }}>
-        {quarters.map((q, qi) => (
-          <div key={qi} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {q.map(m => (
-              <MonthCal
-                key={`${m.year}-${m.month}`}
-                year={m.year}
-                month={m.month}
-                label={m.label}
-                dayMap={dayMap}
-                weekLabels={weekLabels}
-                todayStr={todayStr}
-              />
+      {/* One labeled block per year; within a year, quarters as columns */}
+      {years.map(({ year, quarters }) => (
+        <div key={year} style={{ marginBottom: 28 }}>
+          {years.length > 1 && (
+            <div style={{
+              fontSize: 22, fontWeight: 800, color: '#1e293b',
+              letterSpacing: '-0.01em', marginBottom: 12,
+              paddingBottom: 6, borderBottom: '2px solid #e2e8f0',
+            }}>{year}</div>
+          )}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${quarters.length}, 1fr)`,
+            gap: 16,
+            alignItems: 'start',
+          }}>
+            {quarters.map((q, qi) => (
+              <div key={qi} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {q.map(m => (
+                  <MonthCal
+                    key={`${m.year}-${m.month}`}
+                    year={m.year}
+                    month={m.month}
+                    label={m.label}
+                    dayMap={dayMap}
+                    weekLabels={weekLabels}
+                    todayStr={todayStr}
+                  />
+                ))}
+              </div>
             ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
