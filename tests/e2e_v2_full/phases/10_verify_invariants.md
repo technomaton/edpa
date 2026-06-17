@@ -71,7 +71,7 @@ Aggregate: PI-1=344h, PI-2=544h, total=888h
 ## Notable observations
 
 - **`all_invariants_passed=true` on FIRST engine pass** (no `_rev2` snapshots) — confirms commit `85cd439` fix (mandatory Stage 2b `detect_contributors.py --all-items`) is working as designed.
-- **PI-2 hours (544h) higher than previous run (216h)**. This is Wave B Unit 9 fixture-coverage variance: synthetic mode emits `pr_author` + `pr_reviewer` weights that the real-CI path doesn't (documented in `08_simulate_pi2.md`). Both engine outputs are within capacity and invariant-clean — not a regression.
+- **PI-2 hours higher than the earlier real-CI run**. This is Wave B Unit 9 fixture-coverage variance: synthetic mode adds `pr_reviewer` + `issue_comment` signals that PI-1's real PRs largely lacked (documented in `08_simulate_pi2.md`). Both engine outputs are within capacity and invariant-clean — not a regression. (The aggregate hour figures captured in this log predate the 2.8.0 3-signal model — the `pr_author` weight 3.4 is gone — so a fresh run lands lower; this phase is gated by the invariant checks, not the hour totals.)
 - **Per-person capacity invariant holds for every active person** (engine clamps `total_derived ≤ capacity` within tolerance).
 - **Snapshot signatures recompute byte-identical** — engine is deterministic for these inputs.
 

@@ -32,10 +32,13 @@ each item's evidence the local way:
    item's backlog file, so the post-commit hook fires once more and
    credits the assignee as `commit_author` for the squash sha too.
 4. Synthetic injection: re-read the item's frontmatter and
-   **append** `pr_author` (1 row, assignee), `pr_reviewer` (1 row per
-   fixture `reviewers[]` entry with `action: approve`), and
-   `issue_comment` (1 row per fixture reviewer + 1 row per
-   `comments[]` entry) directly into the `evidence[]` list. Each row
+   **append** `pr_reviewer` (1 row per fixture `reviewers[]` entry
+   with `action: approve`) and `issue_comment` (1 row per fixture
+   reviewer + 1 row per `comments[]` entry) directly into the
+   `evidence[]` list — the same GH-thread signal set the real CI
+   workflow materializes. (The `pr_author` signal was removed in
+   2.8.0; the author is credited via `commit_author` from steps 2-3.)
+   Each row
    uses the canonical EDPA schema
    `{type, person, weight, ref, at, source: synthetic}` matching
    `sync_pr_contributions.py`. `ref` values use
@@ -97,17 +100,17 @@ Per-item evidence shape after the run (read straight from
 
 | Item | status | evidence rows | types present |
 |------|--------|---------------|---------------|
-| S-5  | Done   | 8  | commit_author, pr_author, pr_reviewer, issue_comment |
-| S-10 | Done   | 9  | commit_author, pr_author, pr_reviewer, issue_comment |
-| S-15 | Done   | 10 | commit_author, pr_author, pr_reviewer, issue_comment |
-| S-16 | Done   | 12 | commit_author, pr_author, pr_reviewer, issue_comment |
-| S-17 | Done   | 9  | commit_author, pr_author, pr_reviewer, issue_comment |
-| S-18 | Done   | 10 | commit_author, pr_author, pr_reviewer, issue_comment |
-| S-19 | Done   | 7  | commit_author, pr_author, pr_reviewer, issue_comment |
-| S-20 | Done   | 9  | commit_author, pr_author, pr_reviewer, issue_comment |
-| D-2  | Done   | 8  | commit_author, pr_author, pr_reviewer, issue_comment |
+| S-5  | Done   | 7  | commit_author, pr_reviewer, issue_comment |
+| S-10 | Done   | 8  | commit_author, pr_reviewer, issue_comment |
+| S-15 | Done   | 9  | commit_author, pr_reviewer, issue_comment |
+| S-16 | Done   | 11 | commit_author, pr_reviewer, issue_comment |
+| S-17 | Done   | 8  | commit_author, pr_reviewer, issue_comment |
+| S-18 | Done   | 9  | commit_author, pr_reviewer, issue_comment |
+| S-19 | Done   | 6  | commit_author, pr_reviewer, issue_comment |
+| S-20 | Done   | 8  | commit_author, pr_reviewer, issue_comment |
+| D-2  | Done   | 7  | commit_author, pr_reviewer, issue_comment |
 
-The S-16 row count (12) is higher than peers because it inherited
+The S-16 row count (11) is higher than peers because it inherited
 3 stale `issue_comment` rows from PI-1's D-1 PR — D-1's body
 explicitly mentions S-16 ("cross-checked with S-9 regression test
 (S-16 in fixture)"), so the PI-1 CI workflow picked it up and
@@ -117,7 +120,7 @@ processed S-16 in PI-2 anyway since none of those PI-1 rows are
 `commit_author`.
 
 Every item satisfies the brief's recipe row: ≥1 `commit_author`
-row + ≥1 `pr_author` row + reviewer/comment rows per fixture.
+row + reviewer/comment rows per fixture.
 
 ## Gate transitions applied (end-of-run snapshot)
 
@@ -143,16 +146,16 @@ correctly and the driver applies it as-is.
 | Wall time per item              | ~55 s (CI poll) | ~2 s             |
 | GitHub PRs created              | 14             | 0                |
 | `edpa-contribution-sync.yml` runs | 14           | 0 (unchanged)    |
-| Evidence types attributed       | commit_author + issue_comment | commit_author + pr_author + pr_reviewer + issue_comment |
+| Evidence types attributed       | commit_author + issue_comment | commit_author + pr_reviewer + issue_comment |
 
-The synthetic path is roughly **25× faster per item** and also
-emits the full evidence set (including `pr_author` and
-`pr_reviewer`), which the CI workflow intentionally skips to avoid
-double-counting `pr_author` against `commit_author` (per the
-`sync_pr_contributions.py` docstring). That's a real shape
-difference — engine-side, expect slightly higher CW shares for
-PI-2 contributors vs PI-1 because of the extra `pr_author`
-(weight 3.4) and `pr_reviewer` (weight 2.25) signals.
+The synthetic path is roughly **25× faster per item** and emits the
+same GH-thread signal set the CI workflow does — `pr_reviewer` and
+`issue_comment` (the `pr_author` signal was removed in 2.8.0; the
+author is credited locally via `commit_author`). The remaining shape
+difference vs PI-1 is `pr_reviewer` coverage: PI-1's real PRs carried
+few approving reviews, so PI-2's synthetic reviewers add `pr_reviewer`
+(weight 2.17) signals that nudge PI-2 contributors' CW shares slightly
+higher.
 
 ## E2E recipe verification (per brief)
 
@@ -160,8 +163,8 @@ PI-2 contributors vs PI-1 because of the extra `pr_author`
    (S-5, S-10, S-15, S-16, S-17, S-18, S-19, S-20, D-2) all show
    `status: Done` + `closed_at` on origin/main.
 2. **Evidence shape** — PASS. Each item carries
-   ≥1 `commit_author` (from local hook), 1 `pr_author` (synthetic),
-   ≥1 `pr_reviewer` (synthetic), ≥1 `issue_comment` (synthetic).
+   ≥1 `commit_author` (from local hook), ≥1 `pr_reviewer`
+   (synthetic), ≥1 `issue_comment` (synthetic).
 3. **Gate transitions** — PASS. F-3 → Done, F-4 → Validating,
    E-2 → Implementing, I-1 → Implementing. (Brief mentions
    "F-4 → Done" — the **fixture** says `Validating`, and the brief
