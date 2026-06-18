@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.8.2 — 2026-06-18 — Windows cp1252 subprocess crash fix
+
+### Fixed
+
+- **`/edpa:engine` crashed on a Czech Windows box reading git history (D-23).**
+  Every engine script that shells out to `git`/`gh` and reads the result used
+  `subprocess.run(..., text=True)` **without** an explicit `encoding`, so the
+  child's stdout was decoded with the locale codec — cp1252 on a Czech/German
+  Windows console. The moment a commit message or author name carried a
+  diacritic, the decode raised `UnicodeDecodeError` *inside subprocess's reader
+  thread* (`Exception in thread Thread-1 (_readerthread)`) and aborted the
+  command. Fix: pin `encoding="utf-8"` on all **29 text-decoding subprocess
+  calls across 20 engine scripts** (found via AST sweep, not grep — it sees
+  through multi-line calls). The 6 bytes-mode `capture_output=True` calls that
+  never read stdout are deliberately left untouched — they don't decode, so
+  flipping them to text mode would only risk breaking byte consumers. This is
+  the third leg of the same cp1252 locale trap, after file I/O (2.1.9) and
+  stdout glyph printing (D-21). New regression guard
+  `test_encoding_hygiene.py::test_all_subprocess_text_pins_utf8` AST-walks every
+  script and fails on any text-mode subprocess call lacking `encoding=`.
+
 ## 2.8.1 — 2026-06-17 — PI calendar multi-year fix
 
 ### Fixed
