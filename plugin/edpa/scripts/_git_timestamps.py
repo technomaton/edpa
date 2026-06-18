@@ -24,7 +24,7 @@ def _git(args: list[str], cwd: Path) -> str | None:
             cwd=str(cwd),
             capture_output=True,
             text=True,
-            check=False,
+            check=False, encoding="utf-8",
         )
     except FileNotFoundError:
         return None

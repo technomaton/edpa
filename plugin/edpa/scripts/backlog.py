@@ -1081,7 +1081,7 @@ def cmd_add(root, backlog, args):
     subprocess.run(add_args, capture_output=True, cwd=str(root))
     commit = subprocess.run(
         ["git", "commit", "-m", f"feat({new_id}): {title}"],
-        capture_output=True, text=True, cwd=str(root),
+        capture_output=True, text=True, cwd=str(root), encoding="utf-8",
     )
     if commit.returncode != 0:
         # Hooks rejected the commit. Surface the reason — silent failure

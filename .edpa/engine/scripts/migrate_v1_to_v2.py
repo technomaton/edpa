@@ -42,7 +42,7 @@ finally:
 
 def _git(args: list[str], cwd: Path, check: bool = False) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=check,
+        ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=check, encoding="utf-8",
     )
 
 
@@ -63,7 +63,7 @@ def step_final_sync_pull(repo_root: Path, skip: bool) -> dict:
         return {"action": "skipped", "reason": "sync.py not found"}
     r = subprocess.run(
         ["python3", str(sync_py), "pull", "--commit"],
-        cwd=str(repo_root), capture_output=True, text=True,
+        cwd=str(repo_root), capture_output=True, text=True, encoding="utf-8",
     )
     return {
         "action": "ran" if r.returncode == 0 else "failed",

@@ -118,7 +118,7 @@ def _git_last_commit_epoch(file_path: Path) -> int | None:
     try:
         result = subprocess.run(
             ["git", "log", "-1", "--format=%ct", "--", str(file_path)],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=10, encoding="utf-8",
         )
         out = result.stdout.strip()
         return int(out) if out else None

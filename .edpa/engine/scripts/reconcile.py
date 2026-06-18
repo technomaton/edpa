@@ -69,7 +69,7 @@ def find_repo_root(start: Path | None = None) -> Path:
 
 def _git(repo: Path, *args: str) -> str:
     res = subprocess.run(["git", "-C", str(repo), *args],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8")
     if res.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} failed: {res.stderr.strip()}")
     return res.stdout

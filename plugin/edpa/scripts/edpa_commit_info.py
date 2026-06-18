@@ -34,7 +34,7 @@ def git_config(key):
     try:
         result = subprocess.run(
             ["git", "config", key],
-            capture_output=True, text=True, timeout=5
+            capture_output=True, text=True, timeout=5, encoding="utf-8"
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -48,7 +48,7 @@ def git_branch():
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True, text=True, timeout=5
+            capture_output=True, text=True, timeout=5, encoding="utf-8"
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -62,7 +62,7 @@ def git_diff_staged():
     try:
         result = subprocess.run(
             ["git", "diff", "--cached", "--stat"],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, timeout=10, encoding="utf-8"
         )
         if result.returncode == 0:
             return result.stdout.strip()

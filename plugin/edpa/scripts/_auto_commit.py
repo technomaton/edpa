@@ -30,7 +30,7 @@ from typing import Iterable
 
 
 def _run(args: list[str], cwd: Path):
-    return subprocess.run(args, cwd=str(cwd), capture_output=True, text=True)
+    return subprocess.run(args, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8")
 
 
 def _is_git_repo(root: Path) -> bool:

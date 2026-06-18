@@ -126,7 +126,7 @@ BOT_EMAIL_PATTERNS = [
 def _run_git(args: list[str], cwd: Path) -> str:
     """Run git with cwd, return stdout. Raises on nonzero exit."""
     result = subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True
+        ["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8"
     )
     if result.returncode != 0:
         raise RuntimeError(

@@ -7,6 +7,14 @@ raises ``UnicodeDecodeError``; writing an item whose title has diacritics
 raises ``UnicodeEncodeError``. Both abort the command. Pinning UTF-8 makes the
 engine behave identically on Linux, macOS, and Windows.
 
+The same locale trap applies to ``subprocess`` in **text mode**:
+``run(..., text=True)`` decodes git/gh stdout with cp1252 and raises
+``UnicodeDecodeError`` in the reader thread the instant a commit message or
+author name carries diacritics (D-23 — crashed ``/edpa:engine`` on a Czech
+Windows box). ``test_all_subprocess_text_pins_utf8`` guards that. Calls that
+capture *bytes* (``capture_output=True`` with no ``text=``/``universal_newlines=``)
+never decode, so they can't hit the trap and are intentionally left alone.
+
 This is an AST walk (not a grep) so it sees through multi-line calls and never
 false-positives on a continuation line that already carries ``encoding=``.
 ``os.open`` is excluded — it returns a raw file descriptor and takes no
@@ -80,4 +88,61 @@ def test_all_text_io_pins_utf8() -> None:
         "text-mode file I/O without encoding='utf-8' (crashes on Windows "
         "cp1250 with non-ASCII content):\n"
         + "\n".join(f"  {name}: {sites}" for name, sites in failures.items())
+    )
+
+
+# ─── subprocess text mode ──────────────────────────────────────────────────
+SUBPROCESS_FUNCS = {"run", "Popen", "check_output", "check_call", "call"}
+
+
+def _is_subprocess_call(call: ast.Call) -> bool:
+    f = call.func
+    return (
+        isinstance(f, ast.Attribute)
+        and f.attr in SUBPROCESS_FUNCS
+        and isinstance(f.value, ast.Name)
+        and f.value.id == "subprocess"
+    )
+
+
+def _kw_is_true(call: ast.Call, name: str) -> bool:
+    for kw in call.keywords:
+        if kw.arg == name:
+            return isinstance(kw.value, ast.Constant) and kw.value.value is True
+    return False
+
+
+def _subprocess_text_violations(path: Path) -> list[tuple[str, int]]:
+    """Calls that DECODE stdout/stderr as text (``text=True`` or
+    ``universal_newlines=True``) but never pin ``encoding=``. A bare
+    ``capture_output=True`` returns *bytes* — no decode, no trap — so it is
+    NOT flagged; only the calls that actually decode are at risk."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    bad: list[tuple[str, int]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not _is_subprocess_call(node):
+            continue
+        decodes = _kw_is_true(node, "text") or _kw_is_true(node, "universal_newlines")
+        if not decodes:
+            continue
+        if any(kw.arg == "encoding" for kw in node.keywords):
+            continue
+        bad.append((node.func.attr, node.lineno))
+    return bad
+
+
+def test_all_subprocess_text_pins_utf8() -> None:
+    failures = {
+        path.name: v
+        for path in sorted(SCRIPTS.glob("*.py"))
+        if (v := _subprocess_text_violations(path))
+    }
+    assert not failures, (
+        "subprocess in text mode without encoding='utf-8' — decodes git/gh "
+        "stdout with the locale codec, so a diacritic in a commit message or "
+        "author name raises UnicodeDecodeError in the reader thread on a "
+        "cp1252 Windows box (D-23):\n"
+        + "\n".join(f"  {name}: {sites}" for name, sites in failures.items())
+        + "\nFix: add encoding=\"utf-8\" to each call (or capture bytes if the "
+        "output is genuinely binary)."
     )

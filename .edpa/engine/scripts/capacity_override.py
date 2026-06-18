@@ -192,7 +192,7 @@ def run_validator(iteration_path: Path) -> bool:
         return True
     rc = subprocess.run(
         [sys.executable, str(script), str(iteration_path)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8",
     )
     if rc.returncode != 0:
         print(rc.stdout)
@@ -207,14 +207,14 @@ def git_commit(iteration_path: Path, msg: str, no_commit: bool):
         return
     rc = subprocess.run(
         ["git", "add", str(iteration_path)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8",
     )
     if rc.returncode != 0:
         warn(f"git add failed: {rc.stderr.strip()}")
         return
     rc = subprocess.run(
         ["git", "commit", "-m", msg],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8",
     )
     if rc.returncode != 0:
         warn(f"git commit failed: {rc.stderr.strip()}")

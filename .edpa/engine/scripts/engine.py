@@ -79,7 +79,7 @@ def gh_json(cmd):
     try:
         result = subprocess.run(
             ["gh"] + cmd.split() + ["--json", "number,title,assignees,labels,body"],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, timeout=30, encoding="utf-8"
         )
         if result.returncode == 0:
             return json.loads(result.stdout)

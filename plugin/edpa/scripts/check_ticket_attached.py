@@ -91,7 +91,7 @@ ENV_DISABLE = "EDPA_NO_TICKET_CHECK"
 def _git(args: list[str]) -> str | None:
     try:
         r = subprocess.run(
-            ["git", *args], capture_output=True, text=True, check=False,
+            ["git", *args], capture_output=True, text=True, check=False, encoding="utf-8",
         )
     except FileNotFoundError:
         return None

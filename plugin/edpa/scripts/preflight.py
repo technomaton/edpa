@@ -80,7 +80,7 @@ def _run(cmd, capture=True):
     """Run shell cmd; return (rc, stdout). Never raises."""
     try:
         result = subprocess.run(
-            cmd, shell=True, capture_output=capture, text=True, timeout=30
+            cmd, shell=True, capture_output=capture, text=True, timeout=30, encoding="utf-8"
         )
         return result.returncode, (result.stdout or "") + (result.stderr or "")
     except Exception as e:

@@ -50,7 +50,7 @@ def _git(args: list[str], cwd: Path) -> str | None:
     try:
         r = subprocess.run(
             ["git", *args], cwd=str(cwd),
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, check=False, encoding="utf-8",
         )
     except FileNotFoundError:
         return None

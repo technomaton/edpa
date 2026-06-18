@@ -179,7 +179,7 @@ def run_validator(edpa_root: Path) -> bool:
     if not script.is_file():
         return True
     rc = subprocess.run([sys.executable, str(script), str(edpa_root)],
-                        capture_output=True, text=True)
+                        capture_output=True, text=True, encoding="utf-8")
     if rc.stdout.strip():
         print(rc.stdout.strip())
     if rc.stderr.strip():

@@ -98,7 +98,7 @@ def run_git(args, cwd: Path):
         cwd=cwd,
         capture_output=True,
         text=True,
-        check=False,
+        check=False, encoding="utf-8",
     )
     if result.returncode != 0:
         err = result.stderr.strip()

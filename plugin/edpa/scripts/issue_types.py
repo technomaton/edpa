@@ -106,7 +106,7 @@ def gh_graphql(query):
     """Execute a GitHub GraphQL query via the gh CLI."""
     result = subprocess.run(
         ["gh", "api", "graphql", "-f", f"query={query}"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8",
     )
     if result.returncode != 0:
         err = result.stderr.strip()
@@ -297,7 +297,7 @@ def remove_label(org, repo, issue_number, label_name):
     result = subprocess.run(
         ["gh", "api", "--method", "DELETE",
          f"repos/{org}/{repo}/issues/{issue_number}/labels/{label_name}"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8",
     )
     return result.returncode == 0
 

@@ -110,7 +110,7 @@ def run_gh(args, *, repo: str | None = None):
     cmd = ["gh"] + list(args)
     if repo and "--repo" not in cmd:
         cmd.extend(["--repo", repo])
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
     if result.returncode != 0:
         # Don't spam stderr for expected "not found" — caller decides.
         return None

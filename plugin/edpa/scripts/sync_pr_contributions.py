@@ -85,7 +85,7 @@ def _utc_now() -> str:
 def _gh_json(args: list[str]) -> dict | list | None:
     try:
         r = subprocess.run(
-            ["gh", *args], capture_output=True, text=True, check=False,
+            ["gh", *args], capture_output=True, text=True, check=False, encoding="utf-8",
         )
     except FileNotFoundError:
         print("ERROR: gh CLI not found in PATH", file=sys.stderr)
@@ -339,7 +339,7 @@ def main() -> int:
     for attempt in range(3):
         commit = subprocess.run(
             ["git", "commit", "-m", msg],
-            cwd=str(repo_root), capture_output=True, text=True,
+            cwd=str(repo_root), capture_output=True, text=True, encoding="utf-8",
         )
         if commit.returncode == 0:
             break

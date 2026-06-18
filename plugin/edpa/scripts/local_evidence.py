@@ -92,7 +92,7 @@ def _git(args: list[str], cwd: Path | None = None) -> str | None:
         r = subprocess.run(
             ["git", *args],
             cwd=str(cwd) if cwd else None,
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, check=False, encoding="utf-8",
         )
     except FileNotFoundError:
         return None
@@ -333,7 +333,7 @@ def _commit_evidence(repo_root: Path, paths: list[Path],
     rels = [str(p.relative_to(repo_root)) for p in paths]
     add = subprocess.run(
         ["git", "add", *rels],
-        cwd=str(repo_root), capture_output=True, text=True,
+        cwd=str(repo_root), capture_output=True, text=True, encoding="utf-8",
     )
     if add.returncode != 0:
         return False
@@ -343,7 +343,7 @@ def _commit_evidence(repo_root: Path, paths: list[Path],
            f"Source commit: {commit['sha']}")
     commit_res = subprocess.run(
         ["git", "commit", "--no-verify", "-m", msg],
-        cwd=str(repo_root), capture_output=True, text=True,
+        cwd=str(repo_root), capture_output=True, text=True, encoding="utf-8",
     )
     return commit_res.returncode == 0
 
