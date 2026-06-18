@@ -90,13 +90,13 @@ def claude_run(prompt: str, cwd: Path, *, timeout: int = CLAUDE_TIMEOUT
         capture_output=True,
         text=True,
         timeout=timeout,
-        env=env,
+        env=env, encoding="utf-8",
     )
 
 
 def _git(cwd: Path, *args: str) -> str:
     return subprocess.run(
-        ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=True
+        ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=True, encoding="utf-8"
     ).stdout.strip()
 
 
@@ -111,7 +111,7 @@ def _backlog_add(proj: Path, type_dir: Path, *args: str) -> str:
     before = _ids_in(type_dir)
     r = subprocess.run(
         [sys.executable, str(proj / ".edpa/engine/scripts/backlog.py"), "add", *args],
-        cwd=str(proj), capture_output=True, text=True,
+        cwd=str(proj), capture_output=True, text=True, encoding="utf-8",
     )
     assert r.returncode == 0, f"backlog.py add {args} failed:\n{r.stderr}"
     new = _ids_in(type_dir) - before

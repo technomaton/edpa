@@ -234,7 +234,7 @@ def test_no_stray_files_in_web():
             if name in (".vercel", "dist"):
                 result = subprocess.run(
                     ["git", "ls-files", "--error-unmatch", str(candidate)],
-                    capture_output=True, text=True, cwd=ROOT,
+                    capture_output=True, text=True, cwd=ROOT, encoding="utf-8",
                 )
                 if result.returncode == 0:
                     found.append(f"{name}/ (tracked in git)")
@@ -396,7 +396,7 @@ def test_web_build_succeeds():
         cwd=web_dir,
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=120, encoding="utf-8",
     )
 
     assert result.returncode == 0, (

@@ -95,6 +95,6 @@ print(ic.next_id('Story', d))
 
 
 def test_id_counter_falls_back_when_filelock_missing() -> None:
-    r = subprocess.run([sys.executable, "-c", _PROG], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, "-c", _PROG], capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 0, f"bootstrap crashed without filelock:\n{r.stderr}"
     assert r.stdout.split() == ["S-1", "S-2"], r.stdout

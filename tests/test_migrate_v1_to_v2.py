@@ -184,7 +184,7 @@ def test_e2e_main_creates_one_commit(v1_repo: Path, monkeypatch) -> None:
     # One migration commit
     log = subprocess.run(
         ["git", "log", "--oneline", "-1"], cwd=str(v1_repo),
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8",
     ).stdout
     assert "migrate from GH-coupled V1 to local-first V2" in log
 

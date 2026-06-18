@@ -108,7 +108,7 @@ def test_created_pi_read_by_loader_no_missing_warning(edpa_root: Path) -> None:
 def _run_cli(edpa_root: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(SCRIPTS / "create_pi.py"), *args],
-        cwd=str(edpa_root.parent), capture_output=True, text=True,
+        cwd=str(edpa_root.parent), capture_output=True, text=True, encoding="utf-8",
     )
 
 

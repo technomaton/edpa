@@ -144,7 +144,7 @@ def _run_sync(project: Path, event_path: Path, *,
         "--edpa-root", str(project / ".edpa"),
         *(extra_args or []),
     ]
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
 
 
 # ─── Synthetic-flow tests (always run) ──────────────────────────────────────
@@ -338,7 +338,7 @@ def test_skip_commit_writes_yaml_without_git_commit(
     but leaves git history alone — engine reads current state from disk."""
     head_before = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=str(project),
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, check=True, encoding="utf-8",
     ).stdout.strip()
 
     event = _write_event(
@@ -351,7 +351,7 @@ def test_skip_commit_writes_yaml_without_git_commit(
 
     head_after = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=str(project),
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, check=True, encoding="utf-8",
     ).stdout.strip()
 
     assert head_before == head_after, "subprocess must not create commits"
@@ -425,7 +425,7 @@ def test_real_github_pr_roundtrip(tmp_path: Path) -> None:
     pr = subprocess.run(
         ["gh", "pr", "create", "--title", "S-1: e2e probe",
          "--body", "closes S-1", "--head", branch, "--base", "main"],
-        cwd=str(work), check=True, capture_output=True, text=True,
+        cwd=str(work), check=True, capture_output=True, text=True, encoding="utf-8",
     )
     pr_url = pr.stdout.strip()
     pr_num = int(pr_url.rsplit("/", 1)[-1])
@@ -443,7 +443,7 @@ def test_real_github_pr_roundtrip(tmp_path: Path) -> None:
                        cwd=str(work), check=True, capture_output=True)
         log = subprocess.run(
             ["git", "log", "-1", "--format=%s", "origin/main"],
-            cwd=str(work), capture_output=True, text=True,
+            cwd=str(work), capture_output=True, text=True, encoding="utf-8",
         ).stdout
         if f"PR#{pr_num}" in log and "ci-materialization" in log.lower():
             found_commit = True

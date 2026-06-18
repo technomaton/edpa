@@ -157,7 +157,7 @@ def run_validate() -> tuple[int, str, str]:
         "validate",
     ]
     proc = subprocess.run(
-        cmd, cwd=str(SANDBOX), capture_output=True, text=True, check=False
+        cmd, cwd=str(SANDBOX), capture_output=True, text=True, check=False, encoding="utf-8"
     )
     return proc.returncode, proc.stdout, proc.stderr
 
@@ -191,7 +191,7 @@ def check_validate_iterations() -> tuple[int, str]:
         str(SANDBOX / ".edpa" / "engine" / "scripts" / "validate_iterations.py"),
     ]
     proc = subprocess.run(
-        cmd, cwd=str(SANDBOX), capture_output=True, text=True, check=False
+        cmd, cwd=str(SANDBOX), capture_output=True, text=True, check=False, encoding="utf-8"
     )
     return proc.returncode, (proc.stdout + proc.stderr).strip()
 
@@ -205,7 +205,7 @@ def run_board() -> tuple[bool, int, int, int]:
         str(BOARD_HTML),
     ]
     proc = subprocess.run(
-        cmd, cwd=str(SANDBOX), capture_output=True, text=True, check=False
+        cmd, cwd=str(SANDBOX), capture_output=True, text=True, check=False, encoding="utf-8"
     )
     print(proc.stdout.strip() or "(no stdout)")
     if proc.stderr.strip():

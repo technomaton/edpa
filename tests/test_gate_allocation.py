@@ -170,7 +170,7 @@ def test_no_change_diff_ignored(tmp_path):
 
 
 def _git_head(repo):
-    r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True)
+    r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, encoding="utf-8")
     return r.stdout.strip()
 
 
@@ -203,7 +203,7 @@ def _run_engine(repo, edpa, iteration="PI-2026-1.1"):
         [sys.executable, str(SCRIPTS / "engine.py"),
          "--edpa-root", str(edpa), "--iteration", iteration,
          "--output", str(out)],
-        cwd=repo, capture_output=True, text=True,
+        cwd=repo, capture_output=True, text=True, encoding="utf-8",
     )
     assert r.returncode == 0, r.stderr
     return json.loads(out.read_text())
@@ -280,7 +280,7 @@ def test_demo_runs_without_mode_arg(tmp_path):
     so gate_events is empty and engine credits Done items declaratively)."""
     r = subprocess.run(
         [sys.executable, str(SCRIPTS / "engine.py"), "--demo"],
-        cwd=tmp_path, capture_output=True, text=True,
+        cwd=tmp_path, capture_output=True, text=True, encoding="utf-8",
     )
     assert r.returncode == 0, r.stderr
 

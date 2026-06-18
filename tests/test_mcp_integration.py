@@ -55,7 +55,7 @@ class MCPClient:
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
-            env=env,
+            env=env, encoding="utf-8",
         )
         self._next_id = 1
 

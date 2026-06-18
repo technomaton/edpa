@@ -261,7 +261,7 @@ def _run(cmd: list[str], *, timeout: int = 60) -> tuple[int, str, str]:
             capture_output=True,
             text=True,
             timeout=timeout,
-            check=False,
+            check=False, encoding="utf-8",
         )
     except FileNotFoundError as exc:
         return 127, "", f"command not found: {exc}"

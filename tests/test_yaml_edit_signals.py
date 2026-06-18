@@ -216,7 +216,7 @@ class TestCollectIntegration(unittest.TestCase):
 
     def _run(self, cmd, cwd=None, env=None):
         return subprocess.run(cmd, shell=True, cwd=cwd, env=env,
-                              check=True, capture_output=True, text=True)
+                              check=True, capture_output=True, text=True, encoding="utf-8")
 
     def _commit(self, msg, email, ts_iso, name="Test User"):
         env = {**os.environ,

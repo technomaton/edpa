@@ -146,3 +146,27 @@ def test_all_subprocess_text_pins_utf8() -> None:
         + "\nFix: add encoding=\"utf-8\" to each call (or capture bytes if the "
         "output is genuinely binary)."
     )
+
+
+# The test suite itself shells out to git / project_setup / the engine and
+# reads the result in text mode — E2E + onboarding flows produce backlog
+# titles and commit messages with diacritics. A contributor running `pytest`
+# on a cp1252 Windows box hits the exact same UnicodeDecodeError (D-23). Tests
+# aren't shipped, but Windows contributors are real, so hold them to the same
+# bar. (This guard file has no subprocess calls; it does not flag itself.)
+TESTS_ROOT = Path(__file__).resolve().parent
+
+
+def test_test_suite_subprocess_pins_utf8() -> None:
+    failures = {
+        str(path.relative_to(TESTS_ROOT)): v
+        for path in sorted(TESTS_ROOT.rglob("*.py"))
+        if (v := _subprocess_text_violations(path))
+    }
+    assert not failures, (
+        "test-suite subprocess in text mode without encoding='utf-8' — crashes "
+        "on a cp1252 Windows box the moment git/engine output carries a "
+        "diacritic (D-23):\n"
+        + "\n".join(f"  {name}: {sites}" for name, sites in failures.items())
+        + "\nFix: add encoding=\"utf-8\" to each call."
+    )

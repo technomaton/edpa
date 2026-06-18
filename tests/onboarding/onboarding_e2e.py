@@ -122,7 +122,7 @@ def check_setup_skill_vendors() -> None:
         proc = subprocess.run(
             [sys.executable, str(PROJECT_SETUP),
              "--with-ci", "--with-hooks", "--with-rules"],
-            cwd=sb, capture_output=True, text=True,
+            cwd=sb, capture_output=True, text=True, encoding="utf-8",
         )
         engine_scripts = sb / ".edpa" / "engine" / "scripts"
         backlog = engine_scripts / "backlog.py"   # skill Step 3 target
@@ -181,7 +181,7 @@ def check_hook_skips_fresh() -> None:
         env["CLAUDE_PLUGIN_ROOT"] = str(PLUGIN)
         proc = subprocess.run(
             ["sh", str(UPDATE_ENGINE_SH)], cwd=sb,
-            capture_output=True, text=True, env=env,
+            capture_output=True, text=True, env=env, encoding="utf-8",
         )
         absent = not (sb / ".edpa" / "engine").exists()
         record(
@@ -208,7 +208,7 @@ def check_hook_updates_existing() -> None:
         env["CLAUDE_PLUGIN_ROOT"] = str(PLUGIN)
         proc = subprocess.run(
             ["sh", str(UPDATE_ENGINE_SH)], cwd=sb,
-            capture_output=True, text=True, env=env,
+            capture_output=True, text=True, env=env, encoding="utf-8",
         )
         new_version = (engine / "VERSION").read_text().strip()
         last_err = (proc.stderr.strip().splitlines() or [""])[-1]

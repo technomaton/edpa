@@ -98,7 +98,7 @@ def _plant_minimal_backlog(target: Path):
 def _run(target: Path, *args):
     return subprocess.run(
         [sys.executable, str(target / ".edpa" / "engine" / "scripts" / args[0]), *args[1:]],
-        cwd=target, capture_output=True, text=True,
+        cwd=target, capture_output=True, text=True, encoding="utf-8",
     )
 
 
@@ -179,7 +179,7 @@ def test_engine_runs_with_template_people(project):
         [sys.executable, str(project / ".edpa" / "engine" / "scripts" / "engine.py"),
          "--edpa-root", str(project / ".edpa"),
          "--iteration", "PI-2026-1.1"],
-        cwd=project, capture_output=True, text=True,
+        cwd=project, capture_output=True, text=True, encoding="utf-8",
     )
     assert r.returncode == 0, r.stderr
     assert "All invariants passed: YES" in r.stdout

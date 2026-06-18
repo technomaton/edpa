@@ -30,7 +30,7 @@ def _git(args, cwd, env_extra=None, check=True):
     if env_extra:
         env.update(env_extra)
     return subprocess.run(["git", *args], cwd=str(cwd), env=env,
-                          check=check, capture_output=True, text=True)
+                          check=check, capture_output=True, text=True, encoding="utf-8")
 
 
 @pytest.fixture

@@ -30,7 +30,7 @@ def _run(cwd: Path, env_extra: dict | None = None) -> subprocess.CompletedProces
     return subprocess.run(
         ["sh", str(HOOK)],
         cwd=str(cwd), env=env,
-        capture_output=True, text=True, timeout=30,
+        capture_output=True, text=True, timeout=30, encoding="utf-8",
     )
 
 

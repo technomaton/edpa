@@ -196,7 +196,7 @@ def verify_snapshots() -> list[dict]:
 def run_backlog_status() -> str:
     """Phase 3 — backlog.py status must exit 0."""
     cmd = ['python3', str(SANDBOX / '.edpa/engine/scripts/backlog.py'), 'status']
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=SANDBOX)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=SANDBOX, encoding="utf-8")
     sys.stdout.write(result.stdout)
     if result.returncode != 0:
         sys.stderr.write(result.stderr)

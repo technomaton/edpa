@@ -26,7 +26,7 @@ def _git(args, cwd, env_extra=None):
     if env_extra:
         env.update(env_extra)
     return subprocess.run(["git", *args], cwd=str(cwd), env=env, check=True,
-                          capture_output=True, text=True).stdout
+                          capture_output=True, text=True, encoding="utf-8").stdout
 
 
 def _write_md(repo: Path, rel: str, fm: dict, body: str = "") -> Path:
