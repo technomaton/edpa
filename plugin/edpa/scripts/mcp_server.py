@@ -635,6 +635,30 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="edpa_pi_close",
+            description=(
+                "Close a Program Increment: verify every child iteration is "
+                "closed, flip the PI-level `pi.status` to 'closed' in "
+                ".edpa/iterations/{id}.yaml, and (re)write the PI rollup report "
+                "(.edpa/reports/pi-{id}/pi_results.json + summary.md). The id "
+                "must be PI-level (PI-YYYY-N) — NOT an iteration id. Pass "
+                "force=true to roll up even if some iterations are still open "
+                "(skips the guard). Write only; no git commit (the "
+                "/edpa:close-pi command owns the commit). Delegates to "
+                "pi_close.py — the single source of behavior. Re-runnable: "
+                "regenerates the rollup, no-op on an already-closed status."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "force": {"type": "boolean"},
+                },
+                "required": ["id"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
             name="edpa_pi_board",
             description=(
                 "Generate the self-contained PI planning / overview HTML for a "
@@ -1662,6 +1686,42 @@ def _handle_pi_create(edpa_root: Path, args: dict) -> list[TextContent]:
     return _ok({"id": result["id"], "path": rel_path})
 
 
+def _handle_pi_close(edpa_root: Path, args: dict) -> list[TextContent]:
+    """Close a PI by delegating to pi_close.close_pi — the single source of
+    behavior (also driven by the /edpa:close-pi command).
+
+    Verifies every child iteration is closed (unless force), flips the PI-level
+    pi.status to 'closed', and writes the rollup report. Write only; no git
+    commit, consistent with the other MCP write tools (the CLI layer commits).
+    NOT @_idempotent: the rollup must stay re-runnable as iteration data
+    changes. close_pi() raises ValueError on a bad id, a PI with no iterations,
+    or a still-open iteration — surfaced via _err.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from pi_close import close_pi  # noqa: E402
+        result = close_pi(
+            edpa_root, args.get("id", ""),
+            force=bool(args.get("force", False)))
+    except ValueError as exc:
+        return _err(str(exc))
+    finally:
+        sys.path.pop(0)
+
+    logger.info("edpa_pi_close: id=%s status_changed=%s",
+                result["pi"], result["status_changed"])
+    root = edpa_root.parent
+    return _ok({
+        "id": result["pi"],
+        "status": result["status"],
+        "status_changed": result["status_changed"],
+        "iteration_count": result["iteration_count"],
+        "open_iterations": result["open_iterations"],
+        "results_path": str(Path(result["results_path"]).relative_to(root)),
+        "summary_path": str(Path(result["summary_path"]).relative_to(root)),
+    })
+
+
 def _load_depends_on_map(edpa_root: Path) -> dict:
     """Map every backlog item id -> its depends_on list (scans all type dirs)."""
     graph: dict[str, list[str]] = {}
@@ -2098,6 +2158,7 @@ TOOL_HANDLERS = {
     "edpa_iteration_create": _handle_iteration_create,
     "edpa_iteration_close": _handle_iteration_close,
     "edpa_pi_create": _handle_pi_create,
+    "edpa_pi_close": _handle_pi_close,
     "edpa_people_upsert": _handle_people_upsert,
 }
 

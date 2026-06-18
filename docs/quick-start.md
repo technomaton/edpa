@@ -110,6 +110,10 @@ python3 .edpa/engine/scripts/engine.py \
   --iteration PI-2026-1.1
 ```
 
+> **Closing the whole PI?** Once every iteration in the PI is closed, roll it up
+> with `/edpa:close-pi PI-2026-1` — it flips the PI status and writes the
+> aggregate report (`.edpa/reports/pi-PI-2026-1/summary.md`).
+
 ## Step 7: Review outputs
 
 Check the generated reports in `.edpa/reports/iteration-PI-2026-1.1/`:

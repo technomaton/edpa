@@ -16,6 +16,7 @@ YAML is the source of truth, git is the audit trail. GitHub Projects sync is
 |----------------------|------------------------------------|--------|
 | `/edpa:setup`        | `.edpa/engine/scripts/project_setup.py` | ✅ vendors engine + seeds `.edpa/` (local-first) |
 | `/edpa:create-pi`    | `.edpa/engine/scripts/create_pi.py` | ✅ writes the PI-level `pi:` file (also `edpa_pi_create` MCP tool) |
+| `/edpa:close-pi`     | `.edpa/engine/scripts/pi_close.py` | ✅ guard iterations → flip `pi.status` → write rollup (also `edpa_pi_close` MCP tool) |
 | `/edpa:close-iteration` | `.edpa/engine/scripts/engine.py` → `/edpa:reports` skill | ✅ verified by `tests/test_invariants.py`, `tests/test_gate_allocation.py` |
 | `/edpa:reports`      | `/edpa:reports` skill (no script)   | ✅ manual + skill execution |
 | `/edpa:board`        | `.edpa/engine/scripts/board.py`    | ✅ manual run |
@@ -88,7 +89,7 @@ engine + `.edpa/` tree.
 **Expected output (last steps):**
 
 ```
-  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (50 scripts, VERSION 2.8.2)
+  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (50 scripts, VERSION 2.9.0)
   [2] Directory tree   ✓ Directory tree at .edpa/
   [3] Config templates ✓ Seeded people.yaml, edpa.yaml, cw_heuristics.yaml
   [4] ID counter       ✓ id_counters.yaml seeded

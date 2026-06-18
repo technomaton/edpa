@@ -232,7 +232,7 @@ class TestToolsAdvertised:
                 "edpa_objective_set", "edpa_objective_remove",
                 "edpa_confidence_vote",
                 "edpa_iteration_create", "edpa_iteration_close",
-                "edpa_pi_create", "edpa_people_upsert",
+                "edpa_pi_create", "edpa_pi_close", "edpa_people_upsert",
                 # Read tools added in F1 / E2 / F2 / F4
                 "edpa_forecast_pi",
                 "edpa_pi_metrics",

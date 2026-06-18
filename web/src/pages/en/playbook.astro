@@ -581,7 +581,8 @@ TOTAL_DEVIATION=0.824000</code></pre>
     <pre><code>/edpa:close-iteration PI-2026-1.X    # close the iteration
 /edpa:reports PI-2026-1.X             # generate reports</code></pre>
     <p>Every PI:</p>
-    <pre><code>/edpa:calibrate                       # calibrate signal weights</code></pre>
+    <pre><code>/edpa:close-pi PI-2026-1               # close the PI: guard iterations, status, rollup
+/edpa:calibrate                       # calibrate signal weights</code></pre>
 
     <h3>Each iteration (1 week AI-native / 2 weeks classic)</h3>
     <ol>
@@ -696,6 +697,7 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
           <tr><td><code>/edpa:add</code></td><td>Add a backlog item (local, auto-commit)</td></tr>
           <tr><td><code>/edpa:close-iteration PI-2026-1.X</code></td><td>Close an iteration — capacity, EDPA engine, reports</td></tr>
           <tr><td><code>/edpa:reports PI-2026-1.X</code></td><td>Generate timesheets and PI summary</td></tr>
+          <tr><td><code>/edpa:close-pi PI-2026-1</code></td><td>Close a PI — guard iterations, flip <code>pi.status</code>, rollup report</td></tr>
           <tr><td><code>/edpa:board</code></td><td>Visual HTML Kanban board (local)</td></tr>
           <tr><td><code>/edpa:calibrate</code></td><td>Calibrate signal weights — MAD, propose <code>cw_heuristics.yaml</code> adjustments</td></tr>
         </tbody>

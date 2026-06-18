@@ -190,11 +190,13 @@ def test_skills_exist():
     # marketplace flow.
     # v1.19.5 dropped 5 wrapper commands (add/sync/setup/reports/
     # calibrate) that just invoked the same-named skill — they caused
-    # duplicate /add + /edpa:add entries in the palette. Only commands
-    # without a corresponding skill remain: close-iteration and board.
+    # duplicate /add + /edpa:add entries in the palette. Commands without
+    # a corresponding skill: close-iteration, board, and close-pi (the PI
+    # rollup front-end, D-24).
     required_commands = [
         "plugin/commands/close-iteration.md",
         "plugin/commands/board.md",
+        "plugin/commands/close-pi.md",
     ]
 
     missing = []
@@ -210,7 +212,7 @@ def test_skills_exist():
     commands = plugin.get("commands", [])
     command_basenames = {Path(c).name for c in commands}
 
-    expected_basenames = {"close-iteration.md", "board.md"}
+    expected_basenames = {"close-iteration.md", "board.md", "close-pi.md"}
     missing_refs = expected_basenames - command_basenames
     assert not missing_refs, (
         f"plugin.json missing command references: {missing_refs}"

@@ -576,7 +576,8 @@ TOTAL_DEVIATION=0.824000</code></pre>
     <pre><code>/edpa:close-iteration PI-2026-1.X    # uzavreni iterace
 /edpa:reports PI-2026-1.X             # generovani reportu</code></pre>
     <p>Každý PI:</p>
-    <pre><code>/edpa:calibrate                       # kalibrace signalovych vah</code></pre>
+    <pre><code>/edpa:close-pi PI-2026-1               # uzavreni PI: guard iteraci, status, rollup
+/edpa:calibrate                       # kalibrace signalovych vah</code></pre>
 
     <h3>Každá iterace (1 týden AI-native / 2 týdny classic)</h3>
     <ol>
@@ -691,6 +692,7 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
           <tr><td><code>/edpa:add</code></td><td>Přidá backlog item (lokálně, auto-commit)</td></tr>
           <tr><td><code>/edpa:close-iteration PI-2026-1.X</code></td><td>Uzavření iterace — kapacita, EDPA engine, reporty</td></tr>
           <tr><td><code>/edpa:reports PI-2026-1.X</code></td><td>Generování výkazů a PI summary</td></tr>
+          <tr><td><code>/edpa:close-pi PI-2026-1</code></td><td>Uzavření PI — guard iterací, flip <code>pi.status</code>, rollup report</td></tr>
           <tr><td><code>/edpa:board</code></td><td>Vizuální HTML Kanban board (lokální)</td></tr>
           <tr><td><code>/edpa:calibrate</code></td><td>Kalibrace signálových vah — MAD, návrh úprav <code>cw_heuristics.yaml</code></td></tr>
         </tbody>

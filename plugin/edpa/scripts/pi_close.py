@@ -16,13 +16,16 @@ Usage:
     python3 .claude/edpa/scripts/pi_close.py --pi PI-2026-1 --edpa-root .edpa
 """
 
-try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
-    import _console  # noqa: F401
-except ImportError:
-    pass
+# NOTE: ``_console`` (UTF-8 stdout reconfigure as an import side effect) is
+# imported lazily inside ``main()``, NOT at module top — because ``mcp_server``
+# imports :func:`close_pi` and must keep stdout pristine for JSON-RPC framing.
+# Only the CLI opts into the UTF-8 reconfigure. (Mirrors create_pi.py.)
 import argparse
 import json
+import os
+import re
 import sys
+import tempfile
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,6 +60,49 @@ def load_json(path: Path):
     except (json.JSONDecodeError, OSError) as exc:
         print(f"WARNING: load_json({path}) failed: {exc}", file=sys.stderr)
         return None
+
+
+# PI-level id only (no ``.iteration`` suffix). Mirrors create_pi.PI_ID_RE.
+PI_ID_RE = re.compile(r"^PI-\d{4}-\d{1,2}$")
+
+
+def _write_yaml_atomic(path: Path, data: dict) -> None:
+    """tmp + rename; ``safe_dump(sort_keys=False, allow_unicode=True)``.
+
+    Local copy (mirrors create_pi._write_yaml_atomic) so this script stays
+    runnable without importing the MCP layer.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(suffix=".yaml", prefix=f".{path.stem}_",
+                               dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f, sort_keys=False,
+                           default_flow_style=False, allow_unicode=True)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def open_iterations(iteration_files):
+    """Ids of child iterations whose status is not ``closed``.
+
+    Lifecycle ``closed`` may live on the nested ``iteration.status`` or the
+    top-level ``status`` (both written by edpa_iteration_close) — accept either.
+    """
+    open_ids = []
+    for f in iteration_files:
+        data = load_yaml(f) or {}
+        it = data.get("iteration") or {}
+        status = it.get("status") or data.get("status")
+        if status != "closed":
+            open_ids.append(it.get("id") or f.stem)
+    return open_ids
 
 
 def find_iterations(edpa_root: Path, pi_id: str):
@@ -261,18 +307,139 @@ def render_summary_md(result: dict) -> str:
     return "\n".join(lines)
 
 
+def close_pi(edpa_root, pi_id, *, force=False) -> dict:
+    """Close a PI: require all child iterations closed, flip the PI-level
+    ``pi.status`` to ``closed``, then (re)write the rollup report.
+
+    ``edpa_root`` is the ``.edpa/`` directory; ``pi_id`` must be PI-level
+    (``PI-YYYY-N``). Raises ``ValueError`` on a bad id, a PI with no child
+    iterations, or a still-open iteration (unless ``force``) — callers map that
+    to their own channel (MCP -> ``_err``, CLI -> stderr). Does NOT commit; the
+    CLI/command layer owns the git commit, like create_pi. Returns a result
+    dict carrying the rollup summary and what changed.
+    """
+    edpa_root = Path(edpa_root)
+    if not isinstance(pi_id, str) or not PI_ID_RE.match(pi_id):
+        raise ValueError(
+            f"invalid PI id {pi_id!r}; expected PI-YYYY-N (e.g. PI-2026-1) "
+            f"with no .iteration suffix")
+
+    iteration_files = find_iterations(edpa_root, pi_id)
+    if not iteration_files:
+        raise ValueError(
+            f"No iterations found for {pi_id} in {edpa_root}/iterations/")
+
+    still_open = open_iterations(iteration_files)
+    if still_open and not force:
+        raise ValueError(
+            f"{len(still_open)} iteration(s) still open: "
+            f"{', '.join(still_open)}. Close them first "
+            f"(/edpa:close-iteration) or pass force to roll up anyway.")
+
+    # Flip the PI-level status. The PI metadata file is optional — without it
+    # the PI list is derived from child iterations (_pi_loader), so the rollup
+    # still works; there is simply no explicit status to set.
+    pi_path = edpa_root / "iterations" / f"{pi_id}.yaml"
+    pi_file_present = pi_path.is_file()
+    status_changed = False
+    if pi_file_present:
+        pi_data = load_yaml(pi_path) or {}
+        pi_block = pi_data.get("pi")
+        if not isinstance(pi_block, dict):
+            pi_block = {"id": pi_id}
+        if pi_block.get("status") != "closed":
+            pi_block["status"] = "closed"
+            pi_data["pi"] = pi_block
+            _write_yaml_atomic(pi_path, pi_data)
+            status_changed = True
+
+    result, err = build_pi_results(edpa_root, pi_id)
+    if err:  # unreachable given the find_iterations guard, but stay defensive
+        raise ValueError(err)
+    out_dir = edpa_root / "reports" / f"pi-{pi_id}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    results_path = out_dir / "pi_results.json"
+    summary_path = out_dir / "summary.md"
+    results_path.write_text(
+        json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+    summary_path.write_text(render_summary_md(result), encoding="utf-8")
+
+    return {
+        "pi": pi_id,
+        "status": "closed",
+        "status_changed": status_changed,
+        "pi_file_present": pi_file_present,
+        "forced": bool(still_open),
+        "open_iterations": still_open,
+        "iteration_count": result["summary"]["iteration_count"],
+        "results_path": str(results_path),
+        "summary_path": str(summary_path),
+        "summary": result["summary"],
+    }
+
+
 def main():
+    try:  # best-effort UTF-8 stdio on legacy Windows consoles — CLI only
+        import _console  # noqa: F401
+    except ImportError:
+        pass
     parser = argparse.ArgumentParser(description="EDPA PI Close — aggregate PI metrics")
     parser.add_argument("--pi", required=True, help="PI ID (e.g., PI-2026-1)")
     parser.add_argument("--edpa-root", default=".edpa", type=Path)
     parser.add_argument("--output-dir", type=Path, default=None,
-                        help="Output directory (default: <edpa-root>/reports/pi-<PI>)")
+                        help="Output directory (default: <edpa-root>/reports/pi-<PI>). "
+                             "Ignored with --close (canonical location is used).")
+    parser.add_argument("--close", action="store_true",
+                        help="Full close: require all child iterations closed, "
+                             "flip pi.status to closed, roll up, then commit.")
+    parser.add_argument("--force", action="store_true",
+                        help="With --close, roll up even if some iterations are "
+                             "still open (skips the guard).")
+    parser.add_argument("--no-commit", action="store_true",
+                        help="With --close, skip the git add/commit.")
     args = parser.parse_args()
 
     if not args.edpa_root.is_dir():
         print(f"ERROR: {args.edpa_root} not found", file=sys.stderr)
         return 2
 
+    if args.close:
+        try:
+            res = close_pi(args.edpa_root, args.pi, force=args.force)
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        s = res["summary"]
+        flip = ("status -> closed" if res["status_changed"]
+                else "status already closed" if res["pi_file_present"]
+                else "no PI metadata file")
+        print(f"PI {args.pi} closed: {res['iteration_count']} iterations, "
+              f"{s['total_delivered_sp']}/{s['total_planned_sp']} SP, "
+              f"{s['avg_predictability_pct']}% predictability ({flip})")
+        print(f"  -> {res['results_path']}")
+        print(f"  -> {res['summary_path']}")
+        if res["forced"]:
+            print(f"WARNING: rolled up with {len(res['open_iterations'])} open "
+                  f"iteration(s): {', '.join(res['open_iterations'])}",
+                  file=sys.stderr)
+        if not args.no_commit:
+            paths = [res["results_path"], res["summary_path"]]
+            if res["status_changed"]:
+                paths.append(str(args.edpa_root / "iterations" / f"{args.pi}.yaml"))
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            try:
+                from _auto_commit import maybe_commit
+                if maybe_commit(paths, f"chore(pi): close {args.pi}",
+                                root=str(args.edpa_root.parent)) == "skipped":
+                    print("WARNING: auto-commit skipped (no git, or git "
+                          "user.name/email unset) — commit manually.",
+                          file=sys.stderr)
+            except ImportError:
+                print("WARNING: _auto_commit unavailable — commit manually.",
+                      file=sys.stderr)
+        return 0
+
+    # default: rollup-only (no status flip, no guard) — back-compat path
     result, err = build_pi_results(args.edpa_root, args.pi)
     if err:
         print(f"ERROR: {err}", file=sys.stderr)

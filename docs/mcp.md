@@ -5,7 +5,7 @@ read-only access to `.edpa/` project data — config, iterations, people,
 backlog — over the standard MCP `stdio` transport. Any MCP-aware client
 (Claude Code, Cursor, Codex CLI, custom Python/TS clients) can read it.
 
-**Production-ready since v1.3.0-beta; current as of v2.8.2** (read + write
+**Production-ready since v1.3.0-beta; current as of v2.9.0** (read + write
 tools — see the tool tables below). Validated handlers, schema-checked
 inputs, item-ID path-traversal guard, stderr logging, version-aware identity.
 
@@ -234,7 +234,7 @@ the calling skill/command owns the commit. Full set: `edpa_item_create`,
 `edpa_item_update`, `edpa_item_transition`, `edpa_item_link_parent`,
 `edpa_item_link_dep`, `edpa_item_roam`, `edpa_objective_set`,
 `edpa_objective_remove`, `edpa_confidence_vote`, `edpa_iteration_create`,
-`edpa_iteration_close`, `edpa_pi_create`, `edpa_people_upsert`.
+`edpa_iteration_close`, `edpa_pi_create`, `edpa_pi_close`, `edpa_people_upsert`.
 
 #### `edpa_pi_create`
 
@@ -250,6 +250,24 @@ PI. The filename is always `.yaml` (the loader globs `*.yaml`; a `.yml` is
 silently ignored). Delegates to `create_pi.py`, the single source of behavior
 also used by the `/edpa:create-pi` command. Does not
 scaffold child iterations — add those with `edpa_iteration_create`.
+
+#### `edpa_pi_close`
+
+```json
+{ "id": "PI-2026-1" }
+```
+
+Closes a Program Increment: verifies **every child iteration is `closed`**, flips
+the PI-level `pi.status` to `closed` in `.edpa/iterations/<id>.yaml`, and
+(re)writes the PI rollup report (`.edpa/reports/pi-<id>/pi_results.json` +
+`summary.md` — aggregated SP, predictability, per-person derived hours, completed
+Features). `id` must be **PI-level** (`PI-YYYY-N`); an iteration id is rejected.
+Pass `force: true` to roll up even when some iterations are still open (the
+rollup then under-reports — it only sums closed iterations). Re-runnable:
+regenerates the rollup and is a no-op on an already-closed status. Delegates to
+`pi_close.py`, the single source of behavior also used by the `/edpa:close-pi`
+command. The PI-level counterpart to `edpa_pi_create`; distinct from
+`edpa_iteration_close`, which closes a single iteration.
 
 #### `edpa_item_link_dep`
 
@@ -350,7 +368,7 @@ What changed from the v1.0–v1.2 prototype (kept as design rationale):
 ## Security model
 
 - **Local-first writes.** Read tools never mutate state. The V2 write tools
-  (`edpa_item_*`, `edpa_iteration_*`, `edpa_pi_create`, `edpa_people_upsert`)
+  (`edpa_item_*`, `edpa_iteration_*`, `edpa_pi_create`, `edpa_pi_close`, `edpa_people_upsert`)
   write `.edpa/` files via atomic tmp+rename and do not commit or call the
   network; the calling skill/command owns the commit.
 - **Path traversal blocked.** `item_id` parameter is the only user input that

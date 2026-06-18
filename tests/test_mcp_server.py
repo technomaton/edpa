@@ -262,17 +262,18 @@ def test_handle_item_feature():
 # ---------------------------------------------------------------------------
 
 def test_list_tools():
-    """Returns the documented EDPA V2 tool surface (11 read + 13 write).
+    """Returns the documented EDPA V2 tool surface (14 read + 14 write).
 
     edpa_sync_people was removed in V2.0 along with sync_collaborators.py.
     edpa_pi_create was added in 2.2.0; edpa_pi_board (PI planning HTML),
     edpa_item_link_dep (dependencies), edpa_item_roam (ROAM), and the PI
     objectives tools (set / remove / confidence) added later.
     edpa_forecast_pi added in F1; edpa_pi_metrics added in E2; edpa_insights in F2;
-    edpa_ai_attribution in F4; edpa_payroll_export in F3.
+    edpa_ai_attribution in F4; edpa_payroll_export in F3;
+    edpa_pi_close (PI rollup front-end) in D-24.
     """
     tools = asyncio.run(mcp_server.list_tools())
-    assert len(tools) == 27
+    assert len(tools) == 28
 
     names = {t.name for t in tools}
     expected_read = {"edpa_status", "edpa_iterations", "edpa_people",
@@ -286,7 +287,7 @@ def test_list_tools():
                       "edpa_objective_set", "edpa_objective_remove",
                       "edpa_confidence_vote",
                       "edpa_iteration_create", "edpa_iteration_close",
-                      "edpa_pi_create", "edpa_people_upsert"}
+                      "edpa_pi_create", "edpa_pi_close", "edpa_people_upsert"}
     assert names == expected_read | expected_write
 
     # Verify each tool has a description and inputSchema

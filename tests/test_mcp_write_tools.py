@@ -1,6 +1,6 @@
 """Tests for V2 MCP write tools (mcp_server.py + id_counter.py).
 
-Covers all 8 write handlers:
+Covers the V2 write handlers, including:
   - edpa_item_create
   - edpa_item_update
   - edpa_item_transition
@@ -8,6 +8,7 @@ Covers all 8 write handlers:
   - edpa_iteration_create
   - edpa_iteration_close
   - edpa_pi_create
+  - edpa_pi_close
   - edpa_people_upsert
 
 Each test uses an isolated tmp .edpa/ tree (no shared state with the
@@ -42,6 +43,7 @@ from mcp_server import (  # noqa: E402
     _handle_iteration_create,
     _handle_people_upsert,
     _handle_pi_board,
+    _handle_pi_close,
     _handle_pi_create,
 )
 
@@ -708,6 +710,79 @@ def test_pi_create_rejects_duplicate(edpa_root: Path) -> None:
     result = _handle_pi_create(edpa_root, {"id": "PI-2026-2"})
     assert _is_err(result)
     assert "already exists" in result[0].text
+
+
+# ---------------------------------------------------------------------------
+# edpa_pi_close (thin delegate to pi_close.close_pi)
+# ---------------------------------------------------------------------------
+
+def _setup_pi(edpa_root: Path, pi: str = "PI-2026-2", *, close_iter: bool = True) -> str:
+    """Create a PI with one child iteration; close the iteration unless told not to."""
+    _parse(_handle_pi_create(edpa_root, {"id": pi, "pi_iterations": 1, "status": "active"}))
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": f"{pi}.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    if close_iter:
+        _parse(_handle_iteration_close(edpa_root, {"id": f"{pi}.1"}))
+    return pi
+
+
+def test_pi_close_flips_status_and_writes_rollup(edpa_root: Path) -> None:
+    _setup_pi(edpa_root)
+    data = _parse(_handle_pi_close(edpa_root, {"id": "PI-2026-2"}))
+    assert data["status"] == "closed"
+    assert data["status_changed"] is True
+    assert data["iteration_count"] == 1
+    assert data["results_path"] == ".edpa/reports/pi-PI-2026-2/pi_results.json"
+    # PI-level status flipped to closed (nested under the pi: block).
+    parsed = yaml.safe_load((edpa_root / "iterations" / "PI-2026-2.yaml").read_text())
+    assert parsed["pi"]["status"] == "closed"
+    # Rollup artifacts written.
+    assert (edpa_root / "reports" / "pi-PI-2026-2" / "pi_results.json").exists()
+    assert (edpa_root / "reports" / "pi-PI-2026-2" / "summary.md").exists()
+
+
+def test_pi_close_guard_rejects_open_iteration(edpa_root: Path) -> None:
+    _setup_pi(edpa_root, close_iter=False)
+    result = _handle_pi_close(edpa_root, {"id": "PI-2026-2"})
+    assert _is_err(result)
+    assert "still open" in result[0].text
+    assert "PI-2026-2.1" in result[0].text
+    # Status untouched and no rollup written when the guard fires.
+    parsed = yaml.safe_load((edpa_root / "iterations" / "PI-2026-2.yaml").read_text())
+    assert parsed["pi"]["status"] == "active"
+    assert not (edpa_root / "reports" / "pi-PI-2026-2").exists()
+
+
+def test_pi_close_force_bypasses_guard(edpa_root: Path) -> None:
+    _setup_pi(edpa_root, close_iter=False)
+    data = _parse(_handle_pi_close(edpa_root, {"id": "PI-2026-2", "force": True}))
+    assert data["status"] == "closed"
+    assert data["open_iterations"] == ["PI-2026-2.1"]
+    parsed = yaml.safe_load((edpa_root / "iterations" / "PI-2026-2.yaml").read_text())
+    assert parsed["pi"]["status"] == "closed"
+
+
+def test_pi_close_rejects_iteration_level_id(edpa_root: Path) -> None:
+    result = _handle_pi_close(edpa_root, {"id": "PI-2026-2.1"})
+    assert _is_err(result)
+    assert "PI-YYYY-N" in result[0].text
+
+
+def test_pi_close_rejects_pi_without_iterations(edpa_root: Path) -> None:
+    _parse(_handle_pi_create(edpa_root, {"id": "PI-2026-2"}))
+    result = _handle_pi_close(edpa_root, {"id": "PI-2026-2"})
+    assert _is_err(result)
+    assert "No iterations" in result[0].text
+
+
+def test_pi_close_rerunnable_noop_on_closed_status(edpa_root: Path) -> None:
+    _setup_pi(edpa_root)
+    first = _parse(_handle_pi_close(edpa_root, {"id": "PI-2026-2"}))
+    assert first["status_changed"] is True
+    second = _parse(_handle_pi_close(edpa_root, {"id": "PI-2026-2"}))
+    assert second["status_changed"] is False  # already closed → no-op flip
+    assert second["status"] == "closed"
 
 
 # ---------------------------------------------------------------------------

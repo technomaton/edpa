@@ -70,6 +70,7 @@ plugin/
 │   ├── capacity.md                  # → /edpa:capacity       — per-iteration capacity overrides
 │   ├── server.md                    # → /edpa:server         — start/stop PI-planning server
 │   ├── create-pi.md                 # → /edpa:create-pi      — create the PI-level metadata file (pi: block)
+│   ├── close-pi.md                  # → /edpa:close-pi       — close a PI: guard iterations, flip pi.status, write rollup
 │   ├── pi-planning.md               # → /edpa:pi-planning    — self-contained PI planning / overview HTML
 │   ├── change-state.md              # → /edpa:change-state   — transition item status (wraps edpa_item_transition)
 │   ├── update.md                    # → /edpa:update         — update item fields with before/after diff
@@ -134,6 +135,7 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `/edpa:capacity` | command | Per-iteration per-person capacity overrides (PTO, overtime) |
 | `/edpa:board` | command | HTML Kanban snapshot from local backlog |
 | `/edpa:create-pi` | command | Create the PI-level `pi:` file (also `edpa_pi_create` MCP tool) |
+| `/edpa:close-pi` | command | Close a PI: guard all iterations closed, flip `pi.status`, write the rollup report (also `edpa_pi_close` MCP tool) |
 | `/edpa:pi-planning` | command | Self-contained PI planning / overview HTML — program board, objectives, ROAM, portfolio, WSJF, capacity (also `edpa_pi_board` MCP tool) |
 | `/edpa:change-state` | command | Transition item status with workflow validation (wraps `edpa_item_transition`) |
 | `/edpa:update` | command | Update item fields (`iteration`, `js`, WSJF inputs, `assignee`, `title`) with before/after diff |
@@ -221,6 +223,7 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 | `edpa_iteration_create` | Create a new iteration YAML | — |
 | `edpa_iteration_close` | Mark an iteration closed (audit state) | `/edpa:close-iteration` |
 | `edpa_pi_create` | Create the PI-level metadata file | `/edpa:create-pi` |
+| `edpa_pi_close` | Close a PI: guard iterations, flip `pi.status`, write rollup | `/edpa:close-pi` |
 | `edpa_pi_board` | Generate the self-contained PI planning HTML | `/edpa:pi-planning` |
 | `edpa_objective_set` | Add or update a PI objective (upsert by title) | `/edpa:objectives` |
 | `edpa_objective_remove` | Remove a PI objective | `/edpa:objectives` |

@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.9.0 — 2026-06-18 — `/edpa:close-pi`: a front-end for the PI rollup
+
+### Added
+
+- **`/edpa:close-pi` + `edpa_pi_close` MCP tool — a front-end for the PI rollup
+  (D-24).** `pi_close.py` (the PI-level rollup aggregator) was script-only: no
+  slash command and no MCP tool, unlike its sibling `create-pi`. Reaching for a
+  `pi-close` command found nothing, and the rollup had to be run by hand
+  (`python3 .edpa/engine/scripts/pi_close.py --pi …`). Added a thin script-first
+  front-end. `close-pi` now (1) **guards** that every child iteration is
+  `closed`, (2) flips the PI-level `pi.status` to `closed` in
+  `.edpa/iterations/<PI>.yaml`, then (3) writes the rollup
+  (`.edpa/reports/pi-<PI>/pi_results.json` + `summary.md`). `--force` rolls up
+  past still-open iterations (under-reports — only closed iterations are
+  summed); the path is re-runnable (no-op on an already-closed status). Distinct
+  from `/edpa:close-iteration`, which closes a single iteration (capacity prep +
+  engine + reports + frozen snapshot). The MCP tool is **not** idempotency-keyed
+  so the rollup stays re-runnable as iteration data changes.
+
+### Fixed
+
+- **`pi_close.py` imported `_console` at module top**, reconfiguring stdout to
+  UTF-8 as an import side effect. Harmless for the standalone CLI, but now that
+  `mcp_server` imports `close_pi`, the reconfigure would corrupt JSON-RPC
+  framing. Moved the import lazily into `main()`, matching the same fix already
+  in `create_pi.py`.
+
 ## 2.8.2 — 2026-06-18 — Windows cp1252 subprocess crash fix
 
 ### Fixed
