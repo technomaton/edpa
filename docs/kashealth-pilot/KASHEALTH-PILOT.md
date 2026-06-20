@@ -15,8 +15,9 @@
     Initiatives / Epics / Features (LBC, benefit hypothesis, acceptance
     criteria, NFRs, risks) se kredituje automaticky podle commitů nad
     `.edpa/backlog/<typ>/<id>.md` v okně iterace (create / block_add /
-    list_grow / scalar_change / lines_volume / contributors_rebalance /
-    revert).
+    list_grow / scalar_change / lines_volume / revert). D-26: signály se
+    materializují do `evidence[]` (engine čte snapshot, ne git; backfill /
+    bulk commity se discountují ×0.1).
   - **Gate events** — Feature/Epic/Initiative status transitions z git
     history kreditují autora commitu transition.
   - **Done credit** — Story/Defect s `iteration:` match a status=Done.

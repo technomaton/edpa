@@ -27,24 +27,28 @@ The Python CLI is fully standalone. Claude Code skills provide a more convenient
 
 ### Does EDPA work without GitHub?
 
-V2.1 evidence is **local-first**: post-commit hook + engine reads from `git log` are pure git, no GitHub API. You can run EDPA on any git repo (GitLab, Gitea, Bitbucket, plain self-hosted). GitHub Projects sync is an *optional* PM/BO UI layer; the optional CI workflow can add `pr_reviewer` + `issue_comment` signals if you want them, but the system is fully functional without either.
+V2.1 evidence is **local-first**: the post-commit hook reads `git log` (pure git, no GitHub API) and *materializes* the signals into each item's `evidence[]`. The engine is then a **pure reader of that materialized snapshot** — at compute time it does not scan git, it reads the `evidence[]` / `contributors[]` already written into the backlog YAML. You can run EDPA on any git repo (GitLab, Gitea, Bitbucket, plain self-hosted). GitHub Projects sync is an *optional* PM/BO UI layer; the optional CI workflow can add `pr_reviewer` + `issue_comment` signals if you want them, but the system is fully functional without either.
 
 ### Does EDPA work with Jira instead of GitHub?
 
-The core EDPA engine is git-native — it doesn't talk to either GitHub or Jira directly for evidence. If you want Jira as the PM UI instead of GitHub Projects, you'd swap the `sync` layer (optional anyway). The evidence collection (`commit_author`, `yaml_edit`, `gate_events`, `story_activity`) all runs against `git log` regardless of which UI tracks tickets.
+The core EDPA engine is git-native — it doesn't talk to either GitHub or Jira directly for evidence. If you want Jira as the PM UI instead of GitHub Projects, you'd swap the `sync` layer (optional anyway). Evidence *materialization* (`commit_author`, `yaml_edit`, `state_transition`, …) reads `git log` regardless of which UI tracks tickets — but it runs in the post-commit hook (or `/edpa:materialize`), not in the engine. The engine itself only reads the materialized `evidence[]` snapshot.
 
 ## Evidence Detection
 
 ### What if someone works on something but doesn't commit?
 
 EDPA v2.1 detects multiple evidence types beyond raw commits:
-- **`yaml_edit:*`** — engine reads structural edits to `.edpa/backlog/*.md` directly from `git log` (block adds, list growth, scalar changes, file create — captures refinement, AC, DoD work)
-- **`gate_event`** — F/E/I status transitions parsed from `git log`; each gate (LBC → design → refinement → Done) credits the commit author
+- **`yaml_edit:*`** — structural edits to `.edpa/backlog/*.md` (block adds, list growth, scalar changes, file create — captures refinement, AC, DoD work). D-26: materialized into the item's `evidence[]` with a structural `delta`; the engine reads the snapshot, not `git log`
+- **`state_transition` / `gate_event`** — status changes (who/when/from→to) materialized into `evidence[]`; F/E/I gate scoring (LBC → design → refinement → Done) derives from them, and they double as delivery-lead-time analytics
 - **`story_activity`** — C7.5 synthesizes in-flight Story credit when yaml_edit signals exist but the Story hasn't reached Done
 - **`manual:commit_message`** — `/contribute @person weight:X` parsed from commit body by post-commit hook (explicit additive signal)
 - **`pr_reviewer`, `issue_comment`** — optional, emitted only if you enable the CI workflow
 
 PMs, architects, and other non-coding roles generate evidence through yaml edits (writing LBC, AC, DoD), the `/contribute` directive in commit bodies, and (if enabled) GitHub reviews/comments.
+
+### What does `EDPA_NO_LOCAL_EVIDENCE=1` do?
+
+It gates **only the automatic post-commit hook** — set it and commits stop materializing signals on the fly (useful for bulk migrations or scripted history rewrites you don't want credited live). It does **not** disable evidence forever: the idempotent catch-up `local_evidence.py --materialize` (a.k.a. the `edpa_materialize` MCP tool / `/edpa:materialize`) **ignores** the flag and back-fills any missing signals, deduplicating by commit `ref`. So you can suppress live materialization and reconcile later without double-counting.
 
 ### What if the heuristic assigns wrong weights?
 
@@ -84,7 +88,7 @@ They're excluded with a warning. Job Size is required for EDPA calculation. Set 
 ### Is EDPA accepted by EU grant auditors?
 
 EDPA is designed for EU compliance (OP TAK, Horizon Europe). Its audit trail includes:
-1. Local git delivery evidence (commit_author, yaml_edit, gate_events, story_activity — all reproducible from `git log`)
+1. Local git delivery evidence (commit_author, yaml_edit, state_transition, story_activity — each materialized signal carries a commit-hash `ref`, so the trail is reproducible from `git log`)
 2. Capacity registry (versioned in Git)
 3. Frozen snapshots (immutable)
 4. Reproducible calculation (deterministic formula)

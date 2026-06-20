@@ -45,7 +45,7 @@ class TestScoreDiff(unittest.TestCase):
 
     def test_whitespace_only_diff_zero_weight(self):
         diff = ["+    ", "-    "]
-        weight, tags = score_diff(diff, W)
+        weight, tags, _ = score_diff(diff, W)
         self.assertEqual(weight, 0.0)
         self.assertIn("whitespace_only", tags)
 
@@ -53,7 +53,7 @@ class TestScoreDiff(unittest.TestCase):
         # transitions.py owns gate-event credit; yaml_edit must not
         # double-count when the only delta is a status field flip.
         diff = ["-status: Funnel", "+status: Reviewing"]
-        weight, _ = score_diff(diff, W)
+        weight, _, _ = score_diff(diff, W)
         self.assertEqual(weight, 0.0)
 
     def test_create_signal_fires_on_new_file(self):
@@ -65,7 +65,7 @@ class TestScoreDiff(unittest.TestCase):
 +status: Funnel
 +js: 8
 """)
-        weight, tags = score_diff(diff, W)
+        weight, tags, _ = score_diff(diff, W)
         self.assertGreaterEqual(weight, W["yaml_edit:create"])
         self.assertIn("create", tags)
 
@@ -79,7 +79,7 @@ class TestScoreDiff(unittest.TestCase):
 +benefit_hypothesis_statement: |
 +  We believe X will...
 """)
-        weight, tags = score_diff(diff, W)
+        weight, tags, _ = score_diff(diff, W)
         # block_add fires for both; benefit_hypothesis_statement also
         # registers as scalar_change since it has an inline value.
         self.assertTrue(any(t.startswith("block_add") for t in tags))
@@ -90,7 +90,7 @@ class TestScoreDiff(unittest.TestCase):
         # 30 list items added → cap at 10.
         bullets = "\n".join(f"+- AC-{i}: criterion {i}" for i in range(1, 31))
         diff = _diff(bullets)
-        weight, tags = score_diff(diff, W)
+        weight, tags, _ = score_diff(diff, W)
         # Cap=10 → 10×1.0 = 10.0 from list_grow alone.
         list_grow_credit = 10 * W["yaml_edit:list_grow"]
         # Volume bonus for ~30 lines is min(3.0, 30/30)=1.0.
@@ -100,7 +100,7 @@ class TestScoreDiff(unittest.TestCase):
     def test_lines_volume_capped(self):
         # 1000-line diff → cap at 3.0.
         diff = ["+filler line " + str(i) for i in range(1000)]
-        weight, _ = score_diff(diff, W)
+        weight, _, _ = score_diff(diff, W)
         # No scalars, no blocks → bonus is purely lines_volume cap.
         self.assertLessEqual(weight, W["yaml_edit:lines_volume_cap"] + 0.01)
 
@@ -108,19 +108,19 @@ class TestScoreDiff(unittest.TestCase):
         # Pure removal commit (lots of - lines, no new id).
         removed = "\n".join(f"-old line {i}" for i in range(20))
         diff = _diff(removed)
-        weight, tags = score_diff(diff, W)
+        weight, tags, _ = score_diff(diff, W)
         self.assertLess(weight, 0)
         self.assertTrue(any(t.startswith("revert") for t in tags))
 
-    def test_contributors_rebalance_credits_new_person_only(self):
-        # Adding a new person to the list — should fire contributors+1.
+    def test_contributors_rebalance_removed(self):
+        # D-26: contributors[] is a derived projection of evidence[], not an
+        # input — editing it must NOT produce a contributors_rebalance signal.
         diff = _diff("""
 +- person: tuma-ondrej
 +  cw: 0.3
 """)
-        weight, tags = score_diff(diff, W)
-        # list_grow fires (1 bullet), contributors_rebalance fires (1 person)
-        self.assertTrue(any("contributors+1" in t for t in tags))
+        weight, tags, _ = score_diff(diff, W)
+        self.assertFalse(any(t.startswith("contributors+") for t in tags))
 
     def test_pure_cw_shift_no_contributors_rebalance(self):
         # Same person, just cw value changed. Adds and removes the same
@@ -131,7 +131,7 @@ class TestScoreDiff(unittest.TestCase):
 +- person: turyna-martin
 +  cw: 0.6
 """)
-        weight, tags = score_diff(diff, W)
+        weight, tags, _ = score_diff(diff, W)
         # No contributors+ tag (set diff empty)
         self.assertFalse(any(t.startswith("contributors+") for t in tags))
 
@@ -141,7 +141,7 @@ class TestScoreDiff(unittest.TestCase):
 +js: 13
 +bv: 8
 """)
-        weight, tags = score_diff(diff, W)
+        weight, tags, _ = score_diff(diff, W)
         # 2 × scalar_change = 1.0
         self.assertAlmostEqual(weight, 2 * W["yaml_edit:scalar_change"], places=1)
 
@@ -160,7 +160,7 @@ class TestScoreDiff(unittest.TestCase):
 +- NFR-2: WCAG 2.1 AA
 +js: 8
 """)
-        weight, tags = score_diff(diff, W)
+        weight, tags, _ = score_diff(diff, W)
         # At minimum: 1 block_add (2.0) + 5 list_grow (5.0) + 1 scalar (0.5)
         # + lines_volume bonus (~10/30 = 0.33).
         self.assertGreater(weight, 7.0)
@@ -313,6 +313,39 @@ class TestCollectIntegration(unittest.TestCase):
         s1 = sigs["S-1"][0]
         self.assertLess(s1["weight"], 1.0)
         self.assertIn("bulk_discount", s1["tags"])
+
+    def test_chore_evidence_commit_not_scored(self):
+        # D-26 anti-loop: materialization's own chore(evidence): follow-up
+        # commit must never produce yaml_edit (else evidence writes self-credit).
+        self._write_and_commit(
+            ".edpa/backlog/stories/S-9.md",
+            {"id": "S-9", "type": "Story", "title": "x", "status": "Funnel",
+             "evidence": [{"type": "commit_author", "person": "alice",
+                           "weight": 2.78, "ref": "commit/deadbee"}]},
+            "chore(evidence): S-9 from deadbee", "alice@example.com",
+            "2026-05-14T09:00:00+00:00",
+        )
+        sigs = collect_yaml_edit_signals(self.edpa, "PI-2026-1.1")
+        self.assertNotIn("S-9", sigs)
+
+    def test_bulk_by_item_count_discount(self):
+        # D-26 variant-2: one commit touching > bulk_item_threshold (5) items
+        # is bulk seeding/backfill → every yaml_edit it produced is discounted,
+        # so the committer can't out-credit the real assignees.
+        from _md_frontmatter import save_md
+        for i in range(1, 7):  # 6 stories > threshold 5
+            f = self.repo / f".edpa/backlog/stories/S-1{i}.md"
+            save_md(f, {"id": f"S-1{i}", "type": "Story",
+                        "title": f"s{i}", "status": "Funnel"}, "")
+        self._run("git add .", cwd=self.repo)
+        self._commit("seed initial backlog", "alice@example.com",
+                     "2026-05-14T09:00:00+00:00")
+        sigs = collect_yaml_edit_signals(self.edpa, "PI-2026-1.1")
+        self.assertEqual(len(sigs), 6)
+        for slist in sigs.values():
+            s = slist[0]
+            self.assertIn("bulk_items_discount", s["tags"])
+            self.assertLess(s["weight"], s["raw_weight"])
 
 
 if __name__ == "__main__":

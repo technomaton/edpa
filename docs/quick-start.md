@@ -96,14 +96,25 @@ git checkout -b feature/S-001-first-story
 
 ## Step 6: Close your first iteration
 
-After completing work items, close the iteration:
+After completing work items, first **materialize** the iteration's delivery
+signals into each item's `evidence[]` (the post-commit hook writes them as you go;
+this idempotent reconcile catches anything it missed), then close:
+
+```bash
+python3 .edpa/engine/scripts/local_evidence.py --materialize --iteration PI-2026-1.1
+```
+
+(Also available as the `/edpa:materialize` command / `edpa_materialize` MCP tool.
+Re-running is a no-op — signals dedup by ref.)
+
+Then close the iteration:
 
 With Claude Code:
 ```
 /edpa:close-iteration PI-2026-1.1
 ```
 
-Or manually:
+Or manually (the engine is a pure reader of the materialized `evidence[]`):
 ```bash
 python3 .edpa/engine/scripts/engine.py \
   --edpa-root .edpa \
@@ -112,7 +123,8 @@ python3 .edpa/engine/scripts/engine.py \
 
 > **Closing the whole PI?** Once every iteration in the PI is closed, roll it up
 > with `/edpa:close-pi PI-2026-1` — it flips the PI status and writes the
-> aggregate report (`.edpa/reports/pi-PI-2026-1/summary.md`).
+> aggregate report (`.edpa/reports/pi-PI-2026-1/summary.md`). Materialize each
+> iteration first (`--materialize --all-iterations` back-fills them all at once).
 
 ## Step 7: Review outputs
 

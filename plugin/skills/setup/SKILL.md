@@ -146,7 +146,7 @@ sections matter:
 - **`signals:`** — per-signal-type weight (commit_author 2.78,
   pr_reviewer 2.25, issue_comment 1.14, …). Higher = more influence
   on a person's `cw` share for an item. Calibrate via
-  `/edpa:calibrate` after collecting ≥20 ground-truth records.
+  `/edpa:autocalib` after collecting ≥20 ground-truth records.
 
 - **`gate_weights:`** — fires when a Feature/Epic/Initiative status
   transitions inside an iteration window. Splits the parent's

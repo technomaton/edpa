@@ -273,3 +273,134 @@ def test_emit_merge_commit_skipped(repo: Path) -> None:
     _run_emitter(repo)
     n_after = len(load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"])
     assert n_after == n_before  # merge commit didn't add new signals
+
+
+# ─── Phase 1: state_transition materialization ────────────────────────────
+
+
+def _set_status(repo: Path, item_rel: str, status: str) -> None:
+    p = repo / item_rel
+    data = load_md(p)
+    data["status"] = status
+    save_md_item(p, data)
+
+
+def _commit_status_flip(repo: Path, item_rel: str, status: str,
+                        msg: str) -> str:
+    _set_status(repo, item_rel, status)
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m", msg], cwd=repo, env_extra={
+        "GIT_AUTHOR_DATE": "2026-05-26T10:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-05-26T10:00:00+00:00",
+    })
+    return _git(["rev-parse", "HEAD"], cwd=repo).stdout.strip()
+
+
+def test_emit_writes_state_transition_signal(repo: Path) -> None:
+    """A commit that flips S-1 status emits a weight-0 state_transition."""
+    _commit_status_flip(repo, ".edpa/backlog/stories/S-1.md", "Done",
+                        "S-1: mark done")
+    rc = _run_emitter(repo)
+    assert rc == 0
+    sigs = load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+    trans = [s for s in sigs if s["type"] == "state_transition"]
+    assert len(trans) == 1
+    t = trans[0]
+    assert t["from_status"] == "Implementing"
+    assert t["to_status"] == "Done"
+    assert t["weight"] == 0
+    assert t["person"] == "alice"
+    assert "S-1/Implementing->Done" in t["ref"]
+    # commit_author still emitted alongside it
+    assert any(s["type"] == "commit_author" for s in sigs)
+
+
+def test_state_transition_excluded_from_cw() -> None:
+    """Zero-weight state_transition must not alter contributors[] cw."""
+    from detect_contributors import aggregate_signals
+    sigs = [
+        {"type": "state_transition", "login": "alice", "weight": 0.0,
+         "ref": "commit/x/S-1/Implementing->Done", "detected_at": "x"},
+        {"type": "commit_author", "login": "bob", "weight": 2.78,
+         "ref": "commit/y", "detected_at": "x"},
+    ]
+    out = aggregate_signals(sigs, {})
+    assert {c["person"] for c in out} == {"bob"}
+    assert out[0]["cw"] == 1.0
+
+
+def test_materialize_reconcile_is_idempotent(repo: Path) -> None:
+    """cmd_materialize writes state_transition for the window; re-running
+    is a no-op (dedup by ref, and its own chore(evidence): commit changes
+    no status: field so it produces no new transition)."""
+    (repo / ".edpa" / "iterations").mkdir(parents=True, exist_ok=True)
+    (repo / ".edpa" / "iterations" / "PI-2026-2.1.yaml").write_text(
+        yaml.safe_dump({"iteration": {
+            "id": "PI-2026-2.1",
+            "start_date": "2026-05-01", "end_date": "2026-05-31"}}))
+    # Flip S-2 status without the hook (commit only).
+    _commit_status_flip(repo, ".edpa/backlog/stories/S-2.md", "Done",
+                        "S-2: done")
+
+    edpa = repo / ".edpa"
+    old = Path.cwd()
+    try:
+        os.chdir(repo)
+        assert le.cmd_materialize(edpa, "PI-2026-2.1") == 0
+        sigs = load_md(repo / ".edpa/backlog/stories/S-2.md")["evidence"]
+        trans = [s for s in sigs if s["type"] == "state_transition"]
+        assert any(s["to_status"] == "Done" for s in trans)
+        n1 = len(sigs)
+        # Re-run → idempotent.
+        assert le.cmd_materialize(edpa, "PI-2026-2.1") == 0
+        n2 = len(load_md(repo / ".edpa/backlog/stories/S-2.md")["evidence"])
+    finally:
+        os.chdir(old)
+    assert n1 == n2
+
+
+# ─── Phase 2: yaml_edit materialization ───────────────────────────────────
+
+
+def test_emit_writes_yaml_edit_signal_with_delta(repo: Path) -> None:
+    """A commit that edits a story's YAML emits a yaml_edit signal carrying
+    a structural delta, attributed to the commit author."""
+    p = repo / ".edpa/backlog/stories/S-1.md"
+    data = load_md(p)
+    data["js"] = 5
+    data["bv"] = 3
+    save_md_item(p, data)
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m", "S-1: estimate"], cwd=repo, env_extra={
+        "GIT_AUTHOR_DATE": "2026-05-26T10:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-05-26T10:00:00+00:00"})
+    _run_emitter(repo)
+    sigs = load_md(p)["evidence"]
+    ye = [s for s in sigs if s["type"] == "yaml_edit"]
+    assert len(ye) == 1
+    assert ye[0]["person"] == "alice"
+    assert ye[0]["weight"] > 0
+    assert isinstance(ye[0]["delta"], dict)
+    assert ye[0]["delta"]["scalars_changed"] >= 1
+    assert ye[0]["ref"].startswith("commit/")
+
+
+def test_materialize_all_iterations(repo: Path) -> None:
+    """--all-iterations back-fills every iteration window in one shot."""
+    iters = repo / ".edpa" / "iterations"
+    iters.mkdir(parents=True, exist_ok=True)
+    (iters / "PI-2026-2.1.yaml").write_text(yaml.safe_dump({"iteration": {
+        "id": "PI-2026-2.1",
+        "start_date": "2026-05-01", "end_date": "2026-05-31"}}))
+    _commit_status_flip(repo, ".edpa/backlog/stories/S-1.md", "Done",
+                        "S-1: done")
+    old = Path.cwd()
+    try:
+        os.chdir(repo)
+        rc = le.main(["--materialize", "--all-iterations"])
+    finally:
+        os.chdir(old)
+    assert rc == 0
+    sigs = load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+    assert any(s["type"] == "state_transition" and s["to_status"] == "Done"
+               for s in sigs)

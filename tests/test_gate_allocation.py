@@ -198,6 +198,20 @@ def test_template_gate_weights_sum_to_one():
 # ---------------------------------------------------------------------------
 
 def _run_engine(repo, edpa, iteration="PI-2026-1.1"):
+    # D-26: the engine is a pure reader of evidence[]. Materialize git
+    # transitions into evidence[] first (exactly as close-iteration would),
+    # so the engine has state_transition signals to build gate events from.
+    env = {
+        "GIT_AUTHOR_NAME": "Tester", "GIT_AUTHOR_EMAIL": "tester@example.com",
+        "GIT_COMMITTER_NAME": "Tester", "GIT_COMMITTER_EMAIL": "tester@example.com",
+        "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+    }
+    subprocess.run(
+        [sys.executable, str(SCRIPTS / "local_evidence.py"),
+         "--materialize", "--iteration", iteration],
+        cwd=repo, check=True, env=env, capture_output=True, text=True,
+        encoding="utf-8",
+    )
     out = repo / "out.json"
     r = subprocess.run(
         [sys.executable, str(SCRIPTS / "engine.py"),

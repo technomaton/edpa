@@ -67,6 +67,7 @@ def test_version_consistent():
         ("README.md", f"EDPA-{badge_version}-"),
         ("docs/methodology.md", f"**Version {version} "),
         ("docs/playbook.md", f"**Verze:** EDPA {version}"),
+        ("docs/playbook.md", f'methodology: "EDPA {version}"'),
         ("docs/mcp.md", f"current as of v{version}"),
         ("docs/RUNBOOK.md", f"VERSION {version}"),
         ("plugin/edpa/templates/edpa.yaml.tmpl", f'methodology: "EDPA {version}"'),

@@ -4,9 +4,12 @@ Verified manual walkthrough of every `/edpa:*` slash command. Use this when
 onboarding a new project, debugging an unfamiliar workflow, or before relying
 on the toolchain for a real iteration close.
 
-**Last reviewed:** 2026-05-31 — **V2 local-first** (2.0.0+). `.edpa/backlog/`
-YAML is the source of truth, git is the audit trail. GitHub Projects sync is
-**optional**; the engine derives hours from local git evidence without it.
+**Last reviewed:** 2026-06-19 — **V2 local-first** (2.0.0+). `.edpa/backlog/`
+YAML is the source of truth, git is the audit trail. Delivery signals are
+**materialized** into each item's `evidence[]` (by the post-commit hook and the
+idempotent `local_evidence.py --materialize` reconcile); the engine is a **pure
+reader** of that materialized `evidence[]`/`contributors[]`. GitHub Projects sync
+is **optional**; hours derive from local git evidence without it.
 
 ---
 
@@ -17,6 +20,7 @@ YAML is the source of truth, git is the audit trail. GitHub Projects sync is
 | `/edpa:setup`        | `.edpa/engine/scripts/project_setup.py` | ✅ vendors engine + seeds `.edpa/` (local-first) |
 | `/edpa:create-pi`    | `.edpa/engine/scripts/create_pi.py` | ✅ writes the PI-level `pi:` file (also `edpa_pi_create` MCP tool) |
 | `/edpa:close-pi`     | `.edpa/engine/scripts/pi_close.py` | ✅ guard iterations → flip `pi.status` → write rollup (also `edpa_pi_close` MCP tool) |
+| `/edpa:materialize`  | `.edpa/engine/scripts/local_evidence.py --materialize` | ✅ idempotent reconcile — replays git into `evidence[]` (also `edpa_materialize` MCP tool) |
 | `/edpa:close-iteration` | `.edpa/engine/scripts/engine.py` → `/edpa:reports` skill | ✅ verified by `tests/test_invariants.py`, `tests/test_gate_allocation.py` |
 | `/edpa:reports`      | `/edpa:reports` skill (no script)   | ✅ manual + skill execution |
 | `/edpa:board`        | `.edpa/engine/scripts/board.py`    | ✅ manual run |
@@ -89,7 +93,7 @@ engine + `.edpa/` tree.
 **Expected output (last steps):**
 
 ```
-  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (50 scripts, VERSION 2.9.0)
+  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (50 scripts, VERSION 2.10.0)
   [2] Directory tree   ✓ Directory tree at .edpa/
   [3] Config templates ✓ Seeded people.yaml, edpa.yaml, cw_heuristics.yaml
   [4] ID counter       ✓ id_counters.yaml seeded
@@ -178,10 +182,12 @@ python3 .edpa/engine/scripts/backlog.py add --type Initiative --title "Project A
 
 ## 2. GitHub integration (optional) — PR-signal materialization
 
-V2 is **local-first**: the engine reads delivery evidence straight from
-`git log`, so EDPA produces a complete derived timesheet with **no GitHub at
-all**. The V1 bidirectional `sync.py` (GitHub Project push/pull, `issue_map.yaml`,
-sub-issues, org Issue Types, `gh project` provisioning) was removed in 2.0.0.
+V2 is **local-first**: delivery signals are derived from `git log` by the
+post-commit hook / `--materialize` reconcile and written into each item's
+`evidence[]`; the engine then reads that materialized `evidence[]` (§3), so EDPA
+produces a complete derived timesheet with **no GitHub at all**. The V1
+bidirectional `sync.py` (GitHub Project push/pull, `issue_map.yaml`, sub-issues,
+org Issue Types, `gh project` provisioning) was removed in 2.0.0.
 
 The single optional GitHub touchpoint is **PR-signal materialization**, enabled
 by `/edpa:setup --with-ci` (which copies `.github/workflows/edpa-contribution-sync.yml`):
@@ -211,13 +217,36 @@ history via `_git_timestamps.py`). See [`docs/mcp.md`](mcp.md).
 
 ## 3. `/edpa:close-iteration` — compute derived hours
 
-**Purpose:** at iteration end, compute each person's derived hours from
-delivery evidence and produce the per-person reports.
+**Purpose:** at iteration end, compute each person's derived hours from the
+**materialized** delivery evidence and produce the per-person reports.
 
-**Two-step orchestration** (this slash command runs both):
+**Materialize → read (D-26).** `evidence[]` is the single written signal source;
+`contributors[]`/`cw` are derived from it. Signals are written by the post-commit
+hook on every commit, and the engine is a **pure reader** — it does **not** scan
+git at compute time. Before closing, run the idempotent reconcile so the
+iteration window is fully materialized (catches commits the hook never saw —
+history predating the hook, commits made with `EDPA_NO_LOCAL_EVIDENCE=1`, or
+commits pulled from another machine):
 
 ```bash
-# Step 1: engine — produces .edpa/reports/iteration-<ID>/edpa_results.json
+# materialize one iteration (dedup by signal ref — re-running is a no-op)
+python3 .edpa/engine/scripts/local_evidence.py --materialize --iteration PI-2026-1.4
+# or back-fill every iteration in .edpa/iterations/
+python3 .edpa/engine/scripts/local_evidence.py --materialize --all-iterations
+```
+
+This writes `state_transition` + `yaml_edit` signals into each item's
+`evidence[]` and lands a `chore(evidence):` commit when anything changed. The
+same behavior is exposed as the **`edpa_materialize` MCP tool** and the
+**`/edpa:materialize`** slash command. `EDPA_NO_LOCAL_EVIDENCE=1` gates **only**
+the automatic post-commit hook; `--materialize` ignores it (it is the explicit
+catch-up path).
+
+**Two-step orchestration** (this slash command runs both, after materialize):
+
+```bash
+# Step 1: engine — pure reader of materialized evidence[]/contributors[];
+#         produces .edpa/reports/iteration-<ID>/edpa_results.json
 python3 .edpa/engine/scripts/engine.py \
   --edpa-root .edpa \
   --iteration PI-2026-1.4 \
@@ -230,23 +259,27 @@ python3 .edpa/engine/scripts/engine.py \
 **Single calculation path (v1.14+, extended in v1.17):** the mode
 selector (`--mode simple|gates`) was retired in 1.14 because `gates`
 was a strict superset of the others. The current path credits three
-event kinds together:
+event kinds together, all read from materialized `evidence[]`:
 
 - **Story / Defect / Task Done credit** — items at `status: Done` get
   `JS × cw` per their contributors[]. (v1.17 fix: pre-1.17 Defects
   were silently dropped at a `level == "Story"` filter.)
 - **Parent gate transitions** — Feature / Epic / Initiative status
-  changes captured in git history become synthetic events with
+  changes are materialized as `state_transition` signals (weight 0 —
+  analytics + delivery lead-time, never scored directly); the engine
+  reconstructs gate events from them with
   `effective_js = parent.JS × gate_weights[type][transition]`.
   Validated against `edpa-simulation-gates` harness (avg MAD 7.8%,
-  stable to ±20% CW perturbation). **Requires git history of status
-  changes** — `sync pull --commit` produces these automatically.
-- **YAML-edit signals (v1.17)** — every commit on a backlog YAML in
-  the iteration window contributes structural signals (create,
-  block_add, list_grow, scalar_change, lines_volume,
-  contributors_rebalance, revert). Captures progressive elaboration
-  on parents (LBC, benefit hypothesis, AC, NFRs, risks) that is
-  invisible to PR-only or status-only collectors.
+  stable to ±20% CW perturbation). **Requires the transitions to be
+  materialized** — the post-commit hook and `--materialize` write them.
+- **YAML-edit signals** — every commit on a backlog YAML in the
+  iteration window contributes structural signals (create, block_add,
+  list_grow, scalar_change, lines_volume, revert). D-26: materialized
+  into `evidence[]` with a structural `delta` plus `raw_weight`/`discount`
+  (backfill / migration commits, and commits touching more than
+  `bulk_item_threshold` (5) items, are discounted ×0.1). Captures
+  progressive elaboration on parents (LBC, benefit hypothesis, AC, NFRs,
+  risks) invisible to PR-only or status-only collectors.
 
 **Verification:** `python3 -m pytest tests/test_invariants.py -v` ensures
 score formula, capacity invariant, and ratio sums hold for any output.
@@ -486,11 +519,12 @@ See [`docs/dev-collisions.md`](dev-collisions.md) for decision tree, common coll
 
 ---
 
-## Known limitations (as of 2026-05-04)
+## Known limitations (as of 2026-06-19)
 
-1. **Gates mode under-allocates without commit-recorded status changes.** Real
-   `sync pull --commit` produces them; manual YAML edits do not unless you
-   commit them with a status-change message recognised by `transitions.py`.
+1. **Gates mode under-allocates without commit-recorded status changes.** The
+   post-commit hook (or `--materialize`) records them as `state_transition`
+   signals; a status change is only captured if it was committed with a message
+   `transitions.py` recognises.
 2. **Static-contributor model**: engine uses one contributor list per parent
    item for *every* gate of that item. Highly specialised roles that touch
    only some gates (e.g. Architect at LBC only) get over-attributed at the

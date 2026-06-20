@@ -145,6 +145,17 @@ def find_iteration_for_timestamp(edpa_root: Path, ts: datetime):
     return None
 
 
+def _backlog_paths(edpa_root: Path) -> list[str]:
+    """Backlog dirs tracked for transitions, relative to the repo root."""
+    repo_root = edpa_root.parent
+    paths = []
+    for sub in TRACKED_DIRS:
+        p = edpa_root / "backlog" / sub
+        if p.is_dir():
+            paths.append(str(p.relative_to(repo_root)))
+    return paths
+
+
 def detect_transitions(edpa_root: Path, since: datetime = None, until: datetime = None):
     """Walk git log over backlog YAMLs and yield status transitions.
 
@@ -152,20 +163,36 @@ def detect_transitions(edpa_root: Path, since: datetime = None, until: datetime 
       {item_id, item_type, from_status, to_status,
        changed_at, changed_by, commit_hash, iteration_id (optional)}
     """
-    repo_root = edpa_root.parent
-    backlog_paths = []
-    for sub in TRACKED_DIRS:
-        p = edpa_root / "backlog" / sub
-        if p.is_dir():
-            backlog_paths.append(str(p.relative_to(repo_root)))
-
+    backlog_paths = _backlog_paths(edpa_root)
     if not backlog_paths:
         return []
 
     args = ["log", "--pretty=format:__COMMIT__|%H|%aI|%ae", "-p", "--unified=0", "--"]
     args.extend(backlog_paths)
-    log = run_git(args, repo_root)
+    log = run_git(args, edpa_root.parent)
+    return _parse_transition_log(log, since, until)
 
+
+def detect_transitions_for_commit(edpa_root: Path, sha: str):
+    """Like detect_transitions but scoped to a single commit.
+
+    Used by the post-commit hook so it doesn't re-walk the whole backlog
+    history on every commit. Returns the transitions introduced by `sha`.
+    """
+    backlog_paths = _backlog_paths(edpa_root)
+    if not backlog_paths:
+        return []
+
+    args = ["show", "--pretty=format:__COMMIT__|%H|%aI|%ae", "-p", "--unified=0", sha, "--"]
+    args.extend(backlog_paths)
+    log = run_git(args, edpa_root.parent)
+    return _parse_transition_log(log)
+
+
+def _parse_transition_log(log: str, since: datetime = None, until: datetime = None):
+    """Parse `git log/show -p --unified=0` output (with __COMMIT__ header
+    lines) into transition dicts. Shared by detect_transitions (full
+    history) and detect_transitions_for_commit (single commit)."""
     transitions = []
     cur_commit = cur_ts = cur_author = None
     cur_file = None
@@ -244,6 +271,34 @@ def detect_transitions(edpa_root: Path, since: datetime = None, until: datetime 
 
     transitions.sort(key=lambda t: t["changed_at"])
     return transitions
+
+
+def transition_to_signal(t: dict, person_id):
+    """Convert a transition dict (detect_transitions output) into an
+    ``evidence[]`` signal record.
+
+    Phase-1 semantics: ``weight=0`` — a ``state_transition`` is an
+    analytics record (who / when / from→to), NOT a contribution-weight
+    signal. cw is unaffected because aggregate_signals skips zero-weight
+    signals. Gate scoring stays engine-side: it derives job_size from
+    from_status/to_status × gate_weights, not from this signal's weight.
+
+    Returns None when the author couldn't be resolved to a person id.
+    """
+    if not person_id:
+        return None
+    short = (t.get("commit_hash") or "")[:7]
+    frm = t.get("from_status") or "init"
+    to = t.get("to_status") or ""
+    return {
+        "type": "state_transition",
+        "person": person_id,
+        "weight": 0,
+        "ref": f"commit/{short}/{t['item_id']}/{frm}->{to}",
+        "at": t.get("changed_at"),
+        "from_status": t.get("from_status"),
+        "to_status": t.get("to_status"),
+    }
 
 
 def annotate_with_iterations(edpa_root: Path, transitions):

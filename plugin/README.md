@@ -83,7 +83,8 @@ plugin/
 │   ├── metrics.md                   # → /edpa:metrics        — PI predictability & confidence trending
 │   ├── insights.md                  # → /edpa:insights       — mid-iteration anomaly detection
 │   ├── ai-attribution.md            # → /edpa:ai-attribution — human vs AI delivery ratio
-│   └── reconcile.md                 # → /edpa:reconcile      — git evidence vs backlog status drift
+│   ├── reconcile.md                 # → /edpa:reconcile      — git evidence vs backlog status drift
+│   └── materialize.md               # → /edpa:materialize    — persist git-derived signals into evidence[]
 └── edpa/
     ├── scripts/                     # Python modules (engine, MCP server, evidence pipeline, analytics)
     │   ├── engine.py                # Core engine (Score, DerivedHours, invariants)
@@ -149,6 +150,7 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | `/edpa:insights` | command | Mid-iteration anomaly detection — capacity overload, job-size creep, stalled stories, critical-path blockers |
 | `/edpa:ai-attribution` | command | Human vs AI delivery ratio (Co-Authored-By trailers → agent_contribution signals) |
 | `/edpa:reconcile` | command | Git evidence vs backlog status drift — finds shipped-but-not-Done items, suggests transitions |
+| `/edpa:materialize` | command | Persist git-derived signals (`state_transition`, `yaml_edit`) into `evidence[]` so the report equals the snapshot (idempotent; also `edpa_materialize` MCP tool) |
 
 ## Multi-developer setup — ID collision handling
 
@@ -222,6 +224,7 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 | `edpa_item_roam` | ROAM-classify a Risk item | `/edpa:roam` |
 | `edpa_iteration_create` | Create a new iteration YAML | — |
 | `edpa_iteration_close` | Mark an iteration closed (audit state) | `/edpa:close-iteration` |
+| `edpa_materialize` | Persist git-derived signals (`state_transition`, `yaml_edit`) into `evidence[]` — idempotent, deduped by `ref` (ignores `EDPA_NO_LOCAL_EVIDENCE`) | `/edpa:materialize` |
 | `edpa_pi_create` | Create the PI-level metadata file | `/edpa:create-pi` |
 | `edpa_pi_close` | Close a PI: guard iterations, flip `pi.status`, write rollup | `/edpa:close-pi` |
 | `edpa_pi_board` | Generate the self-contained PI planning HTML | `/edpa:pi-planning` |

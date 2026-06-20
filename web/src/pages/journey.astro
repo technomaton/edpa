@@ -66,7 +66,7 @@ const S=[
 <div class="sg sg3 fade d3">
 <div class="sc a" style="min-height:170px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">1. Install</div><div class="sc-l"><code>curl edpa.technomaton.com/install.sh | sh</code><br><br>Instalace EDPA pluginu. V\u0161echny skripty a konfigurace jsou p\u0159ipraveny.</div></div>
 <div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F465;</div><div class="sc-t">2. T\u00fdm</div><div class="sc-l"><code>.edpa/config/people.yaml</code><br><br>Definujte \u010dleny t\u00fdmu, role, kapacitu. Jeden YAML soubor.</div></div>
-<div class="sc g" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">3. Backlog</div><div class="sc-l"><code>.edpa/backlog/*.yaml</code><br><br>Vytvo\u0159te polo\u017eky backlogu. Ka\u017ed\u00e1 polo\u017eka = 1 YAML soubor.</div></div>
+<div class="sc g" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">3. Backlog</div><div class="sc-l"><code>.edpa/backlog/*.md</code><br><br>Vytvo\u0159te polo\u017eky backlogu. Ka\u017ed\u00e1 polo\u017eka = 1 .md soubor s YAML frontmatter.</div></div>
 </div>
 <div class="s-note fade d4"><b>V\u00fdsledek:</b> B\u011b\u017e\u00edc\u00ed repo s t\u00fdmem a backlogem. Za 15 minut.</div>`,
 
@@ -88,16 +88,18 @@ const S=[
 <div class="cols fade d3">
 <div class="col">
 <div class="sc c" style="padding:14px">
-<div class="sc-t">backlog/str-099.yaml</div>
-<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cy);line-height:1.8;white-space:pre">type: story
+<div class="sc-t">backlog/str-099.md</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cy);line-height:1.8;white-space:pre">---
+type: story
 id: STR-099
 title: "Implementace login flow"
 parent: FEA-042
 estimate: 5
 priority: high
-assignee: urbanek</div>
+assignee: urbanek
+---</div>
 </div>
-<div class="s-note" style="margin-top:10px"><b>Tip:</b> YAML soubory jsou snadno mergeovateln\u00e9 a review-ovateln\u00e9 v PR.</div>
+<div class="s-note" style="margin-top:10px"><b>Tip:</b> .md soubory s YAML frontmatter jsou snadno mergeovateln\u00e9 a review-ovateln\u00e9 v PR.</div>
 </div>
 <div class="col">
 <div class="sc a" style="padding:14px">
@@ -117,13 +119,13 @@ assignee: urbanek</div>
 // 5 — Evidence-driven
 `<div class="s-tag fade">Slide 6 &middot; Evidence-driven</div>
 <div class="s-h1 fade d1">Hodiny z lok\u00e1ln\u00ed evidence v Gitu</div>
-<div class="s-sub fade d2">Z\u00e1dn\u00e9 timesheets. EDPA \u010dte commity, \u00fapravy YAML a stavov\u00e9 p\u0159echody p\u0159\u00edmo z Gitu &mdash; a z nich po\u010d\u00edt\u00e1 CW.</div>
+<div class="s-sub fade d2">Z\u00e1dn\u00e9 timesheets. Post-commit hook a <code>/edpa:materialize</code> zapisuj\u00ed commity, \u00fapravy a stavov\u00e9 p\u0159echody do <code>evidence[]</code> &mdash; engine je pak \u010dte a po\u010d\u00edt\u00e1 CW.</div>
 <div class="sg sg3 fade d3">
 <div class="sc a"><div class="sc-t">commit_author</div><div class="sc-l"><b>Commity</b> s ID polo\u017eky v branchi, titulku nebo zpr\u00e1v\u011b.<br><br>K tomu PR review &mdash; re\u00e1ln\u00e1 delivery.</div></div>
-<div class="sc c"><div class="sc-t">yaml_edit</div><div class="sc-l"><b>\u00dapravy</b> <code>.edpa/backlog/*.yaml</code>: nov\u00fd soubor, p\u0159idan\u00fd blok, AC bullet, zm\u011bna scalaru.<br><br>Strukturn\u00ed delta = sign\u00e1l pr\u00e1ce.</div></div>
+<div class="sc c"><div class="sc-t">yaml_edit</div><div class="sc-l"><b>\u00dapravy</b> <code>.edpa/backlog/*.md</code>: nov\u00fd soubor, p\u0159idan\u00fd blok, AC bullet, zm\u011bna scalaru.<br><br>Strukturn\u00ed delta = sign\u00e1l pr\u00e1ce.</div></div>
 <div class="sc g"><div class="sc-t">gate transitions</div><div class="sc-l"><b>Stavov\u00e9 p\u0159echody</b> na Feature/Epic/Initiative (nap\u0159. Implementing&rarr;Validating) kreditovan\u00e9 v okn\u011b iterace.</div></div>
 </div>
-<div class="fm fade d4">commit_author &middot; yaml_edit &middot; gate transitions &rarr; CW &mdash; v\u0161e z Gitu, GitHub nen\u00ed pot\u0159eba</div>`,
+<div class="fm fade d4">materialize &rarr; evidence[] (commit_author &middot; yaml_edit &middot; state_transition) &rarr; CW &mdash; v\u0161e z Gitu, GitHub nen\u00ed pot\u0159eba</div>`,
 
 // 6 — Tyden 1: Tym pracuje
 `<div class="s-tag fade">Slide 7 &middot; T\u00fdden 1: T\u00fdm pracuje</div>

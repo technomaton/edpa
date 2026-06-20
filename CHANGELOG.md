@@ -1,6 +1,43 @@
 # Changelog
 
-## Unreleased
+## 2.10.0 — 2026-06-20
+
+### Changed
+
+- **`evidence:` is now the single materialized source of every signal; the
+  engine is a pure reader (D-26).** Previously the report could diverge from
+  the YAML: `yaml_edit` and gate/state transitions were re-derived from
+  `git log` in-memory at engine-compute time and never written to `evidence:`,
+  so a person who merely *committed* a backlog YAML (e.g. a bulk backfill)
+  could dominate a Story's credit in `edpa_results.json` while being absent
+  from its `evidence:` / `contributors:`. `EDPA_NO_LOCAL_EVIDENCE=1` didn't
+  stop it (it gated only the post-commit hook, not the engine's git scan).
+  Now:
+  - **Materialization** — the post-commit hook and a new `/edpa:materialize`
+    (`edpa_materialize` MCP tool; `local_evidence.py --materialize --iteration
+    <ID>` / `--all-iterations`) write `state_transition` and `yaml_edit`
+    signals into each item's `evidence:`, idempotently (dedup by commit-hash
+    `ref`). The hook is primary; `--materialize` back-fills commits it never
+    saw (EDPA_NO_LOCAL_EVIDENCE runs, pre-hook history, other machines).
+  - **`state_transition`** (new signal, weight 0) records who/when/from→to for
+    every status change — delivery-lead-time + time-in-state analytics, and the
+    source the engine's gate scoring now reads.
+  - **`yaml_edit`** is persisted with a structural `delta` (blocks / list-items
+    / scalars / lines ±) plus `raw_weight` + `discount`. Variant-2 anti-gaming:
+    backfill/migration commits and any single commit touching >
+    `bulk_item_threshold` (default 5) items are discounted ×0.1, so a committer
+    of many YAMLs can't out-credit the real assignee.
+  - **Engine is a pure reader** — `engine.py` no longer calls
+    `detect_transitions` or `collect_yaml_edit_signals` (the two live git
+    scans); it reads materialized `evidence:` → `contributors:`. The in-memory
+    `_enrich_items_with_yaml_edit_signals` was removed, so the report provably
+    equals the on-disk snapshot.
+  - **Removed** `yaml_edit:contributors_rebalance` (`contributors[]` is a
+    derived projection of `evidence[]`, not an input). Anti-loop:
+    `chore(evidence):` / `chore(ci-materialization):` commits and edits to the
+    `evidence:` / `contributors:` blocks score 0.
+  - `EDPA_NO_LOCAL_EVIDENCE=1` now suppresses all *automatic* materialization
+    (the hook); `--materialize` is the explicit opt-in catch-up and ignores it.
 
 ### Fixed
 
