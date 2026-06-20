@@ -839,6 +839,28 @@ async def list_tools() -> list[Tool]:
                 "additionalProperties": False,
             },
         ),
+        Tool(
+            name="edpa_materialize",
+            description=(
+                "Materialize git-derived signals into each item's evidence[] so the "
+                "report derives only from the persisted snapshot. Phase 1: walks the "
+                "iteration window and writes state_transition signals "
+                "(who/when/from->to, weight 0 — analytics + delivery-lead-time source) "
+                "into the touched Initiative/Epic/Feature/Story. Idempotent: dedup by "
+                "commit-hash ref, so re-running is a no-op. Use it to catch up commits "
+                "the post-commit hook never saw (EDPA_NO_LOCAL_EVIDENCE runs, pre-hook "
+                "history, other machines). Writes a chore(evidence): commit."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "iteration": {"type": "string",
+                                  "description": "Iteration ID, e.g. PI-2026-1.3 (required)"},
+                },
+                "required": ["iteration"],
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -2107,6 +2129,27 @@ def _handle_reconcile(edpa_root: Path, args: dict) -> list[TextContent]:
     return _ok(report)
 
 
+def _handle_materialize(edpa_root: Path, args: dict) -> list[TextContent]:
+    iteration = args.get("iteration")
+    if not iteration:
+        return _err("edpa_materialize requires 'iteration'.")
+    import io
+    import contextlib
+    with _sibling_path():
+        try:
+            from local_evidence import cmd_materialize  # noqa: E402
+        except ImportError as exc:
+            return _err(f"local_evidence module not available: {exc}")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = cmd_materialize(edpa_root, iteration)
+    out = buf.getvalue().strip()
+    if rc != 0:
+        return _err(out or f"materialize failed (rc={rc})")
+    logger.info("edpa_materialize: %s", out)
+    return _ok({"iteration": iteration, "result": out})
+
+
 def _dispatch_item(edpa_root: Path, args: dict) -> list[TextContent]:
     """edpa_item entry: validates item_id before reaching the handler."""
     raw_id = args.get("item_id", "")
@@ -2157,6 +2200,7 @@ TOOL_HANDLERS = {
     "edpa_confidence_vote": _handle_confidence_vote,
     "edpa_iteration_create": _handle_iteration_create,
     "edpa_iteration_close": _handle_iteration_close,
+    "edpa_materialize": _handle_materialize,
     "edpa_pi_create": _handle_pi_create,
     "edpa_pi_close": _handle_pi_close,
     "edpa_people_upsert": _handle_people_upsert,
