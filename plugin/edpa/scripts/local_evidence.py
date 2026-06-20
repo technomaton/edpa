@@ -361,7 +361,12 @@ def _transition_signals(transitions: list[dict], people: list[dict],
     from transitions import transition_to_signal
     grouped: dict[str, list[dict]] = {}
     for t in transitions:
-        pid = _resolve_person(t.get("changed_by", ""), "", people) or default_pid
+        # Resolve author → person id; fall back to the hook's commit author,
+        # then to the raw changed_by (email/login) so a transition by an
+        # unregistered author is still recorded for audit. weight is 0, so an
+        # unresolved person never distorts cw; load_gate_events re-resolves it.
+        pid = (_resolve_person(t.get("changed_by", ""), "", people)
+               or default_pid or t.get("changed_by"))
         sig = transition_to_signal(t, pid)
         if sig:
             grouped.setdefault(t["item_id"], []).append(sig)
@@ -381,6 +386,23 @@ def _load_yaml_edit_weights(edpa_root: Path):
     return data.get("yaml_edit_weights")
 
 
+def _login_to_person(login: str, people: list) -> str | None:
+    """Resolve a yaml_edit `login` (github handle, person id, or email — as
+    emitted by yaml_edit_signals._email_to_login) to a person id. Unlike
+    _resolve_person (email/name oriented), this matches a bare id/github
+    directly, so a login like 'bob' resolves even without an '@'."""
+    l = (login or "").lower()
+    if not l:
+        return None
+    for p in people:
+        if not isinstance(p, dict):
+            continue
+        for key in ("id", "github", "email"):
+            if (p.get(key) or "").lower() == l:
+                return p.get("id")
+    return None
+
+
 def _yaml_edit_to_evidence(raw: dict, people: list,
                            default_pid: str | None = None) -> dict[str, list[dict]]:
     """Convert yaml_edit_signals collector output ({item_id: [sig]}) into
@@ -389,7 +411,7 @@ def _yaml_edit_to_evidence(raw: dict, people: list,
     grouped: dict[str, list[dict]] = {}
     for iid, sigs in raw.items():
         for s in sigs:
-            pid = _resolve_person(s.get("login", ""), "", people) or default_pid
+            pid = _login_to_person(s.get("login", ""), people) or default_pid
             if not pid:
                 continue
             grouped.setdefault(iid, []).append({

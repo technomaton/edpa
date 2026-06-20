@@ -639,6 +639,96 @@ def _build_person_resolver(people):
     return resolver
 
 
+def _in_window(at, start, end) -> bool:
+    """True if ISO timestamp `at` is within [start, end] (tz-aware UTC).
+    Missing/unparseable timestamps are kept (never silently dropped)."""
+    if not at:
+        return True
+    try:
+        ts = datetime.fromisoformat(at).astimezone(timezone.utc)
+    except (ValueError, TypeError):
+        return True
+    if start and ts < start:
+        return False
+    if end and ts > end:
+        return False
+    return True
+
+
+def _read_evidence(item_data) -> list:
+    """Read an item's materialized evidence[] (legacy ci_signals[] tolerated)."""
+    ev = item_data.get("evidence")
+    if not isinstance(ev, list):
+        leg = item_data.get("ci_signals")
+        ev = leg if isinstance(leg, list) else []
+    return ev or []
+
+
+def _transitions_from_evidence(edpa_root, start=None, end=None):
+    """Reconstruct transition dicts from materialized ``state_transition``
+    signals in Feature/Epic/Initiative evidence[] — the engine's read-only
+    replacement for transitions.detect_transitions (which scans git).
+
+    Returns dicts shaped like detect_transitions output. ``changed_by`` is the
+    already-resolved person id (the gate resolver maps id->id, so the
+    no-contributors fallback still credits the right person).
+    """
+    edpa_root = Path(edpa_root)
+    out = []
+    for item_type, sub in GATE_TYPE_DIRS.items():
+        dir_path = edpa_root / "backlog" / sub
+        if not dir_path.is_dir():
+            continue
+        for f in sorted(dir_path.glob("*.md")):
+            data = load_yaml(f) or {}
+            item_id = data.get("id")
+            if not item_id:
+                continue
+            for s in _read_evidence(data):
+                if s.get("type") != "state_transition":
+                    continue
+                at = s.get("at")
+                if not _in_window(at, start, end):
+                    continue
+                parts = (s.get("ref") or "").split("/")
+                out.append({
+                    "item_id": item_id,
+                    "item_type": item_type,
+                    "from_status": s.get("from_status"),
+                    "to_status": s.get("to_status"),
+                    "changed_at": at,
+                    "changed_by": s.get("person"),
+                    "commit_hash": parts[1] if len(parts) > 1 else None,
+                })
+    out.sort(key=lambda t: t.get("changed_at") or "")
+    return out
+
+
+def _yaml_edit_from_evidence(edpa_root, start=None, end=None):
+    """Read materialized ``yaml_edit`` signals from items' evidence[]
+    (windowed). The engine's read-only replacement for the live
+    collect_yaml_edit_signals git scan. Returns {item_id: [signal, ...]}
+    in the same shape the collector produced."""
+    edpa_root = Path(edpa_root)
+    out: dict[str, list] = {}
+    for sub in ("initiatives", "epics", "features", "stories", "defects"):
+        dir_path = edpa_root / "backlog" / sub
+        if not dir_path.is_dir():
+            continue
+        for f in sorted(dir_path.glob("*.md")):
+            data = load_yaml(f) or {}
+            item_id = data.get("id")
+            if not item_id:
+                continue
+            for s in _read_evidence(data):
+                if s.get("type") != "yaml_edit":
+                    continue
+                if not _in_window(s.get("at"), start, end):
+                    continue
+                out.setdefault(item_id, []).append(s)
+    return out
+
+
 def load_story_activity_events(edpa_root, iteration_id, heuristics,
                                 yaml_edit_signals):
     """V2.1 C7.5 — emit synthetic items for in-flight Stories with activity.
@@ -747,7 +837,7 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
 
     sys.path.insert(0, str(Path(__file__).parent))
     try:
-        from transitions import parse_iteration_dates, detect_transitions
+        from transitions import parse_iteration_dates
     finally:
         sys.path.pop(0)
 
@@ -757,7 +847,10 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
         print(f"WARN: cannot parse iteration dates: {e}", file=sys.stderr)
         return [], []
 
-    transitions = detect_transitions(edpa_root, since=start, until=end)
+    # D-26: read materialized state_transition signals from evidence[] — the
+    # engine is a pure reader and no longer scans git (detect_transitions). The
+    # post-commit hook / `--materialize` persist transitions; we read the snapshot.
+    transitions = _transitions_from_evidence(edpa_root, start, end)
     gate_weights = (heuristics or {}).get("gate_weights", {}) or {}
 
     events = []
@@ -1424,22 +1517,27 @@ def main():
             people=(capacity or {}).get("people", []) or [],
         )
         items.extend(gate_events)
-        # v1.17: collect yaml_edit signals from git diff over backlog/.
-        # These augment existing contributors[] additively (signals stack
-        # on top of detect_contributors output). When a parent Feature/
-        # Epic/Initiative was seeded without contributors[], the commit
-        # author who wrote the LBC + AC + NFRs gets credit automatically.
+        # D-26: read materialized yaml_edit signals from evidence[] (windowed).
+        # The engine is a pure reader — it no longer scans git
+        # (collect_yaml_edit_signals). The post-commit hook / `--materialize`
+        # persist yaml_edit into evidence[]; story_activity gating reads it here.
         yaml_edit_signals = {}
         try:
             sys.path.insert(0, str(Path(__file__).parent))
-            from yaml_edit_signals import collect_yaml_edit_signals  # noqa: E402
+            from transitions import parse_iteration_dates  # noqa: E402
             sys.path.pop(0)
-            yaml_edit_signals = collect_yaml_edit_signals(
-                edpa_root, iteration_id,
-                heuristics.get("yaml_edit_weights"),
+            _ye_start = _ye_end = None
+            _iter_file = Path(edpa_root) / "iterations" / f"{iteration_id}.yaml"
+            if _iter_file.is_file():
+                try:
+                    _ye_start, _ye_end = parse_iteration_dates(_iter_file)
+                except (ValueError, KeyError):
+                    pass
+            yaml_edit_signals = _yaml_edit_from_evidence(
+                edpa_root, _ye_start, _ye_end,
             )
         except Exception as exc:  # noqa: BLE001
-            print(f"WARN: yaml_edit_signals collection skipped: {exc}",
+            print(f"WARN: yaml_edit_signals read skipped: {exc}",
                   file=sys.stderr)
         # C7.5: in-flight Story activity events — emit synthetic items
         # for Stories that have yaml_edit activity in this iteration
