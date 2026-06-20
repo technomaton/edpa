@@ -65,11 +65,12 @@ project:
 governance:
   # Auto-stamped to the installed plugin version by install.sh / project_setup.py.
   methodology: "EDPA 2.9.0"
-  # v1.14: single calculation path. v1.17: extended with yaml_edit
-  # signals — every commit on .edpa/backlog/<typ>/<id>.md in the
-  # iteration window contributes structural credit (create / block_add
-  # / list_grow / scalar_change / lines_volume / contributors_rebalance
-  # / revert). v1.17 also fixes Bug A (Defects were silently dropped
+  # v1.14: single calculation path. v1.17: yaml_edit signals — every
+  # commit on .edpa/backlog/<typ>/<id>.md contributes structural credit
+  # (create / block_add / list_grow / scalar_change / lines_volume /
+  # revert). D-26: signals are materialized into evidence[] (the engine
+  # reads the snapshot, no in-memory enrichment; backfill/bulk discounted).
+  # v1.17 also fixes Bug A (Defects were silently dropped
   # at engine.py level filter). The pre-v1.14 simple/full/gates mode
   # selector remains dropped — gates was a strict superset of simple
   # (degenerated to Done-only when no transitions). audit_mode field

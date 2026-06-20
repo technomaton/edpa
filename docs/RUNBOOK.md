@@ -241,12 +241,13 @@ event kinds together:
   Validated against `edpa-simulation-gates` harness (avg MAD 7.8%,
   stable to ±20% CW perturbation). **Requires git history of status
   changes** — `sync pull --commit` produces these automatically.
-- **YAML-edit signals (v1.17)** — every commit on a backlog YAML in
-  the iteration window contributes structural signals (create,
-  block_add, list_grow, scalar_change, lines_volume,
-  contributors_rebalance, revert). Captures progressive elaboration
-  on parents (LBC, benefit hypothesis, AC, NFRs, risks) that is
-  invisible to PR-only or status-only collectors.
+- **YAML-edit signals** — every commit on a backlog YAML in the
+  iteration window contributes structural signals (create, block_add,
+  list_grow, scalar_change, lines_volume, revert). D-26: materialized
+  into `evidence[]` with a structural `delta` (backfill / bulk commits
+  discounted ×0.1). Captures progressive elaboration on parents (LBC,
+  benefit hypothesis, AC, NFRs, risks) invisible to PR-only or
+  status-only collectors.
 
 **Verification:** `python3 -m pytest tests/test_invariants.py -v` ensures
 score formula, capacity invariant, and ratio sums hold for any output.

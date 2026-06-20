@@ -153,8 +153,16 @@ and sees the actual diff.
 | `yaml_edit:list_grow` | 1.00 (cap 10) | Per net `- ` bullet added | `commit/<sha>/<file>` |
 | `yaml_edit:scalar_change` | 0.50 | Per top-level scalar set | `commit/<sha>/<file>` |
 | `yaml_edit:lines_volume` | min(3.0, n/30) | Substantive-edit proxy | `commit/<sha>/<file>` |
-| `yaml_edit:contributors_rebalance` | 0.30 | Per new person added (NOT cw shifts) | `commit/<sha>/<file>` |
 | `yaml_edit:revert` | -0.50 | Per net-removed block (negative) | `commit/<sha>/<file>` |
+| `state_transition` | 0 (analytics) | Status change who/when/from→to (delivery lead time / time-in-state); gate scoring derives from it | `commit/<sha>/<id>/<from>-><to>` |
+
+D-26: every signal above is **materialized into the item's `evidence[]`**
+(by the post-commit hook or `/edpa:materialize`), then aggregated into
+`contributors[]`. `yaml_edit` carries a structural `delta` (blocks /
+list-items / scalars / lines ±) plus `raw_weight` + `discount`. The
+`contributors_rebalance` signal was removed — `contributors[]` is a
+derived projection of `evidence[]`, not an input. `state_transition` is
+weight-0 (it never moves cw; it is the analytics + gate-scoring source).
 
 Built-in mitigations against gaming:
 
@@ -164,7 +172,13 @@ Built-in mitigations against gaming:
 - **Whitespace-only diffs** → 0 weight
 - **Status-only changes** → 0 weight (transitions.py owns gate-event credit)
 - **File renames / moves** → 0 weight (metadata only)
-- **Bulk migrations** (`chore: rename`, `EDPA migrate`) → ×0.1 multiplier
+- **Bulk migrations / backfill** (`chore: rename`, `EDPA migrate`,
+  `backfill`, or a single commit touching > `bulk_item_threshold` items,
+  default 5) → ×0.1 multiplier, so a committer of many YAMLs can't
+  out-credit the real assignee
+- **Evidence commits** (`chore(evidence):`, `chore(ci-materialization):`)
+  and edits to the derived `evidence[]` / `contributors[]` blocks → 0
+  weight (materialization's own commits never self-credit)
 - **Backdated commits** use `GIT_AUTHOR_DATE` for iteration-window check
 
 Auto-detected signal weights live in `.edpa/config/cw_heuristics.yaml`
@@ -190,24 +204,25 @@ work events together and lets per-person ratio normalization split
 the person's capacity across whichever items they touched:
 
 1. **Story / Defect / Task Done credit** — items at `status: Done`
-   get `JS × cw` per their contributors[]. cw shares come pre-computed
-   from `detect_contributors.py` and (v1.17+) augmented in-memory by
-   `yaml_edit_signals.py` before run_edpa. (v1.17 fix: pre-v1.17 the
-   engine silently dropped Defects via a `level == "Story"` filter.)
+   get `JS × cw` per their contributors[]. cw shares are computed by
+   `detect_contributors.py` aggregating the item's materialized
+   `evidence[]` (commit_author, yaml_edit, manual, …). (v1.17 fix:
+   pre-v1.17 the engine silently dropped Defects via a
+   `level == "Story"` filter.)
 2. **Parent gate transitions** — Feature/Epic/Initiative status
-   transitions captured in git history (via `sync pull --commit`
-   auto-commits) become synthetic events with effective JS =
-   `parent.JS × gate_weights[type][transition]`. Parent contributors
-   inherit cw shares from the parent's contributors[] block — and
-   when the parent had no contributors[] populated (e.g., seeded
-   without `--contributor`), v1.17 yaml_edit signals automatically
-   credit the commit author who wrote the LBC / AC / NFRs.
-3. **YAML-edit signals (v1.17)** — every commit on a backlog YAML
-   inside the iteration window contributes structural signals
-   (create / block_add / list_grow / scalar_change / lines_volume /
-   contributors_rebalance / revert). These augment contributors[]
-   in-memory before run_edpa; the frozen snapshot captures the
-   augmented state for full audit trail.
+   transitions become synthetic events with effective JS =
+   `parent.JS × gate_weights[type][transition]`. D-26: the engine reads
+   these from the materialized `state_transition` signals in `evidence[]`
+   (written by the post-commit hook / `/edpa:materialize`) — it no longer
+   scans git. Parent contributors inherit cw from the parent's
+   contributors[]; when the parent has none, the transition's recorded
+   author is credited at cw=1.0.
+3. **YAML-edit signals** — every commit on a backlog YAML contributes
+   structural signals (create / block_add / list_grow / scalar_change /
+   lines_volume / revert). D-26: these are materialized into `evidence[]`
+   (with a structural `delta`) and aggregated into `contributors[]` like
+   any other signal — the engine reads that snapshot and performs **no
+   in-memory augmentation**, so the report can never diverge from the YAML.
 
 When git history records no transitions and no yaml_edit activity,
 only Done-item credit fires. The calculation is feature-preserving

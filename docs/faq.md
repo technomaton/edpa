@@ -38,8 +38,8 @@ The core EDPA engine is git-native — it doesn't talk to either GitHub or Jira 
 ### What if someone works on something but doesn't commit?
 
 EDPA v2.1 detects multiple evidence types beyond raw commits:
-- **`yaml_edit:*`** — engine reads structural edits to `.edpa/backlog/*.md` directly from `git log` (block adds, list growth, scalar changes, file create — captures refinement, AC, DoD work)
-- **`gate_event`** — F/E/I status transitions parsed from `git log`; each gate (LBC → design → refinement → Done) credits the commit author
+- **`yaml_edit:*`** — structural edits to `.edpa/backlog/*.md` (block adds, list growth, scalar changes, file create — captures refinement, AC, DoD work). D-26: materialized into the item's `evidence[]` with a structural `delta`; the engine reads the snapshot, not `git log`
+- **`state_transition` / `gate_event`** — status changes (who/when/from→to) materialized into `evidence[]`; F/E/I gate scoring (LBC → design → refinement → Done) derives from them, and they double as delivery-lead-time analytics
 - **`story_activity`** — C7.5 synthesizes in-flight Story credit when yaml_edit signals exist but the Story hasn't reached Done
 - **`manual:commit_message`** — `/contribute @person weight:X` parsed from commit body by post-commit hook (explicit additive signal)
 - **`pr_reviewer`, `issue_comment`** — optional, emitted only if you enable the CI workflow

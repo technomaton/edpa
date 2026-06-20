@@ -105,9 +105,10 @@ Allow manual override: check issue body for `/contribute @person weight:X`.
 The engine credits three kinds of work events:
 
 ```
-Score[P, story_done]   = JobSize[story]   × CW[P, story]      # also Defect / Task in v1.17
+Score[P, story_done]   = JobSize[story]   × CW[P, story]      # also Defect / Task
 Score[P, gate_event]   = JobSize[parent]  × gate_weight × CW[P, parent]
-Score[P, yaml_edit]    = signal_weight    × CW[P, item]       # v1.17 (in-memory enrichment)
+# D-26: yaml_edit + state_transition are materialized into evidence[] and feed
+# CW (yaml_edit) and gate_events (state_transition) — not a separate score path.
 ```
 
 - **Story / Defect / Task Done credit** for every item at `status: Done`.
@@ -116,13 +117,14 @@ Score[P, yaml_edit]    = signal_weight    × CW[P, item]       # v1.17 (in-memor
 - **Parent gate transitions** for every Feature / Epic / Initiative
   status transition captured in git history (via `sync pull --commit`
   auto-commits) within the iteration date window.
-- **Backlog-edit structural signals (v1.17)** — every commit on
+- **Backlog-edit structural signals** — every commit on
   `.edpa/backlog/<typ>/<id>.md` in the iteration window contributes
   structural signals (`yaml_edit:create`, `yaml_edit:block_add`,
   `yaml_edit:list_grow`, `yaml_edit:scalar_change`,
-  `yaml_edit:lines_volume`, `yaml_edit:contributors_rebalance`,
-  `yaml_edit:revert`). These augment contributors[] in-memory before
-  run_edpa; the frozen snapshot captures the augmented state.
+  `yaml_edit:lines_volume`, `yaml_edit:revert`). D-26: these are
+  materialized into `evidence[]` (with a structural `delta`; backfill /
+  bulk commits discounted) and aggregated into contributors[] — the
+  engine reads that snapshot, no in-memory enrichment.
 
 When git history records no transitions and no yaml_edit activity,
 only Done-item credit fires — the calculation degenerates gracefully

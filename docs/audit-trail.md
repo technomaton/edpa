@@ -119,9 +119,10 @@ Note the v1.11 structure:
     `.edpa/backlog/<typ>/<id>.yaml` per iteration window:
     `yaml_edit:create`, `yaml_edit:block_add`, `yaml_edit:list_grow`,
     `yaml_edit:scalar_change`, `yaml_edit:lines_volume`,
-    `yaml_edit:contributors_rebalance`, `yaml_edit:revert`. Each
-    signal carries `ref = commit/<sha>/<file>` so an auditor opens
-    the commit diff to verify what changed.
+    `yaml_edit:revert`. D-26: these are materialized into `evidence[]`
+    with a structural `delta`, alongside `state_transition` signals
+    (status who/when/from→to). Each signal carries a resolvable `ref`
+    so an auditor opens the commit diff to verify what changed.
   See [`docs/audit-references.md`](audit-references.md) for
   verification commands per signal type.
 - **No `as:` field** — role labels are derived at display time from
