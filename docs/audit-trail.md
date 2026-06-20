@@ -32,12 +32,11 @@ Each revision includes: reason for correction, diff from previous, timestamp, au
 
 ```json
 {
-  "snapshot_version": "1.11",
+  "snapshot_version": "2.9.0",
   "iteration": "PI-2026-1.3",
   "generated_at": "2026-05-12T18:00:00Z",
   "frozen": true,
-  "methodology": "EDPA 1.11.0",
-  "mode": "gates",
+  "methodology": "EDPA 2.9.0",
   "capacity_registry": { "...": "copy from .edpa/config/people.yaml at computation time" },
   "items": [
     {
@@ -116,7 +115,7 @@ Note the v1.11 structure:
   - **`detect_contributors.py`** (v1.11) — PR/issue API surfaces:
     `commit_author`, `pr_reviewer`, `issue_comment`, `manual:*`.
   - **`yaml_edit_signals.py`** (v1.17) — git diff over
-    `.edpa/backlog/<typ>/<id>.yaml` per iteration window:
+    `.edpa/backlog/<typ>/<id>.md` per iteration window:
     `yaml_edit:create`, `yaml_edit:block_add`, `yaml_edit:list_grow`,
     `yaml_edit:scalar_change`, `yaml_edit:lines_volume`,
     `yaml_edit:revert`. D-26: these are materialized into `evidence[]`

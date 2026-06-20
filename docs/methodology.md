@@ -43,7 +43,7 @@ The model provides two complementary views of the same data:
 
 | Layer | Purpose | Where it lives |
 |---|---|---|
-| **Operational Metadata Layer** | Live delivery data | GitHub Issues + GitHub Projects |
+| **Operational Metadata Layer** | Live delivery data | Git + YAML (`.edpa/backlog/**/*.md`, `.edpa/iterations/*.yaml`); GitHub optional |
 | **Capacity Registry Layer** | People's capacity, roles, FTE, availability | YAML/JSON config in repo |
 | **Evidence & Reporting Layer** | Frozen snapshots, timesheets, Excel, signatures | `.edpa/snapshots`, `.edpa/reports`, `.edpa/reports/signed` |
 
@@ -117,7 +117,7 @@ signal pool:
 
 - `detect_contributors.py` (v1.11) — PR/issue API surfaces. Runs at
   PR merge via the `edpa-contributor-detect.yml` workflow.
-- `yaml_edit_signals.py` (v1.17) — git diff over `.edpa/backlog/*.yaml`.
+- `yaml_edit_signals.py` (v1.17) — git diff over `.edpa/backlog/<type>/<id>.md`.
   Runs at engine close, scoped to the iteration window.
 
 Both feed the same `contributors[].signals[]` aggregation. Signal
@@ -139,7 +139,7 @@ weights sum into `contribution_score`, which normalizes to per-item
 
 #### 5.3.2 YAML-edit structural signals (v1.17)
 
-Every commit touching `.edpa/backlog/<typ>/<id>.yaml` is itself
+Every commit touching `.edpa/backlog/<type>/<id>.md` is itself
 evidence of work on that item. Detection is **structural** (count
 list bullets, top-level blocks, scalar changes) — it never tries to
 semantically classify content (operator field-naming drift makes
@@ -156,13 +156,26 @@ and sees the actual diff.
 | `yaml_edit:revert` | -0.50 | Per net-removed block (negative) | `commit/<sha>/<file>` |
 | `state_transition` | 0 (analytics) | Status change who/when/from→to (delivery lead time / time-in-state); gate scoring derives from it | `commit/<sha>/<id>/<from>-><to>` |
 
-D-26: every signal above is **materialized into the item's `evidence[]`**
-(by the post-commit hook or `/edpa:materialize`), then aggregated into
-`contributors[]`. `yaml_edit` carries a structural `delta` (blocks /
+D-26: every signal above is **materialized into the item's `evidence[]`**,
+then aggregated into `contributors[]`. Materialization runs in the
+post-commit hook (live) and via the idempotent catch-up
+`local_evidence.py --materialize [--iteration X | --all-iterations]` —
+exposed as the `edpa_materialize` MCP tool and the `/edpa:materialize`
+slash command — which deduplicates by commit `ref`, so re-running it
+never double-counts and back-fills any iteration the hook missed.
+`yaml_edit` carries a structural `delta` (blocks /
 list-items / scalars / lines ±) plus `raw_weight` + `discount`. The
 `contributors_rebalance` signal was removed — `contributors[]` is a
 derived projection of `evidence[]`, not an input. `state_transition` is
 weight-0 (it never moves cw; it is the analytics + gate-scoring source).
+
+`EDPA_NO_LOCAL_EVIDENCE=1` gates **only the automatic post-commit hook**
+— set it to stop commits materializing signals on the fly (bulk
+migrations, scripted history rewrites). The explicit `--materialize`
+catch-up (and its `edpa_materialize` / `/edpa:materialize` front-ends)
+**ignores** the flag and reconciles deterministically by `ref`, so
+suppressed live materialization can always be back-filled later without
+double-counting.
 
 Built-in mitigations against gaming:
 

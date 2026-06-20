@@ -125,7 +125,7 @@ attributed to post-detection edits rather than EDPA misreading.
 Given a snapshot file `.edpa/snapshots/iteration-PI-2026-1.4.json`,
 verifying turyna's claim of 51% share on S-8:
 
-1. Open `.edpa/backlog/stories/S-8.yaml`, find the `contributors`
+1. Open `.edpa/backlog/stories/S-8.md`, find the `contributors`
    block where `person: turyna`.
 2. Read the `signals[]` list — each entry is one piece of evidence.
 3. For each signal: run the corresponding `gh` command from the

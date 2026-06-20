@@ -2,10 +2,12 @@
 name: engine
 user-invocable: true
 description: >
-  Run EDPA evidence-driven calculation for an iteration. Gathers GitHub delivery evidence
-  (commits, PRs, reviews, comments), computes CW from heuristics, calculates Score and
-  DerivedHours, validates invariants. Use when closing an iteration, computing derived hours,
-  or running "EDPA výpočet". Produces per-person allocation data for the reports skill.
+  Run EDPA evidence-driven calculation for an iteration. Reads the materialized
+  evidence[]/contributors[] persisted in each item's YAML (written by the post-commit
+  hook / /edpa:materialize — the engine does not scan git at compute time), computes CW
+  from heuristics, calculates Score and DerivedHours, validates invariants. Use when
+  closing an iteration, computing derived hours, or running "EDPA výpočet". Produces
+  per-person allocation data for the reports skill.
 license: MIT
 compatibility: GitHub CLI (gh), Python 3.10+, .edpa/config/people.yaml, .edpa/config/heuristics.yaml
 allowed-tools: Read Bash(gh *) Bash(git *) Bash(python3 *) Grep
@@ -61,25 +63,29 @@ with open('.edpa/config/heuristics.yaml') as f:
     heuristics = yaml.safe_load(f)
 ```
 
-### 2. Gather delivery evidence
+### 2. Read materialized evidence
 
-For each person P, identify relevant items:
+The engine is a **pure reader** of the evidence already persisted in each
+item's YAML. It does **not** scan git (or call `gh`) at compute time — it
+reads the materialized `evidence[]` / `contributors[]` blocks and derives
+everything from that snapshot. So the report equals the persisted state,
+deterministically, on any machine.
+
+For each person P, identify relevant items from the persisted snapshot:
 - **Stories:** Done in iteration $ARGUMENTS, where P has evidence
 - **Features:** Not Done and not Funnel in current PI, where P has evidence
 - **Epics:** Not Done and not Funnel, where P has evidence
 
-**Evidence sources (hybrid — MCP preferred, gh CLI fallback):**
-
-```bash
-# Get closed issues in iteration
-gh issue list --label "iteration:$ARGUMENTS" --state closed --json number,title,assignees,labels,body
-
-# Get merged PRs referencing iteration items
-gh pr list --state merged --json number,title,author,reviews,commits,body
-
-# Get commits with item references
-git log --since="iteration_start" --until="iteration_end" --format="%H %an %s"
-```
+> **How signals get into `evidence[]` (not done by the engine).**
+> The post-commit hook (`local_evidence.py`) materializes `commit_author`,
+> `/contribute`, `yaml_edit`, and `state_transition` signals as each commit
+> lands. To backfill history, commits made with `EDPA_NO_LOCAL_EVIDENCE=1`,
+> or signals from another machine, run `/edpa:materialize` (MCP tool
+> `edpa_materialize`, or `local_evidence.py --materialize --iteration <id>`
+> / `--all-iterations`) — idempotent, deduped by `ref`. PR-thread signals
+> (`pr_reviewer`, `issue_comment`) are materialized by the optional
+> `edpa-contribution-sync` CI workflow. The engine then just reads the
+> result.
 
 ### 3. Score evidence per person per item
 
@@ -184,4 +190,6 @@ Print summary table to stdout: person, capacity, derived total, items count, ok/
 - No items in iteration → "No closed items found for {iteration}. Check iteration label."
 - Missing Job Size → warn per item, exclude from calculation
 - Person with 0 relevant items → warn, derive 0h (process issue, not math issue)
-- GitHub API unavailable → use `git log` as fallback evidence source
+- Evidence missing / contributors empty → the engine does **not** scan git to
+  recover it; run `/edpa:materialize <iteration>` to persist the signals into
+  `evidence[]`, then re-run the engine.

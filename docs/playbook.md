@@ -207,7 +207,7 @@ project:
 
 governance:
   # Auto-razitkovano na verzi pluginu instalatorem.
-  methodology: "EDPA 2.5.1"
+  methodology: "EDPA 2.9.0"
   # Jedina vypocetni cesta od v1.14 (zadny simple/full/gates mode selector,
   # zadny audit_mode -- snapshoty vzdy nesou plny signals[] audit trail).
 
@@ -502,7 +502,7 @@ PR review = signal pro EDPA. Aby se PR-thread signaly (`pr_reviewer`, `issue_com
 
 ### 2.3 Volitelny GitHub PR-signal sync
 
-EDPA V2 funguje cisty lokalne -- engine cte evidenci z gitu (`commit_author`) + YAML edits (`yaml_edit`) + gate transitions. GitHub je **volitelny** a slouzi pouze k materializaci PR-thread signalu.
+EDPA V2 funguje cisty lokalne -- lokalni signaly (`commit_author`, `yaml_edit`, `state_transition`) zapisuje do `evidence[]` post-commit hook / reconcile `local_evidence.py --materialize`; engine je pak **cisty ctenar** materializovaneho `evidence[]` (git pri vypoctu uz nescanuje). GitHub je **volitelny** a slouzi pouze k materializaci PR-thread signalu.
 
 S `--with-ci` se nainstaluje **jediny** V2 workflow `.github/workflows/edpa-contribution-sync.yml`. Po merge PR spusti `sync_pr_contributions.py`, ktery z PR-threadu vytahne signaly (`pr_reviewer`, `issue_comment`) a zapise je do `evidence[]` prislusnych itemu. Vyzaduje secret `EDPA_TOKEN` (viz `docs/edpa-token-setup.md`). Flow metriky lze cist pres MCP nastroj `edpa_flow_metrics`.
 
@@ -518,11 +518,15 @@ Na konci kazde iterace (1 tyden AI-native / 2 tydny classic):
 /edpa:close-iteration PI-2026-1.1
 ```
 
-Claude Code (skill `close-iteration`) pripravi kapacitu, spusti EDPA engine a vygeneruje reporty automaticky.
+Claude Code (skill `close-iteration`) materializuje evidenci, pripravi kapacitu, spusti EDPA engine a vygeneruje reporty automaticky.
 
 **Manualni CLI:**
 
 ```bash
+# 1. Materializace: zapis signalu do evidence[] (idempotentni, dedup dle ref)
+python3 .edpa/engine/scripts/local_evidence.py --materialize --iteration PI-2026-1.1
+
+# 2. EDPA engine -- cisty ctenar materializovaneho evidence[]
 python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.1
 # volitelne: --output cesta/edpa_results.json
 ```
@@ -849,7 +853,8 @@ V2 ma **jediny** volitelny workflow (jen s `--with-ci`):
 |--------|-------|
 | `/edpa:setup --with-ci --with-hooks --with-rules` | Vendoruje engine, naseje configy + id_counters, volitelne hooky/CI/rules |
 | `/edpa:add` | Prida backlog item (lokalne, auto-commit) |
-| `/edpa:close-iteration PI-2026-1.X` | Uzavreni iterace -- kapacita, EDPA engine, reporty |
+| `/edpa:materialize PI-2026-1.X` | Idempotentni reconcile -- replay gitu do `evidence[]` (pred uzavrenim; `edpa_materialize` MCP tool) |
+| `/edpa:close-iteration PI-2026-1.X` | Uzavreni iterace -- materialize, kapacita, EDPA engine, reporty |
 | `/edpa:reports PI-2026-1.X` | Generovani vykazu a PI summary |
 | `/edpa:board` | Vizualni HTML Kanban board (lokalni) |
 | `/edpa:calibrate` | Kalibrace signalovych vah -- MAD, navrh uprav `cw_heuristics.yaml` |
@@ -859,7 +864,7 @@ V2 ma **jediny** volitelny workflow (jen s `--with-ci`):
 | Prikaz | Popis |
 |--------|-------|
 | `engine.py --demo` | Demo s ukázkovymi daty |
-| `engine.py --edpa-root .edpa --iteration PI-2026-1.3` | Plny EDPA vypocet pro iteraci (cte backlog/config/heuristiky z `.edpa`) |
+| `engine.py --edpa-root .edpa --iteration PI-2026-1.3` | Plny EDPA vypocet pro iteraci (cisty ctenar materializovaneho `evidence[]`/`contributors[]` + config z `.edpa`; git nescanuje) |
 | `engine.py --edpa-root .edpa --iteration ID --output cesta/edpa_results.json` | Vlastni vystupni cesta |
 | `engine.py --status` | Stav konfigurace |
 
@@ -901,6 +906,15 @@ V2 ma **jediny** volitelny workflow (jen s `--with-ci`):
 | `capacity_override.py PI-2026-1.1 --add --person bob --hours 12` | Prida override |
 | `capacity_override.py PI-2026-1.1 --remove --person bob` | Odebere override |
 
+### local_evidence.py -- materializace evidence[]
+
+| Prikaz | Popis |
+|--------|-------|
+| `local_evidence.py --materialize --iteration PI-2026-1.1` | Idempotentni reconcile -- naskenuje okno iterace a zapise `state_transition` + `yaml_edit` signaly do `evidence[]` (dedup dle `ref`, znovuspusteni = no-op); lokuje `chore(evidence):` commit. Take `edpa_materialize` MCP / `/edpa:materialize`. |
+| `local_evidence.py --materialize --all-iterations` | Back-fill pres vsechny iterace v `.edpa/iterations/` (pri adopci modelu evidence-single-source). |
+
+> Spusti pred `engine.py` / `/edpa:close-iteration`. Post-commit hook materializuje signaly prubezne; `--materialize` dohani commity, ktere hook nevidel (historie pred hookem, `EDPA_NO_LOCAL_EVIDENCE=1`, commity z jineho stroje). `EDPA_NO_LOCAL_EVIDENCE=1` vypina **jen** automaticky post-commit hook; `--materialize` ho ignoruje.
+
 ### detect_contributors.py / calibrate_signals.py
 
 | Prikaz | Popis |
@@ -941,22 +955,23 @@ V2 je **local-first**: `.edpa/` (backlog v `.md` + config) je jediny zdroj pravd
 ### Tok dat
 
 ```
-   (volitelne) GitHub PR thread
-   reviews / komentare
-              |
-              |  edpa-contribution-sync.yml (po merge PR)
-              |  sync_pr_contributions.py
-              v  -- JEDNOSMERNE: signaly -> evidence[]
+   git log (lokalni commity)            (volitelne) GitHub PR thread
+   commit_author / yaml_edit /          reviews / komentare
+   state_transition                                |
+              |                                     |  edpa-contribution-sync.yml
+              |  post-commit hook                   |  sync_pr_contributions.py
+              |  + reconcile                        |
+              |  local_evidence.py --materialize    |
+              v  -- ZAPIS signalu -> evidence[]     v  -- JEDNOSMERNE -> evidence[]
    +-------------------------------------+
    |  .edpa/  (git) -- ZDROJ PRAVDY      |
    |  backlog *.md  config  iterations   |
-   |  evidence[] <- git commit_author    |
-   |             <- yaml_edit            |
-   |             <- gate transitions     |
+   |  evidence[]  (materializovane)      |
+   |  contributors[] (cw, odvozene)      |
    +-------------------------------------+
               |
-        detect_contributors.py
-        evidence[] -> contributors[] (cw)
+        EDPA engine -- CISTY CTENAR
+        cte evidence[]/contributors[]; git pri vypoctu nescanuje
               |
         +-----+-----------------------+
         |             |               |
@@ -978,7 +993,7 @@ EDPA je evidence-driven. `cw[osoba, item] = contribution_score / Σ_osoby contri
 | `pr_reviewer` | 2.17 | odeslany PR review (mimo self) |
 | `issue_comment` | 1.46 | komentar na issue/PR (mimo boty) |
 
-Lokalni signaly (`commit_author`, `yaml_edit`, gate transitions) cte engine primo z gitu/YAMLu. PR-thread signaly (`pr_reviewer`, `issue_comment`) prichazeji jen pres volitelny contribution-sync. Manualni `/contribute @person weight:X` (nebo `--contributor`) nese vahu verbatim.
+Lokalni signaly (`commit_author`, `yaml_edit`, `state_transition`) zapisuje do `evidence[]` post-commit hook a idempotentni reconcile `local_evidence.py --materialize`; engine je **cisty ctenar** -- cte materializovane `evidence[]`/`contributors[]`, git pri vypoctu nescanuje. PR-thread signaly (`pr_reviewer`, `issue_comment`) prichazeji jen pres volitelny contribution-sync. Manualni `/contribute @person weight:X` (nebo `--contributor`) nese vahu verbatim.
 
 Rolove vahy prispevatelu: owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; `evidence_threshold` 1.0.
 
@@ -1142,8 +1157,11 @@ PR-thread signaly (`pr_reviewer`, `issue_comment`) se do `evidence[]` dostanou j
 | **RR-OE** | Risk Reduction & Opportunity Enablement -- snizeni rizika / odemceni prilezitosti (CLI flag `--rr-oe`, legacy alias `--rr`) |
 | **WSJF** | Weighted Shortest Job First = (BV+TC+RR-OE)/JS |
 | **CW** | Contribution Weight -- vaha prispevku (0.0 - 1.0); per-item `Σ cw = 1.0` |
-| **Signal** | Doklad prispevku z gitu/PR (commit_author, pr_reviewer, issue_comment) s vahou |
+| **Signal** | Doklad prispevku s vahou. Taxonomie (7 typu): `commit_author`, `yaml_edit`, `state_transition`, `pr_reviewer`, `issue_comment`, manualni `contribution`, plus materializovane PR-thread. (`yaml_edit:contributors_rebalance` byl odstranen.) |
+| **state_transition** | Signal status zmeny na itemu (person/at/from_status/to_status); **vaha 0** -- analytika + delivery lead-time, neskoruje se primo, jen rekonstruuje gate eventy |
+| **yaml_edit** | Strukturalni signal z editu backlog YAMLu; nese `delta` (blocks/list-items/scalars/lines) + `raw_weight`/`discount`. Backfill/migrace a commity nad `bulk_item_threshold` (5) itemu maji discount x0.1. |
 | **MAD** | Mean Absolute Deviation -- prumerna absolutni odchylka (metrika kalibrace) |
-| **Evidence** | `evidence[]` na itemu -- agregovane signaly; `detect_contributors.py` z nich pocita `contributors[]` |
+| **Evidence** | `evidence[]` na itemu -- **jediny zapisovany zdroj signalu** (D-26); `contributors[]`/`cw` jsou odvozene (`aggregate_signals`, preskakuje vahu 0). Zapisuje post-commit hook / `--materialize`; engine je **cisty ctenar**. |
 | **Gate** | Status transition na Feature/Epic/Initiative; rozdeluje rodicovsky JS pres `gate_weights` |
+| **EDPA_NO_LOCAL_EVIDENCE** | Env vlajka -- vypina **jen** automaticky post-commit hook; `local_evidence.py --materialize` ji ignoruje (explicitni catch-up). |
 | **Ground truth** | Potvrzena realita od tymu (pro kalibraci) |

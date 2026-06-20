@@ -133,12 +133,12 @@ Guarantee: Σ DerivedHours = Capacity per person AND Σ cw = 1.0 per item — al
       <p class="tag">Evidence detection</p>
       <h2 class="section-title">Signals from git (and optionally GitHub)</h2>
       <p class="desc">
-        EDPA reads evidence <strong>primarily from local git</strong>: a post-commit hook writes
-        <code>commit_author</code> and <code>manual:commit_message</code> into <code>evidence[]</code>
-        in the YAML; the engine reads <code>yaml_edit</code> signals straight from <code>git log</code>
-        within the iteration window and synthesizes <code>gate_events</code> from status transitions.
-        An optional CI workflow can additionally emit <code>pr_reviewer</code> and <code>issue_comment</code>
-        from GitHub. Each signal adds weight to <code>contribution_score</code> per (person, item);
+        EDPA reads evidence <strong>primarily from local git</strong>: a post-commit hook
+        (and the idempotent <code>/edpa:materialize</code>) writes <code>commit_author</code>,
+        <code>yaml_edit</code> and <code>state_transition</code> straight into <code>evidence[]</code>
+        in the YAML. The engine is a <strong>pure reader</strong> — it consumes the materialized
+        evidence and no longer scans git at compute time. An optional CI workflow can additionally
+        emit <code>pr_reviewer</code> and <code>issue_comment</code> from GitHub. Each signal adds weight to <code>contribution_score</code> per (person, item);
         the resulting CW is a per-item normalized share: <code>cw = score / Σ_persons score</code> (Σ per item = 1.0).
       </p>
       <div class="table-wrap">
@@ -166,14 +166,14 @@ Guarantee: Σ DerivedHours = Capacity per person AND Σ cw = 1.0 per item — al
             </tr>
             <tr>
               <td><code>yaml_edit:*</code></td>
-              <td class="td-cw">0.3–5.0</td>
-              <td>engine + git log</td>
-              <td>block_add, list_grow, scalar_change, create — structural backlog edits</td>
+              <td class="td-cw">0.5–5.0</td>
+              <td>local hook / materialize</td>
+              <td>block_add, list_grow, scalar_change, create — structural backlog edits (revert −0.5)</td>
             </tr>
             <tr>
               <td><code>gate_event</code></td>
               <td class="td-cw">js × weight</td>
-              <td>engine + git log</td>
+              <td>local hook / materialize</td>
               <td>F/E/I status transition (LBC → design → refinement → Done)</td>
             </tr>
             <tr>
@@ -181,6 +181,12 @@ Guarantee: Σ DerivedHours = Capacity per person AND Σ cw = 1.0 per item — al
               <td class="td-cw">js × 0.40</td>
               <td>engine</td>
               <td>In-flight Story with yaml_edit signals in the window</td>
+            </tr>
+            <tr>
+              <td><code>state_transition</code></td>
+              <td class="td-cw">0</td>
+              <td>local hook / materialize</td>
+              <td>Status transition (person/at/from→to) — analytics + delivery lead-time, does not feed CW</td>
             </tr>
             <tr>
               <td><code>pr_reviewer</code></td>

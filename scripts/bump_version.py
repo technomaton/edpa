@@ -171,6 +171,8 @@ def main():
         (REPO_ROOT / "docs/playbook.md",
          r"\*\*Verze:\*\* EDPA \S+", f"**Verze:** EDPA {new}"),
         (REPO_ROOT / "docs/playbook.md",
+         r'methodology: "EDPA [^"]+"', f'methodology: "EDPA {new}"'),
+        (REPO_ROOT / "docs/playbook.md",
          r"\*\*Posledni aktualizace:\*\* \d{4}-\d{2}-\d{2}",
          f"**Posledni aktualizace:** {date.today().isoformat()}"),
         (REPO_ROOT / "docs/mcp.md",

@@ -13,7 +13,7 @@ inputs, item-ID path-traversal guard, stderr logging, version-aware identity.
 
 ## What it does
 
-Instead of the assistant grepping `.edpa/backlog/*.yaml` itself, it calls one
+Instead of the assistant grepping `.edpa/backlog/**/*.md` itself, it calls one
 of five tools and gets a structured JSON response. That keeps the assistant's
 context tight and makes the data shape predictable.
 
@@ -38,6 +38,7 @@ Analytics read tools (2.6.0+):
 | `edpa_ai_attribution` | Human vs AI delivery ratio from `Co-Authored-By` trailers |
 | `edpa_payroll_export` | Billable-hours CSV from derived hours + `hourly_rate` |
 | `edpa_reconcile` | Git evidence vs backlog status drift — suggests transitions (2.7.0) |
+| `edpa_materialize` | Replay git into each item's `evidence[]` (idempotent; writes a `chore(evidence):` commit) |
 
 It also publishes resources for whole-file reads:
 
@@ -91,6 +92,7 @@ stdout. Logs go to stderr (see below).
 | `EDPA_ROOT`       | walk up cwd   | Force a specific `.edpa/` directory (handy for tests, CI, multi-repo)   |
 | `EDPA_LOG_LEVEL`  | `INFO`        | `DEBUG`, `INFO`, `WARNING`, `ERROR`                                      |
 | `EDPA_LOG_FILE`   | unset         | Mirror logs to this file in addition to stderr                          |
+| `EDPA_NO_LOCAL_EVIDENCE` | unset  | When set, suppresses the **automatic** post-commit evidence hook. `edpa_materialize` / `/edpa:materialize` ignore it — the explicit catch-up path always runs. |
 
 `EDPA_ROOT` precedence: env var → walk up from `cwd` looking for the nearest
 `.edpa/` directory. Returning `None` only when neither resolves.
@@ -234,7 +236,39 @@ the calling skill/command owns the commit. Full set: `edpa_item_create`,
 `edpa_item_update`, `edpa_item_transition`, `edpa_item_link_parent`,
 `edpa_item_link_dep`, `edpa_item_roam`, `edpa_objective_set`,
 `edpa_objective_remove`, `edpa_confidence_vote`, `edpa_iteration_create`,
-`edpa_iteration_close`, `edpa_pi_create`, `edpa_pi_close`, `edpa_people_upsert`.
+`edpa_iteration_close`, `edpa_pi_create`, `edpa_pi_close`, `edpa_people_upsert`,
+`edpa_materialize`.
+
+(`edpa_materialize` is the exception to "does not commit" — see its section below;
+it writes a `chore(evidence):` commit, like the post-commit hook it replays.)
+
+#### `edpa_materialize`
+
+```json
+{ "iteration": "PI-2026-1.3" }
+```
+
+Replays git history into the materialized signal source — each item's `evidence[]`
+array. For every commit it can attribute, it appends the structural signals the
+post-commit hook would have emitted: `state_transition` (weight `0`; carries
+`person` / `at` / `from_status` / `to_status` for analytics and delivery
+lead-time) and `yaml_edit` (carrying a structural `delta` plus `raw_weight` /
+`discount`). It then re-derives `contributors[]` + `cw` from `evidence[]`
+(`aggregate_signals`, skipping weight-0 signals). `iteration` scopes the replay to
+one iteration; omit it to walk the active iteration. The CLI exposes
+`--all-iterations` for a whole-project backfill
+(`local_evidence.py --materialize --all-iterations`).
+
+**Idempotent.** Signals are deduplicated by their commit-hash `ref`, so re-running
+never double-counts — it only fills gaps. This is what makes it safe as the
+catch-up path after a `EDPA_NO_LOCAL_EVIDENCE` session: that variable suppresses
+only the **automatic** post-commit hook, and `edpa_materialize` (and
+`/edpa:materialize`) **ignore it** by design — the explicit replay always runs.
+
+Unlike the other write tools, it **does commit**: it writes a `chore(evidence):`
+commit with the materialized changes, exactly like the hook it stands in for.
+Delegates to `local_evidence.py --materialize`, the single source of behavior also
+driven by the `/edpa:materialize` command.
 
 #### `edpa_pi_create`
 

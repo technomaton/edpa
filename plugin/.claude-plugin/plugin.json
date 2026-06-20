@@ -37,7 +37,8 @@
     "./commands/metrics.md",
     "./commands/insights.md",
     "./commands/ai-attribution.md",
-    "./commands/reconcile.md"
+    "./commands/reconcile.md",
+    "./commands/materialize.md"
   ],
   "agents": []
 }

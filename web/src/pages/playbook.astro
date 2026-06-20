@@ -366,11 +366,12 @@ git checkout -b chore/T-050-ci-pipeline</code></pre>
         <tbody>
           <tr><td>pre-commit</td><td>ID safety — kontrola referencí</td></tr>
           <tr><td>commit-msg</td><td>Vyžaduje referenci itemu nebo <code>no-ticket:</code></td></tr>
-          <tr><td>post-commit</td><td>Zaznamenává <code>commit_author</code> evidence</td></tr>
+          <tr><td>post-commit</td><td>Materializuje <code>commit_author</code>, <code>yaml_edit</code> a <code>state_transition</code> do <code>evidence[]</code> (<code>local_evidence.py</code>)</td></tr>
           <tr><td>pre-push</td><td>Kontrola ID kolizí</td></tr>
         </tbody>
       </table>
     </div>
+    <div class="note"><strong>Materializace evidence:</strong> automatický post-commit hook zapisuje signály po každém commitu. Pro idempotentní doplnění historie (dedup podle <code>ref</code>) spusť <code>/edpa:materialize</code> (MCP nástroj <code>edpa_materialize</code>) nebo CLI <code>python3 .edpa/engine/scripts/local_evidence.py --materialize [--iteration PI-2026-1.1 | --all-iterations]</code>. Proměnná <code>EDPA_NO_LOCAL_EVIDENCE=1</code> vypíná <strong>jen</strong> automatický hook — <code>--materialize</code> ji ignoruje.</div>
     <p>Registrace hooků je idempotentní a self-refreshing (SessionStart auto-update je po update pluginu znovu zaregistruje). Cizí (ne-EDPA) hooky se nikdy nepřepisují — přeskočí se s varováním. Stav hooků (aktivní / chybějící / cizí / lefthook) zkontroluješ kdykoli read-only doctorem:</p>
     <pre><code>python3 .edpa/engine/scripts/project_setup.py --check-hooks
 python3 .edpa/engine/scripts/project_setup.py --refresh-hooks   # jen znovu zaregistruje</code></pre>
@@ -415,7 +416,7 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
     <p>PR review = signál pro EDPA. Aby se PR-thread signály (<code>pr_reviewer</code>, <code>issue_comment</code>) dostaly do <code>evidence[]</code>, je potřeba volitelný contribution-sync workflow — viz <a href="#faze-2">2.3</a>.</p>
 
     <h3>2.3 Volitelný GitHub PR-signal sync</h3>
-    <p>EDPA V2 funguje čistě lokálně — engine čte evidenci z gitu (<code>commit_author</code>) + YAML edits (<code>yaml_edit</code>) + gate transitions. GitHub je <strong>volitelný</strong> a slouží pouze k materializaci PR-thread signálů.</p>
+    <p>EDPA V2 funguje čistě lokálně — post-commit hook a <code>/edpa:materialize</code> zapisují <code>commit_author</code>, <code>yaml_edit</code> a <code>state_transition</code> do <code>evidence[]</code>; engine je čistý reader. GitHub je <strong>volitelný</strong> a slouží pouze k materializaci PR-thread signálů.</p>
     <p>S <code>--with-ci</code> se nainstaluje <strong>jediný</strong> V2 workflow <code>.github/workflows/edpa-contribution-sync.yml</code>. Po merge PR spustí <code>sync_pr_contributions.py</code>, který z PR-threadu vytáhne signály (<code>pr_reviewer</code>, <code>issue_comment</code>) a zapíše je do <code>evidence[]</code> příslušných itemů. Vyžaduje secret <code>EDPA_TOKEN</code> (viz <code>docs/edpa-token-setup.md</code>). Flow metriky lze číst přes MCP nástroj <code>edpa_flow_metrics</code>.</p>
     <div class="note"><strong>Odstraněno v 2.0.0:</strong> obousměrný sync <code>sync.py</code> (pull/push/diff/status/conflicts/<code>--mock</code>) — v V2 <strong>neexistuje</strong>. Stejně tak workflow <code>edpa-sync-projects-to-git.yml</code> a <code>edpa-sync-git-to-projects.yml</code>. Žádný GitHub Project se nepropaguje. Pro board použij lokální <code>/edpa:board</code>.</div>
 
@@ -831,21 +832,23 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
               |  edpa-contribution-sync.yml (po merge PR)
               |  sync_pr_contributions.py
               v  -- JEDNOSMERNE: signaly -&gt; evidence[]
+   post-commit hook / /edpa:materialize
+   local_evidence.py --materialize  (dedup podle ref)
+              |  zapisuje commit_author, yaml_edit, state_transition
+              v  -- do evidence[]
    +-------------------------------------+
    |  .edpa/  (git) -- ZDROJ PRAVDY      |
    |  backlog *.md  config  iterations   |
-   |  evidence[] &lt;- git commit_author    |
-   |             &lt;- yaml_edit            |
-   |             &lt;- gate transitions     |
+   |  evidence[]  -- jediny zdroj signalu|
    +-------------------------------------+
               |
-        detect_contributors.py
+        aggregate_signals (skip weight-0)
         evidence[] -&gt; contributors[] (cw)
               |
         +-----+-----------------------+
         |             |               |
    EDPA engine    reports.py      board.py
-   (JS x CW)      timesheety      HTML board
+   (pure reader)  timesheety      HTML board
         |
    reports/ + snapshots/ + xlsx</code></pre>
     <div class="note"><strong>Odstraněno v 2.0.0:</strong> obousměrný sync GitHub Projects &lt;-&gt; Git, org Issue Types, custom fields. Žádný GitHub Project se neprovisionuje ani nepropaguje.</div>
@@ -864,7 +867,7 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
         </tbody>
       </table>
     </div>
-    <p>Lokální signály (<code>commit_author</code>, <code>yaml_edit</code>, gate transitions) čte engine přímo z gitu/YAMLu. PR-thread signály (<code>pr_reviewer</code>, <code>issue_comment</code>) přicházejí jen přes volitelný contribution-sync. Manuální <code>/contribute @person weight:X</code> (nebo <code>--contributor</code>) nese váhu verbatim.</p>
+    <p>Lokální signály (<code>commit_author</code>, <code>yaml_edit</code>, <code>state_transition</code>) materializuje do <code>evidence[]</code> post-commit hook a <code>/edpa:materialize</code>; engine je čte už jen z <code>evidence[]</code> (žádný git scan při výpočtu). PR-thread signály (<code>pr_reviewer</code>, <code>issue_comment</code>) přicházejí jen přes volitelný contribution-sync. Manuální <code>/contribute @person weight:X</code> (nebo <code>--contributor</code>) nese váhu verbatim.</p>
     <p>Rolové váhy přispěvatelů: owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0.</p>
 
     <h3>Výpočet EDPA</h3>

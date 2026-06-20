@@ -364,11 +364,12 @@ git checkout -b chore/T-050-ci-pipeline</code></pre>
         <tbody>
           <tr><td>pre-commit</td><td>ID safety — reference check</td></tr>
           <tr><td>commit-msg</td><td>Requires an item reference or <code>no-ticket:</code></td></tr>
-          <tr><td>post-commit</td><td>Records <code>commit_author</code> evidence</td></tr>
+          <tr><td>post-commit</td><td>Materializes <code>commit_author</code>, <code>yaml_edit</code> and <code>state_transition</code> into <code>evidence[]</code> (<code>local_evidence.py</code>)</td></tr>
           <tr><td>pre-push</td><td>Checks for ID collisions</td></tr>
         </tbody>
       </table>
     </div>
+    <div class="note"><strong>Materializing evidence:</strong> the automatic post-commit hook writes signals after every commit. To idempotently backfill history (dedup by <code>ref</code>) run <code>/edpa:materialize</code> (the MCP tool <code>edpa_materialize</code>) or the CLI <code>python3 .edpa/engine/scripts/local_evidence.py --materialize [--iteration PI-2026-1.1 | --all-iterations]</code>. The <code>EDPA_NO_LOCAL_EVIDENCE=1</code> variable disables <strong>only</strong> the automatic hook — <code>--materialize</code> ignores it.</div>
     <p>Hook registration is idempotent and self-refreshing (the SessionStart auto-update re-registers them after a plugin update). Foreign (non-EDPA) hooks are never clobbered — they are skipped with a warning. Check hook state (active / missing / foreign / lefthook) anytime with the read-only doctor:</p>
     <pre><code>python3 .edpa/engine/scripts/project_setup.py --check-hooks
 python3 .edpa/engine/scripts/project_setup.py --refresh-hooks   # register only</code></pre>
@@ -413,7 +414,7 @@ gh pr create --title "S-200: OMOP CDM parser implementation" \
     <p>PR review = a signal for EDPA. For PR-thread signals (<code>pr_reviewer</code>, <code>issue_comment</code>) to land in <code>evidence[]</code>, the optional contribution-sync workflow is required — see <a href="#faze-2">2.3</a>.</p>
 
     <h3>2.3 Optional GitHub PR-signal sync</h3>
-    <p>EDPA V2 works purely locally — the engine reads evidence from git (<code>commit_author</code>) + YAML edits (<code>yaml_edit</code>) + gate transitions. GitHub is <strong>optional</strong> and serves only to materialize PR-thread signals.</p>
+    <p>EDPA V2 works purely locally — the post-commit hook and <code>/edpa:materialize</code> write <code>commit_author</code>, <code>yaml_edit</code> and <code>state_transition</code> into <code>evidence[]</code>; the engine is a pure reader. GitHub is <strong>optional</strong> and serves only to materialize PR-thread signals.</p>
     <p>With <code>--with-ci</code>, the <strong>single</strong> V2 workflow <code>.github/workflows/edpa-contribution-sync.yml</code> is installed. After a PR merge it runs <code>sync_pr_contributions.py</code>, which extracts signals (<code>pr_reviewer</code>, <code>issue_comment</code>) from the PR thread and writes them into the relevant items' <code>evidence[]</code>. It requires the <code>EDPA_TOKEN</code> secret (see <code>docs/edpa-token-setup.md</code>). Flow metrics can be read via the MCP tool <code>edpa_flow_metrics</code>.</p>
     <div class="note"><strong>Removed in 2.0.0:</strong> bidirectional sync <code>sync.py</code> (pull/push/diff/status/conflicts/<code>--mock</code>) — it <strong>does not exist</strong> in V2. Likewise the <code>edpa-sync-projects-to-git.yml</code> and <code>edpa-sync-git-to-projects.yml</code> workflows. No GitHub Project is propagated. For a board, use the local <code>/edpa:board</code>.</div>
 
@@ -835,21 +836,23 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
               |  edpa-contribution-sync.yml (after PR merge)
               |  sync_pr_contributions.py
               v  -- ONE-WAY: signals -> evidence[]
+   post-commit hook / /edpa:materialize
+   local_evidence.py --materialize  (dedup by ref)
+              |  writes commit_author, yaml_edit, state_transition
+              v  -- into evidence[]
    +-------------------------------------+
    |  .edpa/  (git) -- SOURCE OF TRUTH   |
    |  backlog *.md  config  iterations   |
-   |  evidence[] &lt;- git commit_author    |
-   |             &lt;- yaml_edit            |
-   |             &lt;- gate transitions     |
+   |  evidence[]  -- single signal source|
    +-------------------------------------+
               |
-        detect_contributors.py
+        aggregate_signals (skip weight-0)
         evidence[] -> contributors[] (cw)
               |
         +-----+-----------------------+
         |             |               |
    EDPA engine    reports.py      board.py
-   (JS x CW)      timesheets      HTML board
+   (pure reader)  timesheets      HTML board
         |
    reports/ + snapshots/ + xlsx</code></pre>
     <div class="note"><strong>Removed in 2.0.0:</strong> bidirectional GitHub Projects &harr; Git sync, org Issue Types, custom fields. No GitHub Project is provisioned or propagated.</div>
@@ -868,7 +871,7 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
         </tbody>
       </table>
     </div>
-    <p>Local signals (<code>commit_author</code>, <code>yaml_edit</code>, gate transitions) are read by the engine directly from git/YAML. PR-thread signals (<code>pr_reviewer</code>, <code>issue_comment</code>) arrive only via the optional contribution-sync. A manual <code>/contribute @person weight:X</code> (or <code>--contributor</code>) carries its weight verbatim.</p>
+    <p>Local signals (<code>commit_author</code>, <code>yaml_edit</code>, <code>state_transition</code>) are materialized into <code>evidence[]</code> by the post-commit hook and <code>/edpa:materialize</code>; the engine reads them only from <code>evidence[]</code> (no git scan at compute time). PR-thread signals (<code>pr_reviewer</code>, <code>issue_comment</code>) arrive only via the optional contribution-sync. A manual <code>/contribute @person weight:X</code> (or <code>--contributor</code>) carries its weight verbatim.</p>
     <p>Contributor role weights: owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0. Signals <strong>aggregate additively</strong> into contribution_score per (person, item), then normalize per-item: <code>cw = score / Σ_persons score</code> (Σ across persons = 1.0).</p>
 
     <h3>EDPA calculation</h3>
