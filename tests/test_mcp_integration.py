@@ -241,6 +241,8 @@ class TestToolsAdvertised:
                 "edpa_payroll_export",
                 # S-241
                 "edpa_reconcile",
+                # D-26 (evidence single-source)
+                "edpa_materialize",
             }, f"Tool set drift: {names}"
 
     def test_edpa_item_requires_item_id(self, edpa_workspace):

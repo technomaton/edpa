@@ -504,6 +504,12 @@ def aggregate_signals(signals: list[dict],
     total_score = 0.0
     unknown: set[str] = set()
     for sig in signals:
+        # Zero-weight signals (e.g. state_transition) are analytics-only
+        # records that live in evidence[] for delivery-lead-time / state-
+        # duration analytics; they never contribute to contribution_score
+        # or cw. Skipping them here keeps contributors[] purely about work.
+        if not sig.get("weight"):
+            continue
         login = sig["login"]
         person_id = people_map.get(login.lower(), login)
         if login.lower() not in people_map:
