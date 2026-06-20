@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **`/edpa:engine` accepted a PI label as `--iteration` and silently
+  under-counted the report (D-25).** Running the engine with `--iteration
+  PI-2026-1` (a PI, not a `PI-2026-1.N` iteration) passed unchecked: a
+  Story/Defect/Task only counts on an *exact* iteration match, so every
+  item tagged `PI-2026-1.N` was dropped while the run still produced a
+  full-looking `reports/iteration-PI-2026-1/` (xlsx + insights). The
+  numbers were quietly wrong. The engine now refuses a PI id — detected by
+  the top-level `pi:` block in `.edpa/iterations/<id>.yaml` — and points to
+  `edpa_pi_close` / `/edpa:close-pi` for PI-level rollups. Free-form
+  iteration ids (no `pi:` block) are never flagged, so projects that don't
+  use the `PI-YYYY-N.M` convention are unaffected.
+
 ## 2.9.0 — 2026-06-18 — `/edpa:close-pi`: a front-end for the PI rollup
 
 ### Added

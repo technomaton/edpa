@@ -1377,6 +1377,32 @@ def write_excel(edpa_root, iteration_id, results, capacity):
     print(f"Excel: {out_path}")
 
 
+def _is_pi_id(edpa_root, iteration_id):
+    """True if ``iteration_id`` resolves to a PI metadata file rather than
+    a per-iteration id.
+
+    A PI file (``.edpa/iterations/PI-YYYY-N.yaml``) carries a top-level
+    ``pi:`` block; an iteration file (``PI-YYYY-N.M.yaml``) carries an
+    ``iteration:`` block. The engine scores ONE iteration, so a PI passed
+    as ``--iteration`` silently drops every Story/Defect/Task tagged
+    ``<pi>.N`` (they require an exact iteration match in
+    ``load_backlog_items``). PI rollups go through ``pi_close`` (the
+    ``edpa_pi_close`` tool). Returns ``False`` for a missing/empty id or a
+    non-PI file — so free-form iteration ids (no ``pi:`` block) are never
+    flagged.
+    """
+    if not iteration_id:
+        return False
+    pi_file = Path(edpa_root) / "iterations" / f"{iteration_id}.yaml"
+    if not pi_file.exists():
+        return False
+    try:
+        data = load_yaml(pi_file)
+    except Exception:  # noqa: BLE001 — a malformed file is not a PI signal
+        return False
+    return isinstance(data, dict) and "pi" in data
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=f"EDPA {VERSION} — Evidence-Driven Proportional Allocation Engine",
@@ -1445,6 +1471,21 @@ def main():
         edpa_root = Path(args.edpa_root)
         if not edpa_root.exists():
             parser.error(f".edpa/ directory not found at {edpa_root}")
+
+        # D-25: refuse a PI label where a per-iteration id is expected.
+        # A Story/Defect/Task only counts on an exact iteration match, so
+        # pointing --iteration at a PI silently drops every item tagged
+        # <pi>.N and emits a plausible-looking but under-counted report.
+        # PI rollups go through pi_close (edpa_pi_close / /edpa:close-pi).
+        if _is_pi_id(edpa_root, args.iteration):
+            parser.error(
+                f"'{args.iteration}' is a PI, not an iteration. The engine "
+                f"scores one iteration at a time (e.g. {args.iteration}.1); "
+                f"pointing --iteration at a PI silently drops all "
+                f"Story/Defect/Task work tagged {args.iteration}.N. For a "
+                f"PI-level rollup use edpa_pi_close "
+                f"(/edpa:close-pi {args.iteration})."
+            )
 
         capacity = load_yaml(edpa_root / "config" / "people.yaml")
         heuristics = load_heuristics(edpa_root)
