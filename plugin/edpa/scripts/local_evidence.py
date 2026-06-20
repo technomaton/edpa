@@ -475,6 +475,26 @@ def cmd_materialize(edpa_root: Path, iteration_id: str) -> int:
     return 0
 
 
+def cmd_materialize_all(edpa_root: Path) -> int:
+    """Back-fill: run cmd_materialize for every iteration in
+    .edpa/iterations/. Idempotent (dedup by ref) — safe to re-run. Use once
+    when adopting the evidence-single-source model on an existing project."""
+    edpa_root = Path(edpa_root)
+    iters_dir = edpa_root / "iterations"
+    if not iters_dir.is_dir():
+        print("materialize: no .edpa/iterations/ directory", file=sys.stderr)
+        return 1
+    iters = sorted(f.stem for f in iters_dir.glob("*.yaml"))
+    if not iters:
+        print("materialize: no iterations found", file=sys.stderr)
+        return 0
+    rc = 0
+    for iid in iters:
+        rc |= cmd_materialize(edpa_root, iid)
+    print(f"materialize --all-iterations: processed {len(iters)} iteration(s)")
+    return rc
+
+
 # ─── main ───────────────────────────────────────────────────────────────────
 
 
@@ -485,14 +505,6 @@ def main(argv=None) -> int:
     # the explicit --materialize reconcile flag; everything else is hook mode.
     argv = list(sys.argv[1:] if argv is None else argv)
     if "--materialize" in argv:
-        iteration = None
-        if "--iteration" in argv:
-            idx = argv.index("--iteration")
-            if idx + 1 < len(argv):
-                iteration = argv[idx + 1]
-        if not iteration:
-            print("materialize: --iteration <ID> required", file=sys.stderr)
-            return 2
         repo_root = _repo_root()
         if not repo_root:
             return 0
@@ -500,6 +512,17 @@ def main(argv=None) -> int:
         if not edpa_root.exists():
             print("materialize: not an EDPA project", file=sys.stderr)
             return 1
+        if "--all-iterations" in argv:
+            return cmd_materialize_all(edpa_root)
+        iteration = None
+        if "--iteration" in argv:
+            idx = argv.index("--iteration")
+            if idx + 1 < len(argv):
+                iteration = argv[idx + 1]
+        if not iteration:
+            print("materialize: --iteration <ID> or --all-iterations required",
+                  file=sys.stderr)
+            return 2
         return cmd_materialize(edpa_root, iteration)
 
     # ---- post-commit hook mode (default) ----

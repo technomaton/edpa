@@ -383,3 +383,24 @@ def test_emit_writes_yaml_edit_signal_with_delta(repo: Path) -> None:
     assert isinstance(ye[0]["delta"], dict)
     assert ye[0]["delta"]["scalars_changed"] >= 1
     assert ye[0]["ref"].startswith("commit/")
+
+
+def test_materialize_all_iterations(repo: Path) -> None:
+    """--all-iterations back-fills every iteration window in one shot."""
+    iters = repo / ".edpa" / "iterations"
+    iters.mkdir(parents=True, exist_ok=True)
+    (iters / "PI-2026-2.1.yaml").write_text(yaml.safe_dump({"iteration": {
+        "id": "PI-2026-2.1",
+        "start_date": "2026-05-01", "end_date": "2026-05-31"}}))
+    _commit_status_flip(repo, ".edpa/backlog/stories/S-1.md", "Done",
+                        "S-1: done")
+    old = Path.cwd()
+    try:
+        os.chdir(repo)
+        rc = le.main(["--materialize", "--all-iterations"])
+    finally:
+        os.chdir(old)
+    assert rc == 0
+    sigs = load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+    assert any(s["type"] == "state_transition" and s["to_status"] == "Done"
+               for s in sigs)
