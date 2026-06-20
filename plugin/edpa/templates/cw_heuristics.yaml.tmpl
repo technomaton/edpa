@@ -122,11 +122,11 @@ yaml_edit_weights:
   yaml_edit:scalar_change:           0.5    # per top-level scalar set
   yaml_edit:lines_volume_cap:        3.0    # max bonus from line volume
   yaml_edit:lines_volume_divisor:   30      # +30 lines = +1.0 bonus
-  yaml_edit:contributors_rebalance:  0.3    # per new person added
   yaml_edit:revert:                 -0.5    # per net-removed block
 
   list_grow_cap_per_commit:        10       # max bullets credited per commit
-  bulk_migration_discount:          0.1     # multiplier for bulk renames
+  bulk_migration_discount:          0.1     # multiplier for bulk renames / backfill
+  bulk_item_threshold:               5      # commit touching > N items → bulk discount
 
 # ─────────────────────────────────────────────────────────────────────
 # RULES

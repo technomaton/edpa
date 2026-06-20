@@ -19,7 +19,6 @@ Signal taxonomy (8 types, all `yaml_edit:*`):
   list_grow               — net `- ` bullets added (capped at 10/commit/item)
   scalar_change           — top-level scalar field set or changed
   lines_volume            — total +lines effort proxy (capped at min(3.0, n/30))
-  contributors_rebalance  — new person added to contributors[] (cw shift only = 0)
   revert                  — net-removal commit (negative weight)
   status_transition_skip  — sentinel; status changes owned by transitions.py
 
@@ -78,10 +77,10 @@ DEFAULT_WEIGHTS = {
     "yaml_edit:scalar_change": 0.5,
     "yaml_edit:lines_volume_cap": 3.0,    # max contribution from line count
     "yaml_edit:lines_volume_divisor": 30, # +30 lines = +1.0
-    "yaml_edit:contributors_rebalance": 0.3,
     "yaml_edit:revert": -0.5,             # per net-removed block
     "bulk_migration_discount": 0.1,
     "list_grow_cap_per_commit": 10,
+    "bulk_item_threshold": 5,   # commit touching > N items → bulk discount
 }
 
 # Commit messages matching these patterns are tool-generated and produce
@@ -93,6 +92,9 @@ TOOL_COMMIT_PATTERNS = [
     re.compile(r"^EDPA: capacity override", re.IGNORECASE),
     re.compile(r"^EDPA sync setup-refresh", re.IGNORECASE),
     re.compile(r"^Auto-commit\b", re.IGNORECASE),
+    # Materialization's own evidence commits must never re-score (anti-loop).
+    re.compile(r"^chore\(evidence\):", re.IGNORECASE),
+    re.compile(r"^chore\(ci-materialization\):", re.IGNORECASE),
 ]
 
 # Bulk migration commits get weight × 0.1. Pattern matches the leading
@@ -102,6 +104,7 @@ BULK_MIGRATION_PATTERNS = [
     re.compile(r"^EDPA migrate\b", re.IGNORECASE),
     re.compile(r"^migrate:", re.IGNORECASE),
     re.compile(r"^refactor[:(].*\bbulk\b", re.IGNORECASE),
+    re.compile(r"\bbackfill\b", re.IGNORECASE),
 ]
 
 # Bot author emails. Commits authored by these never produce yaml_edit
@@ -205,11 +208,19 @@ _RE_TYPE_FIELD = re.compile(r"^\+type:\s*(\S+)\s*$")
 _RE_TITLE_FIELD = re.compile(r"^\+title:\s*")
 
 
-def score_diff(diff_lines: list[str], weights: dict) -> tuple[float, list[str]]:
-    """Score a per-(commit, file) diff. Returns (total_weight, audit_tags).
+_BOOKKEEPING_BLOCKS = ("evidence", "contributors", "ci_signals")
+
+
+def score_diff(diff_lines: list[str], weights: dict) -> tuple[float, list[str], dict]:
+    """Score a per-(commit, file) diff. Returns (total_weight, audit_tags, delta).
+
+    ``delta`` is a structural breakdown (blocks / list-items / scalars /
+    lines added or removed) persisted on the materialized yaml_edit signal
+    for later analytics — "what and how much changed".
 
     Edge cases handled:
       - status-only changes → 0 weight (transitions.py owns those)
+      - evidence[]/contributors[] edits → not scored (derived bookkeeping)
       - whitespace-only diffs → 0 weight
       - file rewrite (yaml.dump reorder) → only counts net deltas, not gross
       - new file (full file as +) → create signal
@@ -228,10 +239,16 @@ def score_diff(diff_lines: list[str], weights: dict) -> tuple[float, list[str]]:
 
     tags: list[str] = []
     weight = 0.0
+    delta = {
+        "blocks_added": 0, "blocks_removed": 0,
+        "list_items_added": 0, "list_items_removed": 0,
+        "scalars_changed": 0,
+        "lines_added": len(added_real), "lines_removed": len(removed_real),
+    }
 
     # Skip pure whitespace diffs.
     if not added_real and not removed_real:
-        return 0.0, ["whitespace_only"]
+        return 0.0, ["whitespace_only"], delta
 
     # Net direction: revert if removal dominates (>2× added by line count and
     # no new id added).
@@ -243,7 +260,8 @@ def score_diff(diff_lines: list[str], weights: dict) -> tuple[float, list[str]]:
         n_blocks_removed = len(removed_real) // 5  # rough block heuristic
         weight += weights["yaml_edit:revert"] * max(1, n_blocks_removed)
         tags.append(f"revert(-{n_blocks_removed})")
-        return weight, tags  # short-circuit on revert
+        delta["blocks_removed"] = n_blocks_removed
+        return weight, tags, delta  # short-circuit on revert
 
     # ─── 1. File creation: +id + +type + +title in adds ──────────────────
     has_id = any(_RE_ID_FIELD.match("+" + a) for a in added_real)
@@ -264,10 +282,13 @@ def score_diff(diff_lines: list[str], weights: dict) -> tuple[float, list[str]]:
     other_added = [a for a in added_real if a not in status_added]
     other_removed = [r for r in removed_real if r not in status_removed]
     if status_added and not other_added and not other_removed:
-        return 0.0, ["status_transition_owned_by_transitions_py"]
+        return 0.0, ["status_transition_owned_by_transitions_py"], delta
 
     # ─── 3. Block addition: top-level key with empty value (followed by
     # nested content). Detected via top-level key with `:` end-of-line.
+    # evidence[]/contributors[] are EDPA-derived bookkeeping (materialized,
+    # not human work), so their blocks are excluded — a chore(evidence):
+    # commit (also tool-skipped at the collector level) never self-credits.
     block_keys_added = set()
     for a in other_added:
         m = _RE_TOP_LEVEL_KEY.match("+" + a)
@@ -279,15 +300,18 @@ def score_diff(diff_lines: list[str], weights: dict) -> tuple[float, list[str]]:
         m = _RE_TOP_LEVEL_KEY.match("-" + r)
         if m and not m.group(2).strip():
             block_keys_removed.add(m.group(1))
-    new_blocks = block_keys_added - block_keys_removed
+    new_blocks = (block_keys_added - block_keys_removed) - set(_BOOKKEEPING_BLOCKS)
     if new_blocks:
         weight += len(new_blocks) * weights["yaml_edit:block_add"]
         tags.append(f"block_add×{len(new_blocks)}")
+        delta["blocks_added"] = len(new_blocks)
 
     # ─── 4. List growth: net `- ` bullets added (cap 10) ─────────────────
     bullets_added = sum(1 for a in other_added if _RE_LIST_BULLET.match("+" + a))
     bullets_removed = sum(1 for r in other_removed if _RE_LIST_BULLET.match("-" + r))
     net_bullets = max(0, bullets_added - bullets_removed)
+    delta["list_items_added"] = bullets_added
+    delta["list_items_removed"] = bullets_removed
     if net_bullets > 0:
         capped = min(net_bullets, weights["list_grow_cap_per_commit"])
         weight += capped * weights["yaml_edit:list_grow"]
@@ -304,28 +328,18 @@ def score_diff(diff_lines: list[str], weights: dict) -> tuple[float, list[str]]:
             # Skip if this is part of a create (id/type/title already credited)
             if is_create and m.group(1) in ("id", "type", "title"):
                 continue
+            if m.group(1) in _BOOKKEEPING_BLOCKS:
+                continue
             scalar_changes += 1
     if scalar_changes > 0:
         weight += scalar_changes * weights["yaml_edit:scalar_change"]
         tags.append(f"scalar×{scalar_changes}")
+        delta["scalars_changed"] = scalar_changes
 
-    # ─── 6. Contributors rebalance: new person added (NOT cw shift) ───────
-    persons_added = set()
-    for a in other_added:
-        m = _RE_PERSON_ENTRY.match("+" + a)
-        if m:
-            persons_added.add(m.group(1).strip())
-    persons_removed = set()
-    for r in other_removed:
-        m = _RE_PERSON_ENTRY.match("-" + r)
-        if m:
-            persons_removed.add(m.group(1).strip())
-    new_persons = persons_added - persons_removed
-    if new_persons and not is_create:  # don't double-count on create
-        weight += len(new_persons) * weights["yaml_edit:contributors_rebalance"]
-        tags.append(f"contributors+{len(new_persons)}")
+    # (contributors_rebalance removed in D-26: contributors[] is a derived
+    #  projection of evidence[], not an input signal — editing it is not work.)
 
-    # ─── 7. Lines volume bonus (capped) ──────────────────────────────────
+    # ─── 6. Lines volume bonus (capped) ──────────────────────────────────
     lines_bonus = min(
         weights["yaml_edit:lines_volume_cap"],
         max(0, net_lines) / weights["yaml_edit:lines_volume_divisor"],
@@ -334,10 +348,20 @@ def score_diff(diff_lines: list[str], weights: dict) -> tuple[float, list[str]]:
         weight += lines_bonus
         tags.append(f"vol+{lines_bonus:.1f}")
 
-    return round(weight, 2), tags
+    return round(weight, 2), tags, delta
 
 
 # ─── Main collection ────────────────────────────────────────────────────────
+
+
+def _tracked_paths(edpa_root: Path) -> list[str]:
+    """Backlog dirs tracked for yaml_edit, relative to the repo root."""
+    repo_root = edpa_root.parent
+    return [
+        str((edpa_root / "backlog" / d).relative_to(repo_root))
+        for d in TRACKED_DIRS
+        if (edpa_root / "backlog" / d).is_dir()
+    ]
 
 
 def collect_yaml_edit_signals(edpa_root: Path, iter_id: str,
@@ -345,29 +369,46 @@ def collect_yaml_edit_signals(edpa_root: Path, iter_id: str,
     """Walk git log over backlog YAMLs in iter window and emit signals.
 
     Returns: {item_id: [signal_dict, ...]}
-    Each signal_dict has: type, ref, login, weight, detected_at, tags.
+    Each signal_dict has: type, ref, login, weight, raw_weight, discount,
+    detected_at, tags, delta.
     """
     edpa_root = Path(edpa_root)
-    weights = {**DEFAULT_WEIGHTS, **(weights or {})}
-
-    start, end = _parse_iter_window(edpa_root, iter_id)
-    people = _load_people(edpa_root)
-    repo_root = edpa_root.parent
-
-    paths = [
-        str((edpa_root / "backlog" / d).relative_to(repo_root))
-        for d in TRACKED_DIRS
-        if (edpa_root / "backlog" / d).is_dir()
-    ]
+    paths = _tracked_paths(edpa_root)
     if not paths:
         return {}
-
+    start, end = _parse_iter_window(edpa_root, iter_id)
+    people = _load_people(edpa_root)
     log = _run_git(
         ["log", "--pretty=format:__COMMIT__|%H|%aI|%ae|%s",
          "-p", "--unified=0", "--", *paths],
-        cwd=repo_root,
+        cwd=edpa_root.parent,
     )
+    return _parse_yaml_edit_log(log, weights, people, start, end)
 
+
+def collect_yaml_edit_signals_for_commit(edpa_root: Path, sha: str,
+                                         weights: dict | None = None) -> dict[str, list[dict]]:
+    """Like collect_yaml_edit_signals but scoped to a single commit (used by
+    the post-commit hook). No iteration-window filter — the hook always
+    materializes the commit it just saw."""
+    edpa_root = Path(edpa_root)
+    paths = _tracked_paths(edpa_root)
+    if not paths:
+        return {}
+    people = _load_people(edpa_root)
+    log = _run_git(
+        ["show", "--pretty=format:__COMMIT__|%H|%aI|%ae|%s",
+         "-p", "--unified=0", sha, "--", *paths],
+        cwd=edpa_root.parent,
+    )
+    return _parse_yaml_edit_log(log, weights, people)
+
+
+def _parse_yaml_edit_log(log: str, weights: dict | None, people: list,
+                         start=None, end=None) -> dict[str, list[dict]]:
+    """Parse `git log/show -p --unified=0` output into yaml_edit signals.
+    Shared by the window collector and the single-commit collector."""
+    weights = {**DEFAULT_WEIGHTS, **(weights or {})}
     signals_by_item: dict[str, list[dict]] = defaultdict(list)
     cur_sha = cur_ts = cur_email = cur_subject = None
     cur_file = None
@@ -381,7 +422,7 @@ def collect_yaml_edit_signals(edpa_root: Path, iter_id: str,
         if not any(f"backlog/{d}/" in cur_file for d in TRACKED_DIRS):
             cur_diff = []
             return
-        if cur_ts < start or cur_ts > end:
+        if (start and cur_ts < start) or (end and cur_ts > end):
             cur_diff = []
             return
         if _is_bot_author(cur_email):
@@ -391,14 +432,20 @@ def collect_yaml_edit_signals(edpa_root: Path, iter_id: str,
             cur_diff = []
             return
 
-        weight, tags = score_diff(cur_diff, weights)
-        if abs(weight) < 0.01:  # zero-weight = nothing to record
+        raw_weight, tags, delta = score_diff(cur_diff, weights)
+        if abs(raw_weight) < 0.01:  # zero-weight = nothing to record
             cur_diff = []
             return
 
-        # Apply bulk migration discount if applicable.
+        # Variant-2 discount (by subject): bulk migration / backfill commits
+        # get ×bulk_migration_discount so a single committer of many YAMLs
+        # can't out-credit the real assignee. Commits touching many items are
+        # additionally discounted in the post-pass below.
+        weight = raw_weight
+        discount = 1.0
         if _is_bulk_migration(cur_subject):
-            weight = round(weight * weights["bulk_migration_discount"], 2)
+            discount = weights["bulk_migration_discount"]
+            weight = round(raw_weight * discount, 2)
             tags.append("bulk_discount")
 
         item_id = Path(cur_file).stem
@@ -408,8 +455,11 @@ def collect_yaml_edit_signals(edpa_root: Path, iter_id: str,
             "ref": f"commit/{cur_sha[:7]}/{Path(cur_file).name}",
             "login": login,
             "weight": weight,
+            "raw_weight": raw_weight,
+            "discount": discount,
             "detected_at": cur_ts.isoformat(),
             "tags": tags,
+            "delta": delta,
         })
         cur_diff = []
 
@@ -440,7 +490,34 @@ def collect_yaml_edit_signals(edpa_root: Path, iter_id: str,
         cur_diff.append(line)
     _flush()
 
+    _apply_bulk_items_discount(signals_by_item, weights)
     return dict(signals_by_item)
+
+
+def _apply_bulk_items_discount(signals_by_item: dict, weights: dict) -> None:
+    """Variant-2 (by item count): a commit touching more than
+    ``bulk_item_threshold`` items is bulk seeding / backfill — discount every
+    yaml_edit it produced (unless already subject-discounted), so one
+    committer of many YAMLs can't out-credit the real assignees."""
+    threshold = int(weights.get("bulk_item_threshold",
+                                DEFAULT_WEIGHTS["bulk_item_threshold"]))
+    disc = weights["bulk_migration_discount"]
+    commit_items: dict[str, set] = defaultdict(set)
+    for iid, sigs in signals_by_item.items():
+        for s in sigs:
+            commit_items[s["ref"].split("/")[1]].add(iid)
+    bulk = {c for c, items in commit_items.items() if len(items) > threshold}
+    if not bulk:
+        return
+    for sigs in signals_by_item.values():
+        for s in sigs:
+            short = s["ref"].split("/")[1]
+            if short in bulk and "bulk_discount" not in s["tags"] \
+                    and "bulk_items_discount" not in s["tags"]:
+                s["raw_weight"] = s.get("raw_weight", s["weight"])
+                s["discount"] = disc
+                s["weight"] = round(s["raw_weight"] * disc, 2)
+                s["tags"].append("bulk_items_discount")
 
 
 # ─── CLI ────────────────────────────────────────────────────────────────────

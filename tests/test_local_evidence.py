@@ -357,3 +357,29 @@ def test_materialize_reconcile_is_idempotent(repo: Path) -> None:
     finally:
         os.chdir(old)
     assert n1 == n2
+
+
+# ─── Phase 2: yaml_edit materialization ───────────────────────────────────
+
+
+def test_emit_writes_yaml_edit_signal_with_delta(repo: Path) -> None:
+    """A commit that edits a story's YAML emits a yaml_edit signal carrying
+    a structural delta, attributed to the commit author."""
+    p = repo / ".edpa/backlog/stories/S-1.md"
+    data = load_md(p)
+    data["js"] = 5
+    data["bv"] = 3
+    save_md_item(p, data)
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m", "S-1: estimate"], cwd=repo, env_extra={
+        "GIT_AUTHOR_DATE": "2026-05-26T10:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-05-26T10:00:00+00:00"})
+    _run_emitter(repo)
+    sigs = load_md(p)["evidence"]
+    ye = [s for s in sigs if s["type"] == "yaml_edit"]
+    assert len(ye) == 1
+    assert ye[0]["person"] == "alice"
+    assert ye[0]["weight"] > 0
+    assert isinstance(ye[0]["delta"], dict)
+    assert ye[0]["delta"]["scalars_changed"] >= 1
+    assert ye[0]["ref"].startswith("commit/")

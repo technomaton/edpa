@@ -134,95 +134,11 @@ def extract_contributors(item):
     return out
 
 
-def _enrich_items_with_yaml_edit_signals(items, yaml_edit_signals, people):
-    """v1.17: merge yaml_edit signals into items' contributors[] in-memory.
-
-    For each (item, person) pair, add yaml_edit weights to the existing
-    contribution_score (or seed a new entry if the person wasn't
-    previously credited), then re-normalize cw across all persons for
-    that item. The mutation is in-memory only — YAML files on disk are
-    not touched. The frozen snapshot captures the augmented contributors
-    so the audit trail is complete.
-
-    Item id resolution: gate_event ids look like `F-7@Funnel→Analyzing`;
-    we strip the `@...` suffix so all gate_events of the same parent
-    share the parent's enriched contributors[].
-    """
-    from collections import defaultdict
-
-    # Build login → person_id resolver. People may register one of:
-    #   github (login),  email,  or just id. yaml_edit_signals.py emits
-    #   `login` populated with whichever resolved at the commit-author
-    #   level, so we accept all three.
-    resolver = {}
-    for p in people:
-        pid = p.get("id")
-        if not pid:
-            continue
-        for key in ("github", "email", "id"):
-            v = p.get(key)
-            if v:
-                resolver[str(v).lower()] = pid
-
-    for item in items:
-        raw_id = item.get("id", "")
-        item_id = raw_id.split("@", 1)[0]  # strip gate-event suffix
-        sigs = yaml_edit_signals.get(item_id) or []
-        if not sigs:
-            continue
-
-        # Aggregate yaml_edit weight + signals per person.
-        weight_per_person = defaultdict(float)
-        signals_per_person = defaultdict(list)
-        for s in sigs:
-            login = (s.get("login") or "").lower()
-            person_id = resolver.get(login)
-            if not person_id:
-                # Unknown commit author — skip silently; auditor sees the
-                # commit ref in the iteration's signal log either way.
-                continue
-            weight_per_person[person_id] += float(s.get("weight", 0))
-            signals_per_person[person_id].append(s)
-
-        if not weight_per_person:
-            continue
-
-        # Existing contributors (from detect_contributors or seed). Their
-        # contribution_score is the canonical raw weight. When missing
-        # (legacy YAMLs), fall back to cw — this means cw is treated as
-        # if it were already a score, which preserves relative shares.
-        existing = item.get("contributors") or []
-        contrib_score = {}
-        signal_pool: dict[str, list] = {}
-        for c in existing:
-            pid = c.get("person")
-            if not pid:
-                continue
-            base = c.get("contribution_score")
-            if base is None:
-                base = float(c.get("cw", 0))
-            contrib_score[pid] = float(base)
-            signal_pool[pid] = list(c.get("signals", []) or [])
-
-        # Stack yaml_edit weights on top.
-        for pid, yaml_w in weight_per_person.items():
-            contrib_score[pid] = contrib_score.get(pid, 0) + yaml_w
-            signal_pool.setdefault(pid, []).extend(signals_per_person[pid])
-
-        total = sum(s for s in contrib_score.values() if s > 0)
-        if total <= 0:
-            continue
-
-        item["contributors"] = [
-            {
-                "person": pid,
-                "cw": round(score / total, 4),
-                "contribution_score": round(score, 2),
-                "signals": signal_pool.get(pid, []),
-            }
-            for pid, score in contrib_score.items()
-            if score > 0
-        ]
+# _enrich_items_with_yaml_edit_signals was removed in D-26. yaml_edit is now
+# materialized into each item's evidence[] (local_evidence.py hook / reconcile)
+# and aggregated into contributors[] by detect_contributors.aggregate_signals.
+# The engine therefore reads the materialized snapshot — it no longer re-applies
+# yaml_edit signals in-memory (which made the report diverge from the YAML).
 
 
 def _load_iteration_people_overrides(edpa_root, iteration_id):
@@ -786,7 +702,10 @@ def load_story_activity_events(edpa_root, iteration_id, heuristics,
             "level": "Story",
             "job_size": round(js * factor, 4),
             "title": data.get("title", ""),
-            "contributors": [],  # populated by yaml_edit enrichment
+            # Materialized contributors[] (yaml_edit + commit_author etc. from
+            # evidence[]) credit the in-flight refinement work. Empty until the
+            # story's evidence[] has been materialized + aggregated (C7.6).
+            "contributors": list(data.get("contributors") or []),
         })
         audit.append({
             "item_id": story_id,
@@ -1530,11 +1449,6 @@ def main():
             edpa_root, iteration_id, heuristics, yaml_edit_signals,
         )
         items.extend(story_activity_events)
-        if yaml_edit_signals:
-            people_for_resolve = (capacity or {}).get("people", []) or []
-            _enrich_items_with_yaml_edit_signals(
-                items, yaml_edit_signals, people_for_resolve,
-            )
         n_yaml = sum(len(v) for v in yaml_edit_signals.values())
         done_count = (len(items) - len(gate_events)
                       - len(story_activity_events))
