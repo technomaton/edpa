@@ -56,6 +56,25 @@ def test_version_consistent():
     if web_pkg["version"] != version:
         errors.append(f"web/package.json: {web_pkg['version']} != {version}")
 
+    # web/package-lock.json — embedded self-version, present in TWO places
+    # (top-level "version" and packages[""]/"version"). npm only rewrites
+    # these as a side effect of `npm install`, so before D-30 they drifted
+    # silently every release (committed main shipped lockfile 2.8.2 while
+    # package.json was already 2.10.0). scripts/bump_version.py now stamps
+    # both via bump_lockfile(); this guard makes the drift fail CI.
+    web_lock = json.loads((ROOT / "web/package-lock.json").read_text())
+    if web_lock.get("version") != version:
+        errors.append(
+            f"web/package-lock.json: top-level {web_lock.get('version')} != {version} "
+            f"— run scripts/bump_version.py {version} --apply"
+        )
+    root_pkg_version = web_lock.get("packages", {}).get("", {}).get("version")
+    if root_pkg_version != version:
+        errors.append(
+            f"web/package-lock.json: packages[''] {root_pkg_version} != {version} "
+            f"— run scripts/bump_version.py {version} --apply"
+        )
+
     # Living docs / templates — anchored version stamps must equal plugin.json.
     # scripts/bump_version.py stamps the same patterns; this test makes drift
     # fail CI instead of surviving a release (it did, three times, up to 2.6.0).
