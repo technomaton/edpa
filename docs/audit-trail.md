@@ -122,6 +122,13 @@ Note the v1.11 structure:
     with a structural `delta`, alongside `state_transition` signals
     (status who/when/from→to). Each signal carries a resolvable `ref`
     so an auditor opens the commit diff to verify what changed.
+  - **D-28/D-29 out-of-iteration gate:** a weighted delivery signal
+    (`commit_author`, `yaml_edit`, `manual:commit_message`,
+    `agent_contribution`) on an item belonging to a *different* iteration
+    than the commit's own is kept for audit but **zeroed** (`weight: 0`
+    + `out_of_iteration` tag), with the original preserved in
+    `raw_weight` so the gate stays reversible. Overflow past a Story's
+    iteration never scores — it is split into a new item instead.
   See [`docs/audit-references.md`](audit-references.md) for
   verification commands per signal type.
 - **No `as:` field** — role labels are derived at display time from

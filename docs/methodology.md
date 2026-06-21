@@ -178,6 +178,15 @@ scores delivery credit on the foreign item. Membership uses the shared
 iteration being materialized; hook → the commit's own iteration by author date).
 Items with no `iteration:` are left untouched.
 
+D-29: the same gate now covers **every weighted delivery signal**, not just
+`yaml_edit` — `commit_author`, `manual:commit_message` and `agent_contribution`
+on a foreign-iteration item are neutralised the same way (weight 0 +
+`out_of_iteration`, the original kept in `raw_weight`). This enforces the
+axiom-preserving rule *"a Story fits one iteration"*: work that overflowed an
+item's iteration window is gated to audit-only, never re-routed to another
+iteration — overflow is split into a new item instead. No engine change is
+needed; `aggregate_signals` already skips weight-0 signals.
+
 `EDPA_NO_LOCAL_EVIDENCE=1` gates **only the automatic post-commit hook**
 — set it to stop commits materializing signals on the fly (bulk
 migrations, scripted history rewrites). The explicit `--materialize`
