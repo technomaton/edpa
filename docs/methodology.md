@@ -169,6 +169,15 @@ list-items / scalars / lines ±) plus `raw_weight` + `discount`. The
 derived projection of `evidence[]`, not an input. `state_transition` is
 weight-0 (it never moves cw; it is the analytics + gate-scoring source).
 
+D-28: a `yaml_edit` whose host item belongs to a *different* iteration than the
+commit that produced it (a bulk backlog-authoring commit, or grooming a closed
+story) is recorded but **neutralised to weight 0** with an `out_of_iteration`
+tag — analytics-only, like `state_transition` — so a cross-iteration edit never
+scores delivery credit on the foreign item. Membership uses the shared
+`item_in_iteration` rule, applied by both writer paths (materialize → the
+iteration being materialized; hook → the commit's own iteration by author date).
+Items with no `iteration:` are left untouched.
+
 `EDPA_NO_LOCAL_EVIDENCE=1` gates **only the automatic post-commit hook**
 — set it to stop commits materializing signals on the fly (bulk
 migrations, scripted history rewrites). The explicit `--materialize`

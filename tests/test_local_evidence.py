@@ -404,3 +404,167 @@ def test_materialize_all_iterations(repo: Path) -> None:
     sigs = load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
     assert any(s["type"] == "state_transition" and s["to_status"] == "Done"
                for s in sigs)
+
+
+# ─── D-28: cross-iteration yaml_edit is recorded but zero-weighted ─────────
+
+
+def _write_iter(repo: Path, iter_id: str, start: str, end: str) -> None:
+    iters = repo / ".edpa" / "iterations"
+    iters.mkdir(parents=True, exist_ok=True)
+    (iters / f"{iter_id}.yaml").write_text(yaml.safe_dump({"iteration": {
+        "id": iter_id, "start_date": start, "end_date": end}}))
+
+
+def _commit_edit(repo: Path, rel: str, mutate: dict, msg: str, date: str,
+                 email: str = "alice@example.dev",
+                 name: str = "Alice Senior") -> str:
+    """Apply a frontmatter mutation to an item and commit it at a fixed date."""
+    p = repo / rel
+    data = load_md(p)
+    data.update(mutate)
+    save_md_item(p, data)
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m", msg], cwd=repo, env_extra={
+        "GIT_AUTHOR_EMAIL": email, "GIT_AUTHOR_NAME": name,
+        "GIT_COMMITTER_EMAIL": email, "GIT_COMMITTER_NAME": name,
+        "GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date})
+    return _git(["rev-parse", "HEAD"], cwd=repo).stdout.strip()
+
+
+def test_item_in_iteration_membership_rules() -> None:
+    """D-28: the shared SAFe-hierarchy membership predicate (answers the
+    per-type question: which items a materialize for iteration N may credit)."""
+    from transitions import item_in_iteration as f
+    for t in ("Story", "Defect", "Task"):          # exact match
+        assert f(t, "PI-2026-3.1", "PI-2026-3.1") is True
+        assert f(t, "PI-2026-1.1", "PI-2026-3.1") is False
+    assert f("Feature", "PI-2026-3", "PI-2026-3.1") is True     # PI-prefix
+    assert f("Feature", "PI-2026-3.1", "PI-2026-3.1") is True
+    assert f("Feature", "PI-2026-1", "PI-2026-3.1") is False
+    assert f("Epic", "PI-2026-1", "PI-2026-3.1") is True        # cross-PI
+    assert f("Initiative", "whatever", "PI-2026-3.1") is True
+    assert f("Story", "PI-2026-1.1", "") is True               # no filter
+
+
+def test_materialize_zero_weights_cross_iteration_yaml_edit(repo: Path) -> None:
+    """D-28: a commit inside iteration N's window that edits a story belonging
+    to a DIFFERENT iteration records the yaml_edit signal but neutralises it to
+    weight 0 (+ ``out_of_iteration`` tag), so it never scores in the foreign
+    story's iteration. A genuine in-iteration story keeps full weight."""
+    _write_iter(repo, "PI-2026-1.1", "2026-04-01", "2026-04-30")  # spring/closed
+    _write_iter(repo, "PI-2026-3.1", "2026-06-15", "2026-06-30")  # current
+
+    # S-1: a CLOSED spring story (belongs to 1.1). Set up in the spring window
+    # so its setup commit is OUTSIDE the 3.1 window being materialized.
+    _commit_edit(repo, ".edpa/backlog/stories/S-1.md",
+                 {"iteration": "PI-2026-1.1", "status": "Done", "js": 5},
+                 "S-1: spring work", "2026-04-10T10:00:00+00:00")
+    # S-2: a genuine 3.1 story (belongs to 3.1).
+    _commit_edit(repo, ".edpa/backlog/stories/S-2.md",
+                 {"iteration": "PI-2026-3.1", "status": "Done", "js": 5},
+                 "S-2: setup", "2026-06-16T09:00:00+00:00",
+                 email="bob@example.dev", name="Bob Architect")
+
+    # JUNE bulk-authoring commit (inside 3.1 window) edits BOTH stories.
+    for rel in (".edpa/backlog/stories/S-1.md", ".edpa/backlog/stories/S-2.md"):
+        d = load_md(repo / rel)
+        d["bv"] = 8
+        d["tc"] = 5
+        save_md_item(repo / rel, d)
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m", "add features and stories for E-1/E-2"],
+         cwd=repo, env_extra={
+             "GIT_AUTHOR_EMAIL": "bob@example.dev", "GIT_AUTHOR_NAME": "Bob Architect",
+             "GIT_COMMITTER_EMAIL": "bob@example.dev", "GIT_COMMITTER_NAME": "Bob Architect",
+             "GIT_AUTHOR_DATE": "2026-06-18T10:00:00+00:00",
+             "GIT_COMMITTER_DATE": "2026-06-18T10:00:00+00:00"})
+
+    edpa = repo / ".edpa"
+    old = Path.cwd()
+    try:
+        os.chdir(repo)
+        assert le.cmd_materialize(edpa, "PI-2026-3.1") == 0
+    finally:
+        os.chdir(old)
+
+    # S-1 (foreign / spring): the June yaml_edit is recorded but neutralised.
+    s1 = [s for s in load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+          if s["type"] == "yaml_edit"]
+    assert s1, "the cross-iteration edit must still be recorded for audit"
+    assert all(s["weight"] == 0 for s in s1)
+    assert all("out_of_iteration" in s.get("tags", []) for s in s1)
+    assert any(s.get("raw_weight") for s in s1)  # raw_weight retained → reversible
+
+    # S-2 (genuine 3.1): full weight, never tagged out_of_iteration.
+    s2 = [s for s in load_md(repo / ".edpa/backlog/stories/S-2.md")["evidence"]
+          if s["type"] == "yaml_edit"]
+    assert s2 and any(s["weight"] > 0 for s in s2)
+    assert all("out_of_iteration" not in s.get("tags", []) for s in s2)
+
+
+def test_materialize_keeps_yaml_edit_on_unassigned_item(repo: Path) -> None:
+    """D-28 guard must NOT zero a yaml_edit on an item with no ``iteration:``
+    — ~half of real stories/defects are unassigned; their in-window work is
+    legitimate and must keep full weight. The guard neutralises only items that
+    PROVABLY belong to a different iteration, not blank/unknown ones."""
+    _write_iter(repo, "PI-2026-3.1", "2026-06-15", "2026-06-30")
+    # S-1 keeps NO iteration field; a real edit lands inside the 3.1 window.
+    _commit_edit(repo, ".edpa/backlog/stories/S-1.md",
+                 {"status": "Done", "js": 5, "bv": 7},
+                 "S-1: work", "2026-06-18T10:00:00+00:00",
+                 email="bob@example.dev", name="Bob Architect")
+    assert "iteration" not in load_md(repo / ".edpa/backlog/stories/S-1.md")
+
+    edpa = repo / ".edpa"
+    old = Path.cwd()
+    try:
+        os.chdir(repo)
+        assert le.cmd_materialize(edpa, "PI-2026-3.1") == 0
+    finally:
+        os.chdir(old)
+
+    ye = [s for s in load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+          if s["type"] == "yaml_edit"]
+    assert ye and any(s["weight"] > 0 for s in ye), "unassigned work must not vanish"
+    assert all("out_of_iteration" not in s.get("tags", []) for s in ye)
+
+
+def test_post_commit_hook_zero_weights_cross_iteration_yaml_edit(repo: Path) -> None:
+    """D-28: the LIVE post-commit hook (not just materialize) neutralises a
+    yaml_edit on an item belonging to a different iteration than the commit's
+    own (resolved by author date). A same-iteration item keeps full weight."""
+    _write_iter(repo, "PI-2026-1.1", "2026-04-01", "2026-04-30")  # spring/closed
+    _write_iter(repo, "PI-2026-3.1", "2026-06-15", "2026-06-30")  # current
+    # S-1 ∈ spring 1.1; S-2 ∈ current 3.1.
+    _commit_edit(repo, ".edpa/backlog/stories/S-1.md",
+                 {"iteration": "PI-2026-1.1", "status": "Done", "js": 5},
+                 "S-1: spring", "2026-04-10T10:00:00+00:00")
+    _commit_edit(repo, ".edpa/backlog/stories/S-2.md",
+                 {"iteration": "PI-2026-3.1", "status": "Done", "js": 5},
+                 "S-2: setup", "2026-06-16T09:00:00+00:00")
+
+    # ONE June commit (iteration 3.1 window) edits BOTH stories; run the HOOK.
+    for rel in (".edpa/backlog/stories/S-1.md", ".edpa/backlog/stories/S-2.md"):
+        d = load_md(repo / rel)
+        d["bv"] = 8
+        d["tc"] = 5
+        save_md_item(repo / rel, d)
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m", "groom S-1/S-2"], cwd=repo, env_extra={
+        "GIT_AUTHOR_EMAIL": "bob@example.dev", "GIT_AUTHOR_NAME": "Bob Architect",
+        "GIT_COMMITTER_EMAIL": "bob@example.dev", "GIT_COMMITTER_NAME": "Bob Architect",
+        "GIT_AUTHOR_DATE": "2026-06-18T10:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-06-18T10:00:00+00:00"})
+    assert _run_emitter(repo) == 0
+
+    # S-1 (spring, foreign to the June commit): yaml_edit recorded but neutralised.
+    s1 = [s for s in load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+          if s["type"] == "yaml_edit"]
+    assert s1 and all(s["weight"] == 0 for s in s1)
+    assert all("out_of_iteration" in s.get("tags", []) for s in s1)
+    # S-2 (genuine 3.1): full weight, never tagged.
+    s2 = [s for s in load_md(repo / ".edpa/backlog/stories/S-2.md")["evidence"]
+          if s["type"] == "yaml_edit"]
+    assert s2 and any(s["weight"] > 0 for s in s2)
+    assert all("out_of_iteration" not in s.get("tags", []) for s in s2)
