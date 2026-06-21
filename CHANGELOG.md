@@ -23,6 +23,17 @@
     way on the hook (a commit editing a foreign-iteration item credits its
     author), but a naive date guard there would drop legitimate early/spillover
     *delivery* work, so it is tracked separately rather than auto-fixed here.
+- **`bump_version.py` now stamps `web/package-lock.json`'s embedded version,
+  and a consistency guard fails CI when it drifts (D-31).** The bump script
+  stamped `web/package.json` but never the lockfile's own `version` — recorded
+  twice (top-level and `packages[""]`). npm only rewrites those as a side
+  effect of `npm install`, so they silently lagged every release: committed
+  `main` shipped a lockfile pinned at `2.8.2` while `package.json` was already
+  `2.10.0`. The script now stamps both self-version fields via a new
+  `bump_lockfile()` (anchored on the package's own `"name"`, so the hundreds of
+  dependency `"version"` entries are untouched), and
+  `test_version_consistent` now asserts the lockfile's self-version equals
+  `plugin.json` — drift fails the build instead of surviving a release.
 
 ## 2.10.0 — 2026-06-20
 
