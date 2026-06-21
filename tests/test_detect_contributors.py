@@ -194,6 +194,24 @@ def test_aggregate_single_contributor_full_share():
     assert result[0]["contribution_score"] == 4.0
 
 
+def test_aggregate_skips_zeroed_out_of_iteration_commit_author():
+    """D-29: a commit_author neutralised to weight 0 (out_of_iteration) must NOT
+    enter contribution_score / cw — the same skip path as state_transition. This
+    is why the write-side gate needs no engine/aggregate_signals change."""
+    sigs = [
+        {"type": "commit_author", "ref": "commit/aaa", "login": "alice",
+         "weight": 2.0, "detected_at": "2026-05-08T12:00:00Z"},
+        {"type": "commit_author", "ref": "commit/bbb", "login": "bob",
+         "weight": 0, "raw_weight": 2.78, "tags": ["out_of_iteration"],
+         "detected_at": "2026-05-08T12:00:00Z"},
+    ]
+    people_map = {"alice": "alice", "bob": "bob"}
+    result = dc.aggregate_signals(sigs, people_map)
+    assert len(result) == 1, "the zeroed out-of-iteration signal must not score"
+    assert result[0]["person"] == "alice"
+    assert result[0]["cw"] == 1.0
+
+
 def test_aggregate_zero_signals_returns_none():
     """v1.11 edge case: warn-and-skip path. Caller decides what to do."""
     assert dc.aggregate_signals([], {}) is None

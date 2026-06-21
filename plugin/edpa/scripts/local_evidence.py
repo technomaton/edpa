@@ -257,13 +257,17 @@ def build_signals(commit: dict, items: list[str], person_id: str,
 
     out: list[dict] = []
     for iid in items:
-        # 1. commit_author (always, once per commit per item)
+        # 1. commit_author (always, once per commit per item). raw_weight mirrors
+        #    weight so the audit trail keeps the original value when the D-29 gate
+        #    later zeroes an out-of-iteration signal (same shape as yaml_edit).
+        ca_w = weights.get("commit_author", 2.78)
         out.append({
             "item_id": iid,
             "signal": {
                 "type": "commit_author",
                 "person": person_id,
-                "weight": weights.get("commit_author", 2.78),
+                "weight": ca_w,
+                "raw_weight": ca_w,
                 "ref": f"commit/{short}",
                 "at": iso,
             },
@@ -434,26 +438,40 @@ def _yaml_edit_to_evidence(raw: dict, people: list,
     return grouped
 
 
-def _neutralize_foreign_yaml_edit(item: dict, sigs: list[dict],
-                                  item_path: Path,
-                                  target_iteration: str | None) -> None:
-    """D-28: zero-weight (analytics-only) any ``yaml_edit`` signal whose host
-    item PROVABLY belongs to an iteration OTHER than ``target_iteration`` — so a
-    commit that edits a foreign-iteration backlog .md (bulk backlog authoring, or
-    grooming a closed story) never scores delivery credit there. Mutates ``sigs``
-    in place; the signal is kept for audit but neutralised — the same idiom as a
-    zero-weight ``state_transition`` (detect_contributors skips zero-weight).
+# D-29: signal types whose weight is GATED by iteration membership. A weighted
+# signal of one of these types on an item that PROVABLY belongs to a different
+# iteration than the commit's own is neutralised to weight 0 (audit-only). This
+# is the axiom-preserving "gate, don't route" model: work that overflowed an
+# item's own iteration window never scores there — it is split into a new item
+# instead, not re-routed to another iteration. ``state_transition`` is already
+# weight 0 (analytics-only), so it is not listed.
+GATED_TYPES = frozenset({
+    "yaml_edit", "commit_author", "agent_contribution", "manual:commit_message",
+})
+
+
+def _neutralize_foreign_signals(item: dict, sigs: list[dict],
+                                item_path: Path,
+                                target_iteration: str | None) -> None:
+    """Zero-weight (analytics-only) any weighted signal in ``GATED_TYPES`` whose
+    host item PROVABLY belongs to an iteration OTHER than ``target_iteration`` —
+    so a commit that touches a foreign-iteration item (bulk backlog authoring,
+    grooming a closed story, or delivery that overflowed its iteration) never
+    scores credit there. Mutates ``sigs`` in place: the original weight is kept
+    in ``raw_weight`` and the signal is tagged ``out_of_iteration`` so the audit
+    trail stays reversible. detect_contributors skips zero-weight signals, so no
+    engine/aggregation change is needed.
+
+    D-28 gated ``yaml_edit`` only; D-29 generalises to ``commit_author`` and the
+    other weighted signal types under the axiom-preserving model (a Story fits
+    one iteration; overflow is gated here, not routed to another iteration).
 
     Shared by the materialize writer (target = the iteration being materialized)
     and the live post-commit hook (target = the commit's own iteration, resolved
     by author date). No-op when the placement is unsafe:
       * ``target_iteration`` falsy/None — e.g. a commit outside every window;
       * the item's ``iteration`` is blank (unassigned/unknown) — don't drop real
-        work; the engine likewise excludes such an item from any iteration.
-
-    Scoped to ``yaml_edit`` only. ``commit_author`` (full weight) leaks the same
-    way on the hook, but a naive date guard there would also drop legitimate
-    early/spillover *delivery* work, so that is left to a separate, smarter fix.
+        work; overflow cannot be proven without a window.
     """
     if not target_iteration:
         return
@@ -465,7 +483,8 @@ def _neutralize_foreign_yaml_edit(item: dict, sigs: list[dict],
     if item_in_iteration(item_type, item_iter, target_iteration):
         return
     for s in sigs:
-        if s.get("type") == "yaml_edit" and s.get("weight"):
+        if s.get("type") in GATED_TYPES and s.get("weight"):
+            s.setdefault("raw_weight", s["weight"])  # keep original for audit
             s["weight"] = 0
             tags = s.setdefault("tags", [])
             if "out_of_iteration" not in tags:
@@ -506,9 +525,9 @@ def cmd_materialize(edpa_root: Path, iteration_id: str) -> int:
         p = find_item_path(edpa_root, iid)
         if not p:
             continue
-        # D-28: neutralise yaml_edit signals on items belonging to a different
-        # iteration than the one being materialized (_neutralize_foreign_yaml_edit).
-        _neutralize_foreign_yaml_edit(load_md(p) or {}, sigs, p, iteration_id)
+        # D-28/D-29: neutralise weighted signals (yaml_edit, commit_author, …) on
+        # items belonging to a different iteration than the one being materialized.
+        _neutralize_foreign_signals(load_md(p) or {}, sigs, p, iteration_id)
         if _apply_to_item(p, sigs):
             touched.append(p)
 
@@ -654,10 +673,11 @@ def main(argv=None) -> int:
         print(f"local_evidence: yaml_edit detection skipped: {exc}",
               file=sys.stderr)
 
-    # D-28: a commit can edit a backlog .md belonging to a different iteration
-    # than the one it was authored in (grooming a closed story, or bulk backlog
-    # authoring). Resolve the commit's own iteration by author date so its
-    # yaml_edit signals on foreign-iteration items are neutralised — the live
+    # D-28/D-29: a commit can touch a backlog item belonging to a different
+    # iteration than the one it was authored in (grooming a closed story, bulk
+    # backlog authoring, or delivery that overflowed its iteration). Resolve the
+    # commit's own iteration by author date so its weighted signals (commit_author,
+    # yaml_edit, …) on foreign-iteration items are neutralised — the live
     # equivalent of the materialize guard.
     commit_iter = None
     iso = (_git(["log", "-1", "--format=%aI", commit["sha"]]) or "").strip()
@@ -680,7 +700,7 @@ def main(argv=None) -> int:
                 file=sys.stderr,
             )
             continue
-        _neutralize_foreign_yaml_edit(load_md(p) or {}, sigs, p, commit_iter)
+        _neutralize_foreign_signals(load_md(p) or {}, sigs, p, commit_iter)
         if _apply_to_item(p, sigs):
             touched_paths.append(p)
 

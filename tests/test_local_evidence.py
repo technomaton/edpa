@@ -568,3 +568,122 @@ def test_post_commit_hook_zero_weights_cross_iteration_yaml_edit(repo: Path) -> 
           if s["type"] == "yaml_edit"]
     assert s2 and any(s["weight"] > 0 for s in s2)
     assert all("out_of_iteration" not in s.get("tags", []) for s in s2)
+
+
+def test_post_commit_hook_zero_weights_cross_iteration_commit_author(repo: Path) -> None:
+    """D-29: the live hook neutralises the full-weight ``commit_author`` signal
+    (not just ``yaml_edit``) on an item belonging to a different iteration than
+    the commit's own — overflow is gated to weight 0 (audit-only), while a
+    same-iteration item keeps full weight. raw_weight is carried for audit."""
+    _write_iter(repo, "PI-2026-1.1", "2026-04-01", "2026-04-30")  # spring/closed
+    _write_iter(repo, "PI-2026-3.1", "2026-06-15", "2026-06-30")  # current
+    _commit_edit(repo, ".edpa/backlog/stories/S-1.md",
+                 {"iteration": "PI-2026-1.1", "status": "Done", "js": 5},
+                 "S-1: spring", "2026-04-10T10:00:00+00:00")
+    _commit_edit(repo, ".edpa/backlog/stories/S-2.md",
+                 {"iteration": "PI-2026-3.1", "status": "Done", "js": 5},
+                 "S-2: setup", "2026-06-16T09:00:00+00:00")
+
+    # ONE June commit (iteration 3.1 window) touches BOTH stories; run the HOOK.
+    for rel in (".edpa/backlog/stories/S-1.md", ".edpa/backlog/stories/S-2.md"):
+        d = load_md(repo / rel)
+        d["bv"] = 8
+        save_md_item(repo / rel, d)
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m", "groom S-1/S-2"], cwd=repo, env_extra={
+        "GIT_AUTHOR_EMAIL": "bob@example.dev", "GIT_AUTHOR_NAME": "Bob Architect",
+        "GIT_COMMITTER_EMAIL": "bob@example.dev", "GIT_COMMITTER_NAME": "Bob Architect",
+        "GIT_AUTHOR_DATE": "2026-06-18T10:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-06-18T10:00:00+00:00"})
+    assert _run_emitter(repo) == 0
+
+    # S-1 (spring, foreign to the June commit): commit_author recorded, neutralised.
+    s1 = [s for s in load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+          if s["type"] == "commit_author"]
+    assert s1, "the cross-iteration commit_author must still be recorded for audit"
+    assert all(s["weight"] == 0 for s in s1)
+    assert all("out_of_iteration" in s.get("tags", []) for s in s1)
+    assert all(s.get("raw_weight") for s in s1)  # original retained → reversible
+    # S-2 (genuine 3.1): full weight, never tagged, raw_weight present.
+    s2 = [s for s in load_md(repo / ".edpa/backlog/stories/S-2.md")["evidence"]
+          if s["type"] == "commit_author"]
+    assert s2 and all(s["weight"] > 0 for s in s2)
+    assert all("out_of_iteration" not in s.get("tags", []) for s in s2)
+    assert all(s.get("raw_weight") for s in s2)
+
+
+def test_post_commit_hook_keeps_commit_author_on_unassigned_item(repo: Path) -> None:
+    """D-29: the gate must NOT zero a ``commit_author`` on an item with no
+    ``iteration:`` — overflow can't be proven without a window, so unassigned
+    work keeps full weight (mirrors the D-28 yaml_edit rule for blank items)."""
+    _write_iter(repo, "PI-2026-3.1", "2026-06-15", "2026-06-30")
+    _commit_edit(repo, ".edpa/backlog/stories/S-1.md",
+                 {"status": "Done", "js": 5}, "S-1: setup",
+                 "2026-06-16T09:00:00+00:00")
+    assert "iteration" not in load_md(repo / ".edpa/backlog/stories/S-1.md")
+
+    d = load_md(repo / ".edpa/backlog/stories/S-1.md")
+    d["bv"] = 7
+    save_md_item(repo / ".edpa/backlog/stories/S-1.md", d)
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m", "work on S-1"], cwd=repo, env_extra={
+        "GIT_AUTHOR_EMAIL": "bob@example.dev", "GIT_AUTHOR_NAME": "Bob Architect",
+        "GIT_COMMITTER_EMAIL": "bob@example.dev", "GIT_COMMITTER_NAME": "Bob Architect",
+        "GIT_AUTHOR_DATE": "2026-06-18T10:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-06-18T10:00:00+00:00"})
+    assert _run_emitter(repo) == 0
+
+    ca = [s for s in load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+          if s["type"] == "commit_author"]
+    assert ca and all(s["weight"] > 0 for s in ca), "unassigned work must not vanish"
+    assert all("out_of_iteration" not in s.get("tags", []) for s in ca)
+
+
+def test_neutralize_foreign_signals_gates_all_weighted_types() -> None:
+    """D-29: the guard zeroes EVERY weighted GATED_TYPES signal on a
+    foreign-iteration item (commit_author, manual:commit_message,
+    agent_contribution, yaml_edit) — preserving raw_weight — while a
+    zero-weight state_transition is left untouched."""
+    item = {"type": "Story", "iteration": "PI-2026-1.1"}
+    sigs = [
+        {"type": "commit_author", "weight": 2.78},
+        {"type": "manual:commit_message", "weight": 5.0},
+        {"type": "agent_contribution", "weight": 1.0},
+        {"type": "yaml_edit", "weight": 7.0, "raw_weight": 7.0},
+        {"type": "state_transition", "weight": 0},
+    ]
+    # commit's iteration (3.1) differs from the item's (1.1) → out of window.
+    le._neutralize_foreign_signals(item, sigs, Path("x/stories/S-1.md"),
+                                   "PI-2026-3.1")
+    by_type = {s["type"]: s for s in sigs}
+    for t in ("commit_author", "manual:commit_message",
+              "agent_contribution", "yaml_edit"):
+        assert by_type[t]["weight"] == 0, t
+        assert "out_of_iteration" in by_type[t]["tags"], t
+        assert by_type[t]["raw_weight"] > 0, t  # original retained for audit
+    assert by_type["state_transition"]["weight"] == 0
+    assert "out_of_iteration" not in by_type["state_transition"].get("tags", [])
+
+
+def test_post_commit_hook_keeps_commit_author_outside_all_windows(repo: Path) -> None:
+    """D-29 / decision #2: a commit whose author date falls in NO iteration
+    window (under a contiguous calendar the only real gap is the edge of the
+    project timeline) resolves commit_iter=None, so the gate no-ops and the
+    commit_author keeps full weight — a lenient fallback, never a router."""
+    _write_iter(repo, "PI-2026-3.1", "2026-06-15", "2026-06-30")
+    _commit_edit(repo, ".edpa/backlog/stories/S-1.md",
+                 {"iteration": "PI-2026-3.1", "status": "Done", "js": 5},
+                 "S-1: setup", "2026-06-16T09:00:00+00:00")
+    # A late edit committed in DECEMBER — after every defined iteration → no window.
+    d = load_md(repo / ".edpa/backlog/stories/S-1.md")
+    d["bv"] = 9
+    save_md_item(repo / ".edpa/backlog/stories/S-1.md", d)
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m", "late tweak on S-1"], cwd=repo, env_extra={
+        "GIT_AUTHOR_DATE": "2026-12-01T10:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-12-01T10:00:00+00:00"})
+    assert _run_emitter(repo) == 0
+    ca = [s for s in load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+          if s["type"] == "commit_author"]
+    assert ca and all(s["weight"] > 0 for s in ca), "no-window commit keeps full weight"
+    assert all("out_of_iteration" not in s.get("tags", []) for s in ca)
