@@ -1,6 +1,6 @@
 {
   "enabledPlugins": {
-    "edpa@technomaton-edpa": true
+    "edpa@technomaton-edpa": false
   }
 }
 
