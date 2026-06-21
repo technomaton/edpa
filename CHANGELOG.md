@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **`materialize` and the post-commit hook no longer leak `yaml_edit` credit
+  across iterations (D-28).** A commit made in iteration N's window that edits a
+  backlog `.md` belonging to a different iteration M (a bulk backlog-authoring
+  commit, or grooming a closed story) used to write a full-weight `yaml_edit`
+  signal onto the foreign item, credited to the commit author. Because the
+  engine's credit path is date-blind (`detect_contributors` sums an item's whole
+  `evidence[]`) and keys off the item's `iteration:` field, that weight surfaced
+  in iteration M's report on recompute and polluted its `contributors[]`
+  snapshot. Both writer paths now share `transitions.item_in_iteration` and
+  **neutralise a cross-iteration `yaml_edit` to `weight: 0` + an
+  `out_of_iteration` tag** — recorded for audit but analytics-only, the same
+  idiom as zero-weight `state_transition`. The materialize guard targets the
+  iteration being materialized; the live hook resolves the commit's own iteration
+  by author date. Items with a blank `iteration:` are left untouched (≈half of
+  real stories/defects are unassigned — their in-window work must not vanish).
+  - **Known limitation:** the full-weight `commit_author` signal leaks the same
+    way on the hook (a commit editing a foreign-iteration item credits its
+    author), but a naive date guard there would drop legitimate early/spillover
+    *delivery* work, so it is tracked separately rather than auto-fixed here.
+
 ## 2.10.0 — 2026-06-20
 
 ### Changed

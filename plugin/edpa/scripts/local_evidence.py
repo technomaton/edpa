@@ -56,6 +56,12 @@ finally:
     sys.path.pop(0)
 
 
+# Reverse of id_counter.TYPE_DIRS (directory → item type). Lets the D-28 guard
+# classify a malformed item missing `type:` the same way the engine does
+# (engine.load_backlog_items: data.get("type", level)).
+_DIR_TO_TYPE = {d: t for t, d in TYPE_DIRS.items()}
+
+
 _SELF_COMMIT_PREFIX = "chore(evidence):"
 
 _ITEM_REF_RE = re.compile(r"\b([A-Z]{1,3}-\d{1,9})\b")
@@ -428,6 +434,44 @@ def _yaml_edit_to_evidence(raw: dict, people: list,
     return grouped
 
 
+def _neutralize_foreign_yaml_edit(item: dict, sigs: list[dict],
+                                  item_path: Path,
+                                  target_iteration: str | None) -> None:
+    """D-28: zero-weight (analytics-only) any ``yaml_edit`` signal whose host
+    item PROVABLY belongs to an iteration OTHER than ``target_iteration`` — so a
+    commit that edits a foreign-iteration backlog .md (bulk backlog authoring, or
+    grooming a closed story) never scores delivery credit there. Mutates ``sigs``
+    in place; the signal is kept for audit but neutralised — the same idiom as a
+    zero-weight ``state_transition`` (detect_contributors skips zero-weight).
+
+    Shared by the materialize writer (target = the iteration being materialized)
+    and the live post-commit hook (target = the commit's own iteration, resolved
+    by author date). No-op when the placement is unsafe:
+      * ``target_iteration`` falsy/None — e.g. a commit outside every window;
+      * the item's ``iteration`` is blank (unassigned/unknown) — don't drop real
+        work; the engine likewise excludes such an item from any iteration.
+
+    Scoped to ``yaml_edit`` only. ``commit_author`` (full weight) leaks the same
+    way on the hook, but a naive date guard there would also drop legitimate
+    early/spillover *delivery* work, so that is left to a separate, smarter fix.
+    """
+    if not target_iteration:
+        return
+    item_iter = item.get("iteration", "")
+    if not item_iter:
+        return
+    from transitions import item_in_iteration
+    item_type = item.get("type") or _DIR_TO_TYPE.get(item_path.parent.name, "")
+    if item_in_iteration(item_type, item_iter, target_iteration):
+        return
+    for s in sigs:
+        if s.get("type") == "yaml_edit" and s.get("weight"):
+            s["weight"] = 0
+            tags = s.setdefault("tags", [])
+            if "out_of_iteration" not in tags:
+                tags.append("out_of_iteration")
+
+
 def cmd_materialize(edpa_root: Path, iteration_id: str) -> int:
     """Idempotent reconcile: scan git for the iteration window and
     materialize ``state_transition`` signals into evidence[].
@@ -460,7 +504,12 @@ def cmd_materialize(edpa_root: Path, iteration_id: str) -> int:
     touched: list[Path] = []
     for iid, sigs in grouped.items():
         p = find_item_path(edpa_root, iid)
-        if p and _apply_to_item(p, sigs):
+        if not p:
+            continue
+        # D-28: neutralise yaml_edit signals on items belonging to a different
+        # iteration than the one being materialized (_neutralize_foreign_yaml_edit).
+        _neutralize_foreign_yaml_edit(load_md(p) or {}, sigs, p, iteration_id)
+        if _apply_to_item(p, sigs):
             touched.append(p)
 
     if touched:
@@ -605,6 +654,22 @@ def main(argv=None) -> int:
         print(f"local_evidence: yaml_edit detection skipped: {exc}",
               file=sys.stderr)
 
+    # D-28: a commit can edit a backlog .md belonging to a different iteration
+    # than the one it was authored in (grooming a closed story, or bulk backlog
+    # authoring). Resolve the commit's own iteration by author date so its
+    # yaml_edit signals on foreign-iteration items are neutralised — the live
+    # equivalent of the materialize guard.
+    commit_iter = None
+    iso = (_git(["log", "-1", "--format=%aI", commit["sha"]]) or "").strip()
+    if iso:
+        try:
+            from datetime import datetime
+            from transitions import find_iteration_for_timestamp
+            commit_iter = find_iteration_for_timestamp(
+                edpa_root, datetime.fromisoformat(iso))
+        except (ValueError, KeyError, TypeError):
+            commit_iter = None
+
     touched_paths: list[Path] = []
     for iid, sigs in grouped.items():
         p = find_item_path(edpa_root, iid)
@@ -615,6 +680,7 @@ def main(argv=None) -> int:
                 file=sys.stderr,
             )
             continue
+        _neutralize_foreign_yaml_edit(load_md(p) or {}, sigs, p, commit_iter)
         if _apply_to_item(p, sigs):
             touched_paths.append(p)
 

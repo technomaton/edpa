@@ -129,6 +129,33 @@ def parse_iteration_dates(iter_yaml: Path):
     )
 
 
+def item_in_iteration(item_type: str, item_iteration: str,
+                      target_iteration: str) -> bool:
+    """Does an item belong to ``target_iteration`` for scoring purposes?
+
+    The single source of truth for SAFe-hierarchy iteration membership,
+    shared by the engine reader (``engine.load_backlog_items``) and the
+    materialize writer (``local_evidence.cmd_materialize``) so they never
+    disagree (D-28):
+
+      * Story / Defect / Task → exact iteration match (e.g. PI-2026-1.1)
+      * Feature              → PI match (PI-2026-1 matches PI-2026-1.x)
+      * Epic / Initiative    → cross-PI; always belong
+
+    An empty/falsy ``target_iteration`` means "no filter" → always True.
+    Unknown types default to True (never silently dropped).
+    """
+    if not target_iteration:
+        return True
+    if item_type in ("Story", "Defect", "Task"):
+        return item_iteration == target_iteration
+    if item_type == "Feature":
+        pi_prefix = target_iteration.rsplit(".", 1)[0]
+        return item_iteration == pi_prefix or item_iteration == target_iteration
+    # Epic / Initiative (and any unknown type): cross-PI, always included.
+    return True
+
+
 def find_iteration_for_timestamp(edpa_root: Path, ts: datetime):
     """Return iteration ID whose [start, end] window contains ts, or None."""
     iter_dir = edpa_root / "iterations"
