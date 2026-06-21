@@ -2,7 +2,7 @@
   "mcpServers": {
     "edpa": {
       "command": "python3",
-      "args": [".claude/edpa/scripts/mcp_server.py"]
+      "args": ["plugin/edpa/scripts/mcp_server.py"]
     }
   }
 }
