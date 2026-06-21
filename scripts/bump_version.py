@@ -69,6 +69,34 @@ def bump_json_field(path: Path, new_version: str, apply: bool) -> bool:
     return new_text != text
 
 
+def bump_lockfile(path: Path, new_version: str, apply: bool) -> int:
+    """Stamp `new_version` into a package-lock.json's *self*-version fields.
+
+    npm records the package's own version in TWO spots — the top-level
+    ``"version"`` and ``packages[""]/"version"`` — while every dependency
+    under ``"packages"`` carries its own ``"version"`` that must NOT be
+    touched. Both self fields are immediately preceded by the package's own
+    ``"name"``, so we anchor on ``"name": "<pkg>"`` to target exactly those
+    two and skip dependency versions. Returns the number of fields stamped
+    (expected: 2).
+
+    Drift-proof like the pattern-stamped targets: it replaces whatever
+    version is present, so a lockfile that lagged behind (npm only rewrites
+    these on `npm install`) self-heals on the next real bump. The companion
+    guard ``tests/test_consistency.py::test_version_consistent`` fails CI if
+    these ever drift again (D-31).
+    """
+    text = path.read_text()
+    name = json.loads(text).get("name", "")
+    if not name:
+        return 0
+    pattern = rf'("name":\s*"{re.escape(name)}",\s*"version":\s*)"[^"]+"'
+    new_text, n = re.subn(pattern, rf'\g<1>"{new_version}"', text)
+    if new_text != text and apply:
+        path.write_text(new_text)
+    return n
+
+
 def bump_literal(path: Path, old: str, new: str, apply: bool) -> int:
     """Replace `old` with `new` in path. Returns number of replacements."""
     text = path.read_text()
@@ -152,6 +180,12 @@ def main():
     web_pkg = REPO_ROOT / "web/package.json"
     print(f"  {'✓' if bump_json_field(plugin_json, new, args.apply) else '·'} plugin/.claude-plugin/plugin.json (version field)")
     print(f"  {'✓' if bump_json_field(web_pkg, new, args.apply) else '·'} web/package.json (version field)")
+    web_lock = REPO_ROOT / "web/package-lock.json"
+    n_lock = bump_lockfile(web_lock, new, args.apply)
+    lock_mark = "✓" if n_lock else "⚠"
+    lock_note = (f"{n_lock} self-version field(s)" if n_lock
+                 else "name-anchored pattern not found — fix by hand")
+    print(f"  {lock_mark} web/package-lock.json ({lock_note})")
 
     # 2. Literal references
     targets = [
