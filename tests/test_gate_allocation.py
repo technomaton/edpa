@@ -158,6 +158,62 @@ def test_iteration_window_filter(tmp_path):
     assert transitions_in[0]["to_status"] == "Analyzing"
 
 
+def test_find_iteration_for_timestamp_accepts_naive_datetime(tmp_path):
+    """A naive (tz-less) timestamp must resolve, not crash.
+
+    Regression: find_iteration_for_timestamp compared ``start <= ts <= end``
+    where the bounds are tz-aware UTC but ``ts`` was used verbatim, so a
+    naive ``at:`` (legacy/hand-written evidence, date-only) raised
+    ``TypeError: can't compare offset-naive and offset-aware datetimes``.
+    A naive ts is read as UTC — consistent with parse_iteration_dates,
+    which builds the bounds from date-only strings as UTC.
+    """
+    repo, edpa = _make_repo(tmp_path)
+    start, _end = transitions.parse_iteration_dates(
+        edpa / "iterations" / "PI-2026-1.1.yaml")
+    midday = start.replace(hour=12)          # aware, inside the window
+    naive = midday.replace(tzinfo=None)      # same wall-clock, but tz-less
+    aware_result = transitions.find_iteration_for_timestamp(edpa, midday)
+    naive_result = transitions.find_iteration_for_timestamp(edpa, naive)
+    assert naive_result is not None
+    assert naive_result == aware_result
+
+
+def test_parse_iteration_dates_converts_offset_to_utc(tmp_path):
+    """An offset-bearing start/end must be CONVERTED to UTC, not clobbered.
+
+    Regression: parse_iteration_dates used ``.replace(tzinfo=utc)``, which
+    overwrites an existing offset instead of converting it, so
+    ``2026-06-01T00:00:00+02:00`` (= 2026-05-31T22:00 UTC) was mis-read as
+    2026-06-01T00:00 UTC — a 2h shift in window membership. Mirrors
+    engine._in_window, which already uses .astimezone(utc).
+    """
+    repo, edpa = _make_repo(tmp_path)
+    f = edpa / "iterations" / "OFFSET.yaml"
+    f.write_text(
+        "iteration:\n  id: OFF\n"
+        "  start_date: '2026-06-01T00:00:00+02:00'\n"
+        "  end_date: '2026-06-14T23:59:59+02:00'\n",
+        encoding="utf-8")
+    start, end = transitions.parse_iteration_dates(f)
+    assert start == datetime(2026, 5, 31, 22, 0, 0, tzinfo=timezone.utc)
+    assert end == datetime(2026, 6, 14, 21, 59, 59, tzinfo=timezone.utc)
+
+
+def test_parse_iteration_dates_date_only_unchanged(tmp_path):
+    """Guard: the common date-only form keeps midnight-UTC start and
+    end-of-day-UTC end (no regression from the offset fix above)."""
+    repo, edpa = _make_repo(tmp_path)
+    f = edpa / "iterations" / "DATEONLY.yaml"
+    f.write_text(
+        "iteration:\n  id: DO\n"
+        "  start_date: 2026-06-01\n  end_date: 2026-06-14\n",
+        encoding="utf-8")
+    start, end = transitions.parse_iteration_dates(f)
+    assert start == datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+    assert end == datetime(2026, 6, 14, 23, 59, 59, tzinfo=timezone.utc)
+
+
 def test_no_change_diff_ignored(tmp_path):
     repo, edpa = _make_repo(tmp_path)
     f = edpa / "backlog" / "features" / "F-1.md"

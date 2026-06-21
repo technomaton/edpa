@@ -122,11 +122,21 @@ def parse_iteration_dates(iter_yaml: Path):
     iso_end = it.get("end_date")
     if not (iso_start and iso_end):
         raise ValueError(f"{iter_yaml.name}: start_date/end_date missing")
-    return (
-        datetime.fromisoformat(str(iso_start)).replace(tzinfo=timezone.utc),
-        datetime.fromisoformat(str(iso_end)).replace(
-            hour=23, minute=59, second=59, tzinfo=timezone.utc),
-    )
+    start_raw = datetime.fromisoformat(str(iso_start))
+    end_raw = datetime.fromisoformat(str(iso_end))
+    # Date-only (naive) inputs are read as UTC wall-clock: start at midnight,
+    # end snapped to end-of-day. An input that already carries a tz offset is
+    # CONVERTED to the same UTC instant (not clobbered via .replace), so the
+    # window stays consistent with engine._in_window's .astimezone(utc).
+    if start_raw.tzinfo is None:
+        start_dt = start_raw.replace(tzinfo=timezone.utc)
+    else:
+        start_dt = start_raw.astimezone(timezone.utc)
+    if end_raw.tzinfo is None:
+        end_dt = end_raw.replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+    else:
+        end_dt = end_raw.astimezone(timezone.utc)
+    return (start_dt, end_dt)
 
 
 def item_in_iteration(item_type: str, item_iteration: str,
@@ -161,6 +171,12 @@ def find_iteration_for_timestamp(edpa_root: Path, ts: datetime):
     iter_dir = edpa_root / "iterations"
     if not iter_dir.is_dir():
         return None
+    # A naive ts (legacy/hand-written `at:`, date-only) is read as UTC so it
+    # is comparable with the tz-aware UTC window bounds — otherwise the
+    # `start <= ts <= end` below raises "can't compare offset-naive and
+    # offset-aware datetimes".
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
     for f in sorted(iter_dir.glob("*.yaml")):
         try:
             start, end = parse_iteration_dates(f)
