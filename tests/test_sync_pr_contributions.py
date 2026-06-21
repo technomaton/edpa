@@ -192,3 +192,70 @@ def test_weights_overridable_via_heuristics_file(edpa_root: Path) -> None:
     assert weights["pr_reviewer"] == 9.99
     # Other defaults preserved
     assert weights["issue_comment"] == 1.14
+
+
+# ---------------------------------------------------------------------------
+# D-33: out-of-iteration gate for GH-side signals
+# ---------------------------------------------------------------------------
+
+def _edpa_with_iterations(tmp_path: Path, item_iteration: str = "PI-2026-1.1") -> Path:
+    root = tmp_path / ".edpa"
+    (root / "config").mkdir(parents=True)
+    for d in ("features", "stories", "defects"):
+        (root / "backlog" / d).mkdir(parents=True)
+    it = root / "iterations"
+    it.mkdir()
+    (it / "PI-2026-1.1.yaml").write_text(
+        "iteration:\n  id: PI-2026-1.1\n  start_date: 2026-04-01\n  end_date: 2026-04-30\n",
+        encoding="utf-8")
+    (it / "PI-2026-3.1.yaml").write_text(
+        "iteration:\n  id: PI-2026-3.1\n  start_date: 2026-06-01\n  end_date: 2026-06-30\n",
+        encoding="utf-8")
+    save_md_item(root / "backlog" / "stories" / "S-1.md",
+                 {"id": "S-1", "type": "Story", "title": "Login",
+                  "iteration": item_iteration})
+    return root
+
+
+def test_apply_gates_review_outside_item_iteration(tmp_path: Path) -> None:
+    """D-33: a review whose submittedAt lands outside the host item's iteration
+    is written to evidence[] but neutralised to weight 0 + out_of_iteration
+    (raw_weight kept) — the GH-side mirror of the commit-side D-29 gate."""
+    edpa = _edpa_with_iterations(tmp_path)  # S-1 in closed PI-2026-1.1 (April)
+    pr = _pr_payload(title="S-1: late review", body="", reviews=[
+        {"id": "RV1", "author": {"login": "bob"},
+         "submittedAt": "2026-06-18T10:00:00Z"}])  # June -> foreign to 1.1
+    weights = spc._load_weights(edpa)
+    spc.apply_signals(edpa, spc.event_to_signals(pr, weights))
+    rv = [s for s in load_md(edpa / "backlog" / "stories" / "S-1.md")["evidence"]
+          if s["type"] == "pr_reviewer"]
+    assert rv and rv[0]["weight"] == 0
+    assert "out_of_iteration" in rv[0]["tags"]
+    assert rv[0]["raw_weight"] > 0
+
+
+def test_apply_keeps_review_inside_item_iteration(tmp_path: Path) -> None:
+    """D-33: a review inside the item's own iteration window keeps full weight."""
+    edpa = _edpa_with_iterations(tmp_path)  # S-1 in PI-2026-1.1 (April)
+    pr = _pr_payload(title="S-1: review", body="", reviews=[
+        {"id": "RV1", "author": {"login": "bob"},
+         "submittedAt": "2026-04-10T10:00:00Z"}])  # April -> own window
+    weights = spc._load_weights(edpa)
+    spc.apply_signals(edpa, spc.event_to_signals(pr, weights))
+    rv = [s for s in load_md(edpa / "backlog" / "stories" / "S-1.md")["evidence"]
+          if s["type"] == "pr_reviewer"]
+    assert rv and rv[0]["weight"] > 0
+    assert "out_of_iteration" not in rv[0].get("tags", [])
+
+
+def test_gate_keeps_pr_signal_on_unassigned_item(tmp_path: Path) -> None:
+    """D-33: an item with no iteration: can't prove overflow -> signal kept
+    (mirrors the D-28/D-29 blank-iteration rule)."""
+    edpa = _edpa_with_iterations(tmp_path)
+    item = {"type": "Story"}  # no iteration
+    sigs = [{"type": "pr_reviewer", "weight": 2.25,
+             "at": "2026-06-18T10:00:00+00:00"}]
+    spc._gate_out_of_iteration(
+        edpa, item, edpa / "backlog" / "stories" / "S-1.md", sigs)
+    assert sigs[0]["weight"] == 2.25
+    assert "out_of_iteration" not in sigs[0].get("tags", [])

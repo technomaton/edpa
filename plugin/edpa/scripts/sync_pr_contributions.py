@@ -239,6 +239,47 @@ def _dedupe_signals(existing: list[dict], new: list[dict]) -> list[dict]:
     return [by_ref[k] for k in sorted(by_ref) if k is not None]
 
 
+def _gate_out_of_iteration(edpa_root: Path, item: dict, item_path: Path,
+                           sigs: list[dict]) -> None:
+    """D-33: zero a GH-side weighted signal whose ``at:`` falls in an iteration
+    OTHER than the one its host item belongs to — the out-of-iteration gate
+    mirroring the commit-side D-29 guard (``local_evidence._neutralize_foreign_
+    signals``), applied here because PR-thread signals (pr_reviewer,
+    issue_comment) bypass the post-commit hook. Resolved PER SIGNAL: reviews /
+    comments on one item can land in different iteration windows. The original
+    weight is kept in ``raw_weight`` and the signal tagged ``out_of_iteration``
+    so the gate stays reversible (detect_contributors skips weight-0 signals).
+
+    No-op when the item's ``iteration:`` is blank (overflow can't be proven
+    without a window) or the signal's ``at:`` resolves to no iteration window
+    (timeline edge — kept at full weight, never re-routed).
+    """
+    item_iter = item.get("iteration", "")
+    if not item_iter:
+        return
+    from datetime import datetime
+    from transitions import find_iteration_for_timestamp, item_in_iteration
+    item_type = item.get("type") or ""
+    for s in sigs:
+        if not s.get("weight"):
+            continue
+        at = s.get("at")
+        try:
+            # GH timestamps use a trailing 'Z'; normalise for fromisoformat
+            # (Python < 3.11 rejects 'Z'). D-30 made the window helpers tz-safe.
+            target = find_iteration_for_timestamp(
+                edpa_root, datetime.fromisoformat(at.replace("Z", "+00:00")))
+        except (ValueError, TypeError, AttributeError):
+            target = None
+        if not target:
+            continue
+        if item_in_iteration(item_type, item_iter, target):
+            continue
+        s.setdefault("raw_weight", s["weight"])  # keep original for audit
+        s["weight"] = 0
+        s.setdefault("tags", []).append("out_of_iteration")
+
+
 def apply_signals(edpa_root: Path, signals: list[dict]) -> dict[str, int]:
     """Group signals by item_id; merge into each item's contributors block.
 
@@ -254,6 +295,9 @@ def apply_signals(edpa_root: Path, signals: list[dict]) -> dict[str, int]:
         if not path:
             continue
         item = load_md(path) or {}
+        # D-33: gate GH-side signals that landed outside the item's own
+        # iteration window (PR-thread events bypass the commit-side D-29 hook).
+        _gate_out_of_iteration(edpa_root, item, path, new_signals)
         # V2.1 rename: ci_signals[] → evidence[]. Read from either
         # (backward-compat for items written by V2.0); always write
         # to evidence[] and drop any legacy ci_signals[] entry so the
