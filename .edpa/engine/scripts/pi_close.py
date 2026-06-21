@@ -192,9 +192,12 @@ def aggregate_engine_results(edpa_root: Path, pi_id: str, iteration_ids):
         if not data:
             continue
         any_results = True
-        for entry in data.get("allocations", []) or []:
-            person = entry.get("person")
-            hours = entry.get("derived_hours", 0) or 0
+        # edpa_results.json schema (engine.py:1587-1595): top-level `people`,
+        # each entry keyed `id` + `total_derived` (D-32 — was reading the
+        # non-existent `allocations`/`person`/`derived_hours`, summing zero).
+        for entry in data.get("people", []) or []:
+            person = entry.get("id")
+            hours = entry.get("total_derived", 0) or 0
             if person:
                 per_person[person]["hours"] += hours
                 per_person[person]["iterations"].append(it_id)

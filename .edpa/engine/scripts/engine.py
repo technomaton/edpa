@@ -440,6 +440,8 @@ def load_backlog_items(edpa_root, iteration_id=None):
         "defects": "Defect",
     }
 
+    from transitions import item_in_iteration  # noqa: E402 (lazy; matches parse_iteration_dates usage)
+
     for dir_name, level in type_dirs.items():
         type_dir = backlog_dir / dir_name
         if not type_dir.exists():
@@ -460,22 +462,18 @@ def load_backlog_items(edpa_root, iteration_id=None):
             if status.lower() not in ("done", "closed", "accepted"):
                 continue
 
-            # Filter by iteration — SAFe hierarchy-aware:
-            #   Story / Defect / Task → exact iteration match (e.g., PI-2026-1.1)
-            #   Feature → PI match (e.g., PI-2026-1 matches PI-2026-1.x)
-            #   Epic/Initiative → always included if Done (cross-PI)
+            # Filter by iteration — SAFe hierarchy-aware. The rule lives in
+            # transitions.item_in_iteration so the materialize writer (D-28
+            # guard) and this reader agree on membership:
+            #   Story / Defect / Task → exact iteration match (PI-2026-1.1)
+            #   Feature → PI match (PI-2026-1 matches PI-2026-1.x)
+            #   Epic / Initiative → always included if Done (cross-PI)
             item_type = data.get("type", level)
             item_iter = data.get("iteration", "")
 
-            if iteration_id:
-                if item_type in ("Story", "Defect", "Task"):
-                    if item_iter != iteration_id:
-                        continue
-                elif item_type == "Feature":
-                    pi_prefix = iteration_id.rsplit(".", 1)[0]
-                    if item_iter != pi_prefix and item_iter != iteration_id:
-                        continue
-                # Epic + Initiative: always included if Done
+            if iteration_id and not item_in_iteration(
+                    item_type, item_iter, iteration_id):
+                continue
 
             js = data.get("js") or data.get("job_size", 0)
             if not js or js <= 0:

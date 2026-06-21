@@ -4,8 +4,8 @@ Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allo
 
 EDPA V2 je **local-first**: zdrojem pravdy je `.edpa/backlog/**/*.md` (YAML frontmatter), git je audit trail. GitHub je **volitelny** -- zadny GitHub Project, zadne org Issue Types, zadny obousmerny sync.
 
-**Verze:** EDPA 2.10.0
-**Posledni aktualizace:** 2026-06-20
+**Verze:** EDPA 2.11.0
+**Posledni aktualizace:** 2026-06-22
 
 ---
 
@@ -207,7 +207,7 @@ project:
 
 governance:
   # Auto-razitkovano na verzi pluginu instalatorem.
-  methodology: "EDPA 2.10.0"
+  methodology: "EDPA 2.11.0"
   # Jedina vypocetni cesta od v1.14 (zadny simple/full/gates mode selector,
   # zadny audit_mode -- snapshoty vzdy nesou plny signals[] audit trail).
 

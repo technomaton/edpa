@@ -1,9 +1,48 @@
 # Changelog
 
-## Unreleased
+## 2.11.0 — 2026-06-22
 
 ### Fixed
 
+- **The out-of-iteration gate now covers every weighted commit-side signal, not
+  just `yaml_edit` (D-29).** D-28 left the full-weight `commit_author` leak open:
+  a commit touching a foreign-iteration item still credited its author there. The
+  guard (`_neutralize_foreign_yaml_edit` → `_neutralize_foreign_signals`) now
+  zeroes any weighted signal in `GATED_TYPES` (`commit_author`,
+  `manual:commit_message`, `agent_contribution`, `yaml_edit`) whose host item
+  provably belongs to a different iteration than the commit's own — `weight: 0` +
+  `out_of_iteration`, original preserved in `raw_weight` (now emitted on
+  `commit_author` too) so the gate stays reversible. This is the axiom-preserving
+  **gate, don't route** model chosen over date-windowing: work that overflowed a
+  Story's iteration never scores there — it is split into a new item instead. No
+  engine change (`aggregate_signals` already skips weight-0). Blank-`iteration:`
+  and cross-PI Epic/Initiative items are left untouched; capping is symmetric.
+  Reports shift by exactly the cross-iteration leak that should not have existed;
+  closed iterations stay immutable (nothing recomputed or re-routed).
+- **Iteration-window helpers are timezone-safe (D-30).**
+  `find_iteration_for_timestamp` raised *"can't compare offset-naive and
+  offset-aware datetimes"* on a naive `at:`, and `parse_iteration_dates` clobbered
+  an offset-bearing date via `.replace(tzinfo=…)` instead of converting it. Both
+  now normalise to UTC (naive read as UTC, aware converted), matching
+  `engine._in_window`. Date-only iteration bounds are unchanged.
+- **GH-side PR-thread signals are now gated to the item's iteration (D-33).**
+  `pr_reviewer` / `issue_comment` (from the optional `sync_pr_contributions` CI
+  path) bypassed the commit-side D-29 gate, so a review or comment whose `at:`
+  fell outside the host item's iteration window still scored full weight there.
+  `apply_signals` now applies the same out-of-iteration gate per-signal — each
+  event resolved by its own `at:` (review/comment timestamp; GitHub trailing-`Z`
+  handled).
+- **PI close rolls up the real per-person engine hours (D-32).**
+  `pi_close.aggregate_engine_results` read `edpa_results.json` under
+  `allocations[]` with `person` / `derived_hours` keys, but the engine writes
+  `people[]` with `id` / `total_derived` — so PI close silently summed **zero**
+  engine-derived hours per person. It now reads the real schema (the function had
+  no test; one was added).
+- **Removed the duplicate edpa MCP server in the source repo (D-27).** The
+  project `.mcp.json` pointed at the vendored consumer path (`.claude/edpa`),
+  making the edpa MCP fail with `-32000` on reconnect inside the source repo; it
+  now points at `plugin/edpa/scripts/mcp_server.py` and the redundant config was
+  removed.
 - **`materialize` and the post-commit hook no longer leak `yaml_edit` credit
   across iterations (D-28).** A commit made in iteration N's window that edits a
   backlog `.md` belonging to a different iteration M (a bulk backlog-authoring
@@ -19,10 +58,9 @@
   iteration being materialized; the live hook resolves the commit's own iteration
   by author date. Items with a blank `iteration:` are left untouched (≈half of
   real stories/defects are unassigned — their in-window work must not vanish).
-  - **Known limitation:** the full-weight `commit_author` signal leaks the same
-    way on the hook (a commit editing a foreign-iteration item credits its
-    author), but a naive date guard there would drop legitimate early/spillover
-    *delivery* work, so it is tracked separately rather than auto-fixed here.
+  - **Resolved in D-29 (above):** the full-weight `commit_author` signal leaked
+    the same way on the hook; the gate now covers it and the other weighted
+    delivery signals under the axiom-preserving gate-not-route model.
 - **`bump_version.py` now stamps `web/package-lock.json`'s embedded version,
   and a consistency guard fails CI when it drifts (D-31).** The bump script
   stamped `web/package.json` but never the lockfile's own `version` — recorded
