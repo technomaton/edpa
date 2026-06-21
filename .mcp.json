@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "edpa": {
-      "command": "python3",
-      "args": ["plugin/edpa/scripts/mcp_server.py"]
-    }
-  }
-}
