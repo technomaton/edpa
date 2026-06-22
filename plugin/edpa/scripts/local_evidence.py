@@ -285,13 +285,19 @@ def build_signals(commit: dict, items: list[str], person_id: str,
                     "at": iso,
                 },
             })
-        # 3. /contribute directives in commit body (additive override)
+        # 3. /contribute directives in commit body (additive override).
+        # D-34: NO upper bound on the weight. It is a RELATIVE weight (per-item
+        # cw is normalised across signals), so an absolute cap is meaningless —
+        # weight:13 just means "worth ~13 against the other signals on this
+        # item". The old `0 <= w <= 10` clamp silently dropped legitimate larger
+        # weights (e.g. crediting off-repo coordination) while the hook still
+        # reported success, and it diverged from detect_contributors, which has
+        # no upper bound. The regex restricts w_str to a non-negative number, so
+        # float() cannot raise — keep the guard defensive in case it ever widens.
         for login, w_str in _CONTRIBUTE_RE.findall(body):
             try:
                 w = float(w_str)
             except ValueError:
-                continue
-            if not (0 <= w <= 10):
                 continue
             out.append({
                 "item_id": iid,

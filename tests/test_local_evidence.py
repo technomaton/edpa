@@ -194,6 +194,23 @@ def test_emit_parses_contribute_directive(repo: Path) -> None:
     assert "bob" in persons
 
 
+def test_emit_keeps_contribute_weight_above_ten(repo: Path) -> None:
+    """D-34: a /contribute weight >10 must still land as a manual:commit_message
+    signal. build_signals previously clamped to [0,10] and silently dropped
+    larger weights — diverging from detect_contributors (no upper bound) and
+    losing legitimate strong manual attributions (e.g. weight:13 for off-repo
+    coordination work)."""
+    _make_commit(repo, "S-1: coordinate\n\n/contribute @bob weight:13",
+                 [("src/coord.py", "x\n")])
+    _run_emitter(repo)
+
+    s1 = load_md(repo / ".edpa/backlog/stories/S-1.md")
+    manual = [s for s in s1["evidence"]
+              if s["type"] == "manual:commit_message" and s["person"] == "bob"]
+    assert manual, "weight:13 /contribute directive was silently dropped"
+    assert manual[0]["weight"] == 13.0
+
+
 def test_emit_dedupes_across_runs(repo: Path) -> None:
     """Running the emitter twice on the same HEAD → no duplicates."""
     _make_commit(repo, "S-1: tweak", [("a.txt", "a\n")])
