@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.11.1 — 2026-06-22
+
+### Fixed
+
+- **`/contribute @login weight:N` directives with weight >10 are no longer
+  silently dropped (D-34).** `local_evidence.build_signals` clamped the manual
+  contribution weight to `[0, 10]` and discarded anything outside it — while the
+  post-commit hook still reported success — so a legitimate strong attribution
+  like `weight:13` (e.g. crediting off-repo coordination work) never reached the
+  item's `evidence[]`, leaving the intended person uncredited while only the
+  commit author was attributed. The clamp also diverged from
+  `detect_contributors`, which has no upper bound. The cap is removed:
+  `/contribute` weight is a *relative* weight (per-item `cw` is normalised across
+  signals), so an absolute ceiling was meaningless; the regex already restricts
+  the value to a non-negative number. Regression test added in
+  `tests/test_local_evidence.py`.
+
 ## 2.11.0 — 2026-06-22
 
 ### Fixed
