@@ -180,9 +180,89 @@ _CW_SIGNAL_NAMES = ("commit_author", "pr_reviewer", "issue_comment")
 _CW_WEIGHT_MIN = 0.1
 _CW_WEIGHT_MAX = 8.0
 
+# yaml_edit_weights bounds. Per-signal weights must stay in a sane band
+# so a typo (e.g. `create: 50`) is caught before it floods cw. One
+# negative is legitimate (revert subtracts credit), hence the lower
+# bound goes below zero. The divisor (`lines_volume_divisor`) is a
+# denominator, not a weight, so it is exempt from this band.
+_YE_WEIGHT_MIN = -2.0
+_YE_WEIGHT_MAX = 8.0
+_YE_WEIGHT_KEYS = (
+    "yaml_edit:create",
+    "yaml_edit:block_add",
+    "yaml_edit:list_grow",
+    "yaml_edit:scalar_change",
+    "yaml_edit:lines_volume_cap",
+    "yaml_edit:revert",
+)
+# Non-weight tuning knobs that may legitimately fall outside the weight
+# band (counts / divisors / multipliers). Skipped by the weight-bound
+# check; still required to be numeric.
+_YE_NONWEIGHT_KEYS = (
+    "yaml_edit:lines_volume_divisor",
+    "list_grow_cap_per_commit",
+    "bulk_migration_discount",
+    "bulk_item_threshold",
+)
+
+
+def validate_yaml_edit_weights(path: Path, data: dict) -> tuple[list[str], list[str]]:
+    """Bound every yaml_edit per-signal weight to [-2.0, 8.0].
+
+    Catches fat-finger typos (e.g. ``create: 50`` or ``scalar_change: 5``
+    where ``0.25`` was meant) that would otherwise silently let one
+    backlog edit out-credit a code commit. ``yaml_edit:revert`` is the one
+    legitimately-negative weight, so the band dips below zero rather than
+    rejecting it. Tuning knobs (divisor, caps, discount, threshold) are
+    only checked for being numeric — they live outside the weight band by
+    design.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    ye = (data or {}).get("yaml_edit_weights")
+    if ye is None:
+        return errors, warnings  # block is optional; engine falls back to defaults
+    if not isinstance(ye, dict):
+        errors.append(f"{path}: yaml_edit_weights: must be a mapping")
+        return errors, warnings
+
+    for key in _YE_WEIGHT_KEYS:
+        if key not in ye:
+            warnings.append(
+                f"{path}: yaml_edit_weights.{key} missing (will use default)")
+            continue
+        try:
+            val = float(ye[key])
+        except (TypeError, ValueError):
+            errors.append(
+                f"{path}: yaml_edit_weights.{key} is not a number: {ye[key]!r}")
+            continue
+        if not (_YE_WEIGHT_MIN <= val <= _YE_WEIGHT_MAX):
+            errors.append(
+                f"{path}: yaml_edit_weights.{key} = {val:.3f} is outside valid "
+                f"range [{_YE_WEIGHT_MIN}, {_YE_WEIGHT_MAX}] — likely a typo "
+                f"(a single backlog edit must not out-credit a code commit)"
+            )
+
+    for key in _YE_NONWEIGHT_KEYS:
+        if key in ye:
+            try:
+                float(ye[key])
+            except (TypeError, ValueError):
+                errors.append(
+                    f"{path}: yaml_edit_weights.{key} is not a number: {ye[key]!r}")
+
+    return errors, warnings
+
 
 def validate_cw_heuristics(path: Path, data: dict) -> tuple[list[str], list[str]]:
-    """Validate signal weights in cw_heuristics.yaml are within [0.1, 8.0]."""
+    """Validate signal weights in cw_heuristics.yaml.
+
+    - ``signals.*`` (commit_author / pr_reviewer / issue_comment) within
+      [0.1, 8.0].
+    - ``yaml_edit_weights.*`` per-signal weights within [-2.0, 8.0]
+      (delegated to validate_yaml_edit_weights).
+    """
     errors: list[str] = []
     warnings: list[str] = []
     signals = (data or {}).get("signals", {})
@@ -203,6 +283,10 @@ def validate_cw_heuristics(path: Path, data: dict) -> tuple[list[str], list[str]
                 f"{path}: signals.{sig} = {val:.3f} is outside valid range "
                 f"[{_CW_WEIGHT_MIN}, {_CW_WEIGHT_MAX}]"
             )
+
+    ye_errors, ye_warnings = validate_yaml_edit_weights(path, data)
+    errors.extend(ye_errors)
+    warnings.extend(ye_warnings)
     return errors, warnings
 
 

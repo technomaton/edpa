@@ -18,7 +18,7 @@ Signal taxonomy (8 types, all `yaml_edit:*`):
   block_add               — new top-level nested object added
   list_grow               — net `- ` bullets added (capped at 10/commit/item)
   scalar_change           — top-level scalar field set or changed
-  lines_volume            — total +lines effort proxy (capped at min(3.0, n/30))
+  lines_volume            — total +lines effort proxy (capped at min(1.0, n/40))
   revert                  — net-removal commit (negative weight)
   status_transition_skip  — sentinel; status changes owned by transitions.py
 
@@ -66,17 +66,18 @@ except ImportError:
 TRACKED_DIRS = ("initiatives", "epics", "features", "stories", "defects", "tasks")
 
 # Default signal weights. Calibration tunes these via /edpa:calibrate
-# against ground truth. Initial values are conservative round numbers
-# anchored to the existing detect_contributors weights
-# (commit_author=2.78) — yaml_edit:create is comparable in effort to
-# commit_author for a meaningful PR.
+# against ground truth. Values are pegged to the calibrated
+# detect_contributors anchor (commit_author=4.00, D-35): a backlog YAML
+# edit is real work, but a single edit should not out-weigh a code
+# commit, so yaml_edit:create lands at half of commit_author and the
+# finer-grained deltas scale down accordingly (D-36 re-tune).
 DEFAULT_WEIGHTS = {
-    "yaml_edit:create": 5.0,
-    "yaml_edit:block_add": 2.0,
-    "yaml_edit:list_grow": 1.0,           # per net + bullet, capped 10
-    "yaml_edit:scalar_change": 0.5,
-    "yaml_edit:lines_volume_cap": 3.0,    # max contribution from line count
-    "yaml_edit:lines_volume_divisor": 30, # +30 lines = +1.0
+    "yaml_edit:create": 2.0,
+    "yaml_edit:block_add": 1.0,
+    "yaml_edit:list_grow": 0.5,           # per net + bullet, capped 10
+    "yaml_edit:scalar_change": 0.25,
+    "yaml_edit:lines_volume_cap": 1.0,    # max contribution from line count
+    "yaml_edit:lines_volume_divisor": 40, # +40 lines = +1.0
     "yaml_edit:revert": -0.5,             # per net-removed block
     "bulk_migration_discount": 0.1,
     "list_grow_cap_per_commit": 10,

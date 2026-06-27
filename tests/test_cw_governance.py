@@ -29,6 +29,7 @@ from validate_syntax import (  # noqa: E402
     _is_heuristics_path,
     validate_cw_heuristics,
     validate_file,
+    validate_yaml_edit_weights,
 )
 
 
@@ -275,3 +276,120 @@ def test_validate_file_heuristics(tmp_path):
     )
     errors, _ = validate_file(f)
     assert any("commit_author" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# validate_yaml_edit_weights (D-36): bound per-signal yaml_edit weights to
+# [-2.0, 8.0] so a typo can't let one backlog edit out-credit a code commit.
+# ---------------------------------------------------------------------------
+
+# Pegged D-36 weight set — must stay in lockstep with cw_heuristics.yaml /
+# the .tmpl / DEFAULT_WEIGHTS. Validates clean.
+_D36_YE_WEIGHTS = {
+    "yaml_edit:create": 2.0,
+    "yaml_edit:block_add": 1.0,
+    "yaml_edit:list_grow": 0.5,
+    "yaml_edit:scalar_change": 0.25,
+    "yaml_edit:lines_volume_cap": 1.0,
+    "yaml_edit:lines_volume_divisor": 40,
+    "yaml_edit:revert": -0.5,
+    "list_grow_cap_per_commit": 10,
+    "bulk_migration_discount": 0.1,
+    "bulk_item_threshold": 5,
+}
+
+
+def test_yaml_edit_weights_pegged_set_is_clean(tmp_path):
+    errors, warnings = validate_yaml_edit_weights(
+        tmp_path / "cw_heuristics.yaml",
+        {"yaml_edit_weights": dict(_D36_YE_WEIGHTS)},
+    )
+    assert errors == []
+    assert warnings == []
+
+
+def test_yaml_edit_weights_typo_create_50_fails(tmp_path):
+    # The headline guard: a fat-finger `create: 50` (meant 2.0 / 5.0) must
+    # be rejected, not silently flood every item's cw.
+    bad = dict(_D36_YE_WEIGHTS, **{"yaml_edit:create": 50})
+    errors, _ = validate_yaml_edit_weights(
+        tmp_path / "cw_heuristics.yaml", {"yaml_edit_weights": bad})
+    assert any("yaml_edit:create" in e for e in errors)
+    assert any("8.0" in e for e in errors)
+
+
+def test_yaml_edit_weights_allows_single_negative_revert(tmp_path):
+    # revert is the one legitimately-negative weight; the band must admit it.
+    errors, _ = validate_yaml_edit_weights(
+        tmp_path / "cw_heuristics.yaml",
+        {"yaml_edit_weights": dict(_D36_YE_WEIGHTS, **{"yaml_edit:revert": -0.5})},
+    )
+    assert errors == []
+
+
+def test_yaml_edit_weights_rejects_too_negative(tmp_path):
+    # ...but a wildly-negative typo (e.g. -50) is still caught.
+    errors, _ = validate_yaml_edit_weights(
+        tmp_path / "cw_heuristics.yaml",
+        {"yaml_edit_weights": dict(_D36_YE_WEIGHTS, **{"yaml_edit:revert": -50})},
+    )
+    assert any("yaml_edit:revert" in e for e in errors)
+
+
+def test_yaml_edit_weights_divisor_exempt_from_band(tmp_path):
+    # lines_volume_divisor=40 is a denominator, not a weight — it sits
+    # outside [-2.0, 8.0] by design and must NOT be flagged.
+    errors, _ = validate_yaml_edit_weights(
+        tmp_path / "cw_heuristics.yaml",
+        {"yaml_edit_weights": dict(_D36_YE_WEIGHTS)},
+    )
+    assert not any("lines_volume_divisor" in e for e in errors)
+
+
+def test_yaml_edit_weights_non_numeric_is_error(tmp_path):
+    bad = dict(_D36_YE_WEIGHTS, **{"yaml_edit:create": "lots"})
+    errors, _ = validate_yaml_edit_weights(
+        tmp_path / "cw_heuristics.yaml", {"yaml_edit_weights": bad})
+    assert any("yaml_edit:create" in e for e in errors)
+
+
+def test_yaml_edit_weights_missing_block_is_noop(tmp_path):
+    # Block is optional (engine falls back to DEFAULT_WEIGHTS); absence is
+    # neither error nor warning.
+    errors, warnings = validate_yaml_edit_weights(
+        tmp_path / "cw_heuristics.yaml", {"signals": {"commit_author": 4.0}})
+    assert errors == []
+    assert warnings == []
+
+
+def test_validate_cw_heuristics_chains_yaml_edit_bound(tmp_path):
+    # End-to-end through the same call path the hooks use: a bad yaml_edit
+    # weight surfaces from validate_cw_heuristics (not just the private fn).
+    errors, _ = validate_cw_heuristics(
+        tmp_path / "cw_heuristics.yaml",
+        {"signals": {"commit_author": 4.0, "pr_reviewer": 2.17,
+                     "issue_comment": 1.46},
+         "yaml_edit_weights": dict(_D36_YE_WEIGHTS, **{"yaml_edit:create": 50})},
+    )
+    assert any("yaml_edit:create" in e for e in errors)
+
+
+def test_validate_file_flags_bad_yaml_edit_weight(tmp_path):
+    # Full file path: write a real cw_heuristics.yaml with a typo and run
+    # validate_file (the pre-commit / PostToolUse entrypoint).
+    f = tmp_path / "cw_heuristics.yaml"
+    f.write_text(
+        "signals:\n  commit_author: 4.0\n  pr_reviewer: 2.17\n"
+        "  issue_comment: 1.46\n"
+        "yaml_edit_weights:\n"
+        "  yaml_edit:create: 50\n"
+        "  yaml_edit:block_add: 1.0\n"
+        "  yaml_edit:list_grow: 0.5\n"
+        "  yaml_edit:scalar_change: 0.25\n"
+        "  yaml_edit:lines_volume_cap: 1.0\n"
+        "  yaml_edit:lines_volume_divisor: 40\n"
+        "  yaml_edit:revert: -0.5\n",
+        encoding="utf-8",
+    )
+    errors, _ = validate_file(f)
+    assert any("yaml_edit:create" in e for e in errors)
