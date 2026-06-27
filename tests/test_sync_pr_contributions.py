@@ -185,13 +185,16 @@ def test_apply_skips_unknown_items(edpa_root: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_weights_overridable_via_heuristics_file(edpa_root: Path) -> None:
+    # D-35: override lives under the canonical ``signals:`` block (the
+    # single source cw_heuristics actually defines), NOT a non-existent
+    # ``signal_weights:`` key.
     (edpa_root / "config" / "cw_heuristics.yaml").write_text(yaml.safe_dump({
-        "signal_weights": {"pr_reviewer": 9.99},
+        "signals": {"pr_reviewer": 9.99},
     }))
     weights = spc._load_weights(edpa_root)
     assert weights["pr_reviewer"] == 9.99
-    # Other defaults preserved
-    assert weights["issue_comment"] == 1.14
+    # Other defaults preserved (calibrated anchor, D-35)
+    assert weights["issue_comment"] == 1.46
 
 
 # ---------------------------------------------------------------------------

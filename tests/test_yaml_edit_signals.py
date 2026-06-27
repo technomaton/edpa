@@ -91,10 +91,13 @@ class TestScoreDiff(unittest.TestCase):
         bullets = "\n".join(f"+- AC-{i}: criterion {i}" for i in range(1, 31))
         diff = _diff(bullets)
         weight, tags, _ = score_diff(diff, W)
-        # Cap=10 → 10×1.0 = 10.0 from list_grow alone.
+        # Cap=10 → 10 × list_grow from list_grow alone (D-36: 10×0.5 = 5.0).
         list_grow_credit = 10 * W["yaml_edit:list_grow"]
-        # Volume bonus for ~30 lines is min(3.0, 30/30)=1.0.
-        self.assertAlmostEqual(weight, list_grow_credit + 1.0, places=1)
+        # Volume bonus for 30 net lines is min(cap, 30/divisor)
+        # (D-36: min(1.0, 30/40) = 0.75).
+        vol_bonus = min(W["yaml_edit:lines_volume_cap"],
+                        30 / W["yaml_edit:lines_volume_divisor"])
+        self.assertAlmostEqual(weight, list_grow_credit + vol_bonus, places=1)
         self.assertTrue(any("capped_from_30" in t for t in tags))
 
     def test_lines_volume_capped(self):
@@ -161,10 +164,77 @@ class TestScoreDiff(unittest.TestCase):
 +js: 8
 """)
         weight, tags, _ = score_diff(diff, W)
-        # At minimum: 1 block_add (2.0) + 5 list_grow (5.0) + 1 scalar (0.5)
-        # + lines_volume bonus (~10/30 = 0.33).
-        self.assertGreater(weight, 7.0)
-        self.assertLess(weight, 10.0)
+        # D-36 weights: 1 block_add + 5 list_grow + 1 scalar (js)
+        # + lines_volume bonus. Assert structurally against the weight set
+        # so this test tracks future re-tunes instead of a frozen literal.
+        base = (1 * W["yaml_edit:block_add"]
+                + 5 * W["yaml_edit:list_grow"]
+                + 1 * W["yaml_edit:scalar_change"])
+        self.assertTrue(any(t.startswith("block_add") for t in tags))
+        self.assertTrue(any(t.startswith("list_grow") for t in tags))
+        # Weight is the structural base plus a small capped volume bonus.
+        self.assertGreaterEqual(weight, base)
+        self.assertLessEqual(
+            weight, base + W["yaml_edit:lines_volume_cap"] + 0.01)
+        # Sanity floor: a substantive multi-part edit clears a bare scalar.
+        self.assertGreater(weight, W["yaml_edit:scalar_change"])
+
+
+# ─── D-36 pegged-weight locks ────────────────────────────────────────────────
+
+
+class TestPeggedWeights(unittest.TestCase):
+    """Lock in the D-36 re-tune (pegged to commit_author=4.00).
+
+    These assert the *exact* shipped weight set so an accidental revert of
+    the re-tune (or drift between DEFAULT_WEIGHTS and the YAML configs)
+    fails loudly rather than silently re-inflating yaml_edit credit.
+    """
+
+    def test_default_weights_are_d36_pegged_values(self):
+        self.assertEqual(W["yaml_edit:create"], 2.0)
+        self.assertEqual(W["yaml_edit:block_add"], 1.0)
+        self.assertEqual(W["yaml_edit:list_grow"], 0.5)
+        self.assertEqual(W["yaml_edit:scalar_change"], 0.25)
+        self.assertEqual(W["yaml_edit:lines_volume_cap"], 1.0)
+        self.assertEqual(W["yaml_edit:lines_volume_divisor"], 40)
+        self.assertEqual(W["yaml_edit:revert"], -0.5)
+
+    def test_contributors_rebalance_key_is_gone(self):
+        # D-26 removed the consumer; D-36 removes the dead key everywhere.
+        self.assertNotIn("yaml_edit:contributors_rebalance", W)
+
+    def test_pure_create_scores_exactly_create_weight(self):
+        # Minimal new-item diff (id+type+title only, no extra scalars/blocks
+        # /bullets, <divisor lines so no volume bonus) → exactly create=2.0.
+        diff = _diff("""
++id: D-99
++type: Defect
++title: x
+""")
+        weight, tags, _ = score_diff(diff, W)
+        self.assertIn("create", tags)
+        self.assertEqual(weight, W["yaml_edit:create"])  # exactly 2.0
+
+    def test_default_weights_match_shipped_yaml_configs(self):
+        # The three lockstep surfaces (DEFAULT_WEIGHTS, live config, template)
+        # must agree on every yaml_edit weight. Reads the real files.
+        import yaml as _yaml
+        for rel in (".edpa/config/cw_heuristics.yaml",
+                    "plugin/edpa/templates/cw_heuristics.yaml.tmpl"):
+            data = _yaml.safe_load((ROOT / rel).read_text(encoding="utf-8"))
+            ye = data["yaml_edit_weights"]
+            for key in ("yaml_edit:create", "yaml_edit:block_add",
+                        "yaml_edit:list_grow", "yaml_edit:scalar_change",
+                        "yaml_edit:lines_volume_cap",
+                        "yaml_edit:lines_volume_divisor", "yaml_edit:revert"):
+                self.assertEqual(
+                    ye[key], W[key],
+                    msg=f"{rel}:{key} = {ye[key]} != DEFAULT_WEIGHTS {W[key]}")
+            # Dead key must not reappear in any config.
+            self.assertNotIn("yaml_edit:contributors_rebalance", ye, msg=rel)
+            # bulk_item_threshold must be present in both (config + template).
+            self.assertEqual(ye["bulk_item_threshold"], 5, msg=rel)
 
 
 # ─── Integration test with real git repo ────────────────────────────────────
@@ -309,9 +379,14 @@ class TestCollectIntegration(unittest.TestCase):
         )
         sigs = collect_yaml_edit_signals(self.edpa, "PI-2026-1.1")
         self.assertIn("S-1", sigs)
-        # Original create signal would be 5.0; with discount, ~0.5.
+        # Create signal (D-36: 2.0) × bulk_migration_discount (0.1) ≈ 0.2.
         s1 = sigs["S-1"][0]
         self.assertLess(s1["weight"], 1.0)
+        self.assertAlmostEqual(
+            s1["weight"],
+            round(s1["raw_weight"] * W["bulk_migration_discount"], 2),
+            places=2,
+        )
         self.assertIn("bulk_discount", s1["tags"])
 
     def test_chore_evidence_commit_not_scored(self):

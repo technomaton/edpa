@@ -158,6 +158,58 @@ def test_resolve_person_by_github_login_prefix(repo: Path) -> None:
     assert le._resolve_person("bob@notlisted.io", "B", people) == "bob"
 
 
+# ─── Calibrated-weight load (D-35) ────────────────────────────────────────
+
+
+def _write_cw_heuristics(repo: Path, commit_author: float = 4.00) -> None:
+    """Write a cw_heuristics.yaml whose calibrated anchor lives under the
+    canonical ``signals:`` block (the same key detect_contributors.py and
+    calibrate_signals.py use)."""
+    (repo / ".edpa" / "config" / "cw_heuristics.yaml").write_text(
+        yaml.safe_dump({
+            "schema_version": "1.0",
+            "signals": {
+                "commit_author": commit_author,
+                "pr_reviewer": 2.17,
+                "issue_comment": 1.46,
+            },
+        }), encoding="utf-8")
+
+
+def test_load_weights_reads_signals_block(repo: Path) -> None:
+    """D-35: _load_weights must read the calibrated anchor from the
+    ``signals:`` block (cw_heuristics single source), NOT a non-existent
+    ``signal_weights:`` key — otherwise commit_author silently falls back
+    to the stale 2.78 default instead of the calibrated 4.00."""
+    _write_cw_heuristics(repo, commit_author=4.00)
+    weights = le._load_weights(repo / ".edpa")
+    assert weights["commit_author"] == 4.00
+
+
+def test_build_signals_emits_calibrated_commit_author_weight(repo: Path) -> None:
+    """D-35 end-to-end: with a signals: block present, the emitted
+    commit_author signal must carry weight 4.00 (and raw_weight 4.00)."""
+    _write_cw_heuristics(repo, commit_author=4.00)
+    sha = _make_commit(repo, "S-1: implement login",
+                       [("src/login.py", "# code\n")])
+    commit = le._head_commit(repo)
+    weights = le._load_weights(repo / ".edpa")
+    sigs = le.build_signals(commit, ["S-1"], "alice", weights)
+    ca = [s["signal"] for s in sigs if s["signal"]["type"] == "commit_author"]
+    assert ca, "no commit_author signal emitted"
+    assert ca[0]["weight"] == 4.00
+    assert ca[0]["raw_weight"] == 4.00
+
+
+def test_load_weights_no_config_uses_calibrated_default(repo: Path) -> None:
+    """D-35: even config-less, the DEFAULT_WEIGHTS fallback for
+    commit_author must match the calibrated anchor (4.00), so a project
+    without a cw_heuristics.yaml is not silently under-weighting commits."""
+    (repo / ".edpa" / "config" / "cw_heuristics.yaml").unlink(missing_ok=True)
+    weights = le._load_weights(repo / ".edpa")
+    assert weights["commit_author"] == 4.00
+
+
 # ─── End-to-end emit + commit ─────────────────────────────────────────────
 
 
