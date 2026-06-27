@@ -500,12 +500,16 @@ Do not store as GitHub field: Iteration Capacity, Derived Hours, FTE, signature 
 | 5 | Velocity Tracker | Iteration/PI close | Velocity JSON + dashboard |
 
 ### 9.3 Branch Naming
+Branch naming is a **soft convention**, not a CI gate — attribution flows from
+the Conventional-Commit scope (`fix(D-30): …`), never from the branch name, so
+auto-generated branches (Claude Code worktrees, bots, release tooling) are left
+alone. A loose, readable shape if you want one:
 ```text
+defect/D-30-lockfile-stamp
 feature/S-200-omop-parser
-bugfix/S-215-upload-validation
-feature/F-102-anon-engine
 ```
-CI check blocks PRs without issue reference (S-XXX, F-XXX, E-XXX).
+What CI *does* enforce on PRs touching `.edpa/backlog/`: **ID-collision**
+detection (`edpa-collision-check.yml`; see `docs/dev-collisions.md`).
 
 ### 9.4 Definition of Ready
 No item enters delivery without: Issue Type, Parent, Job Size, BV+TC+RR, Owner. Contributor is required no later than entry into actual delivery evidence.

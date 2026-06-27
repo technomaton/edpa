@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **CI gates what actually matters: branch-name check removed, ID-collision
+  check dogfooded + distributed (D-37).** `edpa-branch-check.yml` enforced a
+  `{feature,defect,hotfix,chore}/{ID}` branch-name pattern that nothing in EDPA
+  reads — attribution flows from the Conventional-Commit scope in *commits*,
+  never from branch names — so it only produced false failures on
+  auto-generated branches (Claude Code worktrees, bots, the repo's own `fix/…`
+  branches). Removed it; branch naming is now a documented soft convention
+  (`plugin/rules/edpa-work-rules.md`, methodology §9.3, CONTRIBUTING). In its
+  place, the existing `edpa-collision-check.yml` PR gate (fails when a backlog
+  ID added by the PR already exists on the base branch, commenting with the
+  `renumber_collisions.py` fix) is now installed in this repo's own
+  `.github/workflows/` and distributed by `project_setup.py --with-ci` — the
+  server-side complement to the local pre-push hook, which can't catch two
+  sessions racing the same ID before either merges.
+
 ## 2.12.0 — 2026-06-27
 
 This release re-tunes commit-side scoring: `commit_author` now actually emits
