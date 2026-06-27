@@ -1,5 +1,73 @@
 # Changelog
 
+## 2.12.0 — 2026-06-27
+
+This release re-tunes commit-side scoring: `commit_author` now actually emits
+its calibrated anchor weight, and the `yaml_edit` family is re-pegged to that
+anchor. **Forward-only rollout — the new weights apply only to *future*
+commits, taking effect from the next iteration. Past iterations are not
+rescored:** historical `evidence[]` is frozen and signals are deduplicated by
+`ref`, so no already-recorded weight changes and no closed iteration's report
+moves. There is no migration step and none is needed.
+
+### Changed
+
+- **`commit_author` now emits the calibrated `4.00`, not the stale `2.78`
+  (D-35).** `local_evidence._load_weights` and
+  `sync_pr_contributions._load_weights` read a `signal_weights:` key that has
+  **never existed** in `cw_heuristics.yaml` — the calibrated base weights live
+  under the `signals:` block (the same key `detect_contributors` and
+  `/edpa:calibrate` use). The lookup therefore always missed and every commit
+  fell back to the hard-coded `DEFAULT_WEIGHTS` (`commit_author = 2.78`,
+  `pr_reviewer = 2.25`, `issue_comment = 1.14`), silently ignoring calibration.
+  Both loaders now read `signals:`, so the calibrated anchor (`commit_author =
+  4.00`, `pr_reviewer = 2.17`, `issue_comment = 1.46`) reaches new signals. The
+  in-code defaults were also bumped to match the calibrated values, so the
+  fallback path is no longer stale either. *Forward-only:* only commits made
+  from this version onward emit `4.00`; every `commit_author` weight already in
+  an item's `evidence[]` keeps its recorded value and no past report is
+  recomputed.
+- **`yaml_edit` weights re-tuned and pegged to the `commit_author = 4.00`
+  anchor (D-36).** The original `yaml_edit` weights (`create: 5.0`) were
+  anchored to the old `2.78` and let a single backlog YAML edit out-credit a
+  real code commit. They are halved/rescaled so `yaml_edit:create` lands at
+  half a code commit and the finer deltas scale down with it:
+  `create 5.0 → 2.0`, `block_add 2.0 → 1.0`, `list_grow 1.0 → 0.5`,
+  `scalar_change 0.5 → 0.25`, `lines_volume_cap 3.0 → 1.0`,
+  `lines_volume_divisor 30 → 40` (+40 lines = +1.0). `yaml_edit:revert` stays
+  at `-0.5`. Applied in lockstep across `yaml_edit_signals.DEFAULT_WEIGHTS`,
+  `.edpa/config/cw_heuristics.yaml`, and the `cw_heuristics.yaml.tmpl`
+  templates. *Forward-only:* every `yaml_edit` signal already written carries
+  its own materialized `weight`/`raw_weight` and is deduplicated by `ref`, so
+  re-tuning the defaults changes only signals emitted by future commits — no
+  past iteration is rescored.
+
+### Removed
+
+- **Dead `yaml_edit:contributors_rebalance` weight removed (D-36).** Since the
+  D-26 single-source refactor, `contributors[]` is a *derived* projection and
+  is never hand-edited as a scored signal, so `contributors_rebalance` (default
+  `0.3` per person added) was unreachable. It is dropped from
+  `DEFAULT_WEIGHTS`, the config, and the templates.
+
+### Added
+
+- **`bulk_item_threshold` knob for `yaml_edit` (D-36).** A commit that touches
+  more than `bulk_item_threshold` items (default `5`) is treated as bulk
+  seeding / back-fill and gets the `bulk_migration_discount` (`×0.1`) applied,
+  so a single mass backlog-authoring commit can no longer mint full-weight
+  `yaml_edit` credit across dozens of items. Wired through
+  `yaml_edit_signals.DEFAULT_WEIGHTS`, the config, and the templates.
+- **`validate_syntax` now bounds `yaml_edit_weights` (D-36).** A new
+  `validate_yaml_edit_weights` check (called from `validate_cw_heuristics`)
+  rejects any per-signal `yaml_edit:*` weight outside `[-2.0, 8.0]` — catching
+  fat-finger typos like `create: 50` or `scalar_change: 5` (where `0.25` was
+  meant) before they flood `cw`. The band dips below zero because
+  `yaml_edit:revert` is legitimately negative; the tuning knobs
+  (`lines_volume_divisor`, `list_grow_cap_per_commit`, `bulk_migration_discount`,
+  `bulk_item_threshold`) are exempt from the weight band and only required to be
+  numeric.
+
 ## 2.11.1 — 2026-06-22
 
 ### Fixed

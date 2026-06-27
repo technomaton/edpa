@@ -84,7 +84,7 @@ PREFIX_TO_DIR = {
 
 # Default weights — overridable via .edpa/config/cw_heuristics.yaml.
 DEFAULT_WEIGHTS = {
-    "commit_author": 2.78,
+    "commit_author": 4.00,
 }
 
 ENV_DISABLE = "EDPA_NO_LOCAL_EVIDENCE"
@@ -196,7 +196,12 @@ def _load_weights(edpa_root: Path) -> dict[str, float]:
         data = yaml.safe_load(h.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError:
         return dict(DEFAULT_WEIGHTS)
-    sig = data.get("signal_weights") or {}
+    # cw_heuristics single source: calibrated base weights live under the
+    # ``signals:`` block (same key detect_contributors / calibrate_signals
+    # use). The legacy ``signal_weights:`` key never existed in the file, so
+    # reading it silently dropped the override → commit_author fell back to
+    # the stale DEFAULT (D-35).
+    sig = data.get("signals") or {}
     return {**DEFAULT_WEIGHTS, **{k: float(v) for k, v in sig.items()}}
 
 
@@ -260,7 +265,7 @@ def build_signals(commit: dict, items: list[str], person_id: str,
         # 1. commit_author (always, once per commit per item). raw_weight mirrors
         #    weight so the audit trail keeps the original value when the D-29 gate
         #    later zeroes an out-of-iteration signal (same shape as yaml_edit).
-        ca_w = weights.get("commit_author", 2.78)
+        ca_w = weights.get("commit_author", DEFAULT_WEIGHTS["commit_author"])
         out.append({
             "item_id": iid,
             "signal": {
