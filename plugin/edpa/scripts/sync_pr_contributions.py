@@ -73,8 +73,8 @@ _ITEM_REF_RE = re.compile(r"\b([A-Z]{1,3}-\d{1,9})\b")
 # GH-side signals (pr_reviewer, issue_comment); commit_author is
 # emitted locally by local_evidence.py.
 DEFAULT_WEIGHTS = {
-    "pr_reviewer": 2.25,
-    "issue_comment": 1.14,
+    "pr_reviewer": 2.17,
+    "issue_comment": 1.46,
 }
 
 
@@ -123,7 +123,12 @@ def _load_weights(edpa_root: Path) -> dict[str, float]:
         data = yaml.safe_load(h.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError:
         return dict(DEFAULT_WEIGHTS)
-    sig = data.get("signal_weights") or {}
+    # cw_heuristics single source: calibrated base weights live under the
+    # ``signals:`` block (same key detect_contributors / calibrate_signals
+    # use). The legacy ``signal_weights:`` key never existed in the file, so
+    # reading it silently dropped the override → fell back to stale defaults
+    # (D-35).
+    sig = data.get("signals") or {}
     return {**DEFAULT_WEIGHTS, **{k: float(v) for k, v in sig.items()}}
 
 
