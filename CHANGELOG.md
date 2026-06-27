@@ -19,6 +19,20 @@
   server-side complement to the local pre-push hook, which can't catch two
   sessions racing the same ID before either merges.
 
+### Fixed
+
+- **`commit_author` / `agent_contribution` no longer credit every item ID merely
+  *mentioned* in a commit message (D-38).** `local_evidence` gave full weight to
+  every `X-N` token anywhere in the subject or body, so `fix(S-42): … (supersedes
+  S-7, see S-10)` awarded S-7 and S-10 the same delivery credit as S-42 —
+  accidental cross-credit (it once attributed a lockfile fix to an unrelated
+  foreign defect) and trivially gameable. Credit now follows *work*: full weight
+  only for items in the commit's leading scope (`fix(D-31):` or the bare `S-1:`
+  prefix) or whose backlog `.md` the commit changed. Other mentioned IDs are
+  recorded audit-only — `weight: 0`, tagged `referenced`, `raw_weight` retained —
+  the same zero-weight idiom as `out_of_iteration`; `detect_contributors` already
+  skips zero-weight signals, so no aggregation change.
+
 ## 2.12.0 — 2026-06-27
 
 This release re-tunes commit-side scoring: `commit_author` now actually emits

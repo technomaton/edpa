@@ -263,6 +263,40 @@ def test_emit_keeps_contribute_weight_above_ten(repo: Path) -> None:
     assert manual[0]["weight"] == 13.0
 
 
+def test_referenced_only_id_is_audit_only(repo: Path) -> None:
+    """D-38: an item that only *appears* in the message (not in the leading
+    scope, and its backlog .md not changed) is recorded audit-only —
+    commit_author weight 0, tagged ``referenced`` — so a 'see also / supersedes
+    / renumbered from X' mention never inflates X's credit. The scoped item
+    keeps full weight, and the agent / ``/contribute`` extras never leak onto
+    the mention."""
+    msg = ("fix(S-1): real work\n\n"
+           "renumbered from S-2; see S-2 for context\n"
+           "/contribute @bob weight:2\n"
+           "Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>")
+    _make_commit(repo, msg, [("src/login.py", "# code\n")])
+    assert _run_emitter(repo) == 0
+
+    # S-1 (leading scope): full-weight commit_author + agent + manual, untagged.
+    s1 = load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+    ca1 = [s for s in s1 if s["type"] == "commit_author"]
+    assert ca1 and all(s["weight"] > 0 for s in ca1)
+    assert all("referenced" not in s.get("tags", []) for s in ca1)
+    assert any(s["type"] == "agent_contribution" for s in s1)
+    assert any(s["type"] == "manual:commit_message" for s in s1)
+
+    # S-2 (mentioned only): commit_author recorded but weight 0 + referenced tag,
+    # raw_weight kept; NO agent/manual credit leaks onto a mere reference.
+    s2 = load_md(repo / ".edpa/backlog/stories/S-2.md")["evidence"]
+    ca2 = [s for s in s2 if s["type"] == "commit_author"]
+    assert ca2, "the reference must still be recorded for audit"
+    assert all(s["weight"] == 0 for s in ca2)
+    assert all("referenced" in s.get("tags", []) for s in ca2)
+    assert all(s.get("raw_weight") for s in ca2)
+    assert not [s for s in s2
+                if s["type"] in ("agent_contribution", "manual:commit_message")]
+
+
 def test_emit_dedupes_across_runs(repo: Path) -> None:
     """Running the emitter twice on the same HEAD → no duplicates."""
     _make_commit(repo, "S-1: tweak", [("a.txt", "a\n")])
