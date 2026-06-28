@@ -117,12 +117,15 @@ def test_coauthor_re_no_match_empty():
 # ---------------------------------------------------------------------------
 
 def _fake_commit(body: str, items: list[str] | None = None) -> dict:
+    items = items or ["S-1"]
     return {
         "sha": "abc1234" + "0" * 33,
         "parents": ["parent0"],
         "author_email": "user@example.com",
         "author_name": "Test User",
-        "subject": "feat(S-1): test commit",
+        # D-38: build_signals only credits leading-scope (or .md-changed) items,
+        # so scope the commit on exactly the items under test.
+        "subject": f"feat({','.join(items)}): test commit",
         "body": body,
         "changed_files": [],
     }
@@ -162,7 +165,7 @@ def test_build_signals_deduplicates_same_agent():
 
 def test_build_signals_ref_contains_agent():
     body = "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
-    commit = _fake_commit(body)
+    commit = _fake_commit(body, ["S-99"])
     sigs = build_signals(commit, ["S-99"], "bob", {})
     agent_sigs = [s for s in sigs if s["signal"]["type"] == "agent_contribution"]
     assert "claude-opus-4-8" in agent_sigs[0]["signal"]["ref"]
@@ -170,7 +173,10 @@ def test_build_signals_ref_contains_agent():
 
 def test_build_signals_multiple_items_each_get_agent_sig():
     body = "Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
-    commit = _fake_commit(body)
+    # Both items are in the leading scope → both are worked-on, so each earns an
+    # agent_contribution (D-38: credit follows scope/changed-files, not a bare
+    # mention).
+    commit = _fake_commit(body, ["S-1", "S-2"])
     sigs = build_signals(commit, ["S-1", "S-2"], "alice", {})
     item_ids_with_agent = {s["item_id"] for s in sigs
                            if s["signal"]["type"] == "agent_contribution"}

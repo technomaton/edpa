@@ -13,17 +13,19 @@ Thank you for your interest in contributing to EDPA!
 ### Pull Requests
 
 1. Fork the repository
-2. Create a feature branch following EDPA naming: `feature/S-XXX-description`
+2. Create a branch — any short name works; attribution comes from the commit scope, not the branch
 3. Make your changes
 4. Run tests: `python3 -m pytest tests/`
 5. Submit a PR using the PR template
 
 ### Branch Naming
 
-Follow EDPA conventions:
+A **soft** convention — not CI-enforced. Attribution comes from the
+Conventional-Commit scope (see below), not the branch name, so worktree/bot
+branches are fine as-is. A readable shape if you want one:
 ```
+defect/D-15-fix-invariant-check
 feature/S-200-new-signal-type
-bugfix/B-15-fix-invariant-check
 ```
 
 ### Commit Conventions

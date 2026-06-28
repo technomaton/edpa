@@ -37,6 +37,17 @@ Accepted types (Angular convention): `feat`, `fix`, `docs`, `style`,
 scope for breaking changes. The ticket ID in the scope is what the
 commit-msg hook + `local_evidence.py` parse to attribute work.
 
+## Branch naming (soft)
+
+Branch names are **not** governed by these rules and are **not** CI-enforced.
+Attribution flows from the Conventional-Commit **scope** in each commit, never
+from the branch name — so auto-generated branches (Claude Code worktrees, bots,
+release tooling) are fine as-is. If you want a convention, use
+`{cc-type}/{ID}-{slug}` (e.g. `defect/D-30-lockfile-stamp`), but it carries no
+weight in the evidence pipeline. What *is* enforced: the commit-msg ticket check
+(every commit attributes to an item) and, on PRs touching `.edpa/backlog/`,
+ID-collision detection (`edpa-collision-check.yml`).
+
 ## Before making any code change
 
 1. **Check the backlog** for an existing ticket that covers the work:

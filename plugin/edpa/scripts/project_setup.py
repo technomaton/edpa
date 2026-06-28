@@ -13,8 +13,8 @@ What it does:
   3. Seed ``.edpa/config/people.yaml`` + ``.edpa/config/edpa.yaml`` from
      ``plugin/edpa/templates/*.tmpl`` if missing (idempotent).
   4. Seed ``.edpa/config/id_counters.yaml`` from existing file IDs.
-  5. Optionally copy the CI workflow template (``--with-ci``) to
-     ``.github/workflows/edpa-contribution-sync.yml`` so the engine
+  5. Optionally copy the CI workflow templates (``--with-ci``) to
+     ``.github/workflows/`` (edpa-contribution-sync + edpa-collision-check) so the engine
      can read PR signals materialized from PR events.
   6. Optionally install git hooks (``--with-hooks``) — pre-commit + pre-push
      ID safety, commit-msg ticket-attached, post-commit local-evidence. Detects
@@ -240,22 +240,34 @@ def seed_id_counters(root: Path) -> None:
         info(f"current max IDs: {nonzero}")
 
 
+# CI workflows distributed to EDPA-governed projects. contribution-sync
+# materializes PR signals after merge; collision-check gates duplicate IDs
+# on the PR (the server-side complement to the local pre-push hook — local
+# hooks can't catch a push that races another session's same-ID push, D-37).
+_CI_WORKFLOWS = ("edpa-contribution-sync.yml", "edpa-collision-check.yml")
+
+
 def install_ci_workflow(root: Path) -> bool:
     templates = _find_templates_dir(root)
-    src = templates / "github-workflows" / "edpa-contribution-sync.yml"
-    if not src.exists():
-        warn(f"CI workflow template missing — skipping ({src})")
-        return False
     dst_dir = root / ".github" / "workflows"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / "edpa-contribution-sync.yml"
-    if dst.exists():
-        info(f"{dst.relative_to(root)} already present — leaving as-is")
-        return True
-    shutil.copy(src, dst)
-    ok(f"Copied CI workflow → {dst.relative_to(root)}")
-    info("PR signals will be materialized into YAML after merge")
-    return True
+    any_ok = False
+    for name in _CI_WORKFLOWS:
+        src = templates / "github-workflows" / name
+        if not src.exists():
+            warn(f"CI workflow template missing — skipping ({src})")
+            continue
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        dst = dst_dir / name
+        if dst.exists():
+            info(f"{dst.relative_to(root)} already present — leaving as-is")
+            any_ok = True
+            continue
+        shutil.copy(src, dst)
+        ok(f"Copied CI workflow → {dst.relative_to(root)}")
+        any_ok = True
+    if any_ok:
+        info("PR signals materialized after merge; duplicate IDs gated on PR")
+    return any_ok
 
 
 def install_rules(root: Path) -> bool:
@@ -467,7 +479,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--with-ci", action="store_true",
-        help="Copy edpa-contribution-sync.yml to .github/workflows/",
+        help="Copy EDPA CI workflows (contribution-sync + collision-check) to .github/workflows/",
     )
     parser.add_argument(
         "--with-hooks", action="store_true",

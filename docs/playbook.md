@@ -792,7 +792,7 @@ V2 ma **jediny** volitelny workflow (jen s `--with-ci`):
 |----------|---------|--------|
 | `edpa-contribution-sync.yml` | po merge PR | `sync_pr_contributions.py` materializuje PR-thread signaly (`pr_reviewer`, `issue_comment`) do `evidence[]` |
 
-> **Odstraneno v 2.0.0:** `edpa-sync-projects-to-git.yml`, `edpa-sync-git-to-projects.yml` — obousmerny sync neexistuje. Iteration close se spousti lokalne (stale kopie `edpa-iteration-close.yml` a V1 adresar `plugin/edpa/workflows/` definitivne odstraneny v 2.7.0). `edpa-branch-check.yml` v repu EDPA zustava jako volitelna PR kontrola konvence nazvu vetvi; neni soucasti V2 instalace.
+> **Odstraneno v 2.0.0:** `edpa-sync-projects-to-git.yml`, `edpa-sync-git-to-projects.yml` — obousmerny sync neexistuje. Iteration close se spousti lokalne (stale kopie `edpa-iteration-close.yml` a V1 adresar `plugin/edpa/workflows/` definitivne odstraneny v 2.7.0). `edpa-branch-check.yml` byl odstranen (D-37) — pojmenovani vetvi je nove mekka konvence, ne CI gate (atribuce jde z commit scope, ne z nazvu vetve). PR nove hlida ID kolize pres `edpa-collision-check.yml` (distribuovany s `--with-ci`).
 
 ---
 
