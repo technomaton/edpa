@@ -227,6 +227,18 @@ def detect_items(commit: dict) -> list[str]:
     return ids
 
 
+def _scope_item_ids(subject: str) -> set[str]:
+    """Item IDs in the commit's *leading scope* — the part of the subject before
+    the first ``:``. Covers Conventional-Commit ``fix(D-31):`` and the bare
+    ``S-1:`` prefix alike. Empty when the subject has no colon (no leading scope
+    to credit). Used by build_signals to separate worked-on items from mere
+    mentions (D-38)."""
+    head, sep, _rest = (subject or "").partition(":")
+    if not sep:
+        return set()
+    return set(_ITEM_REF_RE.findall(head))
+
+
 def find_item_path(edpa_root: Path, item_id: str) -> Path | None:
     prefix = item_id.split("-", 1)[0]
     dir_name = PREFIX_TO_DIR.get(prefix)
@@ -260,12 +272,41 @@ def build_signals(commit: dict, items: list[str], person_id: str,
         for m in _AGENT_COAUTHOR_RE.findall(body)
     ]
 
+    # D-38: credit follows WORK, not mere mention. An item earns full
+    # commit_author / agent_contribution / `/contribute` weight only if it is in
+    # the commit's leading scope (`fix(D-31):` or bare `S-1:`) OR its backlog .md
+    # was changed by this commit. IDs that merely appear elsewhere in the message
+    # (a "see also" / "supersedes" / "renumbered from X" reference) are recorded
+    # audit-only — weight 0, tagged ``referenced`` — so they never inflate X's
+    # credit (otherwise naming N items credits all N at full weight: gameable +
+    # accidental cross-credit). Same zero-weight idiom as out_of_iteration;
+    # detect_contributors skips zero-weight signals, so no aggregation change.
+    ca_w = weights.get("commit_author", DEFAULT_WEIGHTS["commit_author"])
+    weighted = _scope_item_ids(commit["subject"])
+    for _path in commit["changed_files"]:
+        _m = _BACKLOG_PATH_RE.search(_path)
+        if _m:
+            weighted.add(_m.group(2))
+
     out: list[dict] = []
     for iid in items:
+        if iid not in weighted:
+            out.append({
+                "item_id": iid,
+                "signal": {
+                    "type": "commit_author",
+                    "person": person_id,
+                    "weight": 0,
+                    "raw_weight": ca_w,
+                    "ref": f"commit/{short}",
+                    "at": iso,
+                    "tags": ["referenced"],
+                },
+            })
+            continue
         # 1. commit_author (always, once per commit per item). raw_weight mirrors
         #    weight so the audit trail keeps the original value when the D-29 gate
         #    later zeroes an out-of-iteration signal (same shape as yaml_edit).
-        ca_w = weights.get("commit_author", DEFAULT_WEIGHTS["commit_author"])
         out.append({
             "item_id": iid,
             "signal": {

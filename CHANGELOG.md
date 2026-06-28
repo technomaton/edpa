@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 2.12.1 — 2026-06-28
+
+Hardening fixes surfaced by a parallel-session ID collision: CI now gates the
+right thing (duplicate IDs, not branch names) and commit attribution credits the
+item actually worked on, not every item ID mentioned in the message.
 
 ### Changed
 
