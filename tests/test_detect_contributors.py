@@ -402,3 +402,64 @@ def test_excerpt_for_finds_matching_line():
 
 def test_excerpt_for_returns_empty_when_no_match():
     assert dc._excerpt_for("just text, no directives", "alice") == ""
+
+
+# ─── cmd_item exit code (D-41) ──────────────────────────────────────────────
+#
+# `return 0 if (changed or n == 0) else 0` had a dead else branch — both
+# arms returned 0, so `--item` callers could never see the "signals were
+# detected but nothing was updated" failure mode. These tests pin the
+# chosen contract: 0 = updated or nothing to do; 1 = signals present but
+# no contributors[] update happened.
+
+
+def _item_workspace(tmp_path, evidence):
+    """Minimal .edpa/ with people.yaml and one story carrying evidence[]."""
+    root = _people_root(tmp_path, [{"id": "alice", "email": "a@x"}])
+    stories = root / "backlog" / "stories"
+    stories.mkdir(parents=True)
+    fm = {"id": "S-1", "type": "Story", "title": "Login", "status": "Done"}
+    if evidence is not None:
+        fm["evidence"] = evidence
+    (stories / "S-1.md").write_text(
+        "---\n" + yaml.safe_dump(fm) + "---\n", encoding="utf-8")
+    return root
+
+
+def test_cmd_item_returns_zero_when_updated(tmp_path):
+    """Fresh evidence → contributors[] written → exit 0."""
+    root = _item_workspace(tmp_path, [
+        {"type": "commit_author", "person": "alice", "weight": 4.0,
+         "ref": "commit/abc1234", "at": "2026-05-08T12:00:00Z"},
+    ])
+    assert dc.cmd_item(root, "", "S-1", None) == 0
+    text = (root / "backlog" / "stories" / "S-1.md").read_text(encoding="utf-8")
+    assert "contributors:" in text
+
+
+def test_cmd_item_returns_zero_when_no_signals(tmp_path):
+    """0 signals is the documented warn-and-skip path — not a failure."""
+    root = _item_workspace(tmp_path, None)
+    assert dc.cmd_item(root, "", "S-1", None) == 0
+
+
+def test_cmd_item_returns_one_when_aggregation_yields_nobody(tmp_path):
+    """Signals detected but all zero-weight (analytics-only) → aggregation
+    produces no contributors → exit 1 so CI can flag the item."""
+    root = _item_workspace(tmp_path, [
+        {"type": "state_transition", "person": "alice", "weight": 0,
+         "ref": "commit/x/S-1/Implementing->Done",
+         "at": "2026-05-08T12:00:00Z"},
+    ])
+    assert dc.cmd_item(root, "", "S-1", None) == 1
+
+
+def test_cmd_item_returns_one_on_idempotent_rerun(tmp_path):
+    """Second run over unchanged evidence is a no-op recompute → exit 1
+    ('ran but changed nothing'), distinguishing it from the first run's 0."""
+    root = _item_workspace(tmp_path, [
+        {"type": "commit_author", "person": "alice", "weight": 4.0,
+         "ref": "commit/abc1234", "at": "2026-05-08T12:00:00Z"},
+    ])
+    assert dc.cmd_item(root, "", "S-1", None) == 0
+    assert dc.cmd_item(root, "", "S-1", None) == 1

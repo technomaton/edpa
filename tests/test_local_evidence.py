@@ -232,6 +232,35 @@ def test_emit_creates_evidence_and_followup_commit(repo: Path) -> None:
     assert log.startswith("chore(evidence):")
 
 
+def test_evidence_commit_leaves_unrelated_staged_work_alone(repo: Path) -> None:
+    """D-41: the chore(evidence): auto-commit must be pathspec-limited to the
+    backlog .md files it touched. A user who stages A+B but commits only A
+    (``git commit -- A``) must find B still staged afterwards — previously the
+    bare ``git commit`` swallowed B into the evidence commit, mis-attributing
+    unrelated WIP under an auto prefix the ticket hook whitelists."""
+    (repo / "fileA.txt").write_text("a\n")
+    (repo / "fileB.txt").write_text("b\n")
+    _git(["add", "fileA.txt", "fileB.txt"], cwd=repo)
+    _git(["commit", "-q", "-m", "feat(S-1): partial commit", "--", "fileA.txt"],
+         cwd=repo)
+    assert _run_emitter(repo) == 0
+
+    # Follow-up evidence commit exists and contains ONLY the backlog .md.
+    subject = _git(["log", "-1", "--format=%s"], cwd=repo).stdout.strip()
+    assert subject.startswith("chore(evidence):")
+    committed = _git(["show", "--name-only", "--format=", "HEAD"],
+                     cwd=repo).stdout.split()
+    assert committed == [".edpa/backlog/stories/S-1.md"]
+
+    # The unrelated staged file survived, still staged — not swept.
+    staged = _git(["diff", "--cached", "--name-only"], cwd=repo).stdout.split()
+    assert staged == ["fileB.txt"]
+
+    # Evidence content itself landed intact.
+    sigs = load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+    assert any(s["type"] == "commit_author" for s in sigs)
+
+
 def test_emit_parses_contribute_directive(repo: Path) -> None:
     body_msg = ("S-1: implement\n\nLong rationale.\n"
                 "/contribute @bob weight:1.5")
