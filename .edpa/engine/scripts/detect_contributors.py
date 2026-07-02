@@ -787,7 +787,7 @@ def _parse_relative_since(since: str) -> datetime | None:
             delta = timedelta(days=30 * n)
         return datetime.now(timezone.utc) - delta
     try:
-        return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).replace(tzinfo=timezone.utc)
     except ValueError:
         return None
 

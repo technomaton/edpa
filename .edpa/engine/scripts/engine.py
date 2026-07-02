@@ -638,7 +638,7 @@ def _in_window(at, start, end) -> bool:
     if not at:
         return True
     try:
-        ts = datetime.fromisoformat(at).astimezone(timezone.utc)
+        ts = datetime.fromisoformat(at.replace("Z", "+00:00")).astimezone(timezone.utc)
     except (ValueError, TypeError):
         return True
     if start and ts < start:
