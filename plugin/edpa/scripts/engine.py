@@ -408,6 +408,22 @@ def load_heuristics(edpa_root):
     return {"evidence_threshold": 1.0, "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15}}
 
 
+def _coerce_js(value):
+    """Coerce a frontmatter js/job_size value to a number, or None.
+
+    Hand-edited items may quote the scalar (``js: "5"``); validate_syntax.py
+    accepts any float-coercible value, so the engine must not crash on
+    validator-blessed input (D-42). Non-numeric values return None —
+    callers warn and skip the item instead of raising.
+    """
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def load_backlog_items(edpa_root, iteration_id=None):
     """Read .edpa/backlog/ YAML files and convert to engine item format.
 
@@ -456,7 +472,9 @@ def load_backlog_items(edpa_root, iteration_id=None):
                 continue
 
             item_id = data.get("id", md_file.stem)
-            status = data.get("status", "")
+            # A present-but-blank `status:` parses as None — guard with the
+            # same idiom as load_story_activity_events (D-42).
+            status = data.get("status") or ""
 
             # Filter: only Done items
             if status.lower() not in ("done", "closed", "accepted"):
@@ -475,7 +493,14 @@ def load_backlog_items(edpa_root, iteration_id=None):
                     item_type, item_iter, iteration_id):
                 continue
 
-            js = data.get("js") or data.get("job_size", 0)
+            raw_js = data.get("js") or data.get("job_size", 0)
+            js = _coerce_js(raw_js)
+            if js is None:
+                schema_warnings.append(
+                    f"{item_id}: js must be numeric (got {raw_js!r} "
+                    f"in {md_file}) — item skipped"
+                )
+                continue
             if not js or js <= 0:
                 continue
 
@@ -781,7 +806,15 @@ def load_story_activity_events(edpa_root, iteration_id, heuristics,
         sigs = yaml_edit_signals.get(story_id) or []
         if not sigs:
             continue
-        js = data.get("js") or data.get("job_size") or 0
+        raw_js = data.get("js") or data.get("job_size") or 0
+        js = _coerce_js(raw_js)
+        if js is None:
+            print(
+                f"WARN: {story_id}: js must be numeric (got {raw_js!r} in "
+                f"{story_path}) — story activity skipped",
+                file=sys.stderr,
+            )
+            continue
         if js <= 0:
             continue
 
@@ -881,7 +914,15 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
         if not parent_file.is_file():
             continue
         parent = load_yaml(parent_file) or {}
-        parent_js = parent.get("js") or parent.get("job_size") or 0
+        raw_js = parent.get("js") or parent.get("job_size") or 0
+        parent_js = _coerce_js(raw_js)
+        if parent_js is None:
+            print(
+                f"WARN: {t['item_id']}: js must be numeric (got {raw_js!r} in "
+                f"{parent_file}) — gate event skipped",
+                file=sys.stderr,
+            )
+            continue
         if parent_js <= 0:
             continue
 
