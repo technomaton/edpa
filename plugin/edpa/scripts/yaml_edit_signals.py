@@ -472,7 +472,7 @@ def _parse_yaml_edit_log(log: str, weights: dict | None, people: list,
             except ValueError:
                 continue
             cur_sha = sha
-            cur_ts = datetime.fromisoformat(ts_iso).astimezone(timezone.utc)
+            cur_ts = datetime.fromisoformat(ts_iso.replace("Z", "+00:00")).astimezone(timezone.utc)
             cur_email = email
             cur_subject = subject
             cur_file = None

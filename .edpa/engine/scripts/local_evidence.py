@@ -749,7 +749,7 @@ def main(argv=None) -> int:
             from datetime import datetime
             from transitions import find_iteration_for_timestamp
             commit_iter = find_iteration_for_timestamp(
-                edpa_root, datetime.fromisoformat(iso))
+                edpa_root, datetime.fromisoformat(iso.replace("Z", "+00:00")))
         except (ValueError, KeyError, TypeError):
             commit_iter = None
 

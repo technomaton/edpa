@@ -119,7 +119,7 @@ def collect_evidence(repo: Path, branch: str) -> dict[str, list[dict]]:
 
 
 def _to_utc_z(iso: str) -> str:
-    return (datetime.fromisoformat(iso).astimezone(timezone.utc)
+    return (datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(timezone.utc)
             .strftime("%Y-%m-%dT%H:%M:%SZ"))
 
 
@@ -160,7 +160,7 @@ def build_report(repo: Path, edpa_root: Path, branch: str | None = None,
             continue  # no evidence, not Done — backlog item not started, fine
 
         latest = ev[0]
-        latest_dt = datetime.fromisoformat(latest["date"])
+        latest_dt = datetime.fromisoformat(latest["date"].replace("Z", "+00:00"))
         released = _in_release_tag(repo, latest["sha"])
         is_stale = (now - latest_dt.astimezone(timezone.utc)
                     ) >= timedelta(days=stale_days)

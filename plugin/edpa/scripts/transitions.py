@@ -71,7 +71,7 @@ def parse_since(value: str) -> datetime:
             delta = timedelta(days=30 * n)
         return datetime.now(timezone.utc) - delta
     # Fall back to ISO YYYY-MM-DD
-    return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(s.replace("Z", "+00:00")).replace(tzinfo=timezone.utc)
 
 
 def parse_until(value: str) -> datetime:
@@ -87,7 +87,7 @@ def parse_until(value: str) -> datetime:
         # relative --until still feels like "include the whole day".
         dt = parse_since(s)
         return dt.replace(hour=23, minute=59, second=59)
-    return datetime.fromisoformat(s).replace(
+    return datetime.fromisoformat(s.replace("Z", "+00:00")).replace(
         hour=23, minute=59, second=59, tzinfo=timezone.utc,
     )
 
@@ -122,8 +122,8 @@ def parse_iteration_dates(iter_yaml: Path):
     iso_end = it.get("end_date")
     if not (iso_start and iso_end):
         raise ValueError(f"{iter_yaml.name}: start_date/end_date missing")
-    start_raw = datetime.fromisoformat(str(iso_start))
-    end_raw = datetime.fromisoformat(str(iso_end))
+    start_raw = datetime.fromisoformat(str(iso_start).replace("Z", "+00:00"))
+    end_raw = datetime.fromisoformat(str(iso_end).replace("Z", "+00:00"))
     # Date-only (naive) inputs are read as UTC wall-clock: start at midnight,
     # end snapped to end-of-day. An input that already carries a tz offset is
     # CONVERTED to the same UTC instant (not clobbered via .replace), so the
@@ -245,7 +245,7 @@ def _parse_transition_log(log: str, since: datetime = None, until: datetime = No
         if line.startswith("__COMMIT__|"):
             _, sha, ts, author = line.split("|", 3)
             cur_commit = sha
-            cur_ts = datetime.fromisoformat(ts)
+            cur_ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
             cur_author = author
             cur_file = None
             pending_minus = None
@@ -346,7 +346,7 @@ def transition_to_signal(t: dict, person_id):
 
 def annotate_with_iterations(edpa_root: Path, transitions):
     for t in transitions:
-        ts = datetime.fromisoformat(t["changed_at"])
+        ts = datetime.fromisoformat(t["changed_at"].replace("Z", "+00:00"))
         t["iteration_id"] = find_iteration_for_timestamp(edpa_root, ts)
     return transitions
 
