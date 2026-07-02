@@ -7,9 +7,18 @@
 # When installed via curl|sh (install.sh), run manually after install:
 #   pip3 install -r .claude/requirements.txt
 # or invoke `/edpa:setup` (Claude Code) which delegates to project_setup.py.
+#
+# Set EDPA_NO_AUTO_DEPS=1 to skip the SessionStart auto-install entirely
+# (mirrors the auto_update_engine opt-out for the engine vendor hook).
+#
+# Upper bounds are deliberate: the hook installs into the user's shared
+# environment, so a breaking new major must not be auto-pulled onto every
+# fresh install. (ruamel.yaml breaks API across 0.x minors — cap at the
+# first minor above the range the suite runs on.) Bump caps consciously,
+# with a test run.
 
-PyYAML>=6.0
-ruamel.yaml>=0.18
-mcp>=1.0
-openpyxl>=3.1
-filelock>=3.12
+PyYAML>=6.0,<7
+ruamel.yaml>=0.18,<0.20
+mcp>=1.0,<2
+openpyxl>=3.1,<4
+filelock>=3.12,<4
