@@ -1,6 +1,6 @@
 ---
 description: Update fields on a backlog item (iteration, js, WSJF inputs, assignee, title) with before/after diff
-allowed-tools: Read, Bash
+allowed-tools: Read, Bash, mcp__plugin_edpa_edpa__edpa_item, mcp__plugin_edpa_edpa__edpa_item_update, mcp__plugin_edpa_edpa__edpa_item_link_parent
 model: sonnet
 ---
 

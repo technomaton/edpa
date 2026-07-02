@@ -159,6 +159,25 @@ TYPE_DIRS = {
     "Event":      "events",
     "Risk":       "risks",
 }
+# Read-side directory → type map for the edpa_backlog scan. Superset of the
+# write-path TYPE_DIRS: legacy/migrated projects may hold Task items under
+# backlog/tasks/ (first-class in backlog.py since D-3) — Tasks are readable,
+# filterable, and updatable via MCP, but not creatable (no "Task" in
+# TYPE_DIRS). The edpa_backlog schema "type" enum must stay equal to these
+# values — pinned by test_backlog_type_enum_matches_handler_dirs.
+BACKLOG_TYPE_DIRS = {
+    "stories":     "Story",
+    "features":    "Feature",
+    "epics":       "Epic",
+    "initiatives": "Initiative",
+    "defects":     "Defect",
+    "tasks":       "Task",
+    "events":      "Event",
+    "risks":       "Risk",
+}
+# Dirs scanned when locating an existing item file (read detail + write
+# tools) — every dir edpa_backlog scans, i.e. TYPE_DIRS values plus tasks/.
+ITEM_LOOKUP_DIRS = tuple(BACKLOG_TYPE_DIRS)
 PARENT_RULES = {
     "Initiative": None,
     "Epic":       "Initiative",
@@ -318,7 +337,8 @@ async def list_tools() -> list[Tool]:
                     "type": {
                         "type": "string",
                         "description": "Filter by item type.",
-                        "enum": ["Story", "Feature", "Epic", "Initiative"],
+                        "enum": ["Story", "Feature", "Epic", "Initiative",
+                                 "Defect", "Task", "Event", "Risk"],
                     },
                     "status": {
                         "type": "string",
@@ -364,7 +384,11 @@ async def list_tools() -> list[Tool]:
                     },
                     "level": {
                         "type": "string",
-                        "description": "Filter by item level.",
+                        "description": (
+                            "Filter by item level. Only delivery-tracked types "
+                            "(Story/Feature/Epic/Initiative) carry flow "
+                            "timestamps."
+                        ),
                         "enum": ["Story", "Feature", "Epic", "Initiative"],
                     },
                 },
@@ -1015,19 +1039,8 @@ def _handle_backlog(edpa_root: Path, iteration: str | None, type_filter: str | N
     if not backlog_dir.exists():
         return [TextContent(type="text", text="[]")]
 
-    type_dirs = {
-        "stories": "Story",
-        "features": "Feature",
-        "epics": "Epic",
-        "initiatives": "Initiative",
-        "defects": "Defect",
-        "tasks": "Task",
-        "events": "Event",
-        "risks": "Risk",
-    }
-
     items = []
-    for dir_name, level in type_dirs.items():
+    for dir_name, level in BACKLOG_TYPE_DIRS.items():
         type_dir = backlog_dir / dir_name
         if not type_dir.exists():
             continue
@@ -1064,13 +1077,20 @@ def _handle_backlog(edpa_root: Path, iteration: str | None, type_filter: str | N
 
 
 def _handle_item(edpa_root: Path, item_id: str) -> list[TextContent]:
+    # call_tool dispatch already validates via _dispatch_item; validate here
+    # too so direct callers cannot feed traversal strings into the path join.
+    safe_id = _safe_item_id(item_id)
+    if safe_id is None:
+        return _err(f"invalid item_id {item_id!r}")
+    item_id = safe_id
+
     backlog_dir = edpa_root / "backlog"
     if not backlog_dir.exists():
         return [TextContent(type="text", text=f"ERROR: Backlog not found.")]
 
     # Determine type directory from prefix
     prefix_map = {"S": "stories", "F": "features", "E": "epics", "I": "initiatives",
-                  "T": "stories", "D": "defects"}
+                  "T": "tasks", "D": "defects", "EV": "events", "R": "risks"}
     prefix = item_id.split("-")[0] if "-" in item_id else ""
     dir_name = prefix_map.get(prefix)
 
@@ -1245,11 +1265,13 @@ def _utc_now_iso() -> str:
 def _find_item_file(edpa_root: Path, item_id: str) -> Path | None:
     """Locate the .md file for item_id by scanning all backlog/{type}/ dirs.
 
-    Returns None if not found. Drops the YAML load cache for the item's
-    type dir so concurrent edits across MCP calls are not masked.
+    Scans ITEM_LOOKUP_DIRS (TYPE_DIRS values plus tasks/, so Task items in
+    legacy/migrated projects stay reachable). Returns None if not found.
+    Drops the YAML load cache for the item's type dir so concurrent edits
+    across MCP calls are not masked.
     """
     backlog = edpa_root / "backlog"
-    for type_dir in TYPE_DIRS.values():
+    for type_dir in ITEM_LOOKUP_DIRS:
         candidate = backlog / type_dir / f"{item_id}.md"
         if candidate.exists():
             return candidate

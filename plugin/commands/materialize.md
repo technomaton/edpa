@@ -1,6 +1,6 @@
 ---
 description: Materialize git-derived signals into evidence[] so the report equals the persisted snapshot
-allowed-tools: Read, Bash
+allowed-tools: Read, Bash, mcp__plugin_edpa_edpa__edpa_materialize
 model: sonnet
 ---
 
