@@ -11,7 +11,7 @@
 #                                 / Σ_persons contribution_score[*, item]
 #   → Σ_persons cw[*, item] = 1.0   (per-item invariant)
 #
-# Calibrate with `/edpa:calibrate` after collecting ≥20 ground-truth
+# Calibrate with `/edpa:autocalib` after collecting ≥20 ground-truth
 # CW records. Monte Carlo over the 3 signal weights, then Nelder-Mead
 # refinement around the best candidates. Lower MAD vs. ground truth
 # indicates a better calibration.
@@ -163,7 +163,7 @@ rules:
 # bias for strategic roles.
 
 # ─────────────────────────────────────────────────────────────────────
-# CALIBRATION METADATA — populated by /edpa:calibrate
+# CALIBRATION METADATA — populated by /edpa:autocalib
 # ─────────────────────────────────────────────────────────────────────
 calibration:
   method: "MC random-sample + coordinate descent"
@@ -181,7 +181,7 @@ calibration:
     30622 records). Ground truth was generated
     procedurally from a model where signal counts probabilistically
     reflect each person's true cw share with role-based bias.
-    Re-run /edpa:calibrate after first real PI close with team-confirmed
+    Re-run /edpa:autocalib after first real PI close with team-confirmed
     cw records to derive a real-data baseline.
 
     Weights post-calibration rescaled to set max signal weight = 4.0
