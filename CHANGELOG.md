@@ -1,20 +1,72 @@
 # Changelog
 
-## Unreleased
+## 2.13.0 — 2026-07-02
+
+Whole-repo remediation from a 50-agent audit (**F-126**), plus Python 3.10
+support, CI/test-infra guards, and OSS hygiene. Everything here already landed
+on `main` across ~110 commits; this entry is the human-readable rollup.
+
+### Added
+
+- **CI guards against the failure modes this batch fixed (S-243).** A
+  vendored-engine content-drift test (`.edpa/engine/` must match
+  `plugin/edpa/`), a web build job, release-tag validation, and a Python 3.10
+  test matrix — so the drift, downgrade, and py3.10 regressions can't return
+  silently.
+- **OSS hygiene (S-244).** `SECURITY.md`, GitHub issue templates, and
+  `.coverage` untracked from the repo.
+- **Contributor test infrastructure (S-245).** `tests/conftest.py`, a
+  tool-only `pyproject.toml`, and a CONTRIBUTING dev-setup guide.
+
+### Changed
+
+- **Plugin hooks no longer tax every repo (D-43).** SessionStart/PostToolUse
+  hooks are gated to EDPA projects, and the SessionStart dependency
+  auto-install is now opt-out, transparent, and capped — no more silent
+  `pip --break-system-packages` without consent.
+- **Engine & reports skills delegate to `engine.py` / `reports.py` (D-45)**
+  instead of re-deriving numbers by hand (ADR-003); setup-skill weight docs
+  un-drifted and pointed at `/edpa:autocalib`.
+- **Evidence auto-commit is pathspec-scoped (D-41)** so it can't sweep a user's
+  own staged work; the legacy `as:` contributor field (which `validate_syntax`
+  rejects) is no longer written; `detect_contributors --item` returns non-zero
+  when nothing changed.
+- **Python 3.10 support (D-50).** `datetime.fromisoformat` rejects Z-suffixed
+  timestamps on 3.10; the engine now normalises them across transitions,
+  evidence, and reconcile.
 
 ### Fixed
 
 - **SessionStart auto-vendor no longer downgrades the engine (D-49).** The
-  `update_engine.sh` hook re-vendored `.edpa/engine/` on *any* version mismatch
-  between the installed plugin and the project's committed
-  `.edpa/engine/VERSION`, treating the plugin as canonical in both directions.
-  A developer whose plugin lagged the repo (hadn't run `/plugin update`) had
-  their working tree silently downgraded — stale `scripts/schemas/templates`
-  rsync-clobbered over a newer committed engine — on every session start,
-  reproduced independently across the team. The hook now compares versions as
-  semver and vendors only *forward*: an older plugin is a no-op with a `run
-  /plugin update` nudge; upgrades and non-semver dev builds (`main`) are
-  unaffected. Regression test: `test_refuses_to_downgrade_when_plugin_older_than_project`.
+  `update_engine.sh` hook re-vendored `.edpa/engine/` on *any* version mismatch,
+  treating the installed plugin as canonical in both directions — so a
+  developer whose plugin lagged the repo's committed `.edpa/engine/VERSION` had
+  their working tree silently downgraded (stale `scripts/schemas/templates`
+  rsync-clobbered over a newer engine) on every session start, reproduced
+  independently across the team. The hook now compares versions as semver and
+  vendors only *forward*: an older plugin is a no-op with a `/plugin update`
+  nudge; upgrades and non-semver dev builds (`main`) are unaffected. Regression
+  test: `test_refuses_to_downgrade_when_plugin_older_than_project`.
+- **`install.sh` and engine vendoring (D-39).** Fixed the broken curl-fallback
+  tarball extraction, vendored `assets/` and `rules/` everywhere the engine is
+  vendored (they were silently dropped under a freshly stamped VERSION), removed
+  the dead `--with-server` probe, and added the missing `mcp` dependency to the
+  standalone pip line.
+- **Engine robustness (D-42).** Atomic `.md` item writes (tempfile +
+  `os.replace`), frontmatter reads hardened against blank/quoted YAML scalars,
+  preflight uses a list-argv subprocess (no `shell=True`), and dead V1 code
+  removed.
+- **`EDPA_TOKEN` secrets fallback restored (D-44)** in the contribution-sync
+  workflow — it was documented but wired nowhere.
+- **MCP surface drift (D-46).** `edpa_backlog` type enum, `T-`/`EV-`/`R-` ID
+  routing, `edpa_item` traversal guard, pi-planning argv, allowed-tools, and the
+  plugin README brought back in line with the engine.
+- **Docs & web rot (D-40, D-47, D-48).** README no longer teaches the removed V1
+  architecture (D-40); dead EN journey/tutorial nav, the language switcher, and
+  an orphaned docs hub cleaned up with the flow-metrics card pointed at
+  canonical `docs/mcp.md` (D-47); and a docs-rot batch fixed a methodology
+  contradiction, quick-start, timesheet naming, stale counts, and harness
+  READMEs (D-48).
 
 ## 2.12.1 — 2026-06-28
 
