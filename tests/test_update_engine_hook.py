@@ -94,6 +94,31 @@ def test_warm_path_no_update_when_versions_match(tmp_path):
     assert (tmp_path / ".edpa/engine/scripts/backlog.py").read_text() == "# pinned\n"
 
 
+# ─── Downgrade guard (D-49) ─────────────────────────────────────────────────
+
+
+def test_refuses_to_downgrade_when_plugin_older_than_project(tmp_path):
+    """A developer whose installed plugin is BEHIND the project's committed
+    engine must not have their working tree silently downgraded at
+    SessionStart. The hook vendors only forward (plugin strictly newer); an
+    older plugin is a no-op with a 'run /plugin update' nudge. Regression for
+    D-49 — an out-of-date plugin was rsync-clobbering a newer committed engine
+    on every session start, reproduced independently across developers."""
+    # Project engine is far AHEAD of the installed plugin version.
+    _seed_engine(tmp_path, version="99.0.0")
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    # Must NOT vendor / downgrade.
+    assert "updating engine" not in result.stderr
+    # VERSION left untouched — no downgrade to the older plugin version.
+    assert (tmp_path / ".edpa/engine/VERSION").read_text().strip() == "99.0.0"
+    # rsync --delete did not run: the seeded local script survives verbatim.
+    assert (tmp_path / ".edpa/engine/scripts/sync.py").read_text() == "# old\n"
+    # User is told why nothing happened and how to catch up.
+    assert "not downgrading" in result.stderr
+    assert "/plugin update" in result.stderr
+
+
 # ─── Legacy .yaml backlog warning ───────────────────────────────────────────
 
 
