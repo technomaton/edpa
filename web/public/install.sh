@@ -129,10 +129,12 @@ else
     | head -1 | cut -d'"' -f4) || true
 
   if [ -n "$RELEASE_URL" ]; then
+    # The release asset is rooted at plugin/ (release.yml tars `plugin/`),
+    # so extract into $TMPDIR/edpa — the payload lands at $TMPDIR/edpa/plugin
+    # exactly like the gh branch above.
+    mkdir -p "$TMPDIR/edpa"
+    curl -fsSL "$RELEASE_URL" | tar -xz -C "$TMPDIR/edpa"
     echo "Downloaded from latest release."
-    curl -fsSL "$RELEASE_URL" | tar -xz -C "$TMPDIR"
-    mkdir -p "$TMPDIR/edpa/plugin"
-    mv "$TMPDIR"/* "$TMPDIR/edpa/plugin/" 2>/dev/null || true
     PLUGIN_VERSION="latest-release"
   else
     echo "No release found, downloading main branch..."
