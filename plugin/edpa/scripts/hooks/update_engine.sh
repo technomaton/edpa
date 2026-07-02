@@ -2,10 +2,10 @@
 # SessionStart hook — auto-vendor engine into .edpa/engine/ when the
 # bundled plugin version diverges from the on-disk one.
 #
-# Mirrors the install.sh vendor path (scripts/schemas/templates +
-# VERSION pin) so users don't have to manually re-run /edpa:setup
-# after a `/plugin update`. Fast path is a single file compare
-# returning in <50ms.
+# Mirrors the install.sh / project_setup.py vendor set (scripts/schemas/
+# templates/assets + plugin rules + VERSION pin) so users don't have to
+# manually re-run /edpa:setup after a `/plugin update`. Fast path is a
+# single file compare returning in <50ms.
 #
 # Skip conditions (in order):
 #   1. CLAUDE_PLUGIN_ROOT unset — hook invoked outside Claude Code
@@ -94,17 +94,29 @@ fi
 echo "EDPA: updating engine $LOCAL_VERSION → $PLUGIN_VERSION..." >&2
 
 VENDOR() {
+  # $1 = engine subdir, $2 = optional source parent (default $PLUGIN_SRC).
+  # Missing sources are skipped so older plugin payloads stay valid.
+  _SRC="${2:-$PLUGIN_SRC}/$1"
+  if [ ! -d "$_SRC" ]; then
+    return 0
+  fi
   if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete "$PLUGIN_SRC/$1/" "$TARGET/$1/"
+    rsync -a --delete "$_SRC/" "$TARGET/$1/"
   else
     rm -rf "$TARGET/$1"
-    cp -R "$PLUGIN_SRC/$1" "$TARGET/"
+    cp -R "$_SRC" "$TARGET/"
   fi
 }
 
 VENDOR scripts
 VENDOR schemas
 VENDOR templates
+VENDOR assets
+# Plugin rules live at $PLUGIN_ROOT/rules (one level above edpa/), NOT
+# $PLUGIN_SRC/rules — the same trap project_setup.py's vendor step
+# documents. Getting this wrong silently ships an engine with stale rules
+# under a freshly stamped VERSION.
+VENDOR rules "$PLUGIN_ROOT"
 
 echo "$PLUGIN_VERSION" > "$TARGET/VERSION"
 chmod +x "$TARGET/scripts/hooks/"* 2>/dev/null || true

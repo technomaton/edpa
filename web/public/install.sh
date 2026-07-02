@@ -17,11 +17,11 @@
 #      next-step instructions for project provisioning.
 #
 # This script is intentionally minimal: it vendors `plugin/edpa/{scripts,
-# schemas,templates}/` into `.edpa/engine/` so CI workflows and non-CC tools
-# can find the engine. It does NOT install pip packages, does NOT copy CI
-# workflows (that's project_setup.py / /edpa:setup), and does NOT touch
-# `.claude/`. The result is a project root that has `.edpa/` and nothing
-# else added.
+# schemas,templates,assets}/` plus `plugin/rules/` into `.edpa/engine/` so
+# CI workflows and non-CC tools can find the engine. It does NOT install
+# pip packages, does NOT copy CI workflows (that's project_setup.py /
+# /edpa:setup), and does NOT touch `.claude/`. The result is a project
+# root that has `.edpa/` and nothing else added.
 set -e
 
 REPO="technomaton/edpa"
@@ -129,10 +129,12 @@ else
     | head -1 | cut -d'"' -f4) || true
 
   if [ -n "$RELEASE_URL" ]; then
+    # The release asset is rooted at plugin/ (release.yml tars `plugin/`),
+    # so extract into $TMPDIR/edpa — the payload lands at $TMPDIR/edpa/plugin
+    # exactly like the gh branch above.
+    mkdir -p "$TMPDIR/edpa"
+    curl -fsSL "$RELEASE_URL" | tar -xz -C "$TMPDIR/edpa"
     echo "Downloaded from latest release."
-    curl -fsSL "$RELEASE_URL" | tar -xz -C "$TMPDIR"
-    mkdir -p "$TMPDIR/edpa/plugin"
-    mv "$TMPDIR"/* "$TMPDIR/edpa/plugin/" 2>/dev/null || true
     PLUGIN_VERSION="latest-release"
   else
     echo "No release found, downloading main branch..."
@@ -155,6 +157,12 @@ mkdir -p "$TARGET"
 cp -R "$PLUGIN_SRC/edpa/scripts"   "$TARGET/"
 cp -R "$PLUGIN_SRC/edpa/schemas"   "$TARGET/"
 cp -R "$PLUGIN_SRC/edpa/templates" "$TARGET/"
+# "assets" carries the prebuilt PI planning bundle (pi-bundle.html) that
+# pi_planning.py hydrates — vendored so /edpa:pi-planning works with only
+# Python on the target machine (same file set as project_setup.py).
+if [ -d "$PLUGIN_SRC/edpa/assets" ]; then
+  cp -R "$PLUGIN_SRC/edpa/assets" "$TARGET/"
+fi
 if [ -d "$PLUGIN_SRC/rules" ]; then
   cp -R "$PLUGIN_SRC/rules" "$TARGET/"
 fi
@@ -215,9 +223,18 @@ touch ".edpa/sync_state.json"
 
 # --- Optional: PI planning server vendoring (--with-server flag) ---
 if [ "$WITH_SERVER" = "1" ]; then
-  SERVER_SRC="$TMPDIR/edpa/plugin/tools/pi-planning"
+  # tools/pi-planning sits at the payload root in git-clone / main-tarball
+  # layouts ($TMPDIR/edpa/tools) and under plugin/ if a release asset ever
+  # packs it there — probe both layouts, repo-root first.
+  SERVER_SRC=""
+  for candidate in "$TMPDIR/edpa/tools/pi-planning" "$TMPDIR/edpa/plugin/tools/pi-planning"; do
+    if [ -d "$candidate" ]; then
+      SERVER_SRC="$candidate"
+      break
+    fi
+  done
   SERVER_DST=".claude/edpa/server"
-  if [ -d "$SERVER_SRC" ]; then
+  if [ -n "$SERVER_SRC" ]; then
     echo ""
     echo "Vendoring PI planning server (--with-server)..."
     mkdir -p "$SERVER_DST"
@@ -228,6 +245,7 @@ if [ "$WITH_SERVER" = "1" ]; then
   else
     echo ""
     echo "  --with-server requested but server source not in payload — skipping."
+    echo "  (probed: $TMPDIR/edpa/tools/pi-planning and $TMPDIR/edpa/plugin/tools/pi-planning)"
   fi
 else
   echo ""
@@ -246,8 +264,8 @@ echo "    git hooks, and agent rules. Local-first: no GitHub provisioning."
 echo ""
 echo "  Other tools (Cursor, Codex CLI, raw):"
 echo "    1. Install Python deps:"
-echo "         pip3 install pyyaml ruamel.yaml openpyxl filelock"
-echo "         (add 'mcp' too if you want the MCP server)"
+echo "         pip3 install pyyaml ruamel.yaml openpyxl filelock mcp"
+echo "         ('mcp' is required by backlog.py add and the MCP server)"
 echo "    2. Edit team and project metadata:"
 echo "         .edpa/config/people.yaml    # team + capacity"
 echo "         .edpa/config/edpa.yaml      # project.name + governance"
