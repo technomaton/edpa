@@ -217,9 +217,18 @@ touch ".edpa/sync_state.json"
 
 # --- Optional: PI planning server vendoring (--with-server flag) ---
 if [ "$WITH_SERVER" = "1" ]; then
-  SERVER_SRC="$TMPDIR/edpa/plugin/tools/pi-planning"
+  # tools/pi-planning sits at the payload root in git-clone / main-tarball
+  # layouts ($TMPDIR/edpa/tools) and under plugin/ if a release asset ever
+  # packs it there — probe both layouts, repo-root first.
+  SERVER_SRC=""
+  for candidate in "$TMPDIR/edpa/tools/pi-planning" "$TMPDIR/edpa/plugin/tools/pi-planning"; do
+    if [ -d "$candidate" ]; then
+      SERVER_SRC="$candidate"
+      break
+    fi
+  done
   SERVER_DST=".claude/edpa/server"
-  if [ -d "$SERVER_SRC" ]; then
+  if [ -n "$SERVER_SRC" ]; then
     echo ""
     echo "Vendoring PI planning server (--with-server)..."
     mkdir -p "$SERVER_DST"
@@ -230,6 +239,7 @@ if [ "$WITH_SERVER" = "1" ]; then
   else
     echo ""
     echo "  --with-server requested but server source not in payload — skipping."
+    echo "  (probed: $TMPDIR/edpa/tools/pi-planning and $TMPDIR/edpa/plugin/tools/pi-planning)"
   fi
 else
   echo ""
