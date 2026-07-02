@@ -1036,6 +1036,19 @@ def cmd_add(root, backlog, args):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
         import mcp_server  # noqa: E402
+    except SystemExit:
+        # mcp_server sys.exit()s at import time when a dependency (the
+        # `mcp` package) is missing. Add CLI context before propagating:
+        # `backlog add` deliberately routes through the MCP server's
+        # _handle_item_create as its shared create/validation layer
+        # (single source of truth for ID allocation and parent/type
+        # checks; ADR-002 rejected extracting it into a shared module).
+        print(color(
+            "  Error: `backlog add` could not import the MCP server "
+            "module, which provides the shared item-create/validation "
+            "layer. Install the missing dependency with: pip install mcp",
+            C.ERR))
+        raise
     finally:
         sys.path.pop(0)
 

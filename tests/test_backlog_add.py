@@ -300,6 +300,35 @@ def test_local_bad_contributor_format_exits(tmp_path, silence_git, capsys):
     assert "PERSON:ROLE:CW" in out
 
 
+def test_local_missing_mcp_dep_explains_and_exits(tmp_path, silence_git,
+                                                  capsys, monkeypatch):
+    """D-41: mcp_server sys.exit()s at import time when the `mcp` package is
+    missing. cmd_add must catch that SystemExit, explain that `backlog add`
+    uses the MCP handler as its shared create/validation layer (install with:
+    pip install mcp), and re-raise — not die with only mcp_server's bare
+    stderr line."""
+    import importlib.abc
+
+    class _ExitingFinder(importlib.abc.MetaPathFinder):
+        def find_spec(self, fullname, path=None, target=None):
+            if fullname == "mcp_server":
+                # Mimic mcp_server's import-time `sys.exit(1)` on missing mcp.
+                raise SystemExit(1)
+            return None
+
+    root = _write_workspace(tmp_path)
+    bl = backlog.load_backlog(root)
+    monkeypatch.delitem(sys.modules, "mcp_server")
+    monkeypatch.setattr(sys, "meta_path", [_ExitingFinder(), *sys.meta_path])
+
+    with pytest.raises(SystemExit) as exc:
+        backlog.cmd_add(root, bl, _args(type="Initiative", title="x"))
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert "pip install mcp" in out
+    assert "backlog add" in out
+
+
 def test_local_bad_contributor_cw_exits(tmp_path, silence_git, capsys):
     root = _write_workspace(tmp_path)
     bl = backlog.load_backlog(root)
