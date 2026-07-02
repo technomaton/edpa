@@ -69,10 +69,13 @@ for the full work-attribution rules including escape hatches
 ```bash
 git clone https://github.com/technomaton/edpa.git
 cd edpa
-pip install pyyaml openpyxl pytest
+pip install -r requirements-dev.txt
 python3 -m pytest tests/
 python3 plugin/edpa/scripts/engine.py --demo
 ```
+
+`requirements-dev.txt` installs everything the suite exercises — the runtime deps plus `pytest`, `pytest-cov`, `hypothesis`, `jsonschema` and `openpyxl`.
+If pytest reports **skipped** tests locally, a missing optional extra is the usual cause: the property-based and schema tests `importorskip` their dependencies instead of failing.
 
 ### Claude Code dogfooding (optional but recommended)
 
@@ -111,6 +114,8 @@ the working tree. This matches what end-users experience.
 - `docs/` — Methodology documentation
 - `web/` — Public website (edpa.technomaton.com)
 - `tests/` — Test suite
+- `tools/` — PI-planning UI source and one-off analysis scripts
+- `scripts/` — Release tooling (`bump_version.py`)
 - `.edpa/` — Governance data for this repo
 
 ## License
