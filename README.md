@@ -27,7 +27,7 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 
 **After EDPA:**
 ```
-$ python3 .claude/edpa/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
+$ python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
 
 EDPA 2.12.1 — Iteration PI-2026-1.3
 ======================================================================
@@ -54,21 +54,22 @@ All invariants passed: YES
 - **Mathematical guarantee** — derived hours always sum to declared capacity
 - **Gates mode (default)** — credits each Initiative/Epic/Feature status transition as a mini-deliverable, so prep work (LBC, decomposition, design) gets credited as it happens, not only at final Done. Validated to ±0.35 pp stability under ±20 % CW perturbation across 100 Monte Carlo runs.
 - **C7.5 in-flight Story credit** — Stories with `yaml_edit` activity in the iteration window receive partial credit (`js × credit_factor`, default 0.40) even before they reach Done; the `story_activity_events[]` audit log in `edpa_results.json` records what was credited and why.
-- **Optional GitHub Projects sync** — `sync push` creates issues with custom fields, `sync pull` mirrors GH UI changes back into local YAML (including `created_at`, `closed_at`, `updated_at` timestamps); useful when PMs/BOs want a board view, but **not required** — V2.1 produces a complete derived timesheet from local git alone.
-- **Flow metrics** — `edpa_flow_metrics` MCP tool computes cycle time, throughput, and open item age from synced timestamps, filterable by iteration and level.
+- **Optional PR-signal CI** — one GitHub Actions workflow (`edpa-contribution-sync.yml`) materializes PR-thread signals (`pr_reviewer`, `issue_comment`) into an item's `evidence[]` after the PR merges; useful for review/comment credit, but **not required** — V2.1 produces a complete derived timesheet from local git alone.
+- **Flow metrics** — `edpa_flow_metrics` MCP tool computes cycle time, throughput, and open item age from git-derived item timestamps, filterable by iteration and level.
 - **PI planning / overview** — `/edpa:pi-planning` (and the `edpa_pi_board` MCP tool) render the whole SAFe program picture — program board with dependency arrows, PI objectives, ROAM, portfolio rollup, WSJF, capacity — as a single self-contained, read-only HTML. No server, no Node, no network: it runs with only the Python engine and regenerates deterministically from `.edpa/`. Dependencies are first-class via `edpa_item_link_dep` (with cycle detection).
 - **Dual-view** — per-person timesheets AND per-item cost allocation from the same data
 - **Audit-grade** — frozen snapshots, immutable records, BankID signing support
 - **Self-tuning** — auto-calibrates heuristics using Karpathy's autoresearch loop
-- **Git-native, GitHub-friendly** — works with any git workflow; optional integration with GitHub Issues, Projects, PRs, and Actions (E2E tested against `technomaton/edpa-e2e-test` sandbox)
+- **Git-native, GitHub-friendly** — works with any git workflow; the only GitHub touchpoint is the optional PR-signal Action (E2E tested against `technomaton/edpa-e2e-test` sandbox)
 
 ## First 5 minutes — guided walkthrough
 
 This walkthrough takes a fresh empty repo to a closed iteration with
-derived hours and per-person reports. **No GitHub Project required** —
-the walkthrough stays local so onboarding is zero-friction. For the
-real GitHub Projects flow (push backlog, sync issue states, gate-based
-prep-work attribution) see [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+derived hours and per-person reports. **No GitHub required** — the
+walkthrough stays local so onboarding is zero-friction. For the full
+operational flow (materialized git evidence, hooks, gate-based
+prep-work attribution, optional PR-signal CI) see
+[`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
 ### 1. Install (~30 s)
 
@@ -82,20 +83,32 @@ You should see:
 
 ```
 EDPA Installer
-  Python 3.X ✓
-  PyYAML ✓
-  mcp (MCP SDK) ✓
-  openpyxl ✓
+
+Checking prerequisites...
+  Python 3.12 ✓
+  git ✓
   ...
-EDPA 2.12.1 installed successfully!
+
+Vendoring engine into .edpa/engine/...
+Bootstrapping .edpa/ data tree...
+  Created .edpa/config/people.yaml (edit with your team)
+  Created .edpa/config/edpa.yaml (edit project.name + governance metadata)
+
+EDPA 2.12.1 installed.
 ```
 
-Three config files were seeded from templates:
+The installer vendors the engine to `.edpa/engine/` (it installs no pip
+packages and never touches `.claude/`) and seeds two config files from
+templates:
 
 ```bash
 ls .edpa/config/
-# edpa.yaml  heuristics.yaml  people.yaml
+# edpa.yaml  people.yaml
 ```
+
+(The CW heuristics config, `cw_heuristics.yaml`, is seeded later by
+`/edpa:setup` or `project_setup.py` — until then the engine falls back
+to the vendored template defaults.)
 
 ### 2. Edit `people.yaml` to your team (~1 min)
 
@@ -120,7 +133,7 @@ people:
 Verify the engine sees them:
 
 ```bash
-python3 .claude/edpa/scripts/engine.py --status
+python3 .edpa/engine/scripts/engine.py --status
 ```
 
 ```
@@ -132,11 +145,16 @@ EDPA 2.12.1 — Status
     Bob Developer             Dev      1.0 FTE  40h
 ✓ heuristics loaded
 ✓ backlog — 0 features, 0 stories
+  reports/ empty (no iterations closed yet)
 ```
 
 ### 3. Add a toy iteration + backlog (~2 min)
 
-One iteration plus two stories, one per person:
+One iteration plus two stories, one per person. Iterations are plain
+YAML; backlog items are **Markdown files with YAML frontmatter** — one
+file per item. (In a real project you'd create items with `/edpa:add`
+or `python3 .edpa/engine/scripts/backlog.py add`, which also allocates
+IDs; for the toy we write the files directly.)
 
 ```bash
 cat > .edpa/iterations/PI-2026-1.1.yaml <<'YAML'
@@ -149,7 +167,8 @@ iteration:
   weeks: 1
 YAML
 
-cat > .edpa/backlog/stories/S-1.yaml <<'YAML'
+cat > .edpa/backlog/stories/S-1.md <<'MD'
+---
 id: S-1
 type: Story
 title: "First user-facing feature"
@@ -161,9 +180,11 @@ contributors:
   - person: alice
     as: owner
     cw: 1.0
-YAML
+---
+MD
 
-cat > .edpa/backlog/stories/S-2.yaml <<'YAML'
+cat > .edpa/backlog/stories/S-2.md <<'MD'
+---
 id: S-2
 type: Story
 title: "Backend integration"
@@ -175,7 +196,8 @@ contributors:
   - person: bob
     as: owner
     cw: 1.0
-YAML
+---
+MD
 
 git add .
 git -c user.email="you@example.com" -c user.name="You" commit -q -m "seed"
@@ -185,12 +207,19 @@ git -c user.email="you@example.com" -c user.name="You" commit -q -m "seed"
 
 ```bash
 mkdir -p .edpa/reports/iteration-PI-2026-1.1
-python3 .claude/edpa/scripts/engine.py \
+python3 .edpa/engine/scripts/engine.py \
   --edpa-root .edpa --iteration PI-2026-1.1 \
   --output .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
 ```
 
 ```
+Loaded 2 items (2 Done Stories/Defects + 0 gate events + 0 story activity events)
+Filtered to iteration: PI-2026-1.1
+
+Results written to: .edpa/reports/iteration-PI-2026-1.1/edpa_results.json
+Snapshot frozen: .edpa/snapshots/PI-2026-1.1.json
+Excel: .edpa/reports/iteration-PI-2026-1.1/edpa-results.xlsx
+
 ======================================================================
 EDPA 2.12.1 — Iteration PI-2026-1.1
 ======================================================================
@@ -221,7 +250,9 @@ What just happened:
 - **All invariants passed**: each person's derived hours sum to their
   declared capacity, ratios sum to 1.0, no negative scores. The math
   holds — the snapshot is auditable.
-- An `edpa-results.xlsx` (Team Summary + Item Costs tabs) was emitted alongside the JSON results.
+- An `edpa-results.xlsx` (Team Summary + Item Costs tabs) was emitted
+  alongside the JSON results, and a frozen snapshot landed in
+  `.edpa/snapshots/` for the audit trail.
 
 ### 5. Generate timesheets — `/edpa:reports PI-2026-1.1` (Claude Code)
 
@@ -234,7 +265,8 @@ plus the cost-allocation Excel. After it runs:
 ├── edpa_results.json      ← engine output
 ├── edpa-results.xlsx      ← Team Summary + Item Costs tabs
 ├── timesheet-alice.md     ← human-readable, ready to attach to invoice
-└── timesheet-bob.md
+├── timesheet-bob.md
+└── timesheet-team.md      ← aggregated team rollup
 ```
 
 Each Markdown timesheet is a paste-able audit artefact: which items,
@@ -245,7 +277,7 @@ which roles, which scores, how many hours.
 If you just want to see the math against a synthetic team:
 
 ```bash
-python3 .claude/edpa/scripts/engine.py --demo
+python3 .edpa/engine/scripts/engine.py --demo
 ```
 
 A pre-seeded 3-person team with 4 stories runs through the full
@@ -253,10 +285,14 @@ calculation in under a second.
 
 ### What's next
 
-- **Real GitHub Projects integration** (push backlog → issues, sync
-  status changes, gate-based prep-work credit): [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
-- **Claude Code MCP layer** (5 read-only tools so the assistant
-  reads `.edpa/` structurally instead of grep): [`docs/mcp.md`](docs/mcp.md)
+- **Full operational flow** (materialize git evidence, close
+  iterations and PIs, capacity overrides, gate-based prep-work
+  credit): [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
+- **Optional GitHub integration** (PR-thread signals materialized
+  into `evidence[]` after merges): [`docs/github-setup.md`](docs/github-setup.md)
+- **Claude Code MCP layer** (29 tools — 14 read + 15 write — so the
+  assistant reads and updates `.edpa/` structurally instead of
+  grep): [`docs/mcp.md`](docs/mcp.md)
 - **Methodology** (CW heuristics, gate model, audit trail, Monte
   Carlo calibration): [`docs/methodology.md`](docs/methodology.md)
 - **Repeatable E2E test**: [`docs/E2E-TEST-PLAN.md`](docs/E2E-TEST-PLAN.md)
@@ -266,7 +302,7 @@ calculation in under a second.
 ## How It Works
 
 1. **Person declares capacity** (e.g., 40h per 1-week iteration on the AI-native default; 80h per 2-week on classic SAFe)
-2. **System detects evidence** from GitHub (assignee, PR author, reviewer, committer, commenter)
+2. **System detects evidence** from local git (commit author, `/contribute` directives, `yaml_edit` + gate transitions) plus optional PR-thread signals (reviewer, commenter)
 3. **Evidence maps to Contribution Weight** (owner=1.0, key=0.6, reviewer=0.25, consulted=0.15)
 4. **Score = JobSize x CW** for each (person, item) pair
 5. **Scoring**: each Initiative/Epic/Feature status transition becomes a mini-deliverable
@@ -283,11 +319,13 @@ Two complementary views from the same data:
 
 ## Backlog Item Schema
 
-Every YAML under `.edpa/backlog/<level>/` follows this shape (the
-pre-commit hook + `validate_syntax.py` enforce it):
+Every backlog item is a Markdown file with YAML frontmatter under
+`.edpa/backlog/<level>/` and follows this shape (the pre-commit hook +
+`validate_syntax.py` enforce it):
 
 ```yaml
-id: S-200                 # required, must match file name + level prefix
+---
+id: S-200                 # required, must match file name (S-200.md) + level prefix
 type: Story               # Initiative | Epic | Feature | Story | Defect | Task
 title: "Add OMOP parser"  # required
 parent: F-100             # required for non-Initiative levels
@@ -305,6 +343,7 @@ contributors:             # who actually delivered the work
   - person: carol-qa
     as: reviewer
     cw: 0.2
+---
 ```
 
 `contributors[].as` is **not** the human job role (Dev/Arch/QA/PM —
@@ -316,40 +355,35 @@ and triggers a clear `WARN: 0 evidence pairs derived from N
 contributor entries` at engine startup.
 
 > Migrating from <1.7? Run
-> `python3 .claude/edpa/scripts/migrate_contributors.py` once.
+> `python3 .edpa/engine/scripts/migrate_contributors.py` once.
 > The old keys (`role:` and `weight:`) are hard-rejected — there is
 > no aliasing, by design — so the validator will tell you exactly
 > which file still needs the rewrite.
 
 ## Directory Structure
 
-After installation, your project will have:
+After installation (curl installer or `/edpa:setup`), your project will have:
 
 ```
 .
-├── .claude/
-│   └── edpa/                      # EDPA plugin (installed by npx/curl)
-│       ├── scripts/
-│       │   ├── engine.py          # Core EDPA engine
-│       │   ├── evaluate_cw.py     # CW evaluator for auto-calibration
-│       │   ├── backlog.py         # Git-native backlog CLI
-│       │   ├── sync.py            # GitHub Projects <-> Git sync
-│       │   ├── issue_types.py     # GitHub Issue Types management
-│       │   ├── project_setup.py   # GitHub Project initialization
-│       │   ├── project_views.py   # GitHub Project view setup
-│       │   └── create_project_views.py
-│       ├── templates/             # Config templates (.tmpl)
-│       └── workflows/             # GitHub Actions workflows
-├── .edpa/                         # Project governance data
+├── .edpa/                         # All EDPA state lives here
+│   ├── engine/                    # Vendored engine (never touches .claude/)
+│   │   ├── scripts/               # engine.py, backlog.py, local_evidence.py,
+│   │   │                          #   project_setup.py, mcp_server.py,
+│   │   │                          #   sync_pr_contributions.py, ...
+│   │   ├── schemas/               # JSON schemas
+│   │   ├── templates/             # Config + CI workflow templates (.tmpl)
+│   │   └── VERSION                # Pinned plugin version
 │   ├── config/
-│   │   ├── people.yaml             # Team members, FTE, capacity
-│   │   └── heuristics.yaml        # Evidence scoring weights (CW)
-│   ├── backlog/                   # Work items (file-per-item)
-│   ├── iterations/                # Iteration definitions
+│   │   ├── people.yaml            # Team members, FTE, capacity
+│   │   ├── edpa.yaml              # Project name + governance metadata
+│   │   └── cw_heuristics.yaml     # Evidence scoring weights (seeded by
+│   │                              #   project_setup.py / /edpa:setup)
+│   ├── backlog/                   # Work items (file-per-item, .md + YAML frontmatter)
+│   ├── iterations/                # Iteration definitions (.yaml)
 │   ├── reports/                   # Generated timesheets & exports
 │   ├── snapshots/                 # Frozen iteration snapshots
 │   └── data/                      # Raw evidence data
-├── .mcp.json                      # GitHub MCP server configuration
 └── ...your project files
 ```
 
@@ -358,41 +392,50 @@ Source repository structure:
 ```
 .
 ├── plugin/                        # Plugin source (what gets installed)
-│   ├── edpa/scripts/              # Python engine + utilities
-│   ├── edpa/templates/            # Config templates
-│   ├── edpa/workflows/            # GitHub Actions
-│   ├── commands/edpa/             # Claude Code slash commands
-│   ├── skills/                    # Claude Code skills (5 skills)
+│   ├── edpa/scripts/              # Python engine + utilities (50+ modules)
+│   ├── edpa/schemas/              # JSON schemas
+│   ├── edpa/templates/            # Config + CI workflow templates
+│   ├── commands/                  # Claude Code slash commands (20)
+│   ├── skills/                    # Claude Code skills (5)
 │   └── .mcp.json                  # MCP server config
 ├── docs/                          # Full methodology + examples
+├── tests/                         # Unit / integration / e2e suites
 ├── web/                           # Public website (edpa.technomaton.com)
 ├── install.sh                     # Shell installer
-└── .edpa/                         # Governance data for this repo
+└── .edpa/                         # Governance data for this repo (self-hosted)
 ```
 
 ## Claude Code Integration
 
-EDPA includes 5 composable skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code):
+EDPA ships 5 composable skills, 20 slash commands, and a 29-tool MCP
+server for [Claude Code](https://docs.anthropic.com/en/docs/claude-code):
 
-| Command | What it does |
+| Skill | What it does |
 |---------|-------------|
-| `/edpa setup` | Initialize governance (GitHub Projects, config, CI) |
-| `/edpa close-iteration` | Compute hours + generate reports |
-| `/edpa reports` | Generate timesheets, snapshots, Excel exports |
-| `/edpa calibrate` | Auto-calibrate CW heuristics (after 1st PI) |
-| `/edpa sync` | Sync GitHub Projects <-> Git backlog |
+| `/edpa:setup` | Provision `.edpa/` governance (engine, config, id_counters, hooks, CI) |
+| `/edpa:add` | Create a backlog item (local-first; ID from id_counters) |
+| `/edpa:engine` | Compute hours from local git evidence + validate invariants |
+| `/edpa:reports` | Per-person timesheets, per-item cost, snapshots, Excel |
+| `/edpa:autocalib` | Auto-calibrate CW heuristics (after 1st PI) |
 
-Skills work on 26+ platforms (Codex CLI, Cursor, Gemini CLI, etc.)
+The 20 commands (`/edpa:close-iteration`, `/edpa:board`,
+`/edpa:pi-planning`, `/edpa:forecast`, `/edpa:export`,
+`/edpa:materialize`, ...) and the 29 MCP tools (14 read + 15 write)
+are listed in [`plugin/README.md`](plugin/README.md) and
+[`docs/mcp.md`](docs/mcp.md).
 
 ## Cross-Platform
 
+The engine is plain Python — Claude Code is optional:
+
 ```bash
-# Claude Code — skills auto-detected from .claude/
-# Codex CLI
-cp -r .claude/skills/* ~/.codex/skills/
-# Cursor — auto-detected
-# Gemini CLI
-cp -r .claude/skills/* ~/.gemini/skills/
+# Claude Code — plugin marketplace, then /edpa:setup
+/plugin install edpa@technomaton-edpa
+
+# Cursor, Codex CLI, any editor or CI — shell installer, then drive the CLIs
+curl -fsSL https://edpa.technomaton.com/install.sh | sh
+python3 .edpa/engine/scripts/engine.py --demo
+python3 .edpa/engine/scripts/backlog.py add --type Story --title "..."
 ```
 
 ## Who Is This For?
@@ -408,13 +451,15 @@ cp -r .claude/skills/* ~/.gemini/skills/
 |----------|-------------|
 | [Methodology](docs/methodology.md) | Full EDPA v2.12.1 specification |
 | [Quick Start](docs/quick-start.md) | 10-minute setup guide |
-| [Evidence Detection](docs/evidence-detection.md) | How GitHub signals map to CW |
+| [Operational Runbook](docs/RUNBOOK.md) | Every `/edpa:*` command end to end — setup, close-iteration, capacity, autocalib, board |
+| [Playbook](docs/playbook.md) | From empty repo to first closed PI — full operations guide (Czech) |
+| [Evidence Detection](docs/evidence-detection.md) | How delivery signals map to CW |
 | [Dual-View](docs/dual-view.md) | Per-person vs per-item perspectives |
 | [Audit Trail](docs/audit-trail.md) | Freeze rules and snapshot format |
 | [Auto-Calibration](docs/auto-calibration.md) | Karpathy autoresearch loop |
 | [Cadence](docs/cadence.md) | Classic (2/10) vs AI-Native (1/5) |
-| [GitHub Setup](docs/github-setup.md) | Projects, custom fields, views |
-| [EDPA_TOKEN Setup](docs/edpa-token-setup.md) | PAT generation, repo/org secret, rotation — required for the automated GitHub Projects ↔ git sync |
+| [GitHub Setup](docs/github-setup.md) | Optional GitHub integration — local-first positioning, PR-signal workflow |
+| [EDPA_TOKEN Setup](docs/edpa-token-setup.md) | PAT generation, repo/org secret, rotation — needed only for the optional PR-signal CI workflow |
 | [FAQ](docs/faq.md) | Common questions |
 
 ## Simulation & Calibration
@@ -426,30 +471,33 @@ cp -r .claude/skills/* ~/.gemini/skills/
 | [calibrate_roles.py](https://github.com/technomaton/edpa-simulation/blob/main/scripts/calibrate_roles.py) | Multi-scenario CW calibration (8 scenarios, 569 pairs, MAD reduction 6.7%) |
 | [edpa.technomaton.com](https://edpa.technomaton.com) | Public website with interactive dashboard, presentation, methodology, evaluation |
 
-The default CW weights in `.edpa/config/heuristics.yaml` are calibrated from 8 team scenarios
+The default CW weights ship in the engine's `cw_heuristics.yaml` template (seeded to
+`.edpa/config/cw_heuristics.yaml` by `project_setup.py` / `/edpa:setup`) and are calibrated
+from 8 team scenarios
 (Startup, Enterprise, DevOps-heavy, Research, Consultancy, AI-Native, Regulated, kashealth).
 Key correction: BO/PM/Arch are systematically undervalued by Git auto-detection; QA slightly overvalued.
 
-## GitHub Projects Sync
+## Optional GitHub Integration
 
-EDPA is bidirectionally synchronized with a GitHub Project:
+EDPA V2 is **local-first**: evidence collection runs against `git log` alone,
+so derived timesheets, reports, and snapshots need no GitHub at all. (The V1
+bidirectional GitHub Projects sync — `sync.py`, `issue_map.yaml`, custom
+fields — was removed in 2.0.0.)
 
-```bash
-python3 .claude/edpa/scripts/sync.py status            # health overview
-python3 .claude/edpa/scripts/sync.py diff               # what would change
-python3 .claude/edpa/scripts/sync.py pull --commit      # GH → local YAML, auto-commit
-python3 .claude/edpa/scripts/sync.py push               # local → GH (creates issues if missing)
-python3 .claude/edpa/scripts/sync.py setup-refresh      # rebuild field IDs after manual GH edits
-python3 .claude/edpa/scripts/sync.py conflicts \
-    --strategy last-write-wins --apply                  # auto-resolve conflicts
-```
+There is exactly **one** optional GitHub touchpoint: a CI workflow
+(`edpa-contribution-sync.yml`, installed by `/edpa:setup --with-ci` or
+`project_setup.py --with-ci`) that runs after a PR referencing an item
+(e.g. `feat(S-1): ...`) merges, and materializes PR-thread signals
+(`pr_reviewer`, `issue_comment`) into that item's `evidence[]`. It needs one
+repository secret — see [`docs/edpa-token-setup.md`](docs/edpa-token-setup.md).
 
-`project_setup.py` creates a Project with all custom fields (Job Size, BV, TC, RR, WSJF, Team,
-per-level Status workflows, Iteration), persists field IDs to `.edpa/config/edpa.yaml`, and
-maps every backlog item to a GH issue in `.edpa/config/issue_map.yaml`. See
-[`docs/RUNBOOK.md`](docs/RUNBOOK.md) for the full operational guide and
-[`tests/test_e2e_sync.py`](tests/test_e2e_sync.py) for end-to-end tests against a real GitHub
-sandbox.
+Want a board? `/edpa:board` renders a self-contained HTML Kanban and
+`/edpa:pi-planning` the full PI picture, both straight from `.edpa/backlog/`
+— no GitHub Project needed. See [`docs/github-setup.md`](docs/github-setup.md)
+for the positioning, and
+[`tests/test_sync_pr_contributions.py`](tests/test_sync_pr_contributions.py) +
+[`tests/test_e2e_v2_ci_materialization.py`](tests/test_e2e_v2_ci_materialization.py)
+for the workflow's tests.
 
 ## Part of TECHNOMATON Hub
 
