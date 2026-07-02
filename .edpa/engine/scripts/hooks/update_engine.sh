@@ -2,16 +2,17 @@
 # SessionStart hook — auto-vendor engine into .edpa/engine/ when the
 # bundled plugin version diverges from the on-disk one.
 #
-# Mirrors the install.sh vendor path (scripts/schemas/templates +
-# VERSION pin) so users don't have to manually re-run /edpa:setup
-# after a `/plugin update`. Fast path is a single file compare
-# returning in <50ms.
+# Mirrors the install.sh / project_setup.py vendor set (scripts/schemas/
+# templates/assets + plugin rules + VERSION pin) so users don't have to
+# manually re-run /edpa:setup after a `/plugin update`. Fast path is a
+# single file compare returning in <50ms.
 #
 # Skip conditions (in order):
 #   1. CLAUDE_PLUGIN_ROOT unset — hook invoked outside Claude Code
 #   2. cwd has no .edpa/engine/ — not an EDPA project, or pre-setup
 #   3. VERSION matches — already up to date
-#   4. .edpa/config/edpa.yaml has auto_update_engine: false — opt-out
+#   4. installed plugin OLDER than the on-disk engine — never downgrade (D-49)
+#   5. .edpa/config/edpa.yaml has auto_update_engine: false — opt-out
 #
 # On version mismatch:
 #   - rsync (or cp -R fallback) plugin engine -> .edpa/engine/
@@ -80,6 +81,28 @@ if [ "$PLUGIN_VERSION" = "$LOCAL_VERSION" ]; then
   exit 0
 fi
 
+# 3b. Direction guard (D-49) — vendor only FORWARD. The plugin is canonical
+# only when it is NEWER; an installed plugin that is *older* than the project's
+# committed engine (a developer who hasn't run /plugin update) must never
+# rsync-clobber it back to a stale version. Compare as semver; only a *proven*
+# downgrade is blocked — an upgrade or a non-semver dev build ("main") falls
+# through to the normal vendor path below.
+VERSION_ORDER=$(python3 - "$PLUGIN_VERSION" "$LOCAL_VERSION" 2>/dev/null <<'PY' || echo ""
+import re, sys
+def parse(v):
+    m = re.match(r'\s*(\d+)\.(\d+)\.(\d+)', v or "")
+    return tuple(int(g) for g in m.groups()) if m else None
+plug, loc = parse(sys.argv[1]), parse(sys.argv[2])
+if plug is not None and loc is not None and plug < loc:
+    print("DOWNGRADE")
+PY
+)
+if [ "$VERSION_ORDER" = "DOWNGRADE" ]; then
+  echo "EDPA: installed plugin ($PLUGIN_VERSION) is older than this project's engine ($LOCAL_VERSION) — not downgrading." >&2
+  echo "       Run /plugin update to catch up, then restart the session." >&2
+  exit 0
+fi
+
 # 4. Opt-out check. Cheap grep so we don't pull in PyYAML at hook time.
 EDPA_CONFIG="$PROJECT/.edpa/config/edpa.yaml"
 if [ -f "$EDPA_CONFIG" ]; then
@@ -94,17 +117,29 @@ fi
 echo "EDPA: updating engine $LOCAL_VERSION → $PLUGIN_VERSION..." >&2
 
 VENDOR() {
+  # $1 = engine subdir, $2 = optional source parent (default $PLUGIN_SRC).
+  # Missing sources are skipped so older plugin payloads stay valid.
+  _SRC="${2:-$PLUGIN_SRC}/$1"
+  if [ ! -d "$_SRC" ]; then
+    return 0
+  fi
   if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete "$PLUGIN_SRC/$1/" "$TARGET/$1/"
+    rsync -a --delete "$_SRC/" "$TARGET/$1/"
   else
     rm -rf "$TARGET/$1"
-    cp -R "$PLUGIN_SRC/$1" "$TARGET/"
+    cp -R "$_SRC" "$TARGET/"
   fi
 }
 
 VENDOR scripts
 VENDOR schemas
 VENDOR templates
+VENDOR assets
+# Plugin rules live at $PLUGIN_ROOT/rules (one level above edpa/), NOT
+# $PLUGIN_SRC/rules — the same trap project_setup.py's vendor step
+# documents. Getting this wrong silently ships an engine with stale rules
+# under a freshly stamped VERSION.
+VENDOR rules "$PLUGIN_ROOT"
 
 echo "$PLUGIN_VERSION" > "$TARGET/VERSION"
 chmod +x "$TARGET/scripts/hooks/"* 2>/dev/null || true

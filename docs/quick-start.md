@@ -89,10 +89,15 @@ Create backlog items with `/edpa:add` (Initiative / Epic / Feature / Story / Def
 /edpa:add Story "First story" --parent F-100 --js 5
 ```
 
-Follow the branch naming convention:
+Commit with the item ID as the Conventional-Commit scope — the local
+commit-msg hook and the evidence pipeline read attribution from it:
 ```bash
-git checkout -b feature/S-001-first-story
+git commit -m "feat(S-001): implement first story"
 ```
+
+Branch naming is a soft convention (`feature/S-001-first-story` is a readable
+shape if you want one) — attribution never flows from the branch name, and no
+CI gate checks it.
 
 ## Step 6: Close your first iteration
 
@@ -130,7 +135,8 @@ python3 .edpa/engine/scripts/engine.py \
 
 Check the generated reports in `.edpa/reports/iteration-PI-2026-1.1/`:
 - `edpa_results.json` — raw calculation data
-- `vykaz-{person}.md` — per-person timesheet
+- `timesheet-{person}.md` — per-person timesheet
+- `timesheet-team.md` — aggregated team rollup
 - `edpa-results.xlsx` — Team Summary + Item Costs tabs (per-person aggregate + per-item allocation)
 
 Check the frozen snapshot in `.edpa/snapshots/PI-2026-1.1.json`.

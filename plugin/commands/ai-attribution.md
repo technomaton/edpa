@@ -1,3 +1,9 @@
+---
+description: Compute the human vs AI-agent delivery ratio for an iteration (wraps ai_attribution.py)
+allowed-tools: Read, Bash
+model: sonnet
+---
+
 # EDPA AI Attribution
 
 **Usage:** `/edpa:ai-attribution <iteration> [--json]`

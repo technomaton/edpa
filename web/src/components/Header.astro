@@ -8,6 +8,9 @@ const { currentPath } = Astro.props;
 const isEn = currentPath.startsWith('/en/') || currentPath === '/en';
 const prefix = isEn ? '/en' : '';
 
+// Routes that exist only in Czech (no /en/ counterpart exists yet).
+const czOnly = ['/journey/', '/tutorial/', '/docs/'];
+
 const links = [
   { href: `${prefix}/`, label: 'EDPA' },
   { href: `${prefix}/dashboard/`, label: 'Dashboard' },
@@ -21,17 +24,22 @@ const dropdownItems = [
   { href: `${prefix}/setup/`, label: 'Setup wizard' },
   { href: `${prefix}/guide/`, label: isEn ? 'Guide' : 'Průvodce' },
   { href: `${prefix}/presentation/`, label: isEn ? 'Presentation' : 'Prezentace' },
-  { href: `${prefix}/journey/`, label: 'Journey' },
-  { href: `${prefix}/tutorial/`, label: 'Tutorial' },
+  // Journey and Tutorial are CZ-only pages — omit them from the EN nav.
+  ...(isEn ? [] : [
+    { href: '/journey/', label: 'Journey' },
+    { href: '/tutorial/', label: 'Tutorial' },
+  ]),
   { href: `${prefix}/calculator/`, label: isEn ? 'Calculator' : 'Kalkulátor' },
   { href: `${prefix}/playbook/`, label: 'Playbook' },
+  // Docs section is CZ-only too — link it from the CZ nav only.
+  ...(isEn ? [] : [{ href: '/docs/', label: 'Dokumentace' }]),
 ];
 
 const isDropdownActive = dropdownItems.some(item => currentPath.startsWith(item.href)) || currentPath.startsWith(dropdownHref);
 
 const switchPath = isEn
   ? currentPath.replace(/^\/en(\/|$)/, '/')
-  : `/en${currentPath}`;
+  : (czOnly.includes(currentPath) ? '/en/' : `/en${currentPath}`);
 ---
 <header class="site-header" role="banner">
   <div class="container header-inner">

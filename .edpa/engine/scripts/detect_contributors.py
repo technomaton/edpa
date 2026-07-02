@@ -693,7 +693,16 @@ def cmd_pr(edpa_root: Path, repo: str, pr_number: int,
 
 def cmd_item(edpa_root: Path, repo: str, item_id: str,
              since: datetime | None, dry_run: bool = False) -> int:
-    """Walk all merged PRs touching item_id since `since` and recompute."""
+    """Walk all merged PRs touching item_id since `since` and recompute.
+
+    Exit code contract (D-41 — the else-branch used to be a dead `0`):
+      0 — contributors[] updated, or nothing to do (0 signals detected;
+          existing contributors[] left intact by design).
+      1 — signals were detected but no update happened: aggregation
+          produced no contributors (e.g. all signals zero-weight) or the
+          recompute was a no-op. Lets scripts/CI distinguish "ran but
+          changed nothing" from a real update.
+    """
     weights = load_signal_weights(edpa_root)
     people_map = load_people_map(edpa_root)
     issue_map = load_issue_map(edpa_root)
@@ -703,7 +712,7 @@ def cmd_item(edpa_root: Path, repo: str, item_id: str,
         weights=weights, people_map=people_map, issue_map=issue_map,
         since=since, dry_run=dry_run,
     )
-    return 0 if (changed or n == 0) else 0
+    return 0 if (changed or n == 0) else 1
 
 
 def cmd_ci(edpa_root: Path, repo: str, dry_run: bool = False) -> int:

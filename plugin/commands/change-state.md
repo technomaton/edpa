@@ -1,6 +1,6 @@
 ---
 description: Change the status of a backlog item (wraps edpa_item_transition with workflow validation)
-allowed-tools: Read, Bash
+allowed-tools: Read, Bash, mcp__plugin_edpa_edpa__edpa_item, mcp__plugin_edpa_edpa__edpa_item_transition
 model: sonnet
 ---
 

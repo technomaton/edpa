@@ -253,6 +253,7 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 ├── snapshots/                        # Frozen iteration snapshots
 └── data/                             # Raw evidence cache
 
-.github/workflows/                    # CI — copied here by /edpa:setup (not by install.sh)
-└── edpa-*.yml                        # 11 EDPA workflows (prefixed)
+.github/workflows/                    # CI — 2 EDPA workflows (edpa- prefixed)
+├── edpa-contribution-sync.yml        # PR review/comment signals — installed by install.sh --with-ci
+└── edpa-collision-check.yml          # backlog ID-collision gate — manual copy from templates/github-workflows/
 ```

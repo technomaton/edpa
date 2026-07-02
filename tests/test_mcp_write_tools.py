@@ -374,6 +374,37 @@ def test_transition_event_skips_status_workflow(edpa_root: Path) -> None:
     assert data["status"] == "completed"
 
 
+def test_find_item_file_locates_tasks_dir(edpa_root: Path) -> None:
+    """_find_item_file scans backlog/tasks/ too (D-46) — Task items from
+    legacy/migrated projects were unreachable for every write tool because
+    TYPE_DIRS (the create surface) has no tasks entry."""
+    tasks = edpa_root / "backlog" / "tasks"
+    tasks.mkdir()
+    (tasks / "T-3.md").write_text(
+        "---\nid: T-3\ntype: Task\ntitle: Legacy task\nstatus: Open\n---\n",
+        encoding="utf-8")
+    path = mcp_server._find_item_file(edpa_root, "T-3")
+    assert path is not None
+    assert path.name == "T-3.md"
+    assert path.parent.name == "tasks"
+
+
+def test_transition_task_item_in_tasks_dir(edpa_root: Path) -> None:
+    """Task items are transitionable via MCP (D-46). Task has no enforced
+    workflow (change-state.md: any status string accepted)."""
+    tasks = edpa_root / "backlog" / "tasks"
+    tasks.mkdir()
+    (tasks / "T-3.md").write_text(
+        "---\nid: T-3\ntype: Task\ntitle: Legacy task\nstatus: Open\n---\n",
+        encoding="utf-8")
+    data = _parse(_handle_item_transition(edpa_root, {
+        "item_id": "T-3", "status": "Done",
+    }))
+    assert data["status"] == "Done"
+    md = _read_md(edpa_root, "T-3")
+    assert md["status"] == "Done"
+
+
 # ---------------------------------------------------------------------------
 # edpa_item_link_parent
 # ---------------------------------------------------------------------------

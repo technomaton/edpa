@@ -143,9 +143,11 @@ python3 .edpa/engine/scripts/migrate_evidence_rename.py
 `project_setup.py` seeds this file with sensible defaults. Three
 sections matter:
 
-- **`signals:`** — per-signal-type weight (commit_author 2.78,
-  pr_reviewer 2.25, issue_comment 1.14, …). Higher = more influence
-  on a person's `cw` share for an item. Calibrate via
+- **`signals:`** — per-signal-type weight (`commit_author`,
+  `pr_reviewer`, `issue_comment`, …). Higher = more influence
+  on a person's `cw` share for an item. The seeded file itself
+  carries the current calibrated defaults (plus the calibration
+  metadata that produced them). Recalibrate via
   `/edpa:autocalib` after collecting ≥20 ground-truth records.
 
 - **`gate_weights:`** — fires when a Feature/Epic/Initiative status

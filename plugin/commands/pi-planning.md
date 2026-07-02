@@ -35,11 +35,12 @@ Examples:
 
 ## Steps
 
-1. Parse `$ARGUMENTS` into an optional PI id and flags.
+1. Parse `$ARGUMENTS` into an optional PI id and flags. The script has no
+   positional argument — pass the PI id via `--pi`.
 
 2. Run the script:
    ```bash
-   python3 .edpa/engine/scripts/pi_planning.py [PI-YYYY-N] [--open]
+   python3 .edpa/engine/scripts/pi_planning.py [--pi PI-YYYY-N] [--open] [--output <path>]
    ```
    It discovers the repo root, builds the snapshot (people, iterations,
    backlog, objectives), injects it into the vendored

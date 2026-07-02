@@ -298,6 +298,29 @@ def test_list_tools():
         assert t.inputSchema, f"Tool {t.name} missing inputSchema"
 
 
+def test_backlog_type_enum_matches_handler_dirs():
+    """The edpa_backlog schema `type` enum must equal the set of types the
+    handler actually scans (BACKLOG_TYPE_DIRS). Schema-validating MCP
+    clients reject out-of-enum filter values, so a missing enum entry makes
+    that type unfilterable — D-46: Defect/Task/Event/Risk were missing while
+    the handler supported all eight."""
+    tools = asyncio.run(mcp_server.list_tools())
+    schema = next(t for t in tools if t.name == "edpa_backlog").inputSchema
+    enum = schema["properties"]["type"]["enum"]
+    assert len(enum) == len(set(enum)), "duplicate values in type enum"
+    assert set(enum) == set(mcp_server.BACKLOG_TYPE_DIRS.values())
+
+
+def test_call_tool_backlog_defect_filter(monkeypatch):
+    """edpa_backlog(type=\"Defect\") returns Defect items end-to-end (the
+    schema enum used to block this at the client; D-46)."""
+    monkeypatch.chdir(ROOT)
+    result = asyncio.run(mcp_server.call_tool("edpa_backlog", {"type": "Defect"}))
+    data = parse_result(result)
+    assert len(data) >= 1
+    assert all(i["type"] == "Defect" for i in data)
+
+
 def test_tool_registry_matches_list_tools():
     """TOOL_HANDLERS (dispatch) and list_tools() (advertised schemas) must
     cover exactly the same names — a tool present in only one of them is
@@ -476,6 +499,48 @@ def test_handle_item_no_hyphen():
     """Graceful handling for item ID without hyphen."""
     result = _handle_item(EDPA_ROOT, "NOHYPHEN")
     assert is_error(result)
+
+
+def test_handle_item_task_routes_to_tasks_dir(tmp_path):
+    """T- ids route to backlog/tasks/ where backlog.py stores Task items.
+
+    D-46: prefix_map used to send "T" to stories/, so edpa_item("T-5")
+    returned a false not-found even when backlog/tasks/T-5.md existed."""
+    tasks = tmp_path / "backlog" / "tasks"
+    tasks.mkdir(parents=True)
+    (tasks / "T-5.md").write_text(
+        "---\nid: T-5\ntype: Task\ntitle: Legacy task\nstatus: Open\n---\n",
+        encoding="utf-8")
+    data = parse_result(_handle_item(tmp_path, "T-5"))
+    assert data["id"] == "T-5"
+    assert data["type"] == "Task"
+
+
+def test_handle_item_event_and_risk_prefixes(tmp_path):
+    """EV- and R- ids resolve via the prefix map (D-46 added them; before,
+    they only worked through the full-directory-scan fallback)."""
+    backlog = tmp_path / "backlog"
+    (backlog / "events").mkdir(parents=True)
+    (backlog / "risks").mkdir()
+    (backlog / "events" / "EV-1.md").write_text(
+        "---\nid: EV-1\ntype: Event\ntitle: Outage\n---\n", encoding="utf-8")
+    (backlog / "risks" / "R-2.md").write_text(
+        "---\nid: R-2\ntype: Risk\ntitle: Vendor lock\n---\n", encoding="utf-8")
+    assert parse_result(_handle_item(tmp_path, "EV-1"))["id"] == "EV-1"
+    assert parse_result(_handle_item(tmp_path, "R-2"))["id"] == "R-2"
+
+
+def test_handle_item_rejects_traversal_directly(tmp_path):
+    """_handle_item itself validates item_id (D-46) — a direct caller must
+    not be able to read files outside backlog/ via `../` segments, even
+    though the call_tool dispatch layer also validates."""
+    (tmp_path / "backlog" / "stories").mkdir(parents=True)
+    secret = tmp_path / "secret.md"
+    secret.write_text("---\nleak: true\n---\n", encoding="utf-8")
+    result = _handle_item(tmp_path, "../../secret")
+    assert is_error(result)
+    assert "invalid item_id" in result[0].text
+    assert "leak" not in result[0].text
 
 
 # ---------------------------------------------------------------------------

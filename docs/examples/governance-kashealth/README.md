@@ -3,6 +3,10 @@
 This directory contains a real-world governance document for the
 **Medical Platform a Datovy e-shop** project (CZ.01.01.01/01/24_062/0007440, OP TAK).
 
+> **Provenance:** `governance-reseni-v3.md` is a snapshot copied verbatim
+> from the kashealth project — references inside it (repos, teams,
+> workflows) point at that project's environment, not at this repository.
+
 ## What this demonstrates
 
 A complete EDPA deployment for a cross-organizational team comprising
@@ -33,5 +37,5 @@ Adapt the identity model, team roster, and cadence configuration to your context
 
 ## Related
 
-- [EDPA methodology documentation](../../docs/)
-- [EDPA configuration reference](../../config/)
+- [EDPA methodology documentation](../../methodology.md)
+- [EDPA configuration templates](../../../plugin/edpa/templates/) (`people.yaml.tmpl`, `edpa.yaml.tmpl`, `cw_heuristics.yaml.tmpl`)

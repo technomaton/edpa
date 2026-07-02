@@ -1,6 +1,6 @@
 # EDPA — TODO
 
-Current shipped state: **v2.6.0** (2026-06-10).
+Current shipped state: see the top entry of [CHANGELOG.md](CHANGELOG.md).
 
 **The canonical forward backlog lives in `.edpa/backlog/`** — this repo
 dogfoods EDPA on itself (see Initiative `I-2 EDPA Platform Development`).

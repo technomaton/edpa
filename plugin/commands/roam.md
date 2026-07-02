@@ -1,6 +1,6 @@
 ---
 description: Set the ROAM classification (Resolved / Owned / Accepted / Mitigated) on a Risk item
-allowed-tools: Read, Bash
+allowed-tools: Read, Bash, mcp__plugin_edpa_edpa__edpa_item, mcp__plugin_edpa_edpa__edpa_item_roam
 model: sonnet
 ---
 

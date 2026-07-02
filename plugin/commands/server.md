@@ -9,7 +9,9 @@ model: sonnet
 > **Experimental in V2.0.** The PI planning server is a *complement* to the
 > canonical CLI/skill workflow, not a replacement. Per ADR-009 the default
 > install does not vendor the server (~50 MB Node payload). Opt in with
-> `./install.sh --with-server`.
+> `./install.sh --with-server` — currently that works when installing from a
+> git clone of the EDPA repo; the GitHub release asset does not yet include
+> the server source (release-asset packaging lands separately).
 
 ## What this does
 
@@ -42,17 +44,27 @@ The server bundle lives at `.claude/edpa/server/`. If missing:
 
 ```
 ERROR: PI planning server not installed.
-       Re-run: ./install.sh --with-server
+       Install from a git clone of the EDPA repo: ./install.sh --with-server
+       (the GitHub release asset does not yet include the server source)
 ```
+
+If the bundle exists but `.claude/edpa/server/dist/` or `node_modules/` is
+missing, it was vendored but never built — run the first-run step below.
 
 ### 2. Run the subcommand
 
 ```bash
-# start
-node .claude/edpa/server/index.js --port 3001 &
+# first run only: install deps + build the frontend bundle (dist/)
+npm --prefix .claude/edpa/server install
+npm --prefix .claude/edpa/server run build
+
+# start — `npm run start` runs `tsx server/index.ts --prod`. The port comes
+# from the PORT env var (default 3001; there is no --port flag), and the
+# server finds .edpa/ by walking up from its cwd.
+npm --prefix .claude/edpa/server run start &
 echo $! > .edpa/.server.pid
 
-# stop
+# stop (npm forwards SIGTERM to the tsx child)
 kill "$(cat .edpa/.server.pid)" 2>/dev/null
 rm -f .edpa/.server.pid
 

@@ -7,6 +7,8 @@ Run: python -m pytest tests/test_hooks.py -v
 """
 
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -350,3 +352,149 @@ class TestCWPipelineV1_11:
             )
         except ImportError:
             pass  # expected
+
+
+# ---------------------------------------------------------------------------
+# PostToolUse hook gating (D-43) — shell-level tests
+#
+# hooks.json registers edpa_post_commit.sh on every Bash call and
+# validate_on_save.sh on every Edit/Write, in EVERY project the plugin
+# is enabled for. Both must gate on a .edpa/ directory (walk-up from
+# cwd, same pattern as update_engine.sh) BEFORE spawning python3, so
+# non-EDPA repos pay ~0 per tool call. A python3 PATH-shim spy proves
+# no interpreter is spawned on the skip paths.
+# ---------------------------------------------------------------------------
+
+POST_COMMIT_HOOK = ROOT / "plugin" / "edpa" / "scripts" / "hooks" / "edpa_post_commit.sh"
+VALIDATE_HOOK = ROOT / "plugin" / "edpa" / "scripts" / "hooks" / "validate_on_save.sh"
+
+
+def _run_hook(hook, cwd, stdin, path_prepend=None):
+    env = os.environ.copy()
+    if path_prepend is not None:
+        env["PATH"] = f"{path_prepend}{os.pathsep}{env['PATH']}"
+    return subprocess.run(
+        ["sh", str(hook)],
+        input=stdin, cwd=str(cwd), env=env,
+        capture_output=True, text=True, timeout=30, encoding="utf-8",
+    )
+
+
+def _python3_spy(tmp_path):
+    """PATH dir whose python3 shim records every invocation in a marker."""
+    bindir = tmp_path / "spybin"
+    bindir.mkdir()
+    marker = tmp_path / "python3_invoked"
+    shim = bindir / "python3"
+    shim.write_text(f"#!/bin/sh\ntouch '{marker}'\nexit 0\n", encoding="utf-8")
+    shim.chmod(0o755)
+    return bindir, marker
+
+
+class TestPostCommitHookGating:
+    """edpa_post_commit.sh: .edpa gate + raw 'git commit' pre-filter."""
+
+    @staticmethod
+    def _stdin(command):
+        return json.dumps({"tool_input": {"command": command}})
+
+    def test_non_edpa_cwd_exits_silently_without_python(self, tmp_path):
+        bindir, marker = _python3_spy(tmp_path)
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        r = _run_hook(POST_COMMIT_HOOK, proj,
+                      self._stdin("git commit -m 'feat(S-1): x'"),
+                      path_prepend=bindir)
+        assert r.returncode == 0
+        assert r.stdout == ""
+        assert r.stderr == ""
+        assert not marker.exists(), "python3 spawned in a non-EDPA repo"
+
+    def test_non_commit_bash_skips_before_python(self, tmp_path):
+        bindir, marker = _python3_spy(tmp_path)
+        proj = tmp_path / "proj"
+        (proj / ".edpa").mkdir(parents=True)
+        r = _run_hook(POST_COMMIT_HOOK, proj, self._stdin("ls -la"),
+                      path_prepend=bindir)
+        assert r.returncode == 0
+        assert r.stdout == ""
+        assert r.stderr == ""
+        assert not marker.exists(), "python3 spawned for a non-commit command"
+
+    def test_git_commit_in_edpa_project_reaches_python(self, tmp_path):
+        # Gate + pre-filter passed -> the authoritative python3 JSON
+        # parse runs (the spy prints nothing, so the hook then exits 0).
+        bindir, marker = _python3_spy(tmp_path)
+        proj = tmp_path / "proj"
+        (proj / ".edpa").mkdir(parents=True)
+        r = _run_hook(POST_COMMIT_HOOK, proj,
+                      self._stdin("git commit -m 'feat(S-1): x'"),
+                      path_prepend=bindir)
+        assert r.returncode == 0
+        assert marker.exists(), "gate wrongly blocked a git commit in an EDPA repo"
+
+
+class TestValidateOnSaveGating:
+    """validate_on_save.sh: .edpa gates (cwd + file dir) and extension pre-filter."""
+
+    @staticmethod
+    def _stdin(path):
+        return json.dumps({"tool_input": {"file_path": str(path)}})
+
+    def test_non_edpa_cwd_exits_silently_without_python(self, tmp_path):
+        bindir, marker = _python3_spy(tmp_path)
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        bad = proj / "bad.yaml"
+        bad.write_text("key: [unclosed\n", encoding="utf-8")
+        r = _run_hook(VALIDATE_HOOK, proj, self._stdin(bad), path_prepend=bindir)
+        assert r.returncode == 0
+        assert r.stdout == ""
+        assert r.stderr == ""
+        assert not marker.exists(), "python3 spawned in a non-EDPA repo"
+
+    def test_unsupported_extension_skips_before_python(self, tmp_path):
+        bindir, marker = _python3_spy(tmp_path)
+        proj = tmp_path / "proj"
+        (proj / ".edpa").mkdir(parents=True)
+        f = proj / "main.go"
+        f.write_text("package main\n", encoding="utf-8")
+        r = _run_hook(VALIDATE_HOOK, proj, self._stdin(f), path_prepend=bindir)
+        assert r.returncode == 0
+        assert r.stdout == ""
+        assert r.stderr == ""
+        assert not marker.exists(), "python3 spawned for an unsupported extension"
+
+    def test_valid_file_in_edpa_project_produces_no_stderr(self, tmp_path):
+        # Regression: the hook used to iterate validate_file's
+        # (errors, warnings) TUPLE, printing 'EDPA: validation error: []'
+        # twice for perfectly valid files.
+        proj = tmp_path / "proj"
+        (proj / ".edpa").mkdir(parents=True)
+        good = proj / "good.yaml"
+        good.write_text("key: value\n", encoding="utf-8")
+        r = _run_hook(VALIDATE_HOOK, proj, self._stdin(good))
+        assert r.returncode == 0
+        assert r.stderr == ""
+
+    def test_invalid_yaml_in_edpa_project_reports_error(self, tmp_path):
+        proj = tmp_path / "proj"
+        (proj / ".edpa").mkdir(parents=True)
+        bad = proj / "bad.yaml"
+        bad.write_text("key: [unclosed\n", encoding="utf-8")
+        r = _run_hook(VALIDATE_HOOK, proj, self._stdin(bad))
+        assert r.returncode == 0, "hook must stay fail-open even on errors"
+        assert "EDPA: validation error" in r.stderr
+
+    def test_file_outside_edpa_project_not_validated(self, tmp_path):
+        # cwd is an EDPA project, but the edited file lives elsewhere —
+        # unrelated projects' files must not get EDPA-validated.
+        proj = tmp_path / "proj"
+        (proj / ".edpa").mkdir(parents=True)
+        outside = tmp_path / "other"
+        outside.mkdir()
+        bad = outside / "bad.yaml"
+        bad.write_text("key: [unclosed\n", encoding="utf-8")
+        r = _run_hook(VALIDATE_HOOK, proj, self._stdin(bad))
+        assert r.returncode == 0
+        assert r.stderr == ""

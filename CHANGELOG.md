@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **SessionStart auto-vendor no longer downgrades the engine (D-49).** The
+  `update_engine.sh` hook re-vendored `.edpa/engine/` on *any* version mismatch
+  between the installed plugin and the project's committed
+  `.edpa/engine/VERSION`, treating the plugin as canonical in both directions.
+  A developer whose plugin lagged the repo (hadn't run `/plugin update`) had
+  their working tree silently downgraded — stale `scripts/schemas/templates`
+  rsync-clobbered over a newer committed engine — on every session start,
+  reproduced independently across the team. The hook now compares versions as
+  semver and vendors only *forward*: an older plugin is a no-op with a `run
+  /plugin update` nudge; upgrades and non-semver dev builds (`main`) are
+  unaffected. Regression test: `test_refuses_to_downgrade_when_plugin_older_than_project`.
+
 ## 2.12.1 — 2026-06-28
 
 Hardening fixes surfaced by a parallel-session ID collision: CI now gates the

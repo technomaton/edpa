@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
 """EDPA onboarding E2E harness — fresh-repo sandbox, both install paths.
 
-Drives a brand-new (throwaway) git repo through EDPA's two onboarding paths
-and asserts the engine-vendoring outcome. All checks are OFFLINE and use
+Drives a brand-new (throwaway) git repo through EDPA's onboarding paths and
+asserts the engine-vendoring outcome. All checks are OFFLINE and use
 auto-cleaned temp repos — no network, no GitHub, no writes outside /tmp.
 
-Run with the interpreter that has pexpect (miniconda on this machine):
+History: this harness originally reproduced the onboarding gap where
+/edpa:setup (project_setup.py) never vendored .edpa/engine/. That gap was
+FIXED in 2.1.8 (commit 82d4b9d — the same commit that introduced the
+harness): project_setup.py now vendors the engine itself (vendor_engine(),
+covered by tests/test_project_setup_vendor.py). The harness remains as a
+manual full-path regression/diagnostic tool.
 
-    /opt/miniconda3/bin/python3 tests/onboarding/onboarding_e2e.py
-    /opt/miniconda3/bin/python3 tests/onboarding/onboarding_e2e.py --keep
+Runs under any python3 (check C needs pexpect and SKIPs when it is missing):
+
+    python3 tests/onboarding/onboarding_e2e.py
+    python3 tests/onboarding/onboarding_e2e.py --keep
 
 Checks:
 
   A. install.sh vendor mechanic (control)  → .edpa/engine/scripts/*.py PRESENT
-  B. /edpa:setup mechanic (project_setup)  → .edpa/engine/ ... (currently MISSING)
-     The skill's Step 1 runs only project_setup.py, which never copies the
-     engine. This assertion FAILS today and documents the onboarding gap.
-  C. install.sh overwrite prompt           → driven interactively via pexpect
+  B. /edpa:setup mechanic (project_setup)  → .edpa/engine/ vendored (since 2.1.8)
+  C. install.sh overwrite prompt           → driven via pexpect; SKIP without it
   D. SessionStart hook on fresh repo        → skips (cannot bootstrap an engine)
   E. SessionStart hook on stale engine      → re-vendors (maintenance only)
 
-Exit 0 only if every assertion holds. A failing Path B means the gap between
-the skill's promise ("Vendors the engine into .edpa/engine/") and its actual
-Step 1 is still present.
+Exit 0 only if every executed assertion holds (SKIPs do not fail the run).
+A failure means an onboarding REGRESSION, not the historical 2.1.8 gap.
 """
 
 from __future__ import annotations
@@ -34,15 +38,6 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-
-try:
-    import pexpect
-except ImportError:
-    sys.exit(
-        "pexpect not importable by this interpreter.\n"
-        "Re-run with the one that has it (miniconda):\n"
-        f"  /opt/miniconda3/bin/python3 {__file__}"
-    )
 
 # ─── Paths (harness lives at tests/onboarding/ → repo root is parents[2]) ────
 REPO = Path(__file__).resolve().parents[2]
@@ -63,13 +58,21 @@ class C:
     GRN = "\033[32m"; RED = "\033[31m"; YEL = "\033[33m"; CYN = "\033[36m"
 
 
-results: list[tuple[str, bool, str]] = []
+# Status per check: True = PASS, False = FAIL, None = SKIP (not executed).
+results: list[tuple[str, bool | None, str]] = []
 
 
 def record(name: str, ok: bool, detail: str = "") -> None:
     results.append((name, ok, detail))
     tag = f"{C.GRN}PASS{C.R}" if ok else f"{C.RED}FAIL{C.R}"
     print(f"  [{tag}] {name}")
+    for line in detail.splitlines():
+        print(f"         {C.DIM}{line}{C.R}")
+
+
+def record_skip(name: str, detail: str = "") -> None:
+    results.append((name, None, detail))
+    print(f"  [{C.YEL}SKIP{C.R}] {name}")
     for line in detail.splitlines():
         print(f"         {C.DIM}{line}{C.R}")
 
@@ -113,7 +116,7 @@ def check_install_sh_vendors() -> None:
         cleanup(sb)
 
 
-# ─── B. /edpa:setup mechanic — the gap ──────────────────────────────────────
+# ─── B. /edpa:setup mechanic — vendors since 2.1.8 (vendor_engine) ──────────
 def check_setup_skill_vendors() -> None:
     sb = new_sandbox("setup")
     try:
@@ -143,6 +146,15 @@ def check_setup_skill_vendors() -> None:
 
 # ─── C. install.sh overwrite prompt, driven via pexpect ─────────────────────
 def check_install_prompt() -> None:
+    try:
+        import pexpect  # optional dep — only this interactive check needs it
+    except ImportError:
+        record_skip(
+            "install.sh overwrite prompt (driven via pexpect, offline)",
+            "pexpect not importable by this interpreter — "
+            "`pip install pexpect` to enable the interactive check",
+        )
+        return
     sb = new_sandbox("prompt")
     try:
         marker = sb / ".edpa" / "engine" / "MARKER"
@@ -239,21 +251,21 @@ def main() -> int:
     check_hook_skips_fresh()
     check_hook_updates_existing()
 
-    passed = sum(1 for _, ok, _ in results if ok)
-    print(f"\n{C.B}Summary: {passed}/{len(results)} checks passed{C.R}")
-    failed = [n for n, ok, _ in results if not ok]
+    passed = sum(1 for _, ok, _ in results if ok is True)
+    skipped = sum(1 for _, ok, _ in results if ok is None)
+    executed = len(results) - skipped
+    skip_note = f" ({skipped} skipped)" if skipped else ""
+    print(f"\n{C.B}Summary: {passed}/{executed} checks passed{skip_note}{C.R}")
+    failed = [n for n, ok, _ in results if ok is False]
     if failed:
-        print(f"\n{C.RED}{C.B}Onboarding gap reproduced:{C.R}")
+        print(f"\n{C.RED}{C.B}Onboarding regression detected:{C.R}")
         for n in failed:
             print(f"  {C.RED}✗{C.R} {n}")
-        print(f"\n{C.YEL}Root cause:{C.R} plugin/skills/setup/SKILL.md Step 1 runs only")
-        print("  project_setup.py, which never copies plugin/edpa/{scripts,schemas,")
-        print("  templates} → .edpa/engine/. The skill's description + layout diagram")
-        print("  both claim it vendors. Only curl|sh install.sh vendors; the")
-        print("  SessionStart hook can't bootstrap a missing engine (skip #2).")
-        print(f"\n{C.YEL}Fix options:{C.R}")
-        print("  1. Add a vendor step to SKILL.md Step 1 (cp -R is in allowed-tools), or")
-        print("  2. Make project_setup.py vendor the engine when run from the plugin.")
+        print(f"\n{C.YEL}Context:{C.R} the historical /edpa:setup vendoring gap was fixed")
+        print("  in 2.1.8 (commit 82d4b9d): project_setup.py vendors the engine via")
+        print("  vendor_engine(), covered by tests/test_project_setup_vendor.py.")
+        print("  A failure here means one of the onboarding paths has REGRESSED —")
+        print("  start at project_setup.py / install.sh / hooks/update_engine.sh.")
         return 1
     print(f"{C.GRN}All onboarding paths healthy.{C.R}")
     return 0

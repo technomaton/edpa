@@ -3,6 +3,11 @@ node_modules/
 __pycache__/
 *.pyc
 
+# Test artifacts
+.coverage
+.hypothesis/
+.pytest_cache/
+
 # IDE
 .vscode/
 .idea/

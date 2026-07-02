@@ -1,6 +1,6 @@
 ---
 description: Reconcile git delivery evidence with backlog status (find shipped-but-not-Done items)
-allowed-tools: Read, Bash
+allowed-tools: Read, Bash, mcp__plugin_edpa_edpa__edpa_reconcile, mcp__plugin_edpa_edpa__edpa_item_transition
 model: sonnet
 ---
 
