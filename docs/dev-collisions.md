@@ -83,16 +83,24 @@ T+5  bob    Recovery: python3 .edpa/engine/scripts/renumber_collisions.py --appl
 ```
 You see a conflict on .edpa/backlog/ or id_counters.yaml in your PR or push.
 │
-├── Did pre-push hook block the push?
-│   ├── YES → Hook message points to renumber_collisions.py.
-│   │        Go to RECOVERY FLOW below.
-│   │
-│   └── NO (push succeeded, conflict shown on PR) →
-│       ├── Does CI workflow comment exist on the PR?
-│       │   ├── YES → Follow the comment instructions (= RECOVERY FLOW).
-│       │   └── NO → CI workflow not installed; run RECOVERY FLOW manually.
-│       │
-│       └── Go to RECOVERY FLOW.
+├── Is the conflict INSIDE the evidence[] list of an EXISTING item
+│   (machine-generated entries on both sides, from chore(evidence): commits)?
+│   → NOT an ID collision — renumber_collisions.py correctly reports
+│     "No collisions detected" here. Resolve by UNION (keep both sides).
+│     See "evidence[] merge conflicts on an existing item" below.
+│
+├── Is it a NEW item file (same ID added on both branches) and/or
+│   id_counters.yaml? → ID collision:
+│   ├── Did pre-push hook block the push?
+│   │   ├── YES → Hook message points to renumber_collisions.py.
+│   │   │        Go to RECOVERY FLOW below.
+│   │   │
+│   │   └── NO (push succeeded, conflict shown on PR) →
+│   │       ├── Does CI workflow comment exist on the PR?
+│   │       │   ├── YES → Follow the comment instructions (= RECOVERY FLOW).
+│   │       │   └── NO → CI workflow not installed; run RECOVERY FLOW manually.
+│   │       │
+│   │       └── Go to RECOVERY FLOW.
 │
 └── Was the conflict on something OTHER than .edpa/backlog/ or id_counters.yaml?
     → That's a normal merge conflict, not an EDPA ID collision.
@@ -151,6 +159,60 @@ git push origin <your-branch>
 ```
 
 GitHub re-computes mergeability within ~30s. The PR's CI check re-runs and the merge button enables.
+
+## evidence[] merge conflicts on an existing item
+
+The everyday team conflict is **not** the parallel-new-ID case above — it is two
+developers committing against the **same existing item** on different branches.
+The post-commit hook (`local_evidence.py`) appends machine-generated entries to
+the touched item's `evidence[]` frontmatter list and auto-commits them
+(`chore(evidence): …`) on each developer's machine. Both branches therefore
+edit the same YAML list, and the merge can conflict inside it. (`evidence[]`
+is kept sorted by `ref`, so insertion points scatter across the list —
+short/young lists conflict most often.)
+
+**This is not an ID collision.** `renumber_collisions.py` reports
+"No collisions detected" for it — correctly. Do not renumber anything.
+
+### Resolution: UNION — keep every entry from both sides
+
+```text
+<<<<<<< HEAD
+- ref: "a1b2c3d"            ← your branch's entries
+  type: commit_author
+  ...
+=======
+- ref: "e4f5a6b"            ← their branch's entries
+  type: commit_author
+  ...
+>>>>>>> origin/main
+```
+
+Delete the conflict markers and keep **all** entries from both sides. Unioning
+is always safe:
+
+- signal `ref`s are unique per source commit, so the union holds no logical
+  duplicates;
+- `local_evidence.py` (`_apply_to_item`) re-dedups by `ref` and re-sorts the
+  list on its next write, so ordering and any accidental duplicate self-heal.
+
+Afterwards, optionally reconcile transition/yaml-edit signals for the
+iteration (idempotent — dedup by `ref`):
+
+```bash
+python3 .edpa/engine/scripts/local_evidence.py --materialize --iteration <ITER-ID>
+```
+
+### Never resolve by taking one side
+
+Taking "ours" or "theirs" **silently and permanently discards the other
+developer's `commit_author` / `agent_contribution` entries**. Those signals are
+emitted only by the post-commit hook at commit time; `--materialize` back-fills
+**only** `state_transition` and `yaml_edit` signals and has no replay path for
+commit-time signals at arbitrary SHAs. A dropped `commit_author` entry (weight
+4.0 — the dominant contribution-weight signal) skews the derived-hours
+allocation this tool exists to guarantee, with nothing left behind to detect
+the loss.
 
 ## What `renumber_collisions.py` does internally
 
@@ -248,7 +310,14 @@ chmod +x .git/hooks/pre-push   # if not -rwxr-xr-x
 
 ### "renumber_collisions says 'No collisions detected' but PR shows conflict"
 
-Verify the script is **v2.1.5 or later**. Earlier versions had a bug where the script compared against `origin/<your-branch>` instead of `origin/main`, producing false negatives. Update:
+**First check where the conflict actually is.** If it sits inside the
+`evidence[]` list of an item that exists on both branches, this is not an ID
+collision and "No collisions detected" is the correct answer — resolve by
+union, see [evidence[] merge conflicts on an existing
+item](#evidence-merge-conflicts-on-an-existing-item).
+
+If the conflict really is a same-ID item file added on both branches, verify
+the script is **v2.1.5 or later**. Earlier versions had a bug where the script compared against `origin/<your-branch>` instead of `origin/main`, producing false negatives. Update:
 
 ```bash
 python3 .edpa/engine/scripts/renumber_collisions.py --help | grep target
