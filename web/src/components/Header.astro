@@ -31,6 +31,8 @@ const dropdownItems = [
   ]),
   { href: `${prefix}/calculator/`, label: isEn ? 'Calculator' : 'Kalkulátor' },
   { href: `${prefix}/playbook/`, label: 'Playbook' },
+  // Docs section is CZ-only too — link it from the CZ nav only.
+  ...(isEn ? [] : [{ href: '/docs/', label: 'Dokumentace' }]),
 ];
 
 const isDropdownActive = dropdownItems.some(item => currentPath.startsWith(item.href)) || currentPath.startsWith(dropdownHref);
