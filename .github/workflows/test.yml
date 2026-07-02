@@ -10,7 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        # 3.10 is the enforced support floor: install.sh gates on
+        # >= 3.10 and edpa-collision-check.yml (here and in the template
+        # distributed to consumer repos) runs the engine on 3.10.
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
