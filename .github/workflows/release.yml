@@ -53,6 +53,40 @@ jobs:
         with:
           ref: ${{ steps.tag.outputs.tag }}
 
+      # Publishing whatever the tag points at with zero validation is how a
+      # mislabeled asset ships: install.sh pins .edpa/engine/VERSION from the
+      # payload's plugin.json, so tagging v2.13.0 on a tree still stamped
+      # 2.12.1 gives every consumer a wrong pin. Strict only on tag pushes —
+      # the workflow_dispatch back-fill path must keep working for historical
+      # tags (e.g. v1.23.1-final, whose plugin.json says 1.23.1).
+      - name: Validate tag matches plugin.json version
+        run: |
+          PKG=$(python3 -c "import json; print(json.load(open('plugin/.claude-plugin/plugin.json'))['version'])")
+          if [ "$PKG" != "${{ steps.tag.outputs.version }}" ]; then
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "::error::tag ${{ steps.tag.outputs.tag }} != plugin.json $PKG — run scripts/bump_version.py, commit, retag"
+              exit 1
+            else
+              echo "::warning::back-fill mismatch: tag ${{ steps.tag.outputs.tag }} vs plugin.json $PKG"
+            fi
+          fi
+
+      - name: Set up Python
+        if: github.event_name == 'push'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # test.yml triggers on branch pushes and PRs only — a tag push matches
+      # neither, so without this step a release publishes an untested commit.
+      # Skipped on workflow_dispatch back-fills: historical tags may carry
+      # suites that no longer pass on current runners.
+      - name: Run test suite at tag
+        if: github.event_name == 'push'
+        run: |
+          pip install -r requirements-dev.txt
+          pytest tests/ -m "not e2e" -q --tb=short
+
       - name: Build edpa-plugin.tar.gz
         run: |
           tar --exclude='__pycache__' \
@@ -79,6 +113,9 @@ jobs:
               # doesn't choke on an empty file. Maintainer should backfill.
               print(f"# {version}\n\n_CHANGELOG entry pending._")
           PY
+          if grep -q '_CHANGELOG entry pending._' release-notes.md; then
+            echo "::warning::CHANGELOG.md has no section for ${{ steps.tag.outputs.version }} — publishing stub release notes; backfill CHANGELOG.md"
+          fi
           echo "--- release-notes.md preview ---"
           head -20 release-notes.md
 
