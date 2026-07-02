@@ -17,11 +17,11 @@
 #      next-step instructions for project provisioning.
 #
 # This script is intentionally minimal: it vendors `plugin/edpa/{scripts,
-# schemas,templates}/` into `.edpa/engine/` so CI workflows and non-CC tools
-# can find the engine. It does NOT install pip packages, does NOT copy CI
-# workflows (that's project_setup.py / /edpa:setup), and does NOT touch
-# `.claude/`. The result is a project root that has `.edpa/` and nothing
-# else added.
+# schemas,templates,assets}/` plus `plugin/rules/` into `.edpa/engine/` so
+# CI workflows and non-CC tools can find the engine. It does NOT install
+# pip packages, does NOT copy CI workflows (that's project_setup.py /
+# /edpa:setup), and does NOT touch `.claude/`. The result is a project
+# root that has `.edpa/` and nothing else added.
 set -e
 
 REPO="technomaton/edpa"
@@ -157,6 +157,12 @@ mkdir -p "$TARGET"
 cp -R "$PLUGIN_SRC/edpa/scripts"   "$TARGET/"
 cp -R "$PLUGIN_SRC/edpa/schemas"   "$TARGET/"
 cp -R "$PLUGIN_SRC/edpa/templates" "$TARGET/"
+# "assets" carries the prebuilt PI planning bundle (pi-bundle.html) that
+# pi_planning.py hydrates — vendored so /edpa:pi-planning works with only
+# Python on the target machine (same file set as project_setup.py).
+if [ -d "$PLUGIN_SRC/edpa/assets" ]; then
+  cp -R "$PLUGIN_SRC/edpa/assets" "$TARGET/"
+fi
 if [ -d "$PLUGIN_SRC/rules" ]; then
   cp -R "$PLUGIN_SRC/rules" "$TARGET/"
 fi
