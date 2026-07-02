@@ -8,7 +8,7 @@
 #
 # Drive install.sh through its overwrite prompt (offline abort):
 #   ./tmux_drive.sh new  onb  /tmp/sb && mkdir -p /tmp/sb/.edpa/engine
-#   ./tmux_drive.sh run  onb  'sh /Users/jurby/projects/edpa/install.sh'
+#   ./tmux_drive.sh run  onb  'sh /path/to/edpa/install.sh'
 #   ./tmux_drive.sh cap  onb                 # read what's on screen
 #   ./tmux_drive.sh send onb  'n'            # answer the prompt
 #   ./tmux_drive.sh cap  onb

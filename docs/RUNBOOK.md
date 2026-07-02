@@ -492,6 +492,15 @@ git merge origin/main   # resolve id_counters.yaml conflict by taking MAX value
 git push
 ```
 
+> **Not every `.edpa/backlog/` conflict is an ID collision.** A conflict inside
+> an existing item's `evidence[]` list (machine-generated `chore(evidence):`
+> entries on both sides) is resolved by keeping **both** sides' entries — never
+> by picking one side, which silently discards the other developer's
+> `commit_author` signals (`--materialize` cannot back-fill those).
+> `renumber_collisions.py` correctly reports "No collisions detected" there.
+> Full recipe: [`docs/dev-collisions.md` — evidence[] merge
+> conflicts](dev-collisions.md#evidence-merge-conflicts-on-an-existing-item).
+
 **Setup checklist for a new project** (do once):
 
 ```bash

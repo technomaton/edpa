@@ -1,9 +1,9 @@
 # EDPA MCP Server
 
 A Model Context Protocol server bundled with the EDPA plugin. It exposes
-read-only access to `.edpa/` project data — config, iterations, people,
+read + write access to `.edpa/` project data — config, iterations, people,
 backlog — over the standard MCP `stdio` transport. Any MCP-aware client
-(Claude Code, Cursor, Codex CLI, custom Python/TS clients) can read it.
+(Claude Code, Cursor, Codex CLI, custom Python/TS clients) can use it.
 
 **Production-ready since v1.3.0-beta; current as of v2.12.1** (read + write
 tools — see the tool tables below). Validated handlers, schema-checked
@@ -438,5 +438,6 @@ pip install -r requirements-dev.txt
 pytest tests/test_mcp_server.py -v
 ```
 
-The full repo suite (`pytest tests/ -m "not e2e"`) is currently **127 passed,
-0 skipped, 0 errors** with the dev dependency tree complete.
+The full repo suite (`pytest tests/ -m "not e2e"`) must pass green with the
+dev dependency tree installed — see the CI workflow
+(`.github/workflows/test.yml`) for the authoritative run and count.

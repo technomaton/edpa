@@ -55,6 +55,9 @@ create repositories.
 
 ### CI mode trade-offs
 
+`EDPA_E2E_CI_MODE` is consumed by the agent-driven simulation stages
+(07–08 below), not by the automated verification phases:
+
 - `real` — every PR waits for the actual GitHub Action to complete (~5 min
   per PR). Highest fidelity, slowest. Use this for release verification.
 - `synthetic` — PR signals are injected directly into the local evidence
@@ -66,61 +69,65 @@ create repositories.
 
 ## Usage
 
+`run_e2e.sh` executes **only the automated phases** — `phases/*.sh` and
+`phases/*.py`, i.e. verification (10–12) plus cleanup (99). The seeding and
+simulation stages (01–09) are **Claude-agent-driven** (see "Phases" below)
+and must already have populated the sandbox. Pointing the harness at a fresh
+or nonexistent sandbox (the default when `EDPA_E2E_SANDBOX_DIR` is unset —
+a new `RUN_TAG` is generated) aborts at phase 10 with
+`AssertionError: Expected 10 results files, got 0`.
+
 ```bash
-# Default run (auto-generated RUN_TAG, /tmp sandbox, hybrid CI)
-bash tests/e2e_v2_full/run_e2e.sh
+# Verify an existing, seeded sandbox
+EDPA_E2E_SANDBOX_DIR=/tmp/edpa-e2e-<run-tag> bash tests/e2e_v2_full/run_e2e.sh
 
 # Dry-run — print the phase plan, execute nothing
 EDPA_E2E_DRY_RUN=1 bash tests/e2e_v2_full/run_e2e.sh
 
-# Synthetic-only (fastest; no GitHub Action wait)
-EDPA_E2E_CI_MODE=synthetic bash tests/e2e_v2_full/run_e2e.sh
-
-# Keep the sandbox dir for post-mortem inspection
-EDPA_E2E_KEEP_SANDBOX=1 bash tests/e2e_v2_full/run_e2e.sh
+# Keep the sandbox dir for post-mortem inspection after verification
+EDPA_E2E_KEEP_SANDBOX=1 EDPA_E2E_SANDBOX_DIR=/tmp/edpa-e2e-<run-tag> \
+  bash tests/e2e_v2_full/run_e2e.sh
 
 # Inspect available options
 bash tests/e2e_v2_full/run_e2e.sh --help
 ```
 
-The harness sources phase scripts from `tests/e2e_v2_full/phases/` and
-executes them in lexicographic order. Each phase is either a `.sh`
-(bash) or `.py` (python3) file. Missing phases are reported as `[SKIP]`
-without failing the run.
+The verification phases resolve the sandbox from `EDPA_E2E_SANDBOX_DIR`, with
+a fallback to the run tag recorded in `/tmp/edpa-e2e-current-run-tag` (written
+by the coordinator pre-flight of an agent-driven run).
+
+The harness discovers files under `tests/e2e_v2_full/phases/` and runs them in
+lexicographic order; only `.sh` (bash) and `.py` (python3) files are executed —
+the `.md` files alongside them are run logs, not scripts. Missing phases are
+reported as `[SKIP]` without failing the run.
 
 ## Phases
 
-| Phase | Purpose                                                                                |
-|-------|----------------------------------------------------------------------------------------|
-| 01    | Preflight — check `gh auth`, python version, git version, free disk                    |
-| 02    | Sandbox prep — create `${EDPA_E2E_SANDBOX_DIR}`, init git, write `README.md`           |
-| 03    | Install EDPA via local `install.sh` (`EDPA_FORCE_INSTALL=1`)                           |
-| 04    | Seed people, edpa.yaml, heuristics; install git hooks                                  |
-| 05    | Create GitHub sandbox repo (`${GH_OWNER}/edpa-e2e-${RUN_TAG}`); push initial commit    |
-| 06    | Run `/edpa:setup` flow (project_setup.py); persist `field_ids` + `issue_map`           |
-| 10    | PI-1 backlog plant — initiatives, epics, features, stories via `/edpa:add` + MCP        |
-| 11    | PI-1 iteration 1 — work simulation (4 people, branches, commits, PRs, reviews)         |
-| 12    | PI-1 iteration 2 — work simulation                                                     |
-| 13    | PI-1 iteration 3 — work simulation                                                     |
-| 14    | PI-1 iteration 4 — work simulation                                                     |
-| 15    | PI-1 iteration 5 — work simulation + PI-1 close                                        |
-| 16    | PI-1 reports — timesheets, item costs, snapshot, XLSX export                           |
-| 17    | PI-1 invariants — assert `All invariants passed: YES`, capacity sums match             |
-| 20    | PI-2 backlog plant — next-PI items, parent linkage to PI-1 carry-overs                 |
-| 21    | PI-2 iteration 1 — work simulation                                                     |
-| 22    | PI-2 iteration 2 — work simulation                                                     |
-| 23    | PI-2 iteration 3 — work simulation                                                     |
-| 24    | PI-2 iteration 4 — work simulation                                                     |
-| 25    | PI-2 iteration 5 — work simulation + PI-2 close                                        |
-| 26    | PI-2 reports — timesheets, item costs, snapshot, XLSX export                           |
-| 27    | PI-2 invariants — assert `All invariants passed: YES`, capacity sums match             |
-| 90    | Cross-PI checks — velocity report, flow metrics, calibration readiness                 |
-| 95    | Snapshot diff — confirm PI-1 snapshot still verifies (hash chain)                      |
-| 99    | Cleanup — archive sandbox repo, remove local sandbox unless `KEEP_SANDBOX=1`           |
+Two kinds of entries live in `phases/`:
 
-Numbered gaps (`07–09`, `18–19`, `28–89`, `91–94`, `96–98`) are reserved
-for future phases. Missing phase files are silently skipped, so the
-plan above can grow without breaking older runners.
+- **Agent-driven stages (01–09)** — seeding and simulation performed by
+  Claude agents following the fixture plans in `fixtures/`
+  (`backlog_plan.yaml`, `work_plan.yaml`, `iterations.yaml`, `people.yaml`,
+  `edpa.yaml`). The `phases/0*.md` files are **run logs** of the completed
+  2026-05-27 wave-orchestrated run (run tag `20260527-181051-2c56a6a0`), kept
+  as the reference record of how the sandbox was built — `run_e2e.sh` skips
+  them (not `.sh`/`.py`). Re-running these stages means driving a Claude
+  session through the same playbook, not executing a script.
+- **Automated phases (10–12, 99)** — re-runnable verification scripts plus
+  cleanup, executed by `run_e2e.sh`. Phases 10–12 also have `.md` twins:
+  run logs from the same 2026-05-27 run.
+
+| Stage | File(s)                            | Kind        | Purpose                                                             |
+|-------|------------------------------------|-------------|----------------------------------------------------------------------|
+| 01    | `01_install_seed.md`               | agent (log) | Install EDPA into the sandbox, seed config, install git hooks        |
+| 04    | `04_seed_backlog_iterations.md`    | agent (log) | Plant backlog + iteration files from `fixtures/backlog_plan.yaml`    |
+| 07    | `07_simulate_pi1.md`               | agent (log) | Simulate PI-1 work — branches, commits, PRs (`real` CI signals)      |
+| 08    | `08_simulate_pi2.md`               | agent (log) | Simulate PI-2 work (`synthetic` CI signals)                          |
+| 09    | `09_close_engine_reports.md`       | agent (log) | Close all 10 iterations; run engine, reports, snapshots              |
+| 10    | `10_verify_invariants.py` (+ log)  | automated   | Engine invariants + snapshot signature verification (read-only)      |
+| 11    | `11_verify_reports.py` (+ log)     | automated   | Timesheets, JSON results, frozen snapshots, XLSX exports present + consistent |
+| 12    | `12_verify_backlog.py` (+ log)     | automated   | Backlog + iteration end-state (item/status distribution, `validate`, board) |
+| 99    | `99_cleanup.sh`                    | automated   | Archive sandbox repo; remove local sandbox unless `KEEP_SANDBOX=1`   |
 
 ## Cleanup
 

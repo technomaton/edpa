@@ -546,7 +546,7 @@ Auditability rests on: local git delivery evidence (commit_author, yaml_edit, ga
 |---|---|
 | All items are closed | Undelivered items are moved, not deleted |
 | Capacity confirmed at Iteration Planning | Each member confirms availability |
-| Branch naming followed | CI check enforces S-/F-/E-XXX |
+| Commits attribute to items | Local commit-msg hook requires an item ID (Conventional-Commit scope); `edpa-collision-check.yml` gates backlog ID collisions on PRs |
 | Job Size consistent per level | Planning Poker, reference items |
 | CW calibrated after first Iterations | Retrospective evaluates heuristic |
 
@@ -554,7 +554,7 @@ Auditability rests on: local git delivery evidence (commit_author, yaml_edit, ga
 |---|---|---|
 | Auditor rejects model | High | Methodology, frozen snapshots, reproducibility, BankID |
 | CW heuristic doesn't match | Medium | Override + calibration |
-| Commit without S-/F-/E-XXX | Medium | CI check blocks PR |
+| Commit without S-/F-/E-XXX | Medium | Local commit-msg hook blocks the commit |
 | PM/Arch work without commits | Medium | Comments + /contribute |
 | 0 relevant items | Low | Process escalation |
 
