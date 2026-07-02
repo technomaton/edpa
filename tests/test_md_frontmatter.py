@@ -4,10 +4,12 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "plugin/edpa/scripts"))
 
+import _md_frontmatter  # noqa: E402
 from _md_frontmatter import (  # noqa: E402
     EDPA_TRAILER,
     format_body_sections,
@@ -118,6 +120,39 @@ class TestUpdateField(unittest.TestCase):
             data = load_md(p)
             assert data is not None
             self.assertEqual(data["wsjf"], 4.2)
+
+
+class TestAtomicWrites(unittest.TestCase):
+    """D-42: item writes go through tempfile + os.replace, not truncate+write."""
+
+    def test_save_md_leaves_no_temp_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "S-200.md"
+            save_md(p, SAMPLE_FRONTMATTER, SAMPLE_BODY)
+            save_md(p, SAMPLE_FRONTMATTER, SAMPLE_BODY)  # overwrite path too
+            self.assertEqual([f.name for f in Path(d).iterdir()], ["S-200.md"])
+
+    def test_update_field_leaves_no_temp_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "S-200.md"
+            save_md(p, SAMPLE_FRONTMATTER, SAMPLE_BODY)
+            self.assertTrue(update_frontmatter_field(p, "status", "Done"))
+            self.assertEqual([f.name for f in Path(d).iterdir()], ["S-200.md"])
+
+    def test_failed_replace_keeps_original_and_cleans_temp(self):
+        """A crash mid-write must leave the previous content intact — no
+        torn file, no stray temp for the evidence auto-commit to pick up."""
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "S-200.md"
+            save_md(p, SAMPLE_FRONTMATTER, SAMPLE_BODY)
+            before = p.read_text(encoding="utf-8")
+            with mock.patch.object(_md_frontmatter.os, "replace",
+                                   side_effect=OSError("boom")):
+                with self.assertRaises(OSError):
+                    save_md(p, {**SAMPLE_FRONTMATTER, "status": "Broken"},
+                            SAMPLE_BODY)
+            self.assertEqual(p.read_text(encoding="utf-8"), before)
+            self.assertEqual([f.name for f in Path(d).iterdir()], ["S-200.md"])
 
 
 class TestParseBody(unittest.TestCase):
