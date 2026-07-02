@@ -11,7 +11,8 @@
 #   1. CLAUDE_PLUGIN_ROOT unset — hook invoked outside Claude Code
 #   2. cwd has no .edpa/engine/ — not an EDPA project, or pre-setup
 #   3. VERSION matches — already up to date
-#   4. .edpa/config/edpa.yaml has auto_update_engine: false — opt-out
+#   4. installed plugin OLDER than the on-disk engine — never downgrade (D-49)
+#   5. .edpa/config/edpa.yaml has auto_update_engine: false — opt-out
 #
 # On version mismatch:
 #   - rsync (or cp -R fallback) plugin engine -> .edpa/engine/
@@ -77,6 +78,28 @@ if [ "$PLUGIN_VERSION" = "$LOCAL_VERSION" ]; then
     fi
   }
   _warn_legacy_yaml
+  exit 0
+fi
+
+# 3b. Direction guard (D-49) — vendor only FORWARD. The plugin is canonical
+# only when it is NEWER; an installed plugin that is *older* than the project's
+# committed engine (a developer who hasn't run /plugin update) must never
+# rsync-clobber it back to a stale version. Compare as semver; only a *proven*
+# downgrade is blocked — an upgrade or a non-semver dev build ("main") falls
+# through to the normal vendor path below.
+VERSION_ORDER=$(python3 - "$PLUGIN_VERSION" "$LOCAL_VERSION" 2>/dev/null <<'PY' || echo ""
+import re, sys
+def parse(v):
+    m = re.match(r'\s*(\d+)\.(\d+)\.(\d+)', v or "")
+    return tuple(int(g) for g in m.groups()) if m else None
+plug, loc = parse(sys.argv[1]), parse(sys.argv[2])
+if plug is not None and loc is not None and plug < loc:
+    print("DOWNGRADE")
+PY
+)
+if [ "$VERSION_ORDER" = "DOWNGRADE" ]; then
+  echo "EDPA: installed plugin ($PLUGIN_VERSION) is older than this project's engine ($LOCAL_VERSION) — not downgrading." >&2
+  echo "       Run /plugin update to catch up, then restart the session." >&2
   exit 0
 fi
 
