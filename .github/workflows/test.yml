@@ -37,3 +37,43 @@ jobs:
         run: |
           rate=$(python -c "import xml.etree.ElementTree as ET; print(f'{float(ET.parse(\"coverage.xml\").getroot().get(\"line-rate\", 0)) * 100:.1f}')")
           echo "**pytest line coverage: ${rate}%**" >> "$GITHUB_STEP_SUMMARY"
+
+  web-build:
+    # Builds the Astro site on every PR/push. Without this job web breakage
+    # merges green: test_web_build_succeeds skips whenever web/node_modules
+    # is absent (always true in CI), Vercel auto-builds are deliberately
+    # disabled (vercel.json git.deploymentEnabled=false), and deploys are
+    # manual — so a broken .astro page or a plugin.json change breaking
+    # web/src/lib/version.ts's cross-tree import surfaced only at release
+    # time. Intentionally NOT paths-filtered: at ~1 min it is cheap, and an
+    # unfiltered job never leaves branch protection hanging on non-web PRs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Node 24 matches the Vercel project setting used for deploys.
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Build web site
+        # Reuses test_web_build_succeeds (exit 0 + >= 14 HTML files in dist/)
+        # as the single source of truth instead of duplicating the assertion
+        # in bash. -m "" clears pytest.ini's `-m "not e2e"` addopts so marker
+        # filtering cannot deselect the explicitly named test.
+        run: pytest tests/test_consistency.py::test_web_build_succeeds -m "" -q
