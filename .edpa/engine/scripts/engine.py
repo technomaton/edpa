@@ -20,8 +20,6 @@ except ImportError:
 import argparse
 import json
 import os
-import re
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,41 +56,11 @@ def get_version():
 
 VERSION = get_version()
 
-# Evidence roles — kept as a constant for backward compatibility with
-# pre-v1.11 callers (validate_syntax.py, migrate_contributors.py). In
-# v1.11 the engine no longer uses role-based CW computation; cw values
-# are pre-computed by detect_contributors.py via per-item normalization
-# and consumed directly. This constant remains for tooling that still
-# emits role labels (e.g., display layer in reports.py).
-EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
-
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     from _yaml_io import load_yaml  # noqa: E402  (shared .md/.yaml loader, S-242)
 finally:
     sys.path.pop(0)
-
-
-def gh_json(cmd):
-    """Run gh CLI command and parse JSON output."""
-    try:
-        result = subprocess.run(
-            ["gh"] + cmd.split() + ["--json", "number,title,assignees,labels,body"],
-            capture_output=True, text=True, timeout=30, encoding="utf-8"
-        )
-        if result.returncode == 0:
-            return json.loads(result.stdout)
-    except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError):
-        pass
-    return []
-
-
-def extract_item_refs(text):
-    """Extract work item references (S-123, F-45, E-7) from text."""
-    if not text:
-        return []
-    return re.findall(r'[SFEITD]-\d+', text)
 
 
 def extract_contributors(item):
@@ -408,6 +376,22 @@ def load_heuristics(edpa_root):
     return {"evidence_threshold": 1.0, "role_weights": {"owner": 1.0, "key": 0.6, "reviewer": 0.25, "consulted": 0.15}}
 
 
+def _coerce_js(value):
+    """Coerce a frontmatter js/job_size value to a number, or None.
+
+    Hand-edited items may quote the scalar (``js: "5"``); validate_syntax.py
+    accepts any float-coercible value, so the engine must not crash on
+    validator-blessed input (D-42). Non-numeric values return None —
+    callers warn and skip the item instead of raising.
+    """
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def load_backlog_items(edpa_root, iteration_id=None):
     """Read .edpa/backlog/ YAML files and convert to engine item format.
 
@@ -419,7 +403,10 @@ def load_backlog_items(edpa_root, iteration_id=None):
         iteration_id: If given, only include items matching this iteration. If None, include all Done items.
 
     Returns:
-        List of item dicts in engine format, plus a dict of manual CW overrides.
+        ``(items, {})`` — a list of item dicts in engine format. The second
+        element is a legacy manual-CW-overrides slot: dead v1.x plumbing that
+        was never populated. It stays an always-empty dict only because
+        existing callers/tests unpack two values (D-42).
     """
     edpa_root = Path(edpa_root)
     backlog_dir = edpa_root / "backlog"
@@ -427,7 +414,6 @@ def load_backlog_items(edpa_root, iteration_id=None):
         return [], {}
 
     items = []
-    manual_cw_overrides = {}  # {(person_id, item_id): cw_value}
     schema_warnings = []      # collected per-item schema problems
     contributors_seen_total = 0
     evidence_pairs_total = 0
@@ -456,7 +442,9 @@ def load_backlog_items(edpa_root, iteration_id=None):
                 continue
 
             item_id = data.get("id", md_file.stem)
-            status = data.get("status", "")
+            # A present-but-blank `status:` parses as None — guard with the
+            # same idiom as load_story_activity_events (D-42).
+            status = data.get("status") or ""
 
             # Filter: only Done items
             if status.lower() not in ("done", "closed", "accepted"):
@@ -475,7 +463,14 @@ def load_backlog_items(edpa_root, iteration_id=None):
                     item_type, item_iter, iteration_id):
                 continue
 
-            js = data.get("js") or data.get("job_size", 0)
+            raw_js = data.get("js") or data.get("job_size", 0)
+            js = _coerce_js(raw_js)
+            if js is None:
+                schema_warnings.append(
+                    f"{item_id}: js must be numeric (got {raw_js!r} "
+                    f"in {md_file}) — item skipped"
+                )
+                continue
             if not js or js <= 0:
                 continue
 
@@ -587,7 +582,7 @@ def load_backlog_items(edpa_root, iteration_id=None):
             file=sys.stderr,
         )
 
-    return items, manual_cw_overrides
+    return items, {}
 
 
 GATE_TYPE_DIRS = {
@@ -781,7 +776,15 @@ def load_story_activity_events(edpa_root, iteration_id, heuristics,
         sigs = yaml_edit_signals.get(story_id) or []
         if not sigs:
             continue
-        js = data.get("js") or data.get("job_size") or 0
+        raw_js = data.get("js") or data.get("job_size") or 0
+        js = _coerce_js(raw_js)
+        if js is None:
+            print(
+                f"WARN: {story_id}: js must be numeric (got {raw_js!r} in "
+                f"{story_path}) — story activity skipped",
+                file=sys.stderr,
+            )
+            continue
         if js <= 0:
             continue
 
@@ -881,7 +884,15 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
         if not parent_file.is_file():
             continue
         parent = load_yaml(parent_file) or {}
-        parent_js = parent.get("js") or parent.get("job_size") or 0
+        raw_js = parent.get("js") or parent.get("job_size") or 0
+        parent_js = _coerce_js(raw_js)
+        if parent_js is None:
+            print(
+                f"WARN: {t['item_id']}: js must be numeric (got {raw_js!r} in "
+                f"{parent_file}) — gate event skipped",
+                file=sys.stderr,
+            )
+            continue
         if parent_js <= 0:
             continue
 
@@ -1501,7 +1512,7 @@ def main():
         heuristics = load_heuristics(edpa_root)
         iteration_id = args.iteration
 
-        items, manual_cw = load_backlog_items(edpa_root, iteration_id)
+        items, _ = load_backlog_items(edpa_root, iteration_id)
         # Stories carry Done credit on their own; parents (Feature/Epic/
         # Initiative) come in only as gate events synthesized from git
         # transitions. We strip Done parents from the items[] list so
@@ -1555,8 +1566,6 @@ def main():
               f"{', ' + str(n_yaml) + ' yaml_edit signals' if n_yaml else ''})")
         if iteration_id:
             print(f"Filtered to iteration: {iteration_id}")
-        if manual_cw:
-            print(f"Manual CW overrides: {len(manual_cw)}")
     else:
         # Legacy mode: explicit file paths
         if not args.capacity or not args.heuristics or not args.iteration:

@@ -9,6 +9,13 @@
 # keyed by the plugin's requirements.txt content hash so a deps bump in
 # upstream re-triggers install without manual intervention.
 #
+# Opt-out (mirrors update_engine.sh's auto_update_engine: false, but
+# env-based — this hook is project-agnostic and has no project dir to
+# read an edpa.yaml from):
+#   - EDPA_NO_AUTO_DEPS=1     → never run pip; print the manual command
+#                               instead. For users who manage their
+#                               Python environment themselves.
+#
 # Failure modes:
 #   - pip not on PATH         → warn, return 0 (don't block session start)
 #   - pip install fails       → warn, return 0 (engine will error later
@@ -64,13 +71,23 @@ if python3 -c 'import yaml, ruamel.yaml, mcp.server, openpyxl, filelock' >/dev/n
   exit 0
 fi
 
+# Opt-out: the user manages Python deps themselves — never touch pip.
+if [ "${EDPA_NO_AUTO_DEPS:-0}" != "0" ]; then
+  echo "EDPA: Python deps missing; auto-install skipped (EDPA_NO_AUTO_DEPS set)." >&2
+  echo "       Install manually: pip3 install -r $REQUIREMENTS" >&2
+  exit 0
+fi
+
 if ! command -v pip3 >/dev/null 2>&1; then
   echo "EDPA: pip3 not on PATH — install Python deps manually:" >&2
   echo "       pip3 install -r $REQUIREMENTS" >&2
   exit 0
 fi
 
-echo "EDPA: installing Python deps (one-time, then cached)..." >&2
+# Name exactly what lands in the user's environment and how to opt out
+# (tests/test_install_deps_probe.py keeps this list in sync with
+# requirements.txt).
+echo "EDPA: installing PyYAML, ruamel.yaml, mcp, openpyxl, filelock (pip3 --break-system-packages; set EDPA_NO_AUTO_DEPS=1 to skip)..." >&2
 
 # --break-system-packages is the documented escape hatch for PEP 668
 # environments (Debian/Ubuntu, recent macOS Homebrew). Plain pip3 install

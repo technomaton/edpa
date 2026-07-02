@@ -389,17 +389,28 @@ def _apply_to_item(item_path: Path, new_sigs: list[dict]) -> bool:
 
 
 def _git_commit_paths(repo_root: Path, paths: list[Path], msg: str) -> bool:
-    """Stage the given paths and commit them with --no-verify. Safe because
-    we modify frontmatter only (no new IDs, counter unchanged)."""
+    """Stage the given paths and commit ONLY them with --no-verify.
+
+    The commit is pathspec-limited (``git commit … -- <paths>``) so it can
+    never sweep unrelated user-staged work into the auto-generated
+    ``chore(evidence):`` commit — e.g. after ``git add A B && git commit A``
+    file B must stay staged, not get silently swallowed under an auto
+    prefix the ticket hook whitelists (D-41). Same idiom as
+    ``_auto_commit.maybe_commit``; we keep this local helper because the
+    evidence commit additionally needs ``--no-verify`` (bypass arbitrary
+    user pre-commit hooks) and must not skip on unset git identity.
+
+    Safe because we modify frontmatter only (no new IDs, counter
+    unchanged)."""
     rels = [str(p.relative_to(repo_root)) for p in paths]
     add = subprocess.run(
-        ["git", "add", *rels],
+        ["git", "add", "--", *rels],
         cwd=str(repo_root), capture_output=True, text=True, encoding="utf-8",
     )
     if add.returncode != 0:
         return False
     commit_res = subprocess.run(
-        ["git", "commit", "--no-verify", "-m", msg],
+        ["git", "commit", "--no-verify", "-m", msg, "--", *rels],
         cwd=str(repo_root), capture_output=True, text=True, encoding="utf-8",
     )
     return commit_res.returncode == 0

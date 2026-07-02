@@ -15,8 +15,10 @@ issue body verbatim).
 from __future__ import annotations
 
 import io
+import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -129,6 +131,30 @@ def _dump_frontmatter(frontmatter: dict[str, Any]) -> str:
         )
 
 
+def _write_text_atomic(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` via tempfile + os.replace (atomic rename).
+
+    Mirrors mcp_server._write_yaml_atomic: item writes funnel through this
+    module, and a crash/kill mid-write must never leave a truncated item
+    file for the post-commit evidence auto-commit to pick up. Readers see
+    either the old or the new content, never a torn file (D-42).
+    """
+    p = Path(path)
+    fd, tmp_name = tempfile.mkstemp(
+        suffix=".tmp", prefix=f".{p.name}_", dir=str(p.parent)
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(tmp_name, p)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
 def save_md(path: str | Path, frontmatter: dict[str, Any], body: str = "") -> None:
     """Write a `.md` backlog item.
 
@@ -150,7 +176,7 @@ def save_md(path: str | Path, frontmatter: dict[str, Any], body: str = "") -> No
         parts.append(body)
         if not body.endswith("\n"):
             parts.append("\n")
-    Path(path).write_text("".join(parts), encoding="utf-8")
+    _write_text_atomic(Path(path), "".join(parts))
 
 
 def save_md_item(path: str | Path, item: dict[str, Any]) -> None:
@@ -220,7 +246,7 @@ def update_frontmatter_field(
         parts.append(body_text)
         if not body_text.endswith("\n"):
             parts.append("\n")
-    p.write_text("".join(parts), encoding="utf-8")
+    _write_text_atomic(p, "".join(parts))
     return True
 
 
