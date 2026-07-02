@@ -176,7 +176,11 @@ def test_local_story_under_feature(tmp_path, silence_git):
 
 
 def test_local_writes_contributors_block(tmp_path, silence_git):
-    """``--contributor PERSON:ROLE:CW`` lands in the YAML with ``as:`` field."""
+    """``--contributor PERSON:ROLE:CW`` lands in the YAML as ``{person, cw}``.
+    ROLE is validated but NOT persisted — the legacy ``as:`` field was dropped
+    in v1.11 (validate_syntax hard-errors on it; roles derive from
+    signals[].type at display time). Guards the v1.16.0-beta fix that commit
+    02e4828 regressed (D-41)."""
     root = _write_workspace(
         tmp_path,
         initiatives=[{"id": "I-1", "type": "Initiative", "title": "Root",
@@ -194,9 +198,37 @@ def test_local_writes_contributors_block(tmp_path, silence_git):
     from _md_frontmatter import load_md
     data = load_md(root / ".edpa" / "backlog" / "stories" / "S-1.md")
     assert data["contributors"] == [
-        {"person": "alice", "as": "owner", "cw": 1.0},
-        {"person": "alice", "as": "reviewer", "cw": 0.3},
+        {"person": "alice", "cw": 1.0},
+        {"person": "alice", "cw": 0.3},
     ]
+
+
+def test_local_contributors_pass_validate_syntax(tmp_path, silence_git):
+    """D-41 regression guard: an item created via ``cmd_add --contributor``
+    must pass validate_syntax with ZERO errors — one shipped CLI must not
+    produce data another shipped validator rejects (the legacy ``as:`` field
+    is a hard error even without --strict, resurfacing via the
+    validate_on_save hook on every later edit). The absence of exactly this
+    guard is how the v1.16 fix regressed unnoticed."""
+    import validate_syntax
+    root = _write_workspace(
+        tmp_path,
+        initiatives=[{"id": "I-1", "type": "Initiative", "title": "Root",
+                      "status": "Funnel"}],
+        features=[{"id": "F-1", "type": "Feature", "title": "Auth",
+                   "status": "Funnel", "parent": "I-1"}],
+    )
+    bl = backlog.load_backlog(root)
+
+    backlog.cmd_add(root, bl, _args(
+        type="Story", title="Login", parent="F-1", js=5,
+        iteration="PI-2026-1.1",  # Story schema requires iteration:
+        contributor=["alice:owner:0.7", "alice:reviewer:0.3"],
+    ))
+
+    md_path = root / ".edpa" / "backlog" / "stories" / "S-1.md"
+    errors, _warnings = validate_syntax.validate_file(md_path)
+    assert errors == []
 
 
 def test_local_commits_via_git(tmp_path, silence_git):

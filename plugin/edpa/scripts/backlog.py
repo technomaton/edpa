@@ -977,6 +977,12 @@ def _parse_contributor_args(raw_contributors):
     Returns ``(contributors_list, error_msg)`` — exactly one is non-None.
     Shared between GH-first and V2 local paths so the user sees identical
     diagnostics regardless of mode.
+
+    ROLE is validated (CLI-format compatibility) but NOT persisted: the
+    legacy ``as:`` role field was dropped in v1.11 — roles derive from
+    ``signals[].type`` at display time — and ``validate_syntax.py``
+    hard-errors on it. Entries are emitted as ``{person, cw}`` (the
+    v1.16.0-beta shape; regressed by commit 02e4828, restored for D-41).
     """
     contributors = []
     for raw in raw_contributors or []:
@@ -998,7 +1004,9 @@ def _parse_contributor_args(raw_contributors):
                           f"(got {cw_str!r} in {raw!r})")
         if not (0.0 <= cw <= 1.0):
             return None, f"--contributor cw must be in [0,1] (got {cw} in {raw!r})"
-        contributors.append({"person": person, "as": role, "cw": cw})
+        # Deliberately drop `role` — writing `as:` would make the item
+        # fail validate_syntax on every subsequent save (hard error).
+        contributors.append({"person": person, "cw": cw})
     return contributors, None
 
 
@@ -1156,7 +1164,11 @@ def main():
                        help="Add a contributor (repeatable). Format "
                             "PERSON:ROLE:CW where ROLE ∈ "
                             "{owner,key,reviewer,consulted} and CW ∈ "
-                            "[0,1]. Example: --contributor turyna:owner:0.7")
+                            "[0,1]. ROLE is validated but not persisted "
+                            "(dropped in v1.11 — roles derive from "
+                            "signals[].type at display time); the entry "
+                            "is written as {person, cw}. "
+                            "Example: --contributor turyna:owner:0.7")
 
     args = parser.parse_args()
 
