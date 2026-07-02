@@ -135,7 +135,8 @@ python3 .edpa/engine/scripts/engine.py \
 
 Check the generated reports in `.edpa/reports/iteration-PI-2026-1.1/`:
 - `edpa_results.json` — raw calculation data
-- `vykaz-{person}.md` — per-person timesheet
+- `timesheet-{person}.md` — per-person timesheet
+- `timesheet-team.md` — aggregated team rollup
 - `edpa-results.xlsx` — Team Summary + Item Costs tabs (per-person aggregate + per-item allocation)
 
 Check the frozen snapshot in `.edpa/snapshots/PI-2026-1.1.json`.
