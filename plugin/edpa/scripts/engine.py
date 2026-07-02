@@ -20,8 +20,6 @@ except ImportError:
 import argparse
 import json
 import os
-import re
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,41 +56,11 @@ def get_version():
 
 VERSION = get_version()
 
-# Evidence roles — kept as a constant for backward compatibility with
-# pre-v1.11 callers (validate_syntax.py, migrate_contributors.py). In
-# v1.11 the engine no longer uses role-based CW computation; cw values
-# are pre-computed by detect_contributors.py via per-item normalization
-# and consumed directly. This constant remains for tooling that still
-# emits role labels (e.g., display layer in reports.py).
-EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
-
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     from _yaml_io import load_yaml  # noqa: E402  (shared .md/.yaml loader, S-242)
 finally:
     sys.path.pop(0)
-
-
-def gh_json(cmd):
-    """Run gh CLI command and parse JSON output."""
-    try:
-        result = subprocess.run(
-            ["gh"] + cmd.split() + ["--json", "number,title,assignees,labels,body"],
-            capture_output=True, text=True, timeout=30, encoding="utf-8"
-        )
-        if result.returncode == 0:
-            return json.loads(result.stdout)
-    except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError):
-        pass
-    return []
-
-
-def extract_item_refs(text):
-    """Extract work item references (S-123, F-45, E-7) from text."""
-    if not text:
-        return []
-    return re.findall(r'[SFEITD]-\d+', text)
 
 
 def extract_contributors(item):
@@ -435,7 +403,10 @@ def load_backlog_items(edpa_root, iteration_id=None):
         iteration_id: If given, only include items matching this iteration. If None, include all Done items.
 
     Returns:
-        List of item dicts in engine format, plus a dict of manual CW overrides.
+        ``(items, {})`` — a list of item dicts in engine format. The second
+        element is a legacy manual-CW-overrides slot: dead v1.x plumbing that
+        was never populated. It stays an always-empty dict only because
+        existing callers/tests unpack two values (D-42).
     """
     edpa_root = Path(edpa_root)
     backlog_dir = edpa_root / "backlog"
@@ -443,7 +414,6 @@ def load_backlog_items(edpa_root, iteration_id=None):
         return [], {}
 
     items = []
-    manual_cw_overrides = {}  # {(person_id, item_id): cw_value}
     schema_warnings = []      # collected per-item schema problems
     contributors_seen_total = 0
     evidence_pairs_total = 0
@@ -612,7 +582,7 @@ def load_backlog_items(edpa_root, iteration_id=None):
             file=sys.stderr,
         )
 
-    return items, manual_cw_overrides
+    return items, {}
 
 
 GATE_TYPE_DIRS = {
@@ -1542,7 +1512,7 @@ def main():
         heuristics = load_heuristics(edpa_root)
         iteration_id = args.iteration
 
-        items, manual_cw = load_backlog_items(edpa_root, iteration_id)
+        items, _ = load_backlog_items(edpa_root, iteration_id)
         # Stories carry Done credit on their own; parents (Feature/Epic/
         # Initiative) come in only as gate events synthesized from git
         # transitions. We strip Done parents from the items[] list so
@@ -1596,8 +1566,6 @@ def main():
               f"{', ' + str(n_yaml) + ' yaml_edit signals' if n_yaml else ''})")
         if iteration_id:
             print(f"Filtered to iteration: {iteration_id}")
-        if manual_cw:
-            print(f"Manual CW overrides: {len(manual_cw)}")
     else:
         # Legacy mode: explicit file paths
         if not args.capacity or not args.heuristics or not args.iteration:
