@@ -361,6 +361,49 @@ def test_skip_commit_writes_yaml_without_git_commit(
     assert len(s1["evidence"]) == 1
 
 
+# ─── Workflow template consistency (D-44) ──────────────────────────────────
+
+
+WORKFLOW_COPIES = (
+    ROOT / ".github" / "workflows" / "edpa-contribution-sync.yml",
+    PLUGIN_SRC / "edpa" / "templates" / "github-workflows"
+    / "edpa-contribution-sync.yml",
+)
+
+
+def test_contribution_sync_workflow_copies_identical() -> None:
+    """The shipped template and the repo-local workflow must never drift."""
+    repo_copy, template_copy = (
+        p.read_text(encoding="utf-8") for p in WORKFLOW_COPIES
+    )
+    assert repo_copy == template_copy, (
+        ".github/workflows/edpa-contribution-sync.yml and "
+        "plugin/edpa/templates/github-workflows/edpa-contribution-sync.yml "
+        "have drifted — keep both copies byte-identical"
+    )
+
+
+def test_contribution_sync_workflow_wires_edpa_token() -> None:
+    """D-44: the optional EDPA_TOKEN secret must actually be wired.
+
+    docs/edpa-token-setup.md documents the ``EDPA_TOKEN || github.token``
+    fallback and the '::warning::EDPA_TOKEN secret not configured'
+    log line — both must exist in the workflow, not just in the docs.
+    """
+    for path in WORKFLOW_COPIES:
+        text = path.read_text(encoding="utf-8")
+        # checkout persists these credentials for the push step
+        assert "token: ${{ secrets.EDPA_TOKEN || github.token }}" in text, path
+        # gh api calls in sync_pr_contributions.py
+        assert (
+            "GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}"
+            in text
+        ), path
+        # exact string documented in docs/edpa-token-setup.md §5
+        assert "::warning::EDPA_TOKEN secret not configured" in text, path
+        yaml.safe_load(text)  # must stay valid YAML
+
+
 # ─── Real-GitHub variant (opt-in, requires gh + EDPA_E2E_REPO) ─────────────
 
 

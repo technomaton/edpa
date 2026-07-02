@@ -78,7 +78,11 @@ signals — `pr_reviewer` and `issue_comment` — into that item's
 `evidence[]`. This layers review/comment evidence on top of the
 local-first `git log` evidence.
 
-The workflow needs an `EDPA_TOKEN` repository secret. See
+The workflow runs out of the box with the default `GITHUB_TOKEN` — no
+secret needed. Only if your base branch is protected against
+default-token pushes (or your org restricts default-token write), set
+the optional `EDPA_TOKEN` repository secret to a bypass-entitled PAT;
+the workflow prefers it automatically. See
 [edpa-token-setup.md](edpa-token-setup.md) for how to create and store
 it.
 

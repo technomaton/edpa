@@ -15,6 +15,13 @@
 # Skip this workflow when your team is single-dev, review-light, or
 # entirely off GitHub.
 #
+# Token: runs out of the box with the default github.token (ADR-012,
+# zero setup). Optionally set an EDPA_TOKEN repo secret — a PAT whose
+# owner can bypass branch protection — only if pushes of the
+# materialized evidence to the base branch are rejected. Fork-origin
+# pull_request runs never receive repo secrets, so EDPA_TOKEN cannot
+# help there. See docs/edpa-token-setup.md.
+#
 # Mode (default merge-only): triggers once per PR after merge and
 # writes the PR's review + comment events as `evidence[]` entries.
 # For audit-heavy teams, uncomment the live-mode triggers below to
@@ -50,6 +57,21 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.base.ref }}
+          # checkout persists these credentials, so the push step below
+          # inherits whichever token wins here.
+          token: ${{ secrets.EDPA_TOKEN || github.token }}
+
+      - name: Warn if EDPA_TOKEN not configured
+        # Informational only — the default github.token is the supported
+        # zero-setup path and works unless branch protection rejects its
+        # pushes to the base branch. (Guarded in the shell because the
+        # `secrets` context is not available in step-level `if:`.)
+        env:
+          EDPA_TOKEN: ${{ secrets.EDPA_TOKEN }}
+        run: |
+          if [ -z "$EDPA_TOKEN" ]; then
+            echo "::warning::EDPA_TOKEN secret not configured. Falling back to the default github.token — fine unless branch protection rejects its pushes to the base branch (see docs/edpa-token-setup.md)."
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -71,7 +93,9 @@ jobs:
 
       - name: Materialize PR signals
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer the optional EDPA_TOKEN (protected-branch bypass PAT);
+          # the default GITHUB_TOKEN covers everything else.
+          GH_TOKEN: ${{ secrets.EDPA_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           python3 .edpa/engine/scripts/sync_pr_contributions.py \
             --pr ${{ github.event.pull_request.number }} \
