@@ -3,21 +3,25 @@
 
 # EDPA_TOKEN — průvodce nastavením
 
-> **Komu je určeno:** každý, kdo nasadil EDPA na repo a chce, aby
-> **contribution-sync workflow** (`edpa-contribution-sync.yml`) běžel
-> po merge PR automaticky — tedy aby se PR-thread signály
-> (`pr_reviewer`, `issue_comment`) materializovaly zpět do
-> `evidence[]` položky v `.edpa/backlog/**/*.md` bez manuální obsluhy.
+> **Komu je určeno:** týmy, kterým **contribution-sync workflow**
+> (`edpa-contribution-sync.yml`) nedokáže pushnout materializované
+> PR-thread signály (`pr_reviewer`, `issue_comment`) zpět na base
+> branch — typicky kvůli branch protection. Workflow jinak běží
+> out-of-the-box s default `github.token`; `EDPA_TOKEN` je volitelný
+> bypass, ne prerekvizita.
 >
 > **Čas:** ~5 minut. **Frekvence:** jednou per repo (nebo jednou per
 > org pokud použiješ organization secret).
 >
-> **Kdy to vůbec potřebuješ:** jen pokud tým má signály, které
-> nežijí v git historii — reviews a komentáře v PR/issue threadech.
-> Primární atribuce v V2.1+ jde přes lokální post-commit hook
-> (`local_evidence.py`), který emituje `commit_author` offline a
-> žádný token nepotřebuje. Single-dev / review-light / mimo-GitHub
-> týmy tenhle workflow (a tím i `EDPA_TOKEN`) vynechají.
+> **Kdy to vůbec potřebuješ:** jen pokud (a) tým má signály, které
+> nežijí v git historii — reviews a komentáře v PR/issue threadech —
+> a proto používá contribution-sync workflow, **a zároveň** (b) base
+> branch odmítá pushe od default `GITHUB_TOKEN` (branch protection /
+> org restrikce na default-token write). Primární atribuce v V2.1+
+> jde přes lokální post-commit hook (`local_evidence.py`), který
+> emituje `commit_author` offline a žádný token nepotřebuje.
+> Single-dev / review-light / mimo-GitHub týmy tenhle workflow
+> (a tím i `EDPA_TOKEN`) vynechají.
 
 ## 1. Proč to potřebuješ
 
@@ -27,14 +31,26 @@ Po merge PR, který referencuje EDPA položku, naskočí workflow
 a komentáře z PR threadu a zapíše je jako `evidence[]` záznamy do
 příslušného `.edpa/backlog/**/*.md` (commit zpět na base branch).
 
-Default `GITHUB_TOKEN`, který GitHub injektuje do každého runu, je
-pro tenhle scénář často nedostatečný — typicky když PR přichází
-z forku, nebo když má org restrikce na default-token write/push.
-V takovém případě má job přiznané `contents: write`, ale push se
-přesto odrazí. Robustní řešení je dát workflowu vlastní token.
+Workflow používá fallback vzor `secrets.EDPA_TOKEN || github.token`
+(v checkout i materialize kroku). Když secret neexistuje, běží na
+default `GITHUB_TOKEN`, který GitHub injektuje do každého runu, a jen
+zaloguje `::warning::EDPA_TOKEN secret not configured`. Pro většinu
+repos to stačí — žádný token nastavovat nemusíš.
 
-Řešení: **Personal Access Token (PAT)** se správnými permissions,
-uložený jako repo nebo org secret pod jménem `EDPA_TOKEN`.
+`EDPA_TOKEN` řeší jediný scénář: **push na chráněný base branch.**
+Když branch protection (nebo org restrikce na default-token write)
+odmítá pushe od `GITHUB_TOKEN`, má job sice přiznané `contents:
+write`, ale push se přesto odrazí s `403`. Fix: **Personal Access
+Token (PAT)** uživatele s bypass právem na branch protection, uložený
+jako repo nebo org secret pod jménem `EDPA_TOKEN` — workflow ho pak
+automaticky preferuje.
+
+> **Fork PRs tenhle token neřeší.** GitHub repo secrets do
+> `pull_request` runů spuštěných z forků neinjektuje vůbec, takže
+> `EDPA_TOKEN` tam nikdy nedorazí. Pro fork-heavy projekty je jediná
+> alternativa přepnout trigger na `pull_request_target` — ta ale běží
+> s write tokenem base repa proti PR z forku, takže ji zapínej jen
+> s plným vědomím security dopadů.
 
 ## 2. Klasický PAT vs. Fine-grained PAT
 
@@ -79,10 +95,6 @@ classic, na konci je sekce s odlišnostmi.
    To je celý nutný scope. Workflow **nevytváří ani needituje Issues**
    a v V2 **neexistují žádné GitHub Project items** — žádné Projects /
    Issues / org permissions tedy nepotřebuješ.
-
-   *(Volitelně:* pokud na repu provozuješ i `edpa-collaborators-sync.yml`,
-   přidej **Organization → Members: `Read-only`** pro lookup členství.
-   Pro samotný contribution-sync to není potřeba.)*
 
 5. **Generate token** → **CRITICAL: token se ukáže JEN JEDNOU.**
    Zkopíruj `ghp_...` string do clipboardu, hned přejdi na krok 4.
@@ -149,8 +161,8 @@ přes `git pull` — a tyhle obohacené signály pak započítá nejbližší
 
 | Symptom | Příčina | Fix |
 |---|---|---|
-| `::warning::EDPA_TOKEN secret not configured` v logu | Secret se jmenuje špatně | Přejmenuj na přesně `EDPA_TOKEN` |
-| Workflow naskočí, ale push na base branch selže (`403`/`protected branch`) | Token nemá `Contents: write`, nebo branch protection blokuje push | Edit token → Contents: Read and write; případně povol pushe od bota přes branch protection |
+| `::warning::EDPA_TOKEN secret not configured` v logu | Secret není nastavený (default stav — workflow běží dál na `github.token`); pokud jsi ho nastavoval, jmenuje se špatně | Bez chráněného base branche warning klidně ignoruj; jinak zkontroluj přesný název `EDPA_TOKEN` |
+| Workflow naskočí, ale push na base branch selže (`403`/`protected branch`) | Branch protection blokuje default token a `EDPA_TOKEN` chybí; nebo nastavený token nemá `Contents: write` či bypass právo | Nastav `EDPA_TOKEN` (PAT s Contents: Read and write + bypass na branch protection), případně povol pushe od bota přes branch protection |
 | `Failed to push after 3 retries` v logu | Souběžný commit na base branch / race | Re-run workflow; rebase-retry si většinou poradí sám |
 | Workflow naběhl, commit vznikl, ale `evidence[]` prázdné | PR nemá review ani komentář, nebo neodkazuje EDPA ID | Přidej review/komentář; ujisti se, že PR/commit odkazuje existující item ID |
 | `Please tell me who you are` při git commit | Workflow nemá git config step (legacy verze) | Updatuj `edpa-contribution-sync.yml` na aktuální template |
@@ -183,14 +195,21 @@ vyprší mezi rotacemi), **nepřijdeš o jádro atribuce** — to běží lokál
   GitHubu, bez tokenu.
 - `/edpa:close-iteration` běží **lokálně** a žádný token nepotřebuje.
 
-Co bez tokenu (resp. bez contribution-sync workflowu) nedostaneš:
-- **PR-thread signály** `pr_reviewer` a `issue_comment` se
-  automaticky nematerializují do `evidence[]`. Reviews a komentáře
-  z PR threadů tedy nebudou ve výpočtu zohledněny.
+Co bez tokenu nedostaneš: skoro nic. Workflow běží dál na default
+`github.token` (jen s warningem v logu) a signály materializuje
+normálně. O **PR-thread signály** `pr_reviewer` a `issue_comment`
+přijdeš jen ve dvou případech:
+
+- **base branch je chráněný proti pushům od default tokenu** — runy
+  pak končí `403`, dokud `EDPA_TOKEN` nenastavíš (nebo nepovolíš
+  botovi push přes branch protection);
+- **contribution-sync workflow vůbec neběží** — bez něj se PR-thread
+  signály nematerializují nikdy, s tokenem i bez něj.
 
 **Doporučení:** pokud je tým single-dev nebo review-light, klidně
-workflow i token vynechej — lokální hook stačí. Jakmile začnou
-záležet code-review signály, nastav `EDPA_TOKEN` a zapni workflow.
+workflow vynechej — lokální hook stačí. Jakmile začnou záležet
+code-review signály, zapni workflow; `EDPA_TOKEN` přidej, až pokud
+pushe odmítá branch protection.
 
 ## 8. Classic PAT (legacy varianta)
 
