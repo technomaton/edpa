@@ -1,10 +1,12 @@
 name: Release
 
 # Triggered when a `v*` tag is pushed. Builds edpa-plugin.tar.gz from
-# the plugin/ tree and publishes a GitHub Release with that asset
-# attached. Removes the manual `tar -czf ... && gh release create ...`
-# step from the maintainer's hand and guarantees byte-identical asset
-# layout regardless of who tagged.
+# the plugin/ tree (plus tools/pi-planning, which install.sh's
+# --with-server probe expects in the payload) and publishes a GitHub
+# Release with that asset attached. Removes the manual
+# `tar -czf ... && gh release create ...` step from the maintainer's
+# hand and guarantees byte-identical asset layout regardless of who
+# tagged.
 #
 # Maintainer flow becomes: bump versions, update CHANGELOG, commit
 # release: vX.Y.Z, then `git tag vX.Y.Z && git push --tags`. The
@@ -92,7 +94,9 @@ jobs:
           tar --exclude='__pycache__' \
               --exclude='*.pyc' \
               --exclude='.DS_Store' \
-              -czf edpa-plugin.tar.gz plugin/
+              --exclude='dist' \
+              --exclude='node_modules' \
+              -czf edpa-plugin.tar.gz plugin/ tools/pi-planning
           ls -lh edpa-plugin.tar.gz
           echo "Contents (top level):"
           tar -tzf edpa-plugin.tar.gz | head -10
