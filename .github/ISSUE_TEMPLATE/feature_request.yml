@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an improvement to the EDPA plugin, engine, or reports.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that EDPA makes hard or impossible today?
+      placeholder: When closing an iteration with contractors on multiple teams, I can't...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you would like to happen. Sketches of commands, skills, or report output are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you tried, or other designs that could solve the same problem.
+    validations:
+      required: false
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: Shown in Claude Code's `/plugin` manager, or `version` in the installed plugin's `.claude-plugin/plugin.json` — the behavior you want sometimes already exists in a newer release.
+    validations:
+      required: false

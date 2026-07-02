@@ -1,0 +1,69 @@
+name: Bug report
+description: Report a defect in the EDPA plugin, vendored engine scripts, or MCP server.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The version and environment fields below let a
+        fix land without a reproduction round-trip — please fill them in.
+
+        Found a security vulnerability instead? Please do **not** file a
+        public issue — follow
+        [SECURITY.md](https://github.com/technomaton/edpa/blob/main/SECURITY.md).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, what did EDPA do, and what did you expect instead?
+      placeholder: Ran /edpa:close-iteration and the invariant check failed with...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal sequence of commands or actions that triggers the bug.
+      placeholder: |
+        1. python3 .edpa/engine/scripts/backlog.py tree
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: Shown in Claude Code's `/plugin` manager, or `version` in the installed plugin's `.claude-plugin/plugin.json`.
+      placeholder: e.g. the version /plugin reports for edpa
+    validations:
+      required: true
+  - type: input
+    id: engine-version
+    attributes:
+      label: Vendored engine version
+      description: Contents of `.edpa/engine/VERSION` in your project, if the project is EDPA-initialised. Can differ from the plugin version until you re-run `project_setup.py`.
+      placeholder: cat .edpa/engine/VERSION — or n/a
+    validations:
+      required: false
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. macOS 15, Ubuntu 24.04, Windows 11 + WSL2
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      description: Output of `python3 --version`.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output or logs
+      description: Error messages, git hook output, or MCP server logs. Redact anything sensitive.
+      render: shell
+    validations:
+      required: false
