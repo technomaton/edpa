@@ -1,3 +1,9 @@
+---
+description: PI predictability & confidence trending — planned vs delivered SP, avg velocity, objective completion (wraps edpa_pi_metrics)
+allowed-tools: Read, Bash, mcp__plugin_edpa_edpa__edpa_pi_metrics
+model: sonnet
+---
+
 # /edpa:metrics — PI Predictability & Confidence Trending
 
 Show a table of per-PI metrics (planned vs delivered SP, predictability %, average team

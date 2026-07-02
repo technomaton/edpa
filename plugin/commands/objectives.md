@@ -1,6 +1,6 @@
 ---
 description: Manage PI objectives (set / remove) and team confidence votes for the PI planning board
-allowed-tools: Read, Bash
+allowed-tools: Read, Bash, mcp__plugin_edpa_edpa__edpa_objective_set, mcp__plugin_edpa_edpa__edpa_objective_remove, mcp__plugin_edpa_edpa__edpa_confidence_vote
 model: sonnet
 ---
 
