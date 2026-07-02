@@ -225,7 +225,7 @@ requires_posix_sh = pytest.mark.skipif(
 )
 
 _COREUTILS = (
-    "mktemp", "rm", "tar", "grep", "head", "cut", "mkdir", "cp",
+    "mktemp", "rm", "tar", "gzip", "grep", "head", "cut", "mkdir", "cp",
     "chmod", "find", "wc", "tr", "touch", "mv", "cat",
 )
 
