@@ -89,10 +89,15 @@ Create backlog items with `/edpa:add` (Initiative / Epic / Feature / Story / Def
 /edpa:add Story "First story" --parent F-100 --js 5
 ```
 
-Follow the branch naming convention:
+Commit with the item ID as the Conventional-Commit scope — the local
+commit-msg hook and the evidence pipeline read attribution from it:
 ```bash
-git checkout -b feature/S-001-first-story
+git commit -m "feat(S-001): implement first story"
 ```
+
+Branch naming is a soft convention (`feature/S-001-first-story` is a readable
+shape if you want one) — attribution never flows from the branch name, and no
+CI gate checks it.
 
 ## Step 6: Close your first iteration
 
