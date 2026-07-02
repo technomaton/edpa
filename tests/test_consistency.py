@@ -4,6 +4,7 @@ stray files, and configuration drift.
 
 Run: python -m pytest tests/test_consistency.py -v
 """
+import filecmp
 import json
 import os
 import re
@@ -483,3 +484,76 @@ def test_hook_scripts_executable():
     pre_commit = hooks_dir / "pre-commit"
     if pre_commit.exists():
         assert os.access(pre_commit, os.X_OK), "pre-commit not executable"
+
+
+# ---------------------------------------------------------------------------
+# 16. Vendored engine content matches plugin/ sources
+# ---------------------------------------------------------------------------
+
+def test_vendored_engine_content_in_sync():
+    """.edpa/engine must be byte-identical to its plugin/ sources.
+
+    The only other guards are version-string comparisons
+    (test_version_consistent checks .edpa/engine/VERSION, and the
+    update_engine.sh SessionStart hook fast-paths out on version equality),
+    so a mid-cycle edit to plugin/edpa/scripts/ leaves the vendored copy
+    silently stale — and this repo's own git hooks and CI workflows
+    (edpa-collision-check, contribution-sync) then run the old code.
+    Byte-compare the full vendor set that project_setup.py copies:
+    plugin/edpa/{scripts,schemas,templates,assets} plus plugin/rules.
+    """
+    engine = ROOT / ".edpa" / "engine"
+    if not engine.exists():
+        pytest.skip(".edpa/engine not vendored in this checkout")
+
+    plugin_edpa = ROOT / "plugin" / "edpa"
+    pairs = [
+        (plugin_edpa / "scripts", engine / "scripts"),
+        (plugin_edpa / "schemas", engine / "schemas"),
+        (plugin_edpa / "templates", engine / "templates"),
+        (plugin_edpa / "assets", engine / "assets"),
+        (ROOT / "plugin" / "rules", engine / "rules"),
+    ]
+
+    def ignored(name: str) -> bool:
+        # __pycache__/ dirs are excluded via filecmp.DEFAULT_IGNORES already;
+        # engine/VERSION lives outside the compared subtrees and is guarded
+        # by test_version_consistent, but skip it defensively anyway.
+        return name.endswith(".pyc") or name == "VERSION"
+
+    problems = []
+
+    def walk(dc: filecmp.dircmp, rel: str) -> None:
+        # dircmp.diff_files uses shallow os.stat comparison — force a
+        # byte-level compare so a coincidental size+mtime match (fresh
+        # checkouts rewrite mtimes) can never mask real drift.
+        _, mismatch, cmp_errors = filecmp.cmpfiles(
+            dc.left, dc.right, dc.common_files, shallow=False
+        )
+        for name in sorted(set(mismatch) | set(cmp_errors) | set(dc.funny_files)):
+            if not ignored(name):
+                problems.append(f"content differs: {rel}{name}")
+        for name in sorted(dc.left_only):
+            if not ignored(name):
+                problems.append(f"missing from .edpa/engine: {rel}{name}")
+        for name in sorted(dc.right_only):
+            if not ignored(name):
+                problems.append(f"orphan only in .edpa/engine: {rel}{name}")
+        for name, sub in sorted(dc.subdirs.items()):
+            walk(sub, f"{rel}{name}/")
+
+    for src, dst in pairs:
+        if not src.exists():
+            continue  # optional vendor source absent in this checkout
+        if not dst.exists():
+            problems.append(f"missing vendored dir: {dst.relative_to(ROOT)}/")
+            continue
+        walk(filecmp.dircmp(str(src), str(dst)), f"{dst.relative_to(ROOT)}/")
+
+    assert not problems, (
+        ".edpa/engine drifted from plugin/ sources:\n  "
+        + "\n  ".join(problems)
+        + "\n\nRun `python3 plugin/edpa/scripts/project_setup.py` to re-vendor. "
+        "Note: the re-vendor copytree never deletes, so files listed as "
+        "'orphan only in .edpa/engine' must be deleted by hand."
+    )
