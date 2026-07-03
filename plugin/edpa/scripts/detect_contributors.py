@@ -55,6 +55,16 @@ except ImportError:
     print("ERROR: PyYAML required", file=sys.stderr)
     sys.exit(1)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    # Canonical type→dir tables (Krok 2): PREFIX_TO_DIR for single-item
+    # lookups, ALL_TYPE_DIRS for the --all-items scan (both include the
+    # legacy tasks/ read surface).
+    from id_counter import ALL_TYPE_DIRS as _ALL_TYPE_DIRS  # noqa: E402
+    from id_counter import PREFIX_TO_DIR  # noqa: E402
+finally:
+    sys.path.pop(0)
+
 
 # ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -67,18 +77,6 @@ DEFAULT_SIGNAL_WEIGHTS = {
     "commit_author": 4.00,
     "pr_reviewer": 2.17,
     "issue_comment": 1.46,
-}
-
-# Map item-id prefix → backlog directory under .edpa/backlog/
-PREFIX_TO_DIR = {
-    "S": "stories",
-    "F": "features",
-    "E": "epics",
-    "I": "initiatives",
-    "T": "tasks",
-    "D": "defects",
-    "EV": "events",
-    "R":  "risks",
 }
 
 # /contribute manual directive — additive signal, no role clause.
@@ -740,8 +738,9 @@ def cmd_all_items(edpa_root: Path, dry_run: bool = False) -> int:
     people_map = load_people_map(edpa_root)
     issue_map: dict = {}  # V2 doesn't use GH issue map
 
-    type_dirs = ("initiatives", "epics", "features", "stories",
-                 "defects", "events", "risks")
+    # Full read surface (canonical) — includes legacy tasks/ so migrated
+    # Task items with evidence[] get their contributors[] refreshed too.
+    type_dirs = tuple(_ALL_TYPE_DIRS.values())
     n_touched = 0
     n_total = 0
     for type_dir in type_dirs:

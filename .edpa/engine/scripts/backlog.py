@@ -31,23 +31,49 @@ except ImportError:
     sys.exit(1)
 
 # Backlog items are stored as `.md` files with YAML frontmatter + body.
+# Sibling imports happen once at module top (single insert/pop) instead of
+# a per-callsite sys.path dance (D-52).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     from _md_frontmatter import load_md as _load_md  # noqa: E402
+    from _md_frontmatter import save_md as _save_md  # noqa: E402
+    from _people_loader import load_people as _load_people  # noqa: E402
+    from _pi_loader import format_iteration_dates  # noqa: E402
+    # Canonical type→dir/prefix tables (Krok 2) — id_counter owns them;
+    # backlog.py re-exports the names its callers and tests use.
+    from id_counter import (  # noqa: E402
+        ALL_TYPE_DIRS as _ALL_TYPE_DIRS,
+        ALL_TYPE_PREFIX as TYPE_PREFIX,
+        PREFIX_TO_DIR,
+        TYPE_DIRS,
+    )
 finally:
     sys.path.pop(0)
 
 
-def _people_index(root: Path) -> dict:
-    """Cache: people-by-id index loaded from .edpa/config/people.yaml.
-    Returns {} if the file is absent so callers can fall back to bare ids."""
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _people_loader import load_people  # noqa: E402
-    edpa_root = root if root else Path(".edpa")
-    if not edpa_root.is_dir() and (Path.cwd() / ".edpa").is_dir():
-        edpa_root = Path.cwd() / ".edpa"
-    _, by_id = load_people(edpa_root)
-    return by_id
+# Memo for _people_index — people.yaml is small and effectively immutable
+# within one CLI invocation; tree/status render one row per item, so an
+# uncached loader would re-read + re-parse it once per row.
+_PEOPLE_INDEX_CACHE: dict = {}
+
+
+def _people_index(root: "Path | None") -> dict:
+    """People-by-id index loaded from .edpa/config/people.yaml, memoized per
+    resolved root. Returns {} if the file is absent so callers can fall back
+    to bare ids. Accepts the .edpa/ dir (args._root) or the repo root
+    (cmd_show) — normalized here before the cache lookup so both key the
+    same entry."""
+    edpa_root = Path(root) if root else Path(".edpa")
+    if not (edpa_root / "config" / "people.yaml").is_file():
+        if (edpa_root / ".edpa" / "config" / "people.yaml").is_file():
+            edpa_root = edpa_root / ".edpa"
+        elif (Path.cwd() / ".edpa" / "config" / "people.yaml").is_file():
+            edpa_root = Path.cwd() / ".edpa"
+    key = str(edpa_root.resolve())
+    if key not in _PEOPLE_INDEX_CACHE:
+        _, by_id = _load_people(edpa_root)
+        _PEOPLE_INDEX_CACHE[key] = by_id
+    return _PEOPLE_INDEX_CACHE[key]
 
 
 def _assignee_display(person_id, by_id: dict) -> str:
@@ -127,37 +153,8 @@ ARROW  = "\u2192"   # ->
 
 
 # -- Type-directory mapping ----------------------------------------------------
-
-TYPE_DIRS = {
-    "Initiative": "initiatives",
-    "Epic":       "epics",
-    "Feature":    "features",
-    "Story":      "stories",
-    "Defect":     "defects",
-    "Event":      "events",
-}
-
-PREFIX_TO_DIR = {
-    "I":  "initiatives",
-    "E":  "epics",
-    "F":  "features",
-    "S":  "stories",
-    "D":  "defects",
-    "T":  "tasks",
-    "EV": "events",
-    "R":  "risks",
-}
-
-TYPE_PREFIX = {
-    "Initiative": "I",
-    "Epic":       "E",
-    "Feature":    "F",
-    "Story":      "S",
-    "Defect":     "D",
-    "Task":       "T",
-    "Event":      "EV",
-    "Risk":       "R",
-}
+# TYPE_DIRS / TYPE_PREFIX / PREFIX_TO_DIR are imported from id_counter at the
+# top of this module (canonical tables, Krok 2) and re-exported here.
 
 # -- SAFe Status Workflows -----------------------------------------------------
 
@@ -181,8 +178,9 @@ def load_backlog(root):
     """Load backlog from file-per-item directory structure.
 
     Reads team metadata from people.yaml + project metadata from edpa.yaml,
-    then globs all item files from backlog/initiatives/, backlog/epics/,
-    backlog/features/, backlog/stories/, backlog/defects/.
+    then globs all item files from every backlog type directory
+    (id_counter.ALL_TYPE_DIRS — initiatives through risks, plus legacy
+    tasks/).
     """
     edpa = root / ".edpa"
 
@@ -202,7 +200,7 @@ def load_backlog(root):
     # Load all items from type directories. Items are stored as `.md`
     # files with YAML frontmatter + Markdown body (see _md_frontmatter).
     items = []
-    for type_dir in ["initiatives", "epics", "features", "stories", "defects", "tasks", "events", "risks"]:
+    for type_dir in _ALL_TYPE_DIRS.values():
         dir_path = edpa / "backlog" / type_dir
         if dir_path.exists():
             for f in sorted(dir_path.glob("*.md")):
@@ -246,16 +244,8 @@ def load_config(root):
 
 # -- Utility: collect all items flat -------------------------------------------
 
-TYPE_TO_LEVEL = {
-    "Initiative": "Initiative",
-    "Epic": "Epic",
-    "Feature": "Feature",
-    "Story": "Story",
-    "Defect": "Defect",
-    "Task": "Task",
-    "Event": "Event",
-    "Risk": "Risk",
-}
+# Identity map over the canonical read surface — level == type in V2.
+TYPE_TO_LEVEL = {t: t for t in _ALL_TYPE_DIRS}
 
 
 def collect_items(backlog):
@@ -348,36 +338,10 @@ def wsjf_score(item):
     return round((bv + tc + rr_oe) / js, 2)
 
 
-def next_id_for_type(root, item_type):
-    """Determine the next available numeric ID for a given type.
-
-    Scans existing files in the type directory and returns the next
-    sequential ID string (e.g. 'S-227'). Kept for migration tooling
-    and ad-hoc local-only flows in tests — interactive ``cmd_add`` now
-    requires GH sync and always derives the id from the GH issue
-    number, so this function is no longer on the user-facing path.
-    """
-    prefix = TYPE_PREFIX.get(item_type)
-    if not prefix:
-        raise ValueError(f"Unknown item type: {item_type}")
-
-    type_dir = TYPE_DIRS[item_type]
-    dir_path = root / ".edpa" / "backlog" / type_dir
-
-    max_num = 0
-    if dir_path.exists():
-        for f in dir_path.glob("*.md"):
-            stem = f.stem  # e.g. "S-226"
-            parts = stem.split("-")
-            if len(parts) == 2:
-                try:
-                    num = int(parts[1])
-                    if num > max_num:
-                        max_num = num
-                except ValueError:
-                    pass
-
-    return f"{prefix}-{max_num + 1}"
+# NOTE: the old ``next_id_for_type`` helper was deleted in D-52 — it had no
+# callers left (cmd_add routes through mcp_server._handle_item_create →
+# id_counter.next_id) and carried its own drifted TYPE_DIRS copy that raised
+# KeyError for Risk. Use ``id_counter.next_id`` for ID allocation.
 
 
 # -- Commands ------------------------------------------------------------------
@@ -395,6 +359,9 @@ def cmd_tree(backlog, args):
 
     # Get all initiatives (items with no parent / parent=null)
     initiatives = [i for i in backlog.get("items", []) if i.get("type") == "Initiative"]
+
+    # One people.yaml read for the whole render, not one per feature row.
+    by_id = _people_index(getattr(args, "_root", None))
 
     for init in initiatives:
         print(f"  {color(DOT, C.INIT)} {color(bold(init['id']), C.INIT)} {color(init['title'], C.INIT)}  {status_badge(init.get('status'))}")
@@ -436,7 +403,6 @@ def cmd_tree(backlog, args):
                 if iter_filter:
                     stories = [s for s in stories if s.get("iteration") == iter_filter]
 
-                by_id = _people_index(getattr(args, "_root", None))
                 for si, story in enumerate(stories):
                     is_last_story = si == len(stories) - 1
                     scon = ELBOW if is_last_story else TEE
@@ -694,8 +660,6 @@ def _show_iteration_status(backlog, iteration_id, args):
 
     if iter_data:
         it = iter_data.get("iteration", {})
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from _pi_loader import format_iteration_dates  # noqa: E402
         weeks = it.get("weeks", "?")
         print(color(f"  {format_iteration_dates(it)}  |  Status: {it.get('status', '?')}  |  Weeks: {weeks}", C.MUTED))
 
@@ -1078,17 +1042,12 @@ def cmd_add(root, backlog, args):
     if contributors:
         # MCP edpa_item_update intentionally does not expose contributors
         # (structured signal that engine/CI materialize). Local-CLI path
-        # writes them directly via the frontmatter helper.
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        try:
-            from _md_frontmatter import load_md as _load_md  # noqa: E402
-            from _md_frontmatter import save_md as _save_md_helper  # noqa: E402
-        finally:
-            sys.path.pop(0)
+        # writes them directly via the frontmatter helpers (module-top
+        # imports — no per-callsite sys.path dance).
         item_data = _load_md(file_path) or {}
         body = item_data.pop("body", "") if isinstance(item_data, dict) else ""
         item_data["contributors"] = contributors
-        _save_md_helper(file_path, item_data, body=body)
+        _save_md(file_path, item_data, body=body)
 
     # Git add + commit. Stage the counter file alongside the new item
     # so the pre-commit ID-safety hook sees them as one consistent

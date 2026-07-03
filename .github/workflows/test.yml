@@ -6,6 +6,28 @@ on:
   pull_request:
 
 jobs:
+  ruff:
+    # Errors-only lint gate: E9 (syntax errors), F63 (invalid comparisons),
+    # F7 (misplaced statements), F82 (undefined names). The rule set lives
+    # in pyproject.toml [tool.ruff.lint] — deliberately no style/formatting
+    # rules, so this job can only fail on real breakage, never on taste.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ruff
+        # Capped like requirements-dev.txt: a hypothetical ruff 1.0 config
+        # break must not brick every open PR at once.
+        run: pip install 'ruff>=0.15,<1'
+
+      - name: ruff check (errors only)
+        run: ruff check .
+
   pytest:
     runs-on: ubuntu-latest
     strategy:
@@ -27,10 +49,16 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Run tests
+        # --cov-fail-under is a floor, not a target: line rate measured 59%
+        # (2026-07, S-249), the floor sits ~3 points below so coverage can
+        # only ratchet up — raise it after sustained gains, never lower it
+        # to get a PR green. It lives here (CI invocation) rather than in
+        # pyproject addopts so partial local runs (pytest tests/test_x.py)
+        # don't false-fail the threshold.
         run: >
           pytest tests/ -m "not e2e" -q --tb=short
           --cov=plugin/edpa/scripts --cov-report=term-missing:skip-covered
-          --cov-report=xml
+          --cov-report=xml --cov-fail-under=56
 
       - name: Coverage summary
         if: matrix.python-version == '3.12'

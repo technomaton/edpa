@@ -11,6 +11,35 @@ export interface Props {
 }
 
 const { title, description = `EDPA v${VERSION} — Evidence-Driven Proportional Allocation. Automaticke odvozeni hodin z delivery evidence.`, lang = 'cs' } = Astro.props;
+
+const fullTitle = `${title} | EDPA v${VERSION}`;
+
+// Canonical URL — absolute, built from `site` in astro.config.mjs.
+// Normalize to the trailing-slash form (directory-format build output).
+const pathname = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
+const canonical = new URL(pathname, Astro.site);
+
+// Routes that exist in BOTH locales, keyed by their Czech (unprefixed) path.
+// journey/tutorial/docs are cs-only (mirrors czOnly in Header.astro), so they
+// get no hreflang alternates. x-default points at the Czech original.
+const pairedRoutes = [
+  '/',
+  '/calculator/',
+  '/dashboard/',
+  '/dashboard/kashealth/',
+  '/evaluation/',
+  '/guide/',
+  '/methodology/',
+  '/playbook/',
+  '/presentation/',
+  '/presentation/kashealth/',
+  '/setup/',
+  '/start/',
+];
+const basePath = pathname.startsWith('/en/') ? pathname.slice(3) : pathname;
+const hasAlternate = pairedRoutes.includes(basePath);
+const csUrl = new URL(basePath, Astro.site);
+const enUrl = new URL(`/en${basePath}`, Astro.site);
 ---
 <!doctype html>
 <html lang={lang}>
@@ -20,7 +49,16 @@ const { title, description = `EDPA v${VERSION} — Evidence-Driven Proportional 
   <meta name="description" content={description} />
   <meta name="author" content="TECHNOMATON" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <title>{title} | EDPA v{VERSION}</title>
+  <link rel="canonical" href={canonical} />
+  <meta property="og:title" content={fullTitle} />
+  <meta property="og:description" content={description} />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content={canonical} />
+  <meta name="twitter:card" content="summary" />
+  {hasAlternate && <link rel="alternate" hreflang="cs" href={csUrl} />}
+  {hasAlternate && <link rel="alternate" hreflang="en" href={enUrl} />}
+  {hasAlternate && <link rel="alternate" hreflang="x-default" href={csUrl} />}
+  <title>{fullTitle}</title>
 </head>
 <body>
   <Header currentPath={Astro.url.pathname} />

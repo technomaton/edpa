@@ -35,6 +35,10 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     from _md_frontmatter import load_md as _load_md  # noqa: E402
+    # Canonical type → expected `id` prefix map (Krok 2; matches
+    # naming.item_prefixes default). Includes legacy Task so migrated
+    # tasks/ items still validate.
+    from id_counter import ALL_TYPE_PREFIX as TYPE_PREFIXES  # noqa: E402
 finally:
     sys.path.pop(0)
 
@@ -143,18 +147,6 @@ ITEM_SCHEMA = {
 # self-contained and doesn't import the full engine module just to
 # check a contributor entry.
 EVIDENCE_ROLES = {"owner", "key", "reviewer", "consulted"}
-
-# Type → expected `id` prefix (matches naming.item_prefixes default).
-TYPE_PREFIXES = {
-    "Initiative": "I",
-    "Epic": "E",
-    "Feature": "F",
-    "Story": "S",
-    "Defect": "D",
-    "Task": "T",
-    "Risk": "R",
-    "Event": "EV",
-}
 
 
 def _is_iteration_path(path: Path) -> bool:

@@ -634,6 +634,24 @@ pre-push:
 </style>
 
 <script>
+  import {
+    buildZipBlob,
+    generateConfigYaml,
+    generateLaunchCommands,
+    generatePeopleYaml,
+    generateProjectYaml,
+    type LaunchStrings,
+  } from '../../lib/setup-generator';
+
+  // English lines injected into the shared launch-command generator (S-248);
+  // all wizard generator logic lives in lib/setup-generator.ts.
+  const launchStrings: LaunchStrings = {
+    installComment: '# in Claude Code: /plugin install edpa@technomaton-edpa',
+    interactiveSetup: '/edpa:setup   # interactive, guides you through everything',
+    vendorComment: '# vendors the engine into .edpa/engine/ (Cursor, Codex CLI, …)',
+    thenComment: '# then in Claude Code: /edpa:setup --with-ci --with-hooks --with-rules',
+  };
+
   function initWizard() {
     let currentStep = 1;
     const totalSteps = 4;
@@ -875,127 +893,24 @@ pre-push:
       teamSummary.textContent = `Total: ${count} members, ${totalFte.toFixed(1)} FTE, ${totalCap}h/iteration`;
     }
 
-    // YAML generators
-    function generatePeopleYaml(): string {
-      const lines = ['# EDPA People Registry', `# Generated: ${new Date().toISOString().split('T')[0]}`, '', 'people:'];
-      state.members.forEach(m => {
-        if (!m.email && !m.name) return;
-        lines.push(`  - name: "${m.name}"`);
-        lines.push(`    id: "${m.id}"`);
-        lines.push(`    email: "${m.email}"`);
-        lines.push(`    role: ${m.role}`);
-        lines.push(`    fte: ${m.fte}`);
-        lines.push(`    capacity_h: ${m.capacity}`);
-        if (m.contract) {
-          lines.push(`    contract: ${m.contract}`);
-        }
-        lines.push('');
-      });
-      const totalFte = state.members.reduce((s, m) => s + m.fte, 0);
-      const totalCap = state.members.reduce((s, m) => s + m.capacity, 0);
-      lines.push(`# Total: ${state.members.filter(m => m.email || m.name).length} members, ${totalFte.toFixed(1)} FTE, ${totalCap}h/iteration`);
-      return lines.join('\n');
-    }
-
-    function generateConfigYaml(): string {
-      const org = state.githubOrg || 'my-org';
-      const repo = state.githubRepo || 'my-project';
-      const lines = [
-        '# EDPA Configuration',
-        `# Generated: ${new Date().toISOString().split('T')[0]}`,
-        '',
-        'edpa:',
-        '  version: "2.13.0"',
-        '',
-        '# Optional: GitHub repo for contribution-sync (--with-ci). Local-first;',
-        '# omit this block if you are not using the PR-signal CI workflow.',
-        'github:',
-        `  org: "${org}"`,
-        `  repo: "${repo}"`,
-        '',
-        'scoring:',
-        '  contribution_weights:',
-        '    commit: 0.25',
-        '    contribute_command: 0.6',
-        '    pr_reviewer: 0.25',
-        '    comment: 0.15',
-        '',
-        'outputs:',
-        '  snapshots_dir: "snapshots"',
-        '  reports_dir: "reports"',
-        '  signed_dir: "signed"',
-      ];
-      return lines.join('\n');
-    }
-
-    function generateProjectYaml(): string {
-      const name = state.projectName || 'My Project';
-      const program = state.program;
-      const lines = [
-        '# EDPA Project Configuration (.edpa/config/edpa.yaml)',
-        `# Generated: ${new Date().toISOString().split('T')[0]}`,
-        '',
-        'project:',
-        `  name: "${name}"`,
-        '  description: ""',
-      ];
-      if (program) {
-        lines.push('  funding:');
-        lines.push(`    program: "${program}"`);
-        lines.push('    registration: ""');
-      }
-      lines.push('  organizations:');
-      lines.push('    - name: ""');
-      lines.push('      legal_name: ""');
-      lines.push('      role: "primary"');
-      lines.push('      tax_id: ""');
-      lines.push('      vat_id: ""');
-      lines.push('');
-      lines.push('governance:');
-      lines.push('  methodology: "EDPA 2.13.0"');
-      return lines.join('\n');
-    }
-
+    // Config previews — YAML generation shared via lib/setup-generator (S-248)
     function updateConfigPreviews() {
       const peoplePre = document.getElementById('peoplePre');
       const configPre = document.getElementById('configPre');
       const projectPre = document.getElementById('projectPre');
-      if (peoplePre) peoplePre.textContent = generatePeopleYaml();
-      if (configPre) configPre.textContent = generateConfigYaml();
-      if (projectPre) projectPre.textContent = generateProjectYaml();
+      if (peoplePre) peoplePre.textContent = generatePeopleYaml(state.members);
+      if (configPre) configPre.textContent = generateConfigYaml(state);
+      if (projectPre) projectPre.textContent = generateProjectYaml(state);
     }
 
     function updateLaunchCommands() {
-      const org = state.githubOrg || '{org}';
-      const repo = state.githubRepo || '{repo}';
-
+      const launch = generateLaunchCommands(state.githubRepo, launchStrings);
       const launchA = document.getElementById('launchA');
-      if (launchA) {
-        launchA.textContent = [
-          `cd ${repo}`,
-          `# in Claude Code: /plugin install edpa@technomaton-edpa`,
-          `/edpa:setup --with-ci --with-hooks --with-rules`,
-        ].join('\n');
-      }
-
+      if (launchA) launchA.textContent = launch.a;
       const launchB = document.getElementById('launchB');
-      if (launchB) {
-        launchB.textContent = [
-          `cd ${repo}`,
-          `# in Claude Code: /plugin install edpa@technomaton-edpa`,
-          `/edpa:setup   # interactive, guides you through everything`,
-        ].join('\n');
-      }
-
+      if (launchB) launchB.textContent = launch.b;
       const launchC = document.getElementById('launchC');
-      if (launchC) {
-        launchC.textContent = [
-          `cd ${repo}`,
-          `curl -fsSL https://edpa.technomaton.com/install.sh | sh`,
-          `# vendors the engine into .edpa/engine/ (Cursor, Codex CLI, …)`,
-          `# then in Claude Code: /edpa:setup --with-ci --with-hooks --with-rules`,
-        ].join('\n');
-      }
+      if (launchC) launchC.textContent = launch.c;
     }
 
     // Navigation
@@ -1064,78 +979,11 @@ pre-push:
     });
 
     function downloadAsZip() {
-      const files = [
-        { name: 'people.yaml', content: generatePeopleYaml() },
-        { name: 'config.yaml', content: generateConfigYaml() },
-        { name: 'edpa.yaml', content: generateProjectYaml() },
-      ];
-
-      const encoder = new TextEncoder();
-      const parts: Uint8Array[] = [];
-      const centralDir: Uint8Array[] = [];
-      let offset = 0;
-
-      for (const file of files) {
-        const nameBytes = encoder.encode(file.name);
-        const contentBytes = encoder.encode(file.content);
-
-        const localHeader = new Uint8Array(30 + nameBytes.length);
-        const lv = new DataView(localHeader.buffer);
-        lv.setUint32(0, 0x04034b50, true);
-        lv.setUint16(4, 20, true);
-        lv.setUint16(6, 0, true);
-        lv.setUint16(8, 0, true);
-        lv.setUint16(10, 0, true);
-        lv.setUint16(12, 0, true);
-        lv.setUint32(14, crc32(contentBytes), true);
-        lv.setUint32(18, contentBytes.length, true);
-        lv.setUint32(22, contentBytes.length, true);
-        lv.setUint16(26, nameBytes.length, true);
-        lv.setUint16(28, 0, true);
-        localHeader.set(nameBytes, 30);
-
-        const cdEntry = new Uint8Array(46 + nameBytes.length);
-        const cv = new DataView(cdEntry.buffer);
-        cv.setUint32(0, 0x02014b50, true);
-        cv.setUint16(4, 20, true);
-        cv.setUint16(6, 20, true);
-        cv.setUint16(8, 0, true);
-        cv.setUint16(10, 0, true);
-        cv.setUint16(12, 0, true);
-        cv.setUint16(14, 0, true);
-        cv.setUint32(16, crc32(contentBytes), true);
-        cv.setUint32(20, contentBytes.length, true);
-        cv.setUint32(24, contentBytes.length, true);
-        cv.setUint16(28, nameBytes.length, true);
-        cv.setUint16(30, 0, true);
-        cv.setUint16(32, 0, true);
-        cv.setUint16(34, 0, true);
-        cv.setUint16(36, 0, true);
-        cv.setUint32(38, 0, true);
-        cv.setUint32(42, offset, true);
-        cdEntry.set(nameBytes, 46);
-
-        parts.push(localHeader, contentBytes);
-        centralDir.push(cdEntry);
-        offset += localHeader.length + contentBytes.length;
-      }
-
-      const cdOffset = offset;
-      let cdSize = 0;
-      centralDir.forEach(e => cdSize += e.length);
-
-      const eocd = new Uint8Array(22);
-      const ev = new DataView(eocd.buffer);
-      ev.setUint32(0, 0x06054b50, true);
-      ev.setUint16(4, 0, true);
-      ev.setUint16(6, 0, true);
-      ev.setUint16(8, files.length, true);
-      ev.setUint16(10, files.length, true);
-      ev.setUint32(12, cdSize, true);
-      ev.setUint32(16, cdOffset, true);
-      ev.setUint16(20, 0, true);
-
-      const blob = new Blob([...parts, ...centralDir, eocd], { type: 'application/zip' });
+      const blob = buildZipBlob([
+        { name: 'people.yaml', content: generatePeopleYaml(state.members) },
+        { name: 'config.yaml', content: generateConfigYaml(state) },
+        { name: 'edpa.yaml', content: generateProjectYaml(state) },
+      ]);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -1144,17 +992,6 @@ pre-push:
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    }
-
-    function crc32(bytes: Uint8Array): number {
-      let crc = 0xFFFFFFFF;
-      for (let i = 0; i < bytes.length; i++) {
-        crc ^= bytes[i];
-        for (let j = 0; j < 8; j++) {
-          crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
-        }
-      }
-      return (crc ^ 0xFFFFFFFF) >>> 0;
     }
 
     function escapeHtml(s: string): string {

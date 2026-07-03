@@ -147,33 +147,33 @@ def _sibling_path():
             pass
 
 
-# Type metadata — single source of truth for write tools (mirrors
-# backlog.py constants; kept here to avoid an import cycle until
-# Krok 2 refactors backlog.py to import from id_counter).
-TYPE_DIRS = {
-    "Initiative": "initiatives",
-    "Epic":       "epics",
-    "Feature":    "features",
-    "Story":      "stories",
-    "Defect":     "defects",
-    "Event":      "events",
-    "Risk":       "risks",
-}
+# Type metadata — canonical tables live in id_counter (Krok 2: backlog.py,
+# this server, and the evidence/sync scripts all import the same maps;
+# tests/test_type_dirs.py guards against re-declared drifted copies).
+# TYPE_DIRS is the CREATE surface: what edpa_item_create may allocate.
+with _sibling_path():
+    from id_counter import (  # noqa: E402
+        DIR_TO_TYPE as _DIR_TO_TYPE,
+        PREFIX_TO_DIR as _PREFIX_TO_DIR,
+        TYPE_DIRS,
+        # Coarse per-project mutex for item read-modify-write cycles
+        # (D-52): serializes the write tools against the post-commit
+        # evidence emitter and concurrent MCP sessions.
+        BacklogLockTimeout as _BacklogLockTimeout,
+        backlog_write_lock as _backlog_write_lock,
+    )
 # Read-side directory → type map for the edpa_backlog scan. Superset of the
 # write-path TYPE_DIRS: legacy/migrated projects may hold Task items under
 # backlog/tasks/ (first-class in backlog.py since D-3) — Tasks are readable,
 # filterable, and updatable via MCP, but not creatable (no "Task" in
 # TYPE_DIRS). The edpa_backlog schema "type" enum must stay equal to these
-# values — pinned by test_backlog_type_enum_matches_handler_dirs.
+# values — pinned by test_backlog_type_enum_matches_handler_dirs. Contents
+# come from the canonical map; only the scan ORDER (most-common dirs first,
+# for lookup and output stability) is fixed here.
 BACKLOG_TYPE_DIRS = {
-    "stories":     "Story",
-    "features":    "Feature",
-    "epics":       "Epic",
-    "initiatives": "Initiative",
-    "defects":     "Defect",
-    "tasks":       "Task",
-    "events":      "Event",
-    "risks":       "Risk",
+    d: _DIR_TO_TYPE[d]
+    for d in ("stories", "features", "epics", "initiatives",
+              "defects", "tasks", "events", "risks")
 }
 # Dirs scanned when locating an existing item file (read detail + write
 # tools) — every dir edpa_backlog scans, i.e. TYPE_DIRS values plus tasks/.
@@ -1088,11 +1088,9 @@ def _handle_item(edpa_root: Path, item_id: str) -> list[TextContent]:
     if not backlog_dir.exists():
         return [TextContent(type="text", text=f"ERROR: Backlog not found.")]
 
-    # Determine type directory from prefix
-    prefix_map = {"S": "stories", "F": "features", "E": "epics", "I": "initiatives",
-                  "T": "tasks", "D": "defects", "EV": "events", "R": "risks"}
+    # Determine type directory from prefix (canonical map, incl. legacy T-)
     prefix = item_id.split("-")[0] if "-" in item_id else ""
-    dir_name = prefix_map.get(prefix)
+    dir_name = _PREFIX_TO_DIR.get(prefix)
 
     search_dirs = [backlog_dir / dir_name] if dir_name else list(backlog_dir.iterdir())
 
@@ -1471,34 +1469,41 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
         return _err(f"invalid assignee id {assignee!r}")
 
     repo_root = edpa_root.parent
-    new_id = _allocate_id(item_type, repo_root)
+    try:
+        with _backlog_write_lock(edpa_root):
+            # allocate-ID + write-file as one critical section (D-52): the
+            # id_counter lock is taken strictly inside this one, never the
+            # reverse, so the ordering cannot deadlock.
+            new_id = _allocate_id(item_type, repo_root)
 
-    item: dict = {
-        "id": new_id,
-        "type": item_type,
-        "title": title.strip(),
-        "status": args.get("status") or "Funnel",
-    }
-    if parent:
-        item["parent"] = parent
-    if iteration:
-        item["iteration"] = iteration
-    if assignee:
-        item["assignee"] = assignee
-    # V2.1 strict defaults — WSJF fields always present so engine reads a
-    # deterministic value (no implicit-zero coercion) and so the YAML
-    # surfaces "this item has not been WSJF-scored yet" visibly to humans.
-    for field in ("js", "bv", "tc", "rr_oe"):
-        item[field] = args[field] if args.get(field) is not None else 0
-    js = item["js"]
-    bv = item["bv"]
-    tc = item["tc"]
-    rr = item["rr_oe"]
-    item["wsjf"] = round((bv + tc + rr) / js, 2) if js > 0 else 0.0
+            item: dict = {
+                "id": new_id,
+                "type": item_type,
+                "title": title.strip(),
+                "status": args.get("status") or "Funnel",
+            }
+            if parent:
+                item["parent"] = parent
+            if iteration:
+                item["iteration"] = iteration
+            if assignee:
+                item["assignee"] = assignee
+            # V2.1 strict defaults — WSJF fields always present so engine reads a
+            # deterministic value (no implicit-zero coercion) and so the YAML
+            # surfaces "this item has not been WSJF-scored yet" visibly to humans.
+            for field in ("js", "bv", "tc", "rr_oe"):
+                item[field] = args[field] if args.get(field) is not None else 0
+            js = item["js"]
+            bv = item["bv"]
+            tc = item["tc"]
+            rr = item["rr_oe"]
+            item["wsjf"] = round((bv + tc + rr) / js, 2) if js > 0 else 0.0
 
-    file_path = edpa_root / "backlog" / TYPE_DIRS[item_type] / f"{new_id}.md"
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    _save_md_item(file_path, item, body=args.get("body") or "")
+            file_path = edpa_root / "backlog" / TYPE_DIRS[item_type] / f"{new_id}.md"
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            _save_md_item(file_path, item, body=args.get("body") or "")
+    except _BacklogLockTimeout as exc:
+        return _err(str(exc))
     _load_yaml_cache_clear()
 
     logger.info("edpa_item_create: id=%s type=%s", new_id, item_type)
@@ -1542,18 +1547,22 @@ def _handle_item_update(edpa_root: Path, args: dict) -> list[TextContent]:
         if _safe_person_id(fields["assignee"]) is None:
             return _err(f"invalid assignee id {fields['assignee']!r}")
 
-    item = _load_md_item(path) or {}
-    body = item.pop("body", "") if isinstance(item, dict) else ""
-    item.update(fields)
-    # V2.1 — keep WSJF fields explicit (write 0 if any are still missing
-    # after the update; this also handles legacy items that pre-date the
-    # strict-defaults rule). wsjf is always recomputed deterministically.
-    for f in ("js", "bv", "tc", "rr_oe"):
-        if item.get(f) is None:
-            item[f] = 0
-    js, bv, tc, rr = item["js"], item["bv"], item["tc"], item["rr_oe"]
-    item["wsjf"] = round((bv + tc + rr) / js, 2) if js > 0 else 0.0
-    _save_md_item(path, item, body=body)
+    try:
+        with _backlog_write_lock(edpa_root):
+            item = _load_md_item(path) or {}
+            body = item.pop("body", "") if isinstance(item, dict) else ""
+            item.update(fields)
+            # V2.1 — keep WSJF fields explicit (write 0 if any are still missing
+            # after the update; this also handles legacy items that pre-date the
+            # strict-defaults rule). wsjf is always recomputed deterministically.
+            for f in ("js", "bv", "tc", "rr_oe"):
+                if item.get(f) is None:
+                    item[f] = 0
+            js, bv, tc, rr = item["js"], item["bv"], item["tc"], item["rr_oe"]
+            item["wsjf"] = round((bv + tc + rr) / js, 2) if js > 0 else 0.0
+            _save_md_item(path, item, body=body)
+    except _BacklogLockTimeout as exc:
+        return _err(str(exc))
     _load_yaml_cache_clear()
 
     logger.info("edpa_item_update: id=%s fields=%s", safe_id, list(fields))
@@ -1574,22 +1583,26 @@ def _handle_item_transition(edpa_root: Path, args: dict) -> list[TextContent]:
     if not path:
         return _err(f"item {safe_id} not found")
 
-    item = _load_md_item(path) or {}
-    item_type = item.get("type")
-    allowed = _allowed_statuses(item_type)
-    if allowed is not None and status not in allowed:
-        return _err(
-            f"status {status!r} not valid for {item_type}; "
-            f"allowed: {list(allowed)}"
-        )
+    try:
+        with _backlog_write_lock(edpa_root):
+            item = _load_md_item(path) or {}
+            item_type = item.get("type")
+            allowed = _allowed_statuses(item_type)
+            if allowed is not None and status not in allowed:
+                return _err(
+                    f"status {status!r} not valid for {item_type}; "
+                    f"allowed: {list(allowed)}"
+                )
 
-    body = item.pop("body", "") if isinstance(item, dict) else ""
-    item["status"] = status
-    closed_at = item.get("closed_at")
-    if status == "Done" and not closed_at:
-        closed_at = _utc_now_iso()
-        item["closed_at"] = closed_at
-    _save_md_item(path, item, body=body)
+            body = item.pop("body", "") if isinstance(item, dict) else ""
+            item["status"] = status
+            closed_at = item.get("closed_at")
+            if status == "Done" and not closed_at:
+                closed_at = _utc_now_iso()
+                item["closed_at"] = closed_at
+            _save_md_item(path, item, body=body)
+    except _BacklogLockTimeout as exc:
+        return _err(str(exc))
     _load_yaml_cache_clear()
 
     logger.info("edpa_item_transition: id=%s status=%s", safe_id, status)
@@ -1616,18 +1629,22 @@ def _handle_item_link_parent(edpa_root: Path, args: dict) -> list[TextContent]:
     if not parent_path:
         return _err(f"parent {safe_parent} not found")
 
-    item = _load_md_item(path) or {}
-    parent_data = _load_md_item(parent_path) or {}
-    expected = PARENT_RULES.get(item.get("type"))
-    if expected and parent_data.get("type") != expected:
-        return _err(
-            f"parent {safe_parent} is {parent_data.get('type')!r}, "
-            f"expected {expected!r} for {item.get('type')}"
-        )
+    try:
+        with _backlog_write_lock(edpa_root):
+            item = _load_md_item(path) or {}
+            parent_data = _load_md_item(parent_path) or {}
+            expected = PARENT_RULES.get(item.get("type"))
+            if expected and parent_data.get("type") != expected:
+                return _err(
+                    f"parent {safe_parent} is {parent_data.get('type')!r}, "
+                    f"expected {expected!r} for {item.get('type')}"
+                )
 
-    body = item.pop("body", "") if isinstance(item, dict) else ""
-    item["parent"] = safe_parent
-    _save_md_item(path, item, body=body)
+            body = item.pop("body", "") if isinstance(item, dict) else ""
+            item["parent"] = safe_parent
+            _save_md_item(path, item, body=body)
+    except _BacklogLockTimeout as exc:
+        return _err(str(exc))
     _load_yaml_cache_clear()
 
     logger.info("edpa_item_link_parent: id=%s parent=%s", safe_id, safe_parent)
@@ -1829,29 +1846,33 @@ def _handle_item_link_dep(edpa_root: Path, args: dict) -> list[TextContent]:
     if not path:
         return _err(f"item {safe_id} not found")
 
-    item = _load_md_item(path) or {}
-    deps = item.get("depends_on")
-    deps = [str(d) for d in deps] if isinstance(deps, list) else []
+    try:
+        with _backlog_write_lock(edpa_root):
+            item = _load_md_item(path) or {}
+            deps = item.get("depends_on")
+            deps = [str(d) for d in deps] if isinstance(deps, list) else []
 
-    if action == "add":
-        if not _find_item_file(edpa_root, safe_dep):
-            return _err(f"depends_on target {safe_dep} not found")
-        if safe_dep in deps:
-            return _ok({"id": safe_id, "depends_on": deps, "action": "add", "noop": True})
-        if _dep_would_cycle(edpa_root, safe_id, safe_dep):
-            return _err(f"adding {safe_id} -> {safe_dep} would create a dependency cycle")
-        deps.append(safe_dep)
-    else:  # remove
-        if safe_dep not in deps:
-            return _ok({"id": safe_id, "depends_on": deps, "action": "remove", "noop": True})
-        deps = [d for d in deps if d != safe_dep]
+            if action == "add":
+                if not _find_item_file(edpa_root, safe_dep):
+                    return _err(f"depends_on target {safe_dep} not found")
+                if safe_dep in deps:
+                    return _ok({"id": safe_id, "depends_on": deps, "action": "add", "noop": True})
+                if _dep_would_cycle(edpa_root, safe_id, safe_dep):
+                    return _err(f"adding {safe_id} -> {safe_dep} would create a dependency cycle")
+                deps.append(safe_dep)
+            else:  # remove
+                if safe_dep not in deps:
+                    return _ok({"id": safe_id, "depends_on": deps, "action": "remove", "noop": True})
+                deps = [d for d in deps if d != safe_dep]
 
-    body = item.pop("body", "") if isinstance(item, dict) else ""
-    if deps:
-        item["depends_on"] = deps
-    else:
-        item.pop("depends_on", None)
-    _save_md_item(path, item, body=body)
+            body = item.pop("body", "") if isinstance(item, dict) else ""
+            if deps:
+                item["depends_on"] = deps
+            else:
+                item.pop("depends_on", None)
+            _save_md_item(path, item, body=body)
+    except _BacklogLockTimeout as exc:
+        return _err(str(exc))
     _load_yaml_cache_clear()
 
     logger.info("edpa_item_link_dep: id=%s %s %s", safe_id, action, safe_dep)
@@ -1879,13 +1900,17 @@ def _handle_item_roam(edpa_root: Path, args: dict) -> list[TextContent]:
     if not path:
         return _err(f"item {safe_id} not found")
 
-    item = _load_md_item(path) or {}
-    if item.get("type") != "Risk":
-        return _err(f"roam_status applies only to Risk items ({safe_id} is {item.get('type')!r})")
+    try:
+        with _backlog_write_lock(edpa_root):
+            item = _load_md_item(path) or {}
+            if item.get("type") != "Risk":
+                return _err(f"roam_status applies only to Risk items ({safe_id} is {item.get('type')!r})")
 
-    body = item.pop("body", "") if isinstance(item, dict) else ""
-    item["roam_status"] = roam
-    _save_md_item(path, item, body=body)
+            body = item.pop("body", "") if isinstance(item, dict) else ""
+            item["roam_status"] = roam
+            _save_md_item(path, item, body=body)
+    except _BacklogLockTimeout as exc:
+        return _err(str(exc))
     _load_yaml_cache_clear()
 
     logger.info("edpa_item_roam: id=%s roam_status=%s", safe_id, roam)

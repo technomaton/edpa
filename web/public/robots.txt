@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://edpa.technomaton.com/sitemap-index.xml

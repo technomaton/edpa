@@ -47,6 +47,54 @@ import { VERSION } from '../../lib/version';
     </div>
   </section>
 
+  <!-- What's New -->
+  <section class="section" id="whats-new">
+    <div class="container">
+      <p class="tag">What's new</p>
+      <h2 class="section-title">What's new in EDPA this wave</h2>
+      <div class="grid grid-3">
+        <div class="card accent">
+          <h3 class="card-heading">PI planning / overview</h3>
+          <p class="card-text">
+            <code>/edpa:pi-planning</code> renders the whole SAFe program board
+            (teams × iterations, dependency arrows), PI objectives, ROAM,
+            portfolio, WSJF and capacity into <strong>one self-contained
+            HTML</strong> — no server, no Node, no network. A read-only
+            projection of <code>.edpa/</code>, deterministically regenerable.
+            Dependencies via <code>edpa_item_link_dep</code> (cycle-checked).
+          </p>
+        </div>
+        <div class="card cyan">
+          <h3 class="card-heading">Gates mode (default)</h3>
+          <p class="card-text">
+            The engine credits every Initiative/Epic/Feature status transition
+            as a mini-deliverable. Architects and PMs get credit for LBC,
+            design and refinement work across gates — not just for the final
+            Done. Validated on a 4 PI × 2 iteration simulation.
+          </p>
+        </div>
+        <div class="card green">
+          <h3 class="card-heading">In-flight Story credit</h3>
+          <p class="card-text">
+            Stories in the iteration that have not reached Done yet get credit
+            based on yaml_edit activity in the window (refinement, AC, DoD).
+            <code>story_activity_events[]</code> in <code>edpa_results.json</code>
+            shows which Stories were credited and with what <code>credit_factor</code>.
+          </p>
+        </div>
+        <div class="card yellow">
+          <h3 class="card-heading">Production ready</h3>
+          <p class="card-text">
+            975 unit tests, 6 E2E against real GitHub, 100 Monte Carlo runs
+            (avg MAD 7.8 % vs ground truth, spread 0.35 pp under ±20 %
+            perturbation). Full operational runbook in
+            <code>docs/RUNBOOK.md</code>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Problem Section -->
   <section class="section" id="problem">
     <div class="container">
@@ -292,17 +340,6 @@ Guarantee: Σ shares = 100%</div>
             (<code>--with-ci</code>), which materializes PR reviews and comments
             into <code>evidence[]</code>. For a board, use the local
             <code>/edpa:board</code> HTML — no Projects sync.
-          </p>
-        </div>
-        <div class="card cyan">
-          <h3 class="card-heading">PI planning / overview (v2.4)</h3>
-          <p class="card-text">
-            <code>/edpa:pi-planning</code> renders the whole SAFe program
-            picture — program board with dependency arrows, PI objectives, ROAM,
-            portfolio, WSJF, capacity — as a single <strong>self-contained,
-            read-only HTML</strong>. No server, no Node, no network; it
-            regenerates deterministically from <code>.edpa/</code>. Dependencies
-            are first-class via <code>edpa_item_link_dep</code> (cycle-checked).
           </p>
         </div>
       </div>
