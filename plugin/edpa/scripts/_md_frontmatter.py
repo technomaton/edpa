@@ -39,6 +39,15 @@ SECTION_HEADINGS = {
 }
 EDPA_TRAILER = "\n---\n_Managed by EDPA — edit fields in `.edpa/backlog/`._"
 
+# Level tokens recognized at the head of an auto-generated issue-body meta
+# line (see strip_issue_body_chrome). Must equal the canonical read surface
+# (id_counter.ALL_TYPE_DIRS keys) — pinned by tests/test_type_dirs.py; kept
+# literal here so this leaf format module stays dependency-free.
+META_LEVEL_TOKENS = frozenset({
+    "Story", "Feature", "Epic", "Initiative", "Defect", "Task",
+    "Risk", "Event",
+})
+
 
 # ─── Parse / serialize ──────────────────────────────────────────────────────
 
@@ -377,13 +386,11 @@ def strip_issue_body_chrome(issue_body: str) -> str:
     # optionally followed by " · …". We keep this conservative: only strip
     # if the first non-empty line matches the known shape.
     lines = text.split("\n")
-    LEVELS = {"Story", "Feature", "Epic", "Initiative", "Defect", "Task",
-              "Risk", "Event"}
     for i, ln in enumerate(lines):
         if not ln.strip():
             continue
         head = ln.split(" · ", 1)[0].strip()
-        if head in LEVELS:
+        if head in META_LEVEL_TOKENS:
             # drop this line + any single blank line that follows
             del lines[i]
             if i < len(lines) and not lines[i].strip():

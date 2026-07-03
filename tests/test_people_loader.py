@@ -157,6 +157,30 @@ def test_validate_assignee_in_backlog_counts(tmp_path):
     assert any(d["code"] == "person_no_github" for d in warnings)
 
 
+def test_validate_assignee_in_defects_counts(tmp_path):
+    """D-52: the backlog scan covers the FULL read surface. Defect (and
+    event/risk/legacy-task) assignees used to be invisible — a person
+    referenced only from defects/ was flagged person_unused and an
+    unregistered defect assignee produced no person_missing error."""
+    write_yaml(tmp_path / "config" / "people.yaml",
+               make_people_yaml({"id": "alice", "github": "alice-gh"}))
+    from _md_frontmatter import save_md
+    for sub, item in (
+        ("defects", {"id": "D-1", "type": "Defect", "assignee": "alice"}),
+        ("risks",   {"id": "R-1", "type": "Risk",   "assignee": "ghost"}),
+    ):
+        (tmp_path / "backlog" / sub).mkdir(parents=True, exist_ok=True)
+        save_md(tmp_path / "backlog" / sub / f"{item['id']}.md", item, "")
+    diags = validate_people(tmp_path)
+    errors, warnings = split_diagnostics(diags)
+    # alice is USED (via defects/) — no person_unused for her
+    assert not any(d["code"] == "person_unused" and d["person"] == "alice"
+                   for d in warnings)
+    # ghost is referenced from risks/ but absent from people.yaml
+    assert any(d["code"] == "person_missing" and d["person"] == "ghost"
+               for d in errors)
+
+
 def test_validate_handles_no_iterations_no_backlog(tmp_path):
     """Empty workspace — only person_unused warnings, no errors."""
     write_yaml(tmp_path / "config" / "people.yaml",
