@@ -10,6 +10,9 @@ Files that import from the sources of truth (no edit needed, automatic):
   - web/src/pages/**/*.astro             (import { VERSION } from lib/version)
   - web/src/layouts/Layout.astro         (same)
   - web/src/components/{Header,Footer}.astro (same)
+  - web/src/lib/setup-generator.ts       (setup-wizard YAML bakes VERSION in
+                                          at build time — S-248; the site is
+                                          rebuilt on every release)
 
 Files that contain the version literally and need manual update (this
 script handles them):
@@ -213,15 +216,10 @@ def main():
          r"current as of v\d+\.\d+\.\d+(?:-[\w.]+)?", f"current as of v{new}"),
         (REPO_ROOT / "docs/RUNBOOK.md",
          r"\(\d+ scripts, VERSION [^)]+\)", f"({n_scripts} scripts, VERSION {new})"),
-        # Setup-wizard generators embed the version in the YAML they emit
-        (REPO_ROOT / "web/src/pages/setup.astro",
-         r'version: "\d+\.\d+\.\d+"', f'version: "{new}"'),
-        (REPO_ROOT / "web/src/pages/setup.astro",
-         r'methodology: "EDPA [^"]+"', f'methodology: "EDPA {new}"'),
-        (REPO_ROOT / "web/src/pages/en/setup.astro",
-         r'version: "\d+\.\d+\.\d+"', f'version: "{new}"'),
-        (REPO_ROOT / "web/src/pages/en/setup.astro",
-         r'methodology: "EDPA [^"]+"', f'methodology: "EDPA {new}"'),
+        # NOTE: web/src/pages/{,en/}setup.astro are intentionally absent —
+        # since S-248 the wizard YAML gets its version from
+        # web/src/lib/setup-generator.ts (imports lib/version.ts) at build
+        # time, so there is no literal left to stamp.
     ]
     marks = {"stamped": ("✓", "stamped"), "current": ("·", "already current"),
              "missing": ("⚠", "pattern not found — fix by hand")}
