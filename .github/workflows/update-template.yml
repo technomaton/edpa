@@ -1,4 +1,8 @@
-name: Build Plugin Release
+name: Verify plugin structure
+
+# Smoke-checks the plugin/ tree layout on every push to main that touches
+# it. This workflow builds and publishes NOTHING — release.yml owns the
+# release asset (the old name "Build Plugin Release" predates that split).
 
 on:
   push:
@@ -12,7 +16,7 @@ permissions:
   contents: read
 
 jobs:
-  build-plugin:
+  verify-plugin:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout EDPA
@@ -21,19 +25,28 @@ jobs:
       - name: Verify plugin structure
         run: |
           echo "Checking plugin directory..."
-          test -f plugin/.claude-plugin/plugin.json || (echo "ERROR: plugin.json missing" && exit 1)
-          test -d plugin/skills || (echo "ERROR: skills/ missing" && exit 1)
-          test -d plugin/commands || (echo "ERROR: commands/ missing" && exit 1)
-          test -d plugin/edpa/scripts || (echo "ERROR: scripts/ missing" && exit 1)
-          test -d plugin/edpa/templates || (echo "ERROR: templates/ missing" && exit 1)
+          test -f plugin/.claude-plugin/plugin.json || { echo "::error::plugin/.claude-plugin/plugin.json missing"; exit 1; }
+          for dir in \
+            plugin/skills \
+            plugin/commands \
+            plugin/edpa/scripts \
+            plugin/edpa/templates \
+            plugin/edpa/templates/github-workflows \
+            plugin/edpa/assets; do
+            test -d "$dir" || { echo "::error::${dir} missing"; exit 1; }
+          done
           VERSION=$(python3 -c "import json; print(json.load(open('plugin/.claude-plugin/plugin.json'))['version'])")
           echo "Plugin version: ${VERSION}"
           echo "Plugin structure verified."
 
       - name: Count assets
+        # Informational only. The test -d gate above already failed the job
+        # if any of these directories vanished, so a substituted `ls` can no
+        # longer mask a missing path by silently printing 0.
         run: |
           echo "Skills: $(ls plugin/skills/ | wc -l)"
-          echo "Commands: $(ls plugin/commands/edpa/ | wc -l)"
+          echo "Commands: $(ls plugin/commands/ | wc -l)"
           echo "Scripts: $(ls plugin/edpa/scripts/*.py | wc -l)"
           echo "Templates: $(ls plugin/edpa/templates/ | wc -l)"
-          echo "Workflows: $(ls plugin/edpa/workflows/ | wc -l)"
+          echo "Workflow templates: $(ls plugin/edpa/templates/github-workflows/ | wc -l)"
+          echo "Assets: $(ls plugin/edpa/assets/ | wc -l)"
