@@ -147,33 +147,28 @@ def _sibling_path():
             pass
 
 
-# Type metadata — single source of truth for write tools (mirrors
-# backlog.py constants; kept here to avoid an import cycle until
-# Krok 2 refactors backlog.py to import from id_counter).
-TYPE_DIRS = {
-    "Initiative": "initiatives",
-    "Epic":       "epics",
-    "Feature":    "features",
-    "Story":      "stories",
-    "Defect":     "defects",
-    "Event":      "events",
-    "Risk":       "risks",
-}
+# Type metadata — canonical tables live in id_counter (Krok 2: backlog.py,
+# this server, and the evidence/sync scripts all import the same maps;
+# tests/test_type_dirs.py guards against re-declared drifted copies).
+# TYPE_DIRS is the CREATE surface: what edpa_item_create may allocate.
+with _sibling_path():
+    from id_counter import (  # noqa: E402
+        DIR_TO_TYPE as _DIR_TO_TYPE,
+        PREFIX_TO_DIR as _PREFIX_TO_DIR,
+        TYPE_DIRS,
+    )
 # Read-side directory → type map for the edpa_backlog scan. Superset of the
 # write-path TYPE_DIRS: legacy/migrated projects may hold Task items under
 # backlog/tasks/ (first-class in backlog.py since D-3) — Tasks are readable,
 # filterable, and updatable via MCP, but not creatable (no "Task" in
 # TYPE_DIRS). The edpa_backlog schema "type" enum must stay equal to these
-# values — pinned by test_backlog_type_enum_matches_handler_dirs.
+# values — pinned by test_backlog_type_enum_matches_handler_dirs. Contents
+# come from the canonical map; only the scan ORDER (most-common dirs first,
+# for lookup and output stability) is fixed here.
 BACKLOG_TYPE_DIRS = {
-    "stories":     "Story",
-    "features":    "Feature",
-    "epics":       "Epic",
-    "initiatives": "Initiative",
-    "defects":     "Defect",
-    "tasks":       "Task",
-    "events":      "Event",
-    "risks":       "Risk",
+    d: _DIR_TO_TYPE[d]
+    for d in ("stories", "features", "epics", "initiatives",
+              "defects", "tasks", "events", "risks")
 }
 # Dirs scanned when locating an existing item file (read detail + write
 # tools) — every dir edpa_backlog scans, i.e. TYPE_DIRS values plus tasks/.
@@ -1088,11 +1083,9 @@ def _handle_item(edpa_root: Path, item_id: str) -> list[TextContent]:
     if not backlog_dir.exists():
         return [TextContent(type="text", text=f"ERROR: Backlog not found.")]
 
-    # Determine type directory from prefix
-    prefix_map = {"S": "stories", "F": "features", "E": "epics", "I": "initiatives",
-                  "T": "tasks", "D": "defects", "EV": "events", "R": "risks"}
+    # Determine type directory from prefix (canonical map, incl. legacy T-)
     prefix = item_id.split("-")[0] if "-" in item_id else ""
-    dir_name = prefix_map.get(prefix)
+    dir_name = _PREFIX_TO_DIR.get(prefix)
 
     search_dirs = [backlog_dir / dir_name] if dir_name else list(backlog_dir.iterdir())
 

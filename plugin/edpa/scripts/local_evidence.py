@@ -51,15 +51,15 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 try:
     from _md_frontmatter import load_md, save_md_item  # noqa: E402
-    from id_counter import TYPE_DIRS  # noqa: E402
+    # Canonical type→dir maps (Krok 2). DIR_TO_TYPE lets the D-28 guard
+    # classify a malformed item missing `type:` the same way the engine does
+    # (engine.load_backlog_items: data.get("type", level)); PREFIX_TO_DIR now
+    # includes the legacy T→tasks entry, so commits referencing migrated Task
+    # items attribute instead of being silently skipped (D-52).
+    from id_counter import DIR_TO_TYPE as _DIR_TO_TYPE  # noqa: E402
+    from id_counter import PREFIX_TO_DIR  # noqa: E402
 finally:
     sys.path.pop(0)
-
-
-# Reverse of id_counter.TYPE_DIRS (directory → item type). Lets the D-28 guard
-# classify a malformed item missing `type:` the same way the engine does
-# (engine.load_backlog_items: data.get("type", level)).
-_DIR_TO_TYPE = {d: t for t, d in TYPE_DIRS.items()}
 
 
 _SELF_COMMIT_PREFIX = "chore(evidence):"
@@ -76,11 +76,6 @@ _AGENT_COAUTHOR_RE = re.compile(
     r"^Co-[Aa]uthored-[Bb]y:\s+(Claude[^<\r\n]*)<[^>]*@anthropic\.com>",
     re.MULTILINE,
 )
-
-PREFIX_TO_DIR = {
-    "I": "initiatives", "E": "epics", "F": "features", "S": "stories",
-    "D": "defects", "EV": "events", "R": "risks",
-}
 
 # Default weights — overridable via .edpa/config/cw_heuristics.yaml.
 DEFAULT_WEIGHTS = {

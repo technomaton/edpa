@@ -38,8 +38,14 @@ except ImportError:
     # mutual-exclusion contract; see _fallback_lock for its limitations.
     from _fallback_lock import FileLock, Timeout
 
-# Mirrored from backlog.py to avoid circular import. Keep in sync until
-# backlog.py is refactored to import these from here (Krok 2).
+# ─── Canonical type metadata (Krok 2) ───────────────────────────────────────
+# Single source of truth for the item-type → backlog-directory / ID-prefix
+# mapping. backlog.py, mcp_server.py, local_evidence.py, detect_contributors,
+# sync_pr_contributions, validate_syntax, engine, and _people_loader import
+# these tables instead of re-declaring them; tests/test_type_dirs.py fails
+# the build if a consumer carries a drifted copy (D-52).
+
+# Create surface: the types the allocator / CLI / MCP create tools support.
 TYPE_DIRS = {
     "Initiative": "initiatives",
     "Epic":       "epics",
@@ -59,6 +65,34 @@ TYPE_PREFIX = {
     "Event":      "EV",
     "Risk":       "R",
 }
+
+# Legacy read-only surface: migrated projects may hold Task items under
+# backlog/tasks/ (first-class read support since D-3/D-46). Tasks stay
+# readable, filterable, updatable, and schema-validated everywhere, but are
+# never creatable (no allocator/CLI/MCP entry above) and never engine-credited
+# (see ENGINE_CREDIT_DIRS below).
+LEGACY_TYPE_DIRS = {"Task": "tasks"}
+LEGACY_TYPE_PREFIX = {"Task": "T"}
+
+# Read surface: every type/dir/prefix a loader may encounter (create + legacy).
+ALL_TYPE_DIRS = {**TYPE_DIRS, **LEGACY_TYPE_DIRS}
+ALL_TYPE_PREFIX = {**TYPE_PREFIX, **LEGACY_TYPE_PREFIX}
+DIR_TO_TYPE = {d: t for t, d in ALL_TYPE_DIRS.items()}
+PREFIX_TO_DIR = {p: ALL_TYPE_DIRS[t] for t, p in ALL_TYPE_PREFIX.items()}
+
+# Named scope subsets — deliberate divergences from the full read surface,
+# derived here from the canonical tables so they cannot drift as inline
+# literals in consumer modules.
+#
+# Engine credit scope (engine.load_backlog_items): Events and Risks are
+# PI-planning artefacts and deliberately earn no engine credit (see
+# CHANGELOG); Tasks are legacy read-only and never engine-loaded.
+ENGINE_CREDIT_DIRS = {
+    TYPE_DIRS[t]: t for t in ("Story", "Feature", "Epic", "Initiative",
+                              "Defect")
+}
+# Gate-event scope: parent levels credited via status-transition gate events.
+GATE_TYPE_DIRS = {t: TYPE_DIRS[t] for t in ("Feature", "Epic", "Initiative")}
 
 _COUNTER_REL = Path(".edpa/config/id_counters.yaml")
 _LOCK_REL = Path(".edpa/.id_counter.lock")

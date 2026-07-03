@@ -18,8 +18,20 @@ The validator returns the same diagnostic shape as ``_pi_loader`` so
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 from typing import Iterable
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    # Canonical backlog type→dir map (Krok 2). The assignee validator walks
+    # the FULL read surface — defects/events/risks (assignee is schema-valid
+    # there and used in practice) and legacy tasks/ included — so a person
+    # referenced only from those dirs is no longer reported as unused or
+    # silently skipped when missing from people.yaml (D-52).
+    from id_counter import ALL_TYPE_DIRS as _ALL_TYPE_DIRS  # noqa: E402
+finally:
+    sys.path.pop(0)
 
 logger = logging.getLogger(__name__)
 
@@ -93,14 +105,15 @@ def _collect_assignees_from_iterations(edpa_root: Path,
 
 def _collect_assignees_from_backlog(edpa_root: Path,
                                     loader=None) -> "set[str]":
-    """Walk backlog/{stories,features,epics,initiatives}/*.md — return
-    the set of internal person IDs referenced as ``assignee``."""
+    """Walk every backlog type dir (canonical read surface, incl. defects/
+    events/risks and legacy tasks/) — return the set of internal person IDs
+    referenced as ``assignee``."""
     backlog = edpa_root / "backlog"
     if not backlog.is_dir():
         return set()
     load = loader or _default_loader
     seen: set[str] = set()
-    for sub in ("stories", "features", "epics", "initiatives"):
+    for sub in _ALL_TYPE_DIRS.values():
         d = backlog / sub
         if not d.is_dir():
             continue
