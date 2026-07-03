@@ -7,7 +7,7 @@ Thank you for your interest in contributing to EDPA!
 ### Reporting Issues
 
 - Use [GitHub Issues](https://github.com/technomaton/edpa/issues) for bugs and feature requests
-- Use the provided issue templates (Story, Feature, Epic)
+- Use the provided issue templates (bug report, feature request — see `.github/ISSUE_TEMPLATE/`)
 - Include your EDPA version, Python version, and OS
 
 ### Pull Requests
@@ -52,7 +52,10 @@ for the full work-attribution rules including escape hatches
 
 ### Code Style
 
-- Python: Follow PEP 8
+- Python: Follow PEP 8. CI also runs an errors-only `ruff check .`
+  (rule set in `pyproject.toml` `[tool.ruff.lint]` — syntax errors and
+  undefined names, no style rules); reproduce locally with
+  `pip install ruff && ruff check .`
 - YAML: 2-space indentation
 - Markdown: One sentence per line in docs
 
