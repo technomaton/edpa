@@ -30,6 +30,7 @@ try:
     # referenced only from those dirs is no longer reported as unused or
     # silently skipped when missing from people.yaml (D-52).
     from id_counter import ALL_TYPE_DIRS as _ALL_TYPE_DIRS  # noqa: E402
+    from _md_frontmatter import load_md as _load_md  # noqa: E402
 finally:
     sys.path.pop(0)
 
@@ -41,13 +42,7 @@ def _default_loader(path: Path) -> "dict | None":
     import yaml
     try:
         if Path(path).suffix == ".md":
-            import sys
-            sys.path.insert(0, str(Path(__file__).resolve().parent))
-            try:
-                from _md_frontmatter import load_md
-            finally:
-                sys.path.pop(0)
-            return load_md(path) or {}
+            return _load_md(path) or {}
         with open(path, encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     except (yaml.YAMLError, OSError) as exc:

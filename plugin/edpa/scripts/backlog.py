@@ -36,7 +36,9 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     from _md_frontmatter import load_md as _load_md  # noqa: E402
+    from _md_frontmatter import save_md as _save_md  # noqa: E402
     from _people_loader import load_people as _load_people  # noqa: E402
+    from _pi_loader import format_iteration_dates  # noqa: E402
     # Canonical type→dir/prefix tables (Krok 2) — id_counter owns them;
     # backlog.py re-exports the names its callers and tests use.
     from id_counter import (  # noqa: E402
@@ -658,8 +660,6 @@ def _show_iteration_status(backlog, iteration_id, args):
 
     if iter_data:
         it = iter_data.get("iteration", {})
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from _pi_loader import format_iteration_dates  # noqa: E402
         weeks = it.get("weeks", "?")
         print(color(f"  {format_iteration_dates(it)}  |  Status: {it.get('status', '?')}  |  Weeks: {weeks}", C.MUTED))
 
@@ -1042,17 +1042,12 @@ def cmd_add(root, backlog, args):
     if contributors:
         # MCP edpa_item_update intentionally does not expose contributors
         # (structured signal that engine/CI materialize). Local-CLI path
-        # writes them directly via the frontmatter helper.
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        try:
-            from _md_frontmatter import load_md as _load_md  # noqa: E402
-            from _md_frontmatter import save_md as _save_md_helper  # noqa: E402
-        finally:
-            sys.path.pop(0)
+        # writes them directly via the frontmatter helpers (module-top
+        # imports — no per-callsite sys.path dance).
         item_data = _load_md(file_path) or {}
         body = item_data.pop("body", "") if isinstance(item_data, dict) else ""
         item_data["contributors"] = contributors
-        _save_md_helper(file_path, item_data, body=body)
+        _save_md(file_path, item_data, body=body)
 
     # Git add + commit. Stage the counter file alongside the new item
     # so the pre-commit ID-safety hook sees them as one consistent
