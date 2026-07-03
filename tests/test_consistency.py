@@ -91,16 +91,39 @@ def test_version_consistent():
         ("docs/mcp.md", f"current as of v{version}"),
         ("docs/RUNBOOK.md", f"VERSION {version}"),
         ("plugin/edpa/templates/edpa.yaml.tmpl", f'methodology: "EDPA {version}"'),
-        ("web/src/pages/setup.astro", f'version: "{version}"'),
-        ("web/src/pages/setup.astro", f'methodology: "EDPA {version}"'),
-        ("web/src/pages/en/setup.astro", f'version: "{version}"'),
-        ("web/src/pages/en/setup.astro", f'methodology: "EDPA {version}"'),
     ]
     for rel, needle in stamps:
         if needle not in (ROOT / rel).read_text(encoding="utf-8"):
             errors.append(
                 f"{rel}: missing current-version stamp {needle!r} — drifted; "
                 f"run scripts/bump_version.py {version} --apply"
+            )
+
+    # Setup-wizard pages carry no stamped version literal anymore (S-248):
+    # the YAML the wizard emits bakes the version in at build time via
+    # web/src/lib/setup-generator.ts -> lib/version.ts -> plugin.json, and
+    # the site is rebuilt on every release. Guard the import chain instead
+    # of a stamp so a regression back to hardcoded literals fails CI.
+    setup_gen_rel = "web/src/lib/setup-generator.ts"
+    setup_gen = (ROOT / setup_gen_rel).read_text(encoding="utf-8")
+    if "from './version'" not in setup_gen:
+        errors.append(f"{setup_gen_rel}: must import VERSION from lib/version.ts")
+    if re.search(r"\d+\.\d+\.\d+", setup_gen):
+        errors.append(
+            f"{setup_gen_rel}: hardcoded X.Y.Z version literal found — "
+            f"emit VERSION from lib/version.ts instead"
+        )
+    for rel in ("web/src/pages/setup.astro", "web/src/pages/en/setup.astro"):
+        page = (ROOT / rel).read_text(encoding="utf-8")
+        if "lib/setup-generator" not in page:
+            errors.append(
+                f"{rel}: must import the shared lib/setup-generator (S-248) — "
+                f"do not paste generator code back into the page"
+            )
+        if re.search(r'(?:version|methodology): "(?:EDPA )?\d+\.\d+\.\d+"', page):
+            errors.append(
+                f"{rel}: stamped version literal reappeared — the wizard bakes "
+                f"the version in via lib/setup-generator.ts (S-248)"
             )
 
     # Repo's own vendored engine must track the plugin version
