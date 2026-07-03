@@ -41,6 +41,7 @@ try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
     import _console  # noqa: F401
 except ImportError:
     pass
+import contextlib
 import os
 import re
 import subprocess
@@ -58,6 +59,9 @@ try:
     # items attribute instead of being silently skipped (D-52).
     from id_counter import DIR_TO_TYPE as _DIR_TO_TYPE  # noqa: E402
     from id_counter import PREFIX_TO_DIR  # noqa: E402
+    # Coarse per-project mutex for item read-modify-write cycles (D-52) —
+    # serializes this hook against the MCP server's write tools.
+    from id_counter import BacklogLockTimeout, backlog_write_lock  # noqa: E402
 finally:
     sys.path.pop(0)
 
@@ -353,34 +357,58 @@ def build_signals(commit: dict, items: list[str], person_id: str,
     return out
 
 
+def _lock_root_for_item(item_path: Path) -> "Path | None":
+    """Resolve the .edpa/ dir an item lives under so _apply_to_item can take
+    the per-project write lock (items live at .edpa/backlog/<dir>/<ID>.md).
+    Returns None when the path doesn't match the canonical layout (ad-hoc
+    paths in unit tests) — the caller then writes unlocked, matching
+    pre-lock behaviour."""
+    parents = item_path.resolve().parents
+    if len(parents) >= 3 and parents[1].name == "backlog":
+        return parents[2]
+    return None
+
+
 def _apply_to_item(item_path: Path, new_sigs: list[dict]) -> bool:
     """Merge new signals into item.evidence[] (dedup by ref). Return True
-    if anything changed on disk."""
-    data = load_md(item_path) or {}
-    body = data.pop("body", "") if isinstance(data, dict) else ""
-    existing = data.get("evidence")
-    if existing is None:
-        existing = data.get("ci_signals") or []  # backward-compat read
-    if not isinstance(existing, list):
-        existing = []
+    if anything changed on disk.
 
-    by_ref = {s.get("ref"): s for s in existing if isinstance(s, dict)}
-    changed = False
-    for s in new_sigs:
-        ref = s.get("ref")
-        if ref in by_ref:
-            continue
-        by_ref[ref] = s
-        changed = True
-    if not changed:
-        return False
+    The load → mutate → save cycle runs under the coarse per-project write
+    lock (``.edpa/.backlog.lock``, D-52) so it cannot interleave with the
+    MCP server's write tools — save_md is atomic (no torn files) but only
+    the lock prevents lost updates. The lock is held for the file cycle
+    only; git calls happen after release. Raises ``BacklogLockTimeout``
+    when another writer wedges the lock; callers degrade with a stderr
+    note (the source commit already succeeded, ``--materialize`` catches
+    up later)."""
+    lock_root = _lock_root_for_item(item_path)
+    lock = backlog_write_lock(lock_root) if lock_root else contextlib.nullcontext()
+    with lock:
+        data = load_md(item_path) or {}
+        body = data.pop("body", "") if isinstance(data, dict) else ""
+        existing = data.get("evidence")
+        if existing is None:
+            existing = data.get("ci_signals") or []  # backward-compat read
+        if not isinstance(existing, list):
+            existing = []
 
-    merged = [by_ref[k] for k in sorted(by_ref) if k is not None]
-    data["evidence"] = merged
-    if "ci_signals" in data:
-        del data["ci_signals"]  # converge on V2.1 shape
-    save_md_item(item_path, {**data, "body": body})
-    return True
+        by_ref = {s.get("ref"): s for s in existing if isinstance(s, dict)}
+        changed = False
+        for s in new_sigs:
+            ref = s.get("ref")
+            if ref in by_ref:
+                continue
+            by_ref[ref] = s
+            changed = True
+        if not changed:
+            return False
+
+        merged = [by_ref[k] for k in sorted(by_ref) if k is not None]
+        data["evidence"] = merged
+        if "ci_signals" in data:
+            del data["ci_signals"]  # converge on V2.1 shape
+        save_md_item(item_path, {**data, "body": body})
+        return True
 
 
 def _git_commit_paths(repo_root: Path, paths: list[Path], msg: str) -> bool:
@@ -579,15 +607,24 @@ def cmd_materialize(edpa_root: Path, iteration_id: str) -> int:
         grouped.setdefault(iid, []).extend(sigs)
 
     touched: list[Path] = []
-    for iid, sigs in grouped.items():
-        p = find_item_path(edpa_root, iid)
-        if not p:
-            continue
-        # D-28/D-29: neutralise weighted signals (yaml_edit, commit_author, …) on
-        # items belonging to a different iteration than the one being materialized.
-        _neutralize_foreign_signals(load_md(p) or {}, sigs, p, iteration_id)
-        if _apply_to_item(p, sigs):
-            touched.append(p)
+    try:
+        for iid, sigs in grouped.items():
+            p = find_item_path(edpa_root, iid)
+            if not p:
+                continue
+            # D-28/D-29: neutralise weighted signals (yaml_edit, commit_author, …) on
+            # items belonging to a different iteration than the one being materialized.
+            _neutralize_foreign_signals(load_md(p) or {}, sigs, p, iteration_id)
+            if _apply_to_item(p, sigs):
+                touched.append(p)
+    except BacklogLockTimeout as exc:
+        # Fail loud and clean: report, commit nothing half-locked beyond
+        # what already landed, and let a re-run (idempotent, dedup-by-ref)
+        # catch up once the competing writer is gone.
+        print(f"materialize: {exc}", file=sys.stderr)
+        print(f"materialize: aborted for {iteration_id} — re-run once the "
+              f"competing writer finishes.", file=sys.stderr)
+        return 1
 
     if touched:
         msg = (f"{_SELF_COMMIT_PREFIX} materialize {iteration_id} "
@@ -749,18 +786,29 @@ def main(argv=None) -> int:
             commit_iter = None
 
     touched_paths: list[Path] = []
-    for iid, sigs in grouped.items():
-        p = find_item_path(edpa_root, iid)
-        if not p:
-            print(
-                f"local_evidence: item {iid!r} referenced but not found in "
-                f"backlog — skipping its signal.",
-                file=sys.stderr,
-            )
-            continue
-        _neutralize_foreign_signals(load_md(p) or {}, sigs, p, commit_iter)
-        if _apply_to_item(p, sigs):
-            touched_paths.append(p)
+    try:
+        for iid, sigs in grouped.items():
+            p = find_item_path(edpa_root, iid)
+            if not p:
+                print(
+                    f"local_evidence: item {iid!r} referenced but not found in "
+                    f"backlog — skipping its signal.",
+                    file=sys.stderr,
+                )
+                continue
+            _neutralize_foreign_signals(load_md(p) or {}, sigs, p, commit_iter)
+            if _apply_to_item(p, sigs):
+                touched_paths.append(p)
+    except BacklogLockTimeout as exc:
+        # The user's commit already succeeded — never wedge the hook. Stop
+        # emitting (each further item would block another timeout window),
+        # report clearly, and let `--materialize` reconcile later. Whatever
+        # was written before the timeout still gets committed below
+        # (idempotent dedup-by-ref makes the catch-up safe).
+        print(f"local_evidence: {exc}", file=sys.stderr)
+        print("local_evidence: evidence for this commit is incomplete — run "
+              "`local_evidence.py --materialize --iteration <ID>` to catch up.",
+              file=sys.stderr)
 
     if not touched_paths:
         return 0

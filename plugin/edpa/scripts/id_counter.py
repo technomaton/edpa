@@ -22,6 +22,7 @@ full layered design. This module implements Layers 1 (fs_scan) and 2
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import tempfile
@@ -98,9 +99,67 @@ _COUNTER_REL = Path(".edpa/config/id_counters.yaml")
 _LOCK_REL = Path(".edpa/.id_counter.lock")
 _LOCK_TIMEOUT_SEC = 5
 
+# Coarse per-project backlog write lock (D-52) — see backlog_write_lock().
+_BACKLOG_LOCK_NAME = ".backlog.lock"
+BACKLOG_LOCK_TIMEOUT_SEC = 5
+
 
 class IdCounterError(Exception):
     """Raised when the ID counter is in an unrecoverable state."""
+
+
+class BacklogLockTimeout(TimeoutError):
+    """Raised when the per-project backlog write lock cannot be acquired.
+
+    Callers degrade explicitly and loudly — the MCP server returns an
+    ERROR result, the post-commit evidence emitter prints a stderr note
+    and leaves catch-up to ``--materialize`` — instead of proceeding
+    unlocked (silent lost updates) or hanging forever.
+    """
+
+
+@contextlib.contextmanager
+def backlog_write_lock(edpa_root: Path | str,
+                       timeout: "float | None" = None):
+    """One coarse per-project mutex for backlog item read-modify-write cycles.
+
+    ``_md_frontmatter.save_md`` writes are atomic (tempfile + os.replace),
+    which prevents torn files but not lost updates: two writers that
+    interleave load → mutate → save silently drop one side's changes. The
+    long-running MCP server and the git post-commit evidence emitter are a
+    real single-machine multi-writer pairing, so both wrap their cycles in
+    this lock (``.edpa/.backlog.lock``).
+
+    Rules for critical sections:
+      * lock ONLY the load → mutate → save cycle — never git calls or other
+        long work, so hold times stay in the milliseconds;
+      * the lock is NOT reentrant — never call another locked section from
+        inside one (the only sanctioned nesting is the ID-counter lock,
+        which next_id takes as a strict leaf).
+
+    Raises :class:`BacklogLockTimeout` with a clear message when the lock
+    cannot be acquired within ``timeout`` seconds (default
+    ``BACKLOG_LOCK_TIMEOUT_SEC``; the module constant is read at call time
+    so tests can shrink it).
+    """
+    if timeout is None:
+        timeout = BACKLOG_LOCK_TIMEOUT_SEC
+    lock_path = Path(edpa_root) / _BACKLOG_LOCK_NAME
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock = FileLock(str(lock_path), timeout=timeout)
+    try:
+        lock.acquire()
+    except Timeout as e:
+        raise BacklogLockTimeout(
+            f"could not acquire backlog write lock {lock_path} within "
+            f"{timeout}s — another EDPA process is writing backlog items "
+            f"(retry; if no other process is running, delete the stale "
+            f"lock file)"
+        ) from e
+    try:
+        yield
+    finally:
+        lock.release()
 
 
 def _read_counter(counter_path: Path, item_type: str) -> int:
