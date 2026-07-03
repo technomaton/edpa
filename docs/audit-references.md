@@ -1,100 +1,156 @@
-# Audit Reference Taxonomy (v1.11)
+# Audit Reference Taxonomy
 
-Every evidence signal in a contributor's `signals[]` block carries a
-`ref` field that **uniquely identifies the source on GitHub** and is
-resolvable by `gh` CLI or an HTTPS URL. This document is the
-canonical spec for that reference format, intended for auditors who
-need to verify EDPA's contribution-share computations against the
-underlying GitHub state.
+Every evidence signal in an item's `evidence[]` block (and in the
+aggregated `contributors[].signals[]`) carries a `ref` field that
+**uniquely identifies its source**. This document is the canonical
+spec for that reference format, intended for auditors who need to
+verify EDPA's contribution-share computations against the underlying
+evidence.
 
-## Reference format per signal type
+In the local-first pipeline the primary refs resolve **in any clone
+of the repository** with plain `git` — no `gh` CLI, no API token, no
+network. GitHub-side refs appear only when the optional CI complement
+is installed (or legacy collectors were used; see the last section).
 
-| Signal type | `ref` format | Required IDs | Example |
-|-------------|--------------|--------------|---------|
-| `commit_author` | `pr#<num>/commit/<sha>` | PR number, commit short-sha | `pr#146/commit/fa9f440` |
-| `pr_reviewer` | `pr#<num>/review/<review_id>` | PR number, review API id | `pr#146/review/2845102347` |
-| `issue_comment` | `issue#<num>/comment/<comment_id>` | issue number, comment API id | `issue#137/comment/c984712` |
-| `manual:pr_body` | `pr#<num>/body` | PR number | `pr#146/body` |
-| `manual:commit_message` | `commit/<sha>/message` | commit short-sha | `commit/fa9f440/message` |
-| `manual:issue_body` | `issue#<num>/body` | issue number | `issue#137/body` |
-| `manual:issue_comment` | `issue#<num>/comment/<comment_id>` | issue number, comment id | `issue#137/comment/c123456` |
-| `manual:pr_comment` | `pr#<num>/comment/<comment_id>` | PR number, comment id | `pr#146/comment/c456789` |
+## Local git references (primary)
 
-The `<sha>` in commit refs is the **short SHA** (first 7 chars of the
-full git commit ID); `gh` CLI accepts short SHAs in all relevant API
-calls.
+| Signal type | `ref` format | Example |
+|-------------|--------------|---------|
+| `commit_author` | `commit/<short>` | `commit/2fe43cb` |
+| `agent_contribution` | `commit/<short>/agent/<agent>` | `commit/2fe43cb/agent/claude-sonnet-4-6` |
+| `manual:commit_message` | `commit/<short>/contrib/<login>` | `commit/2fe43cb/contrib/alice` |
+| `yaml_edit` | `commit/<short>/<id>.md` | `commit/9a1b2c3/S-8.md` |
+| `state_transition` | `commit/<short>/<id>/<from>-><to>` | `commit/9a1b2c3/F-100/Backlog->Implementing` |
 
-## Per-signal verification commands
+`<short>` is the **short SHA** (first 7 chars of the full commit ID);
+git accepts short SHAs in all relevant commands. `<agent>` is the
+normalized AI co-author name (`Claude Sonnet 4.6` →
+`claude-sonnet-4-6`). The `manual:commit_message` ref keys on the
+credited login, so one commit records at most one directive per
+person. (The pre-V2 format `commit/<sha>/message` is superseded; it
+may still appear in historical data.)
 
-### `commit_author:pr#<num>/commit/<sha>` — commit author
+## Per-signal verification commands (git-local)
+
+### `commit_author:commit/<short>` — commit author
 
 ```bash
-gh api repos/<org>/<repo>/commits/<sha> | jq '.author.login, .commit.author'
-# → expected login + commit author email
+git show -s --format='%an <%ae>%n%s' <short>
+# → author name + email (map to the person via .edpa/config/people.yaml)
+#   and the subject — its leading scope names the worked-on item (D-38)
 ```
 
-URL: `https://github.com/<org>/<repo>/pull/<num>/commits/<sha>`
+### `agent_contribution:commit/<short>/agent/<agent>` — AI co-author
 
-### `pr_reviewer:pr#<num>/review/<review_id>` — PR review
+```bash
+git show -s --format='%B' <short> | grep -i 'Co-Authored-By: Claude'
+# → the trailer whose normalized name matches <agent> in the ref
+```
+
+### `manual:commit_message:commit/<short>/contrib/<login>` — /contribute
+
+```bash
+git show -s --format='%B' <short> | grep -i '/contribute'
+# → "/contribute @<login> weight:<X>" — @<login> and weight must match
+#   the signal's person and weight
+```
+
+### `yaml_edit:commit/<short>/<id>.md` — structural backlog edit
+
+```bash
+git show <short> -- '.edpa/backlog/*/<id>.md'
+# → the actual diff. Compare against the signal's `delta` breakdown
+#   (blocks / list items / scalars / lines ±) and `tags`
+#   (e.g. create, block_add×2, bulk_discount).
+```
+
+### `state_transition:commit/<short>/<id>/<from>-><to>` — status flip
+
+```bash
+git show <short> -- '.edpa/backlog/*/<id>.md' | grep '^[-+]status:'
+# → "-status: <from>" / "+status: <to>" matching the ref
+```
+
+Because git is content-addressed, the referenced evidence is
+**immutable**: the commit message, diff, author, and dates cannot be
+edited without changing the SHA the ref points to. That is why local
+signals carry no `excerpt` field — the ref alone is tamper-evident.
+(GitHub-side surfaces are mutable, which is what the `excerpt` field
+below exists for.)
+
+## Zero-weight audit records
+
+A signal with `weight: 0` never enters `contribution_score` — it is
+an audit/analytics record. The original value is preserved in
+`raw_weight` and the reason is named in `tags`:
+
+| Marker | Meaning |
+|--------|---------|
+| tag `referenced` | Item was merely mentioned in the commit message, not worked on (D-38) — full credit goes only to items in the commit's leading scope or whose backlog `.md` changed |
+| tag `out_of_iteration` | Weighted signal on an item provably belonging to a different iteration than the commit's own (D-28/D-29); for CI-side `pr_reviewer` / `issue_comment` the gate resolves per event `at:` timestamp (D-33) |
+| type `state_transition` | Always weight 0 by design — analytics source, gate scoring derives engine-side |
+
+An auditor seeing `weight: 0` + `raw_weight: 4.0` + a tag should read
+it as "recorded, deliberately not credited" — not as missing data.
+
+## CI complement references (optional, GitHub-side)
+
+When `edpa-contribution-sync.yml` is installed, PR-thread events that
+don't exist in git history are materialized after each PR merge:
+
+| Signal type | `ref` format | Example |
+|-------------|--------------|---------|
+| `pr_reviewer` | `PR#<num>:review:<review_id>` | `PR#146:review:2845102347` |
+| `issue_comment` | `PR#<num>:comment:<comment_id>` | `PR#146:comment:984712` |
+
+Verification (needs `gh` CLI with access to the repo):
 
 ```bash
 gh api repos/<org>/<repo>/pulls/<num>/reviews/<review_id> | jq '.user.login, .state'
 # → expected login + state ("APPROVED", "COMMENTED", "CHANGES_REQUESTED")
-```
-
-URL:
-`https://github.com/<org>/<repo>/pull/<num>#pullrequestreview-<review_id>`
-
-### `issue_comment:issue#<num>/comment/<comment_id>` — issue/PR comment
-
-```bash
 gh api repos/<org>/<repo>/issues/comments/<comment_id> | jq '.user.login, .body'
 # → expected login + comment body
 ```
 
-URL: `https://github.com/<org>/<repo>/issues/<num>#issuecomment-<comment_id>`
+URLs:
+`https://github.com/<org>/<repo>/pull/<num>#pullrequestreview-<review_id>`
+and `https://github.com/<org>/<repo>/issues/<num>#issuecomment-<comment_id>`.
 
-### `manual:pr_body:pr#<num>/body` — /contribute in PR description
+The CI complement does **not** emit a `pr_author` signal (the local
+hook already credited the author's commits — emitting it here would
+double-count) and does **not** parse `/contribute`.
 
-```bash
-gh pr view <num> --repo <org>/<repo> --json body | jq -r .body | grep -i '/contribute'
-# → expected line(s) like "/contribute @<person> weight:<X>"
-```
+## Common audit workflow
 
-URL: `https://github.com/<org>/<repo>/pull/<num>` (PR description on
-top)
+Verifying a person's claimed share on an item (say `turyna` on S-8):
 
-### `manual:commit_message:commit/<sha>/message` — /contribute in commit message
+1. Open `.edpa/backlog/stories/S-8.md`. Read the `evidence[]` block —
+   each entry is one piece of evidence with a resolvable `ref`.
+2. For each signal, run the matching verification command above.
+   Confirm the resolved author/login maps to the expected person via
+   `.edpa/config/people.yaml`.
+3. Sum the `weight:` values per person across all signals, **skipping
+   zero-weight entries** → `contribution_score`.
+4. Compare against the `contributors[]` block: per-person
+   `contribution_score` should match (±0.01 rounding), and
+   `cw = person_score / Σ_persons score`.
+5. Cross-check `Σ cw[*, S-8] ≈ 1.0` — engine invariant.
+6. For a frozen iteration, compare the item's `contributors[]` against
+   the snapshot in `.edpa/snapshots/` (see
+   [`docs/audit-trail.md`](audit-trail.md)).
 
-```bash
-git -C <repo_clone> show <sha> --format='%B' --no-patch | grep -i '/contribute'
-# OR via gh API:
-gh api repos/<org>/<repo>/commits/<sha> | jq -r '.commit.message' | grep -i '/contribute'
-```
+If a ref does not resolve (`git show` fails in a full clone, or the
+`gh` command 404s), the audit trail has been **broken** — either
+history was rewritten post-detection or there is a detector bug.
+Either case is a finding to escalate. Note that `git show <short>`
+requires full history — use a non-shallow clone for audits.
 
-URL: `https://github.com/<org>/<repo>/commit/<sha>` (commit message
-shown above the diff)
+## The `excerpt` field (GitHub surfaces)
 
-### `manual:issue_body:issue#<num>/body` — /contribute in issue description
-
-```bash
-gh issue view <num> --repo <org>/<repo> --json body | jq -r .body | grep -i '/contribute'
-```
-
-URL: `https://github.com/<org>/<repo>/issues/<num>` (issue description
-on top)
-
-### `manual:issue_comment` / `manual:pr_comment` — /contribute in any comment
-
-Same verification commands as `issue_comment` (the comment is fetched
-the same way; the `manual:` prefix just means EDPA's parser found a
-`/contribute` directive inside).
-
-## The `excerpt` field
-
-For all `manual:*` signal types, the entry also carries an `excerpt`
-field with the **literal /contribute line** as it appeared at
-detection time:
+Signals parsed from **mutable** GitHub surfaces (the legacy
+`manual:pr_body`, `manual:issue_*`, `manual:pr_comment` types) also
+carry an `excerpt` with the literal `/contribute` line as it appeared
+at detection time:
 
 ```yaml
 - type: manual:pr_body
@@ -104,53 +160,42 @@ detection time:
   detected_at: 2026-05-08T15:23:11Z
 ```
 
-(Default auto-detected weights for non-manual signals are:
-commit_author=4.00, pr_reviewer=2.17, issue_comment=1.46.
-Manual `/contribute` weights are operator-supplied verbatim.)
-
-This is load-bearing for audit because GitHub does **not** preserve
-edit history of PR descriptions or commit messages by default.
+GitHub does not preserve edit history of PR descriptions by default.
 Without `excerpt`, an auditor verifying months later might see a
 modified PR body that no longer contains the directive — and have no
-way to know whether EDPA's signal record was bogus or whether the PR
-was edited post-merge. With `excerpt`, the auditor sees what EDPA
-actually matched and can compare against the current state.
+way to know whether EDPA's record was bogus or the PR was edited
+post-merge. With `excerpt`, the auditor sees what EDPA actually
+matched; `detected_at` (or `at` on local signals) pins when. Local git
+refs don't need this — see the immutability note above.
 
-The `detected_at` timestamp pins when EDPA captured the signal, so
-discrepancies between excerpt and current GitHub state can be
-attributed to post-detection edits rather than EDPA misreading.
+## Legacy v1.11 reference formats (historical data)
 
-## Common audit workflow
+Projects with evidence collected before the local-first pipeline (or
+via the `EDPA_USE_GH=1` debugging escape hatch, which re-enables the
+old live GitHub collectors) may carry these refs:
 
-Given a snapshot file `.edpa/snapshots/iteration-PI-2026-1.4.json`,
-verifying turyna's claim of 51% share on S-8:
+| Signal type | `ref` format | Verify with |
+|-------------|--------------|-------------|
+| `commit_author` | `pr#<num>/commit/<sha>` | `gh api repos/<org>/<repo>/commits/<sha>` |
+| `pr_reviewer` | `pr#<num>/review/<review_id>` | `gh api repos/<org>/<repo>/pulls/<num>/reviews/<review_id>` |
+| `issue_comment` | `issue#<num>/comment/<comment_id>` | `gh api repos/<org>/<repo>/issues/comments/<comment_id>` |
+| `manual:pr_body` | `pr#<num>/body` | `gh pr view <num> --json body \| jq -r .body \| grep -i /contribute` |
+| `manual:commit_message` | `commit/<sha>/message` | `git show -s --format='%B' <sha> \| grep -i /contribute` |
+| `manual:issue_body` | `issue#<num>/body` | `gh issue view <num> --json body \| jq -r .body \| grep -i /contribute` |
+| `manual:issue_comment` | `issue#<num>/comment/<comment_id>` | as `issue_comment` |
+| `manual:pr_comment` | `pr#<num>/comment/<comment_id>` | `gh api repos/<org>/<repo>/issues/<num>/comments` |
 
-1. Open `.edpa/backlog/stories/S-8.md`, find the `contributors`
-   block where `person: turyna`.
-2. Read the `signals[]` list — each entry is one piece of evidence.
-3. For each signal: run the corresponding `gh` command from the
-   table above using the `ref`. Compare result against the expected
-   login (turyna's GitHub handle from `.edpa/config/people.yaml`).
-4. Sum the `weight:` values across all of turyna's signals →
-   `contribution_score`.
-5. Sum `contribution_score` across **all contributors** on S-8 → item
-   total.
-6. Compute turyna's cw = turyna_score / item_total. Compare with the
-   stored `cw:` value (should match within ~0.001 rounding).
-7. Cross-check that `Σ cw[*, S-8] ≈ 1.0` — engine invariant.
+These remain valid audit targets for the data that carries them; new
+evidence is emitted in the local git formats above.
 
-If any signal's `gh` command returns a different login than expected
-(or returns 404), the audit trail has been **broken**. Either the
-GitHub data was modified post-detection (compare `detected_at`
-against PR/issue updated_at), or there's a bug in the detector.
-Either case is a finding to escalate.
+## Bot and tool exclusion
 
-## Bot exclusion
-
-Comments authored by `<login>[bot]` (or known service accounts like
-`edpa-bot`, `github-actions`) are **excluded** from `issue_comment`
-signal collection. This prevents EDPA's own auto-commit messages or
-GitHub Actions' status updates from accidentally crediting "the bot"
-as a contributor. Manual `/contribute` directives in such comments
-are still respected (they're explicit operator intent), just under
-the appropriate `manual:` signal type, not `issue_comment`.
+Signals are never credited to automation: commits authored by bot
+identities (`*[bot]@*`, `github-actions@*`, the EDPA sync bot) and
+tool-generated commits (`chore(evidence):`, `chore(ci-materialization):`,
+`EDPA sync …`) produce no weight, and comments authored by `<login>[bot]`
+or known service accounts are excluded from `issue_comment`
+collection. This prevents EDPA's own materialization commits or CI
+status updates from crediting "the bot" as a contributor. Manual
+`/contribute` directives written by a human remain explicit operator
+intent and are respected under the appropriate `manual:*` type.

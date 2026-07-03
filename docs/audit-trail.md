@@ -1,12 +1,16 @@
-# Audit Trail & Freeze Rules (v1.11)
+# Audit Trail & Freeze Rules
 
 ## Six pillars of audit compliance
 
-1. **GitHub delivery evidence** — commits, PRs, reviews, comments (living data)
+1. **Local git delivery evidence** — commits, backlog edits, status
+   transitions in the project's own history (living data, reproducible
+   from `git log`); PR reviews/comments join via the optional CI
+   complement
 2. **Capacity registry** — `.edpa/config/people.yaml` (versioned in git)
 3. **Per-signal audit refs** — every contribution has a resolvable
-   `ref` to a specific GitHub artifact (issue#N, pr#N/commit/SHA,
-   etc.). See [`docs/audit-references.md`](audit-references.md).
+   `ref` to a specific git or GitHub artifact (`commit/<short>`,
+   `commit/<short>/<id>.md`, `PR#<num>:review:<id>`, etc.). See
+   [`docs/audit-references.md`](audit-references.md).
 4. **Frozen snapshot** — `.edpa/snapshots/iteration-{ID}.json` (immutable)
 5. **Reproducible calculation** — `cw[P, item] = score[P, item] / Σ_persons score`
    (per-item normalization), `DerivedHours[P, item] = (JS×cw / Σ_items JS×cw) × Capacity`
@@ -28,7 +32,7 @@ Example:
 
 Each revision includes: reason for correction, diff from previous, timestamp, author.
 
-## Snapshot format (v1.11)
+## Snapshot format
 
 ```json
 {
@@ -102,7 +106,7 @@ Each revision includes: reason for correction, diff from previous, timestamp, au
 }
 ```
 
-Note the v1.11 structure:
+Notes on the structure (v1.11 schema, extended since):
 
 - **`contributors[].cw`** is the per-item share (Σ across persons =
   1.0 per item). Different from v1.10 where cw was an absolute
@@ -110,18 +114,24 @@ Note the v1.11 structure:
 - **`contributors[].contribution_score`** is the raw signal-weight
   sum, the input to per-item normalization.
 - **`contributors[].signals[]`** is the per-signal audit trail with
-  resolvable `ref` for each evidence source. Two collectors feed
-  this list:
-  - **`detect_contributors.py`** (v1.11) — PR/issue API surfaces:
-    `commit_author`, `pr_reviewer`, `issue_comment`, `manual:*`.
-  - **`yaml_edit_signals.py`** (v1.17) — git diff over
-    `.edpa/backlog/<typ>/<id>.md` per iteration window:
-    `yaml_edit:create`, `yaml_edit:block_add`, `yaml_edit:list_grow`,
-    `yaml_edit:scalar_change`, `yaml_edit:lines_volume`,
-    `yaml_edit:revert`. D-26: these are materialized into `evidence[]`
-    with a structural `delta`, alongside `state_transition` signals
-    (status who/when/from→to). Each signal carries a resolvable `ref`
-    so an auditor opens the commit diff to verify what changed.
+  resolvable `ref` for each evidence source. Three collectors feed the
+  underlying `evidence[]`, which `detect_contributors.py` aggregates
+  into `contributors[]`:
+  - **`local_evidence.py`** (primary; post-commit hook +
+    `/edpa:materialize`) — local git history: `commit_author`,
+    `agent_contribution`, `manual:commit_message`, plus
+    `state_transition` records (status who/when/from→to, weight 0).
+  - **`yaml_edit_signals.py`** (v1.17, invoked by the same hook /
+    materialize path) — structural git diff over
+    `.edpa/backlog/<typ>/<id>.md`, scored by the `yaml_edit:*`
+    component weights (`create`, `block_add`, `list_grow`,
+    `scalar_change`, `lines_volume`, `revert`). D-26: materialized
+    into `evidence[]` as `yaml_edit` signals carrying a structural
+    `delta`. Each signal carries a resolvable `ref` so an auditor
+    opens the commit diff to verify what changed.
+  - **`sync_pr_contributions.py`** (optional CI complement,
+    `edpa-contribution-sync.yml`) — the GH-side PR-thread events that
+    don't exist in git: `pr_reviewer`, `issue_comment`.
   - **D-28/D-29 out-of-iteration gate:** a weighted delivery signal
     (`commit_author`, `yaml_edit`, `manual:commit_message`,
     `agent_contribution`) on an item belonging to a *different* iteration
