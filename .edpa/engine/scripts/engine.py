@@ -59,6 +59,11 @@ VERSION = get_version()
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     from _yaml_io import load_yaml  # noqa: E402  (shared .md/.yaml loader, S-242)
+    # Canonical credit scopes (Krok 2 / D-52): both are named, deliberate
+    # subsets of the full read surface — Events/Risks are PI-planning
+    # artefacts that earn no engine credit (see CHANGELOG), legacy Tasks are
+    # never engine-loaded.
+    from id_counter import ENGINE_CREDIT_DIRS, GATE_TYPE_DIRS  # noqa: E402
 finally:
     sys.path.pop(0)
 
@@ -418,13 +423,9 @@ def load_backlog_items(edpa_root, iteration_id=None):
     contributors_seen_total = 0
     evidence_pairs_total = 0
 
-    type_dirs = {
-        "stories": "Story",
-        "features": "Feature",
-        "epics": "Epic",
-        "initiatives": "Initiative",
-        "defects": "Defect",
-    }
+    # Engine credit scope — canonical named subset (id_counter, D-52):
+    # events/risks/tasks are deliberately absent, see the import note.
+    type_dirs = ENGINE_CREDIT_DIRS
 
     from transitions import item_in_iteration  # noqa: E402 (lazy; matches parse_iteration_dates usage)
 
@@ -585,11 +586,8 @@ def load_backlog_items(edpa_root, iteration_id=None):
     return items, {}
 
 
-GATE_TYPE_DIRS = {
-    "Feature": "features",
-    "Epic": "epics",
-    "Initiative": "initiatives",
-}
+# GATE_TYPE_DIRS is imported from id_counter (canonical tables) at module
+# top — Feature/Epic/Initiative, the levels credited via gate events.
 
 
 def _passthrough_contributors(item_data):
@@ -1459,7 +1457,7 @@ def main():
         try:
             from explain import explain_person, load_results  # noqa: E402
         finally:
-            pass
+            sys.path.pop(0)
         edpa_root = Path(args.edpa_root) if args.edpa_root else Path(".edpa")
         if not args.iteration:
             parser.error("--explain requires --iteration")
@@ -1519,8 +1517,10 @@ def main():
         # they don't get double-counted — gate_events represent them.
         # Defects ARE credited at Done status (small bug-fix items
         # without their own gate ladder); v1.17 fix to the v1.16 silent
-        # drop. Tasks behave the same way.
-        items = [i for i in items if i.get("level") in ("Story", "Defect", "Task")]
+        # drop. ("Task" was listed here for years but was phantom credit:
+        # the loader never reads tasks/ — legacy Tasks are read-only,
+        # uncreatable, and deliberately not engine-credited. D-52.)
+        items = [i for i in items if i.get("level") in ("Story", "Defect")]
         gate_events, gate_audit = load_gate_events(
             edpa_root, iteration_id, heuristics,
             people=(capacity or {}).get("people", []) or [],

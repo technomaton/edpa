@@ -49,22 +49,12 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 try:
-    from id_counter import TYPE_DIRS  # noqa: E402
+    # Canonical item-id prefix → backlog directory map (Krok 2, incl. the
+    # legacy T→tasks entry so PR refs to migrated Task items materialize).
+    from id_counter import PREFIX_TO_DIR  # noqa: E402
     from _md_frontmatter import load_md, save_md_item  # noqa: E402
 finally:
     sys.path.pop(0)
-
-
-# Map item-id prefix → backlog directory.
-PREFIX_TO_DIR = {
-    "I": "initiatives",
-    "E": "epics",
-    "F": "features",
-    "S": "stories",
-    "D": "defects",
-    "EV": "events",
-    "R": "risks",
-}
 
 # Recognized EDPA item refs in PR title/body/branch.
 _ITEM_REF_RE = re.compile(r"\b([A-Z]{1,3}-\d{1,9})\b")
