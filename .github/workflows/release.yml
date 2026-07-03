@@ -10,12 +10,15 @@ name: Release
 #
 # Maintainer flow becomes: bump versions, update CHANGELOG, commit
 # release: vX.Y.Z, then `git tag vX.Y.Z && git push --tags`. The
-# workflow does the rest.
+# workflow does the rest — including, on stable tags, deploying the
+# website (deploy-web job below, once the Vercel secrets exist).
 #
 # "Bump versions" = update BOTH files together so the site mirrors
 # the engine release in product copy:
 #   - plugin/.claude-plugin/plugin.json   (engine, single source of truth)
-#   - web/package.json                    (mirror, drives Vercel deploys)
+#   - web/package.json                    (mirror, stamped by
+#     scripts/bump_version.py and shown in site copy; Vercel git deploys
+#     are disabled — the deploy-web job ships prebuilt output instead)
 
 on:
   push:
@@ -37,6 +40,12 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Consumed by deploy-web: which tag to check out, which version string
+    # must appear on the live site, and whether this is a prerelease.
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+      prerelease: ${{ steps.prerelease.outputs.flag }}
     steps:
       - name: Resolve target tag
         id: tag
@@ -154,3 +163,113 @@ jobs:
               --title "$TAG" \
               --notes-file release-notes.md
           fi
+
+  # Ships the website right after a stable release so the live site cannot
+  # drift behind the engine (previously manual: vercel build + deploy +
+  # curl verify from the release checklist).
+  #
+  # Requires three repo secrets (Settings → Secrets and variables → Actions):
+  #   VERCEL_TOKEN      — account token from vercel.com/account/tokens
+  #   VERCEL_ORG_ID     — "orgId" from web/.vercel/project.json after
+  #                       `vercel link` (that file is gitignored, hence secrets)
+  #   VERCEL_PROJECT_ID — "projectId" from the same file
+  # Until the secrets exist, the job exits 0 with a ::warning and the deploy
+  # stays manual — releases are never blocked on missing web credentials.
+  #
+  # Deploys PREBUILT output from this runner. vercel.json keeps
+  # git.deploymentEnabled=false on purpose (commit 414f308: Vercel's
+  # auto-detection built the repo as Python and failed every push, and
+  # Vercel build minutes cost money) — building here and shipping with
+  # `vercel deploy --prebuilt` preserves both halves of that decision.
+  deploy-web:
+    needs: release
+    # Stable tag pushes only: prerelease tags (-alpha/-beta/-rc, detected by
+    # the release job) and workflow_dispatch back-fills of historical tags
+    # must never overwrite the production site.
+    if: github.event_name == 'push' && needs.release.outputs.prerelease == ''
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Check Vercel secrets
+        id: gate
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::warning::VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID repo secrets are not configured — skipping web deploy. Ship manually: vercel build --prod --cwd web && vercel deploy --prebuilt --prod --cwd web"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout at tag
+        if: steps.gate.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Set up Node
+        if: steps.gate.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          # Node 24 matches the Vercel project setting (same as test.yml).
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: web
+        run: npm ci
+
+      - name: Install Vercel CLI
+        if: steps.gate.outputs.ready == 'true'
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel project settings
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: web
+        # Recreates the gitignored web/.vercel/ from VERCEL_ORG_ID /
+        # VERCEL_PROJECT_ID (the CLI reads both from the environment).
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build prebuilt output
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: web
+        # vercel build, NOT astro build — astro alone skips .vercel/output/,
+        # which is exactly what --prebuilt deploys.
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy to production
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: web
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+      - name: Verify live site
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          # Plain curl with retries — alias/CDN propagation can lag the
+          # deploy by a few seconds, and caching fetchers lie for ~15 min.
+          ok=""
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS https://edpa.technomaton.com/ | grep -qF "v${VERSION}"; then
+              ok=1
+              break
+            fi
+            echo "attempt ${attempt}: v${VERSION} not visible yet — retrying in 15s"
+            sleep 15
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::live site does not show v${VERSION} after deploy"
+            exit 1
+          fi
+          # The deployed install.sh must be byte-identical to the tagged
+          # one: tests/test_install_sh_hygiene.py guards only the in-repo
+          # mirror (web/public/install.sh), not what production serves.
+          if ! curl -fsS https://edpa.technomaton.com/install.sh | cmp -s - install.sh; then
+            echo "::error::deployed install.sh differs from install.sh at ${{ needs.release.outputs.tag }}"
+            exit 1
+          fi
+          echo "Live site verified at v${VERSION}."
