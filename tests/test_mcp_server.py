@@ -532,6 +532,47 @@ def test_handle_item_event_and_risk_prefixes(tmp_path):
     assert parse_result(_handle_item(tmp_path, "R-2"))["id"] == "R-2"
 
 
+def test_safe_item_id_accepts_all_real_prefixes():
+    """Every canonical item prefix (S/F/E/I/D/EV/R plus legacy T) passes
+    _safe_item_id unchanged — the D-76 tightening must not reject real ids."""
+    for good in ("S-1", "F-2", "E-10", "I-1", "D-5", "EV-3", "R-4", "T-9"):
+        assert mcp_server._safe_item_id(good) == good
+
+
+def test_safe_item_id_rejects_pi_shaped_tokens():
+    """D-76: a bare 'PI-2026' is <=3 letters + digits, so the old ITEM_ID_RE
+    accepted it and PREFIX_TO_DIR then produced a confusing not-found. 'PI'
+    is not a known item prefix — reject it up front. The multi-hyphen
+    'PI-2026-1' was already regex-rejected; assert it stays rejected."""
+    assert mcp_server._safe_item_id("PI-2026") is None
+    assert mcp_server._safe_item_id("PI-2026-1") is None
+
+
+def test_safe_item_id_prefix_set_matches_id_counter():
+    """Accepted prefixes are exactly id_counter's canonical set — no hardcoded
+    drift (the source table is guarded by tests/test_type_dirs.py)."""
+    from mcp_server import _PREFIX_TO_DIR
+    for prefix in _PREFIX_TO_DIR:
+        assert mcp_server._safe_item_id(f"{prefix}-1") == f"{prefix}-1"
+
+
+def test_handle_item_rejects_pi_shaped_token():
+    """edpa_item read handler returns a clear 'invalid item_id' — not the old
+    confusing 'not found in backlog' — for a PI-shaped token (D-76)."""
+    result = _handle_item(EDPA_ROOT, "PI-2026")
+    assert is_error(result)
+    assert "invalid item_id" in result[0].text
+    assert "not found" not in result[0].text
+
+
+def test_dispatch_item_rejects_pi_shaped_token():
+    """The call_tool dispatch layer rejects PI-2026 with the invalid-id message
+    before touching the filesystem (D-76)."""
+    result = mcp_server._dispatch_item(EDPA_ROOT, {"item_id": "PI-2026"})
+    assert is_error(result)
+    assert "invalid item_id" in result[0].text
+
+
 def test_handle_item_rejects_traversal_directly(tmp_path):
     """_handle_item itself validates item_id (D-46) — a direct caller must
     not be able to read files outside backlog/ via `../` segments, even

@@ -105,16 +105,36 @@ SERVER_VERSION = _read_plugin_version()
 
 # Item IDs are <type-prefix>-<digits>: S-200, F-12, I-1, D-3, T-99,
 # plus 2-letter EV-3 (Event) and 1-letter R-2 (Risk) added in V2.
+# ITEM_ID_RE is only the coarse shape gate; _safe_item_id also checks the
+# prefix against id_counter's canonical set (D-76) so PI-shaped tokens like
+# "PI-2026" — which match the shape but name no real item type — are rejected
+# up front with a clear error instead of a confusing downstream not-found.
 ITEM_ID_RE = re.compile(r"^[A-Z]{1,3}-\d{1,9}$")
 ITERATION_ID_RE = re.compile(r"^PI-\d{4}-\d{1,2}(?:\.\d{1,2})?$")
 PERSON_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 
 def _safe_item_id(item_id: str) -> str | None:
-    """Return item_id if it matches the allowed shape, else None."""
+    """Return item_id if it is a syntactically valid item id, else None.
+
+    Two gates: the coarse ITEM_ID_RE shape (<letters>-<digits>) and a prefix
+    check against id_counter's canonical prefix set (_PREFIX_TO_DIR, i.e.
+    S/F/E/I/D/EV/R plus legacy T). The prefix gate (D-76) rejects PI-shaped
+    tokens such as "PI-2026" whose 2-letter prefix passes the shape but is
+    not a real item type — surfacing a clear invalid-id error rather than a
+    confusing not-found once PREFIX_TO_DIR fails to resolve it downstream.
+    """
     if not isinstance(item_id, str):
         return None
-    return item_id if ITEM_ID_RE.match(item_id) else None
+    if not ITEM_ID_RE.match(item_id):
+        return None
+    # Reject anything whose prefix is not a known item prefix. Reuse the
+    # canonical map rather than hardcoding, so new item types can never drift
+    # out of sync (the source table is guarded by tests/test_type_dirs.py).
+    prefix = item_id.split("-", 1)[0]
+    if prefix not in _PREFIX_TO_DIR:
+        return None
+    return item_id
 
 
 def _safe_iteration_id(iter_id: str) -> str | None:
