@@ -720,6 +720,57 @@ def _yaml_edit_from_evidence(edpa_root, start=None, end=None):
     return out
 
 
+def _activity_contributors(sigs):
+    """D-73: contributor shares for a story-activity event, scoped to the
+    signals actually in THIS iteration's window.
+
+    ``sigs`` are the live (weight>0, not out_of_iteration — the same D-62
+    filter the caller applied to decide whether to emit the event) yaml_edit
+    signals from the story's evidence[], already windowed by
+    ``_yaml_edit_from_evidence``. Shares are recomputed from *these* signals
+    only — never copied from the story's frontmatter contributors[], whose cw
+    is aggregated over ALL-TIME evidence and would credit people who worked
+    the story in an earlier iteration.
+
+    Mirrors detect_contributors.aggregate_signals: group by resolved person,
+    contribution_score = Σ weight, cw = score / total, deterministic order
+    (score desc, then person id). Materialized evidence[] signals carry a
+    resolved ``person`` id; a signal without one is non-attributable and
+    earns no share (the event stays inert for that weight rather than
+    crediting an unknown) — the engine would award it 0h anyway.
+    """
+    by_person: dict[str, list] = {}
+    total = 0.0
+    for s in sigs:
+        person = s.get("person")
+        if not person:
+            continue
+        try:
+            weight = float(s.get("weight") or 0)
+        except (TypeError, ValueError):
+            continue
+        if weight <= 0:
+            continue
+        by_person.setdefault(person, []).append(s)
+        total += weight
+    if total <= 0:
+        return []
+    scored = [
+        (pid, sum(float(x.get("weight") or 0) for x in plist), plist)
+        for pid, plist in by_person.items()
+    ]
+    scored.sort(key=lambda t: (-t[1], t[0]))
+    return [
+        {
+            "person": pid,
+            "cw": round(score / total, 4),
+            "contribution_score": round(score, 2),
+            "signals": plist,
+        }
+        for pid, score, plist in scored
+    ]
+
+
 def load_story_activity_events(edpa_root, iteration_id, heuristics,
                                 yaml_edit_signals):
     """V2.1 C7.5 — emit synthetic items for in-flight Stories with activity.
@@ -734,7 +785,9 @@ def load_story_activity_events(edpa_root, iteration_id, heuristics,
       id        = f"{story_id}@activity"
       level     = "Story"
       job_size  = story.js * credit_factor    (configurable; default 0.40)
-      contributors = []  (filled by _enrich_items_with_yaml_edit_signals)
+      contributors = shares recomputed from the in-window signals only
+                     (D-73, via _activity_contributors) — NOT the story's
+                     all-time frontmatter contributors[]
 
     The credit_factor is reserved capacity for "in-progress activity"
     — a refinement-heavy iteration crediting 40 % of Story.js per
@@ -805,10 +858,12 @@ def load_story_activity_events(edpa_root, iteration_id, heuristics,
             "level": "Story",
             "job_size": round(js * factor, 4),
             "title": data.get("title", ""),
-            # Materialized contributors[] (yaml_edit + commit_author etc. from
-            # evidence[]) credit the in-flight refinement work. Empty until the
-            # story's evidence[] has been materialized + aggregated (C7.6).
-            "contributors": list(data.get("contributors") or []),
+            # D-73: credit the in-flight refinement work to whoever did it in
+            # THIS iteration — shares recomputed from the windowed, live `sigs`
+            # (same set the audit counts), not the story's frontmatter
+            # contributors[] (cw aggregated over ALL-TIME evidence, which would
+            # credit editors from earlier iterations).
+            "contributors": _activity_contributors(sigs),
         })
         audit.append({
             "item_id": story_id,

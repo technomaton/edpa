@@ -47,6 +47,12 @@ try:
         PREFIX_TO_DIR,
         TYPE_DIRS,
     )
+    # Per-type parent-requirement rule — the single source of truth shared by
+    # the create side (mcp_server.PARENT_RULES) and the syntax validator.
+    # validate_syntax re-exports it dependency-safe (it imports no `mcp`, so
+    # unlike mcp_server it never sys.exit()s at import when the MCP package is
+    # absent — `backlog validate` must run without it). See _parent_required.
+    from validate_syntax import ITEM_SCHEMA as _ITEM_SCHEMA  # noqa: E402
 finally:
     sys.path.pop(0)
 
@@ -246,6 +252,20 @@ def load_config(root):
 
 # Identity map over the canonical read surface — level == type in V2.
 TYPE_TO_LEVEL = {t: t for t in _ALL_TYPE_DIRS}
+
+
+def _parent_required(item_type: "str | None") -> bool:
+    """Whether an item of ``item_type`` must reference a parent.
+
+    Mirrors the create side (mcp_server.PARENT_RULES) via the shared
+    validate_syntax.ITEM_SCHEMA: the Epic->Initiative / Feature->Epic /
+    Story->Feature spine requires a parent; Defect/Event/Risk (and
+    Initiative/Task) "land at top level — no parent required". Unknown or
+    missing types default to not-required, matching PARENT_RULES.get(t) ->
+    None (a missing `type` is reported separately by the type-field check).
+    """
+    schema = _ITEM_SCHEMA.get(item_type)
+    return bool(schema and schema.get("parent_required"))
 
 
 def collect_items(backlog):
@@ -775,13 +795,20 @@ def cmd_validate(backlog, args):
         if js and js > 8:
             warnings.append(f"{s['id']} ({s.get('title','')}): JS={js} exceeds recommended max of 8")
 
-    # 4. All non-Initiative items must have a valid parent reference
+    # 4. Items whose type requires a parent must have a valid parent reference.
+    #    Only the Epic->Feature->Story spine requires one; Defect/Event/Risk
+    #    (like Initiative/Task) land at top level with no parent (D-72, per
+    #    `backlog add --help` and mcp_server.PARENT_RULES). Sourcing the rule
+    #    from the shared ITEM_SCHEMA keeps standalone validate in lockstep with
+    #    the create side, so it never rejects a parentless item create accepts.
+    #    A present-but-dangling parent is still flagged for every type.
     for item in items:
         if item.get("level") == "Initiative":
             continue
         parent = item.get("parent")
         if not parent:
-            errors.append(f"{item['id']} ({item.get('title','')}): missing parent reference")
+            if _parent_required(item.get("type")):
+                errors.append(f"{item['id']} ({item.get('title','')}): missing parent reference")
         elif parent not in all_ids:
             errors.append(f"{item['id']} ({item.get('title','')}): parent '{parent}' does not exist")
 

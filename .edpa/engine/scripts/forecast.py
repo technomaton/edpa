@@ -70,7 +70,11 @@ def load_velocity_history(edpa_root: Path, window: int) -> list[float]:
     for f in iter_dir.glob("*.yaml"):
         data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
         it = data.get("iteration", {})
-        if it.get("status") != "closed":
+        # Lifecycle 'closed' may live on the nested iteration.status or the
+        # top-level status key (both written by edpa_iteration_close) — accept
+        # either, matching pi_close.open_iterations (D-57/D-75).
+        status = it.get("status") or data.get("status")
+        if status != "closed":
             continue
         # Skip PI-level files (no .N suffix)
         it_id = it.get("id", f.stem)

@@ -208,7 +208,15 @@ def is_bot_author(email: str) -> bool:
 _RE_STATUS_LINE = re.compile(r"^[+-]status:\s*(.+)$")
 _RE_TOP_LEVEL_KEY = re.compile(r"^[+-]([a-z_][a-z0-9_]*)\s*:\s*(.*)$", re.IGNORECASE)
 _RE_LIST_BULLET = re.compile(r"^[+-]- ")
-_RE_PERSON_ENTRY = re.compile(r"^[+-]- person:\s*(.+?)\s*$")
+# Bookkeeping-list bullets. evidence[] entries lead with `- type:` (the legacy
+# ci_signals[] block is identical in shape — ADR-012 rename) and contributors[]
+# entries lead with `- person:`. Both lists are EDPA-derived (materialized from
+# commit evidence, not authored by hand), so their growth must not earn
+# list-growth credit — the same reason block_add / scalar_change already skip
+# _BOOKKEEPING_BLOCKS below. Genuine content bullets key on their own field
+# (`- AC-1:`, `- NFR-2:`, `- typeface:`) or are scalar (`- S-200`), and the
+# anchored `type:`/`person:` never match those, so real work is untouched.
+_RE_BOOKKEEPING_BULLET = re.compile(r"^[+-]- (?:type|person):", re.IGNORECASE)
 _RE_ID_FIELD = re.compile(r"^\+id:\s*(\S+)\s*$")
 _RE_TYPE_FIELD = re.compile(r"^\+type:\s*(\S+)\s*$")
 _RE_TITLE_FIELD = re.compile(r"^\+title:\s*")
@@ -313,8 +321,19 @@ def score_diff(diff_lines: list[str], weights: dict) -> tuple[float, list[str], 
         delta["blocks_added"] = len(new_blocks)
 
     # ─── 4. List growth: net `- ` bullets added (cap 10) ─────────────────
-    bullets_added = sum(1 for a in other_added if _RE_LIST_BULLET.match("+" + a))
-    bullets_removed = sum(1 for r in other_removed if _RE_LIST_BULLET.match("-" + r))
+    # D-74: evidence[]/contributors[] rows grow their list mechanically as a
+    # by-product of materialization, not authoring. Real bookkeeping growth
+    # rides chore(evidence):/chore(contributors): commits already zeroed
+    # wholesale by TOOL_COMMIT_PATTERNS; excluding the `- type:`/`- person:`
+    # bullets here additionally covers the residual case of a derived row
+    # landing inside a human-subject commit, so it can never earn list-growth
+    # credit. Mirrors the _BOOKKEEPING_BLOCKS skip in block_add/scalar_change.
+    def _content_bullet(sign: str, line: str) -> bool:
+        return bool(_RE_LIST_BULLET.match(sign + line)) \
+            and not _RE_BOOKKEEPING_BULLET.match(sign + line)
+
+    bullets_added = sum(1 for a in other_added if _content_bullet("+", a))
+    bullets_removed = sum(1 for r in other_removed if _content_bullet("-", r))
     net_bullets = max(0, bullets_added - bullets_removed)
     delta["list_items_added"] = bullets_added
     delta["list_items_removed"] = bullets_removed
@@ -346,6 +365,13 @@ def score_diff(diff_lines: list[str], weights: dict) -> tuple[float, list[str], 
     #  projection of evidence[], not an input signal — editing it is not work.)
 
     # ─── 6. Lines volume bonus (capped) ──────────────────────────────────
+    # net_lines is a gross effort proxy; unlike the structural signals above it
+    # is intentionally NOT block-filtered. A --unified=0 diff carries no block
+    # context, so an indented sub-key line (`  weight: 4.0`) can't be attributed
+    # to evidence[] versus a real block. This is safe (D-74): bulk bookkeeping
+    # growth only ever rides chore(evidence):/chore(contributors): commits,
+    # which never reach here (TOOL_COMMIT_PATTERNS zeroes them), and a stray
+    # derived row inside a human commit stays under the 0.1 floor below.
     lines_bonus = min(
         weights["yaml_edit:lines_volume_cap"],
         max(0, net_lines) / weights["yaml_edit:lines_volume_divisor"],

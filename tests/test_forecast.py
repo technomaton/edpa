@@ -52,6 +52,22 @@ iteration:
 status: {status}
 """
 
+# Lifecycle status ONLY at the top level — the nested iteration block carries
+# no status. pi_close.open_iterations accepts this shape (status may live on
+# either the nested or the top-level key); forecast's velocity history must
+# too (D-75 alignment).
+ITER_YAML_TOPLEVEL_STATUS = """\
+iteration:
+  id: {id}
+  pi: {pi}
+  start_date: 2026-04-06
+  end_date: 2026-04-13
+status: {status}
+delivery:
+  delivered_sp: {sp}
+  velocity: {sp}
+"""
+
 STORY_MD = """\
 ---
 id: {id}
@@ -231,6 +247,40 @@ def test_load_velocity_history_explicit_zero_not_rederived(edpa_root):
     _write_story(edpa_root, "S-1", 5, "Done", "PI-2026-1.1")
     vels = load_velocity_history(edpa_root, window=3)
     assert vels == [0.0]
+
+
+# D-75 regression: an iteration closed with a top-level status:closed but no
+# nested iteration.status must still count. pi_close.open_iterations already
+# reads either key; load_velocity_history was nested-only and silently dropped
+# these iterations from the baseline.
+
+def test_load_velocity_history_accepts_top_level_status(edpa_root):
+    (edpa_root / "iterations").mkdir(parents=True, exist_ok=True)
+    for it_id, sp in [("PI-2026-1.1", 20), ("PI-2026-1.2", 30)]:
+        (edpa_root / "iterations" / f"{it_id}.yaml").write_text(
+            ITER_YAML_TOPLEVEL_STATUS.format(
+                id=it_id, pi="PI-2026-1", status="closed", sp=sp),
+            encoding="utf-8",
+        )
+    vels = load_velocity_history(edpa_root, window=3)
+    assert vels == [20.0, 30.0]
+
+
+def test_load_velocity_history_top_level_open_still_skipped(edpa_root):
+    # Symmetry: a top-level status that is NOT closed must still be skipped.
+    (edpa_root / "iterations").mkdir(parents=True, exist_ok=True)
+    (edpa_root / "iterations" / "PI-2026-1.1.yaml").write_text(
+        ITER_YAML_TOPLEVEL_STATUS.format(
+            id="PI-2026-1.1", pi="PI-2026-1", status="closed", sp=20),
+        encoding="utf-8",
+    )
+    (edpa_root / "iterations" / "PI-2026-1.2.yaml").write_text(
+        ITER_YAML_TOPLEVEL_STATUS.format(
+            id="PI-2026-1.2", pi="PI-2026-1", status="active", sp=99),
+        encoding="utf-8",
+    )
+    vels = load_velocity_history(edpa_root, window=5)
+    assert vels == [20.0]
 
 
 def test_forecast_pi_on_close_tool_output(edpa_root):
