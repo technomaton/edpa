@@ -179,6 +179,38 @@ class TestScoreDiff(unittest.TestCase):
         # Sanity floor: a substantive multi-part edit clears a bare scalar.
         self.assertGreater(weight, W["yaml_edit:scalar_change"])
 
+    def test_bookkeeping_bullets_earn_no_list_grow(self):
+        # D-74: evidence[] (`- type:`) and contributors[] (`- person:`) rows are
+        # EDPA-derived bookkeeping — materialized from commit evidence, not
+        # authored. Their list growth must earn NO list-growth credit, mirroring
+        # the _BOOKKEEPING_BLOCKS skip already applied to block_add/scalar_change.
+        diff = _diff("""
++- type: commit_author
++- type: yaml_edit
++- person: urbanek
+""")
+        weight, tags, delta = score_diff(diff, W)
+        self.assertFalse(any(t.startswith("list_grow") for t in tags),
+                         f"derived bookkeeping rows earned list-growth: {tags}")
+        self.assertEqual(weight, 0.0)
+        # delta stays consistent with the weight (like blocks_added/scalars).
+        self.assertEqual(delta["list_items_added"], 0)
+
+    def test_real_content_bullets_still_earn_list_grow(self):
+        # D-74 control: genuine content lists key on their own field and MUST
+        # still earn list-growth. The anchored `type:`/`person:` match must not
+        # over-reach onto `type`/`person`-prefixed keys (typeface, personnel).
+        diff = _diff("""
++- AC-1: timeline view
++- typeface: serif
++- personnel: on-call
+""")
+        weight, tags, _ = score_diff(diff, W)
+        self.assertTrue(any(t.startswith("list_grow") for t in tags),
+                        f"authored bullets lost list-growth: {tags}")
+        # 3 genuine bullets → 3 × list_grow (below the volume floor at 3 lines).
+        self.assertAlmostEqual(weight, 3 * W["yaml_edit:list_grow"], places=1)
+
 
 # ─── D-36 pegged-weight locks ────────────────────────────────────────────────
 
@@ -402,6 +434,52 @@ class TestCollectIntegration(unittest.TestCase):
         )
         sigs = collect_yaml_edit_signals(self.edpa, "PI-2026-1.1")
         self.assertNotIn("S-9", sigs)
+
+    def test_chore_contributors_commit_not_scored(self):
+        # D-66/D-74 (belt): contributor-refresh bookkeeping (chore(contributors):)
+        # is machine-generated; the whole commit must produce no yaml_edit — else
+        # whoever authored the refresh self-credits the contributors[] growth.
+        self._write_and_commit(
+            ".edpa/backlog/stories/S-8.md",
+            {"id": "S-8", "type": "Story", "title": "x", "status": "Funnel",
+             "contributors": [{"person": "alice", "cw": 0.6},
+                              {"person": "bob", "cw": 0.4}]},
+            "chore(contributors): S-8 refresh", "alice@example.com",
+            "2026-05-14T09:00:00+00:00",
+        )
+        sigs = collect_yaml_edit_signals(self.edpa, "PI-2026-1.1")
+        self.assertNotIn("S-8", sigs)
+
+    def test_human_commit_growing_contributors_no_list_grow(self):
+        # D-74 (the residual, end-to-end): even on a human-subject commit,
+        # growth of the derived contributors[] list must not earn list-growth
+        # credit. A feat() create seeds one contributor row; no S-6 signal may
+        # carry a list_grow tag for it (the only list present is contributors[]).
+        self._write_and_commit(
+            ".edpa/backlog/stories/S-6.md",
+            {"id": "S-6", "type": "Story", "title": "x", "status": "Funnel",
+             "contributors": [{"person": "alice", "cw": 1.0}]},
+            "feat(S-6): seed", "alice@example.com",
+            "2026-05-13T09:00:00+00:00",
+        )
+        # A later human-subject commit hand-adds a second contributor row plus a
+        # genuine scalar (js). The scalar earns credit; the contributor row must
+        # not add list-growth.
+        self._write_and_commit(
+            ".edpa/backlog/stories/S-6.md",
+            {"id": "S-6", "type": "Story", "title": "x", "status": "Funnel",
+             "js": 5,
+             "contributors": [{"person": "alice", "cw": 0.6},
+                              {"person": "bob", "cw": 0.4}]},
+            "feat(S-6): scope + stray contributor row", "alice@example.com",
+            "2026-05-14T09:00:00+00:00",
+        )
+        sigs = collect_yaml_edit_signals(self.edpa, "PI-2026-1.1")
+        self.assertIn("S-6", sigs)
+        for s in sigs["S-6"]:
+            self.assertFalse(
+                any(t.startswith("list_grow") for t in s["tags"]),
+                f"contributors[] growth earned list-growth: {s['tags']}")
 
     def test_bulk_by_item_count_discount(self):
         # D-26 variant-2: one commit touching > bulk_item_threshold (5) items
