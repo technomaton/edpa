@@ -29,6 +29,14 @@ except ImportError:
     print("ERROR: PyYAML required. pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
+# Shared backlog→SP rollup (sibling module; same directory in both the plugin
+# checkout and the vendored .edpa/engine/scripts layout).
+try:
+    from _sp_rollup import iteration_sp as _iteration_sp
+except ImportError:  # pragma: no cover — sibling import when embedded oddly
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _sp_rollup import iteration_sp as _iteration_sp
+
 
 # ---------------------------------------------------------------------------
 # Data loading
@@ -45,11 +53,20 @@ def _iter_sort_key(it_id: str):
 
 
 def load_velocity_history(edpa_root: Path, window: int) -> list[float]:
-    """Return the last `window` closed-iteration velocities (global history)."""
+    """Return the last `window` closed-iteration velocities (global history).
+
+    Velocity comes from the iteration YAML's ``delivery.velocity`` /
+    ``delivery.delivered_sp``. Iterations closed before edpa_iteration_close
+    stamped delivery blocks (D-57) carry neither key — for those, derive
+    delivered SP from the backlog (Σ js of Done Story/Defect items assigned
+    to the iteration, via the shared _sp_rollup) instead of reading them as
+    0-velocity and collapsing the forecast baseline to zero.
+    """
     iter_dir = edpa_root / "iterations"
     if not iter_dir.is_dir():
         return []
     records = []
+    derived_sp = None  # lazy — only walk the backlog if a block is missing
     for f in iter_dir.glob("*.yaml"):
         data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
         it = data.get("iteration", {})
@@ -59,10 +76,14 @@ def load_velocity_history(edpa_root: Path, window: int) -> list[float]:
         it_id = it.get("id", f.stem)
         if "." not in it_id:
             continue
-        delivery = data.get("delivery", {})
+        delivery = data.get("delivery") or {}
         vel = delivery.get("velocity")
         if vel is None:
-            vel = delivery.get("delivered_sp", 0)
+            vel = delivery.get("delivered_sp")
+        if vel is None:
+            if derived_sp is None:
+                derived_sp = _iteration_sp(edpa_root)
+            vel = derived_sp.get(it_id, {}).get("delivered_sp", 0)
         records.append((it_id, float(vel)))
     records.sort(key=lambda r: _iter_sort_key(r[0]))
     return [v for _, v in records[-window:]]

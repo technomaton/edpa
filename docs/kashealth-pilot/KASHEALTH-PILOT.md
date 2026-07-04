@@ -193,15 +193,19 @@ vidí i evidence z PR, které ještě nejsou merged. Přeskoč, když
 **Stage 2b (POVINNÉ — neskipovat)** — refresh `contributors[]`:
 
 ```bash
-python3 .edpa/engine/scripts/detect_contributors.py --all-items
+python3 .edpa/engine/scripts/detect_contributors.py --all-items \
+  --commit --context "<iteration-id> close"
 ```
 
 Engine čte `contributors[]` (normalizovaná per-item CW mapa), NE
 `evidence[]` (raw signal log). Post-commit hook a `sync_pr_contributions.py`
 píšou jen `evidence[]`. Bez tohoto kroku engine vidí prázdné contributors
 a vrátí **0h derived** pro každý item, který přišel přes evidence — bez
-erroru, jen tiché nuly. Idempotentní (items bez evidence = no-op),
-auto-commit `chore(contributors): …`.
+erroru, jen tiché nuly. Idempotentní (items bez evidence = no-op).
+`--commit` (D-66) commitne JEN přepsané soubory jako
+`chore(contributors): refresh after <iteration-id> close` s potlačeným
+evidence hookem — bez něj zůstanou soubory nekomitnuté a close commit
+by je smetl (hook by pak kreditoval closera na všech dotčených itemech).
 
 **Stage 2c — engine + reports:**
 

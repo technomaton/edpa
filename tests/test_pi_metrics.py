@@ -240,18 +240,58 @@ def test_compute_metrics_no_objectives(populated):
     assert m["confidence_votes"] == {}
 
 
-def test_compute_metrics_sp_fallback_to_rollup(edpa_root):
-    """When iteration YAML has no planned/delivered SP, derive from backlog items."""
+ITER_YAML_BARE = """\
+iteration:
+  id: {it_id}
+  pi: {pi_id}
+  status: {status}
+  start_date: 2026-04-06
+  end_date: 2026-04-10
+"""
+
+
+def _write_iter_bare(edpa_root, it_id, pi_id, status):
+    """Iteration YAML with NO planning/delivery blocks (unstamped)."""
+    (edpa_root / "iterations").mkdir(parents=True, exist_ok=True)
+    (edpa_root / "iterations" / f"{it_id}.yaml").write_text(
+        ITER_YAML_BARE.format(it_id=it_id, pi_id=pi_id, status=status),
+        encoding="utf-8",
+    )
+
+
+def test_compute_metrics_planned_only_from_planning_stamp(edpa_root):
+    """D-60: delivered still falls back to the item rollup, but planned must
+    NOT — the rollup tracks CURRENT assignment (incl. unplanned mid-PI items),
+    which equals delivered once everything lands → predictability was
+    vacuously 100%. Unstamped planning → planned None, predictability n/a."""
     _write_pi(edpa_root, "PI-2026-1", status="active")
-    _write_iter(edpa_root, "PI-2026-1.1", "PI-2026-1", "closed", 0, 0)  # no SP in YAML
+    _write_iter_bare(edpa_root, "PI-2026-1.1", "PI-2026-1", "closed")
     _write_story(edpa_root, "S-1", 8, "Done", "PI-2026-1.1")
     _write_story(edpa_root, "S-2", 5, "Implementing", "PI-2026-1.1")
 
     import yaml
     pi_block = yaml.safe_load((edpa_root / "iterations" / "PI-2026-1.yaml").read_text())["pi"]
     m = compute_pi_metrics(edpa_root, pi_block)
-    assert m["planned_sp"] == 13   # S-1 + S-2
-    assert m["delivered_sp"] == 8  # only Done
+    assert m["planned_sp"] is None      # no planning-time stamp anywhere
+    assert m["delivered_sp"] == 8       # rollup fallback for delivered kept
+    assert m["predictability_pct"] is None
+
+    md = render_md(build_report(edpa_root))
+    assert "None" not in md
+
+
+def test_compute_metrics_overdelivery_not_100(edpa_root):
+    """D-60 (E2E PI-2026-2.2): planned 26 at planning time, delivered 29 with
+    the unplanned mid-PI defect → ~89.7%, not 100 (and not 111.5)."""
+    _write_pi(edpa_root, "PI-2026-1", status="closed")
+    _write_iter(edpa_root, "PI-2026-1.1", "PI-2026-1", "closed", 26, 29)
+
+    import yaml
+    pi_block = yaml.safe_load((edpa_root / "iterations" / "PI-2026-1.yaml").read_text())["pi"]
+    m = compute_pi_metrics(edpa_root, pi_block)
+    assert m["planned_sp"] == 26
+    assert m["delivered_sp"] == 29
+    assert m["predictability_pct"] == 89.7
 
 
 # ---------------------------------------------------------------------------

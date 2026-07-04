@@ -104,12 +104,21 @@ snapshot, not the people who actually moved the item through its
 lifecycle this iteration.
 
 ```bash
-python3 .edpa/engine/scripts/detect_contributors.py --all-items
+python3 .edpa/engine/scripts/detect_contributors.py --all-items \
+  --commit --context "<iteration-id> close"
 ```
 
 Idempotent: items without `evidence[]` are no-ops. Cost is trivial
-(<1s for typical backlogs). Auto-commits as `chore(contributors): …`
-follow-up. **Always run, never skip.**
+(<1s for typical backlogs). **Always run, never skip.**
+
+`--commit` (D-66) commits ONLY the contributor-rewritten files as
+`chore(contributors): refresh after <iteration-id> close`, with the
+post-commit evidence hook suppressed (`EDPA_NO_LOCAL_EVIDENCE=1`) —
+machine bookkeeping must not create attribution. Never drop
+`--commit` and sweep the rewritten backlog files into the Stage 2c
+close commit instead: a close commit touching N backlog `.md` files
+makes the post-commit hook credit the closer with `commit_author`
+weight on all N items (the D-66 attribution spray).
 
 ### Stage 2c — Engine + reports
 

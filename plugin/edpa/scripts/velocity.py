@@ -32,7 +32,7 @@ except ImportError:
     sys.exit(1)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _sp_rollup import iteration_sp  # noqa: E402
+from _sp_rollup import iteration_sp, predictability_pct  # noqa: E402
 
 
 def iteration_sort_key(it_id: str):
@@ -61,8 +61,12 @@ def load_closed_iterations(edpa_root: Path):
         planning = data.get("planning", {})
         delivery = data.get("delivery", {})
         derived = sp.get(it_id, {})
-        # Prefer explicit iteration SP; fall back to the item-derived rollup.
-        planned = planning.get("planned_sp") or derived.get("planned_sp", 0)
+        # delivered_sp: explicit stamp wins, else the item-derived rollup.
+        # planned_sp (D-60): ONLY the planning-time stamp counts — deriving it
+        # from the current item→iteration assignment tracks scope as delivered
+        # (incl. unplanned mid-iteration items), which made predictability
+        # vacuously 100%. Missing stamp → null planned, n/a predictability.
+        planned = planning.get("planned_sp")
         delivered = delivery.get("delivered_sp") or derived.get("delivered_sp", 0)
         records.append({
             "id": it_id,
@@ -72,9 +76,7 @@ def load_closed_iterations(edpa_root: Path):
             "planned_sp": planned,
             "delivered_sp": delivered,
             "velocity": delivery.get("velocity", delivered),
-            "predictability_pct": (
-                round(100 * delivered / planned, 1) if planned else None
-            ),
+            "predictability_pct": predictability_pct(planned, delivered),
         })
     records.sort(key=lambda r: iteration_sort_key(r["id"]))
     return records
@@ -139,9 +141,12 @@ def render_md(report: dict) -> str:
         "|---|---|---:|---:|---:|",
     ]
     for r in report["iterations"]:
+        planned = r["planned_sp"] if r["planned_sp"] is not None else "n/a"
+        pred = (f"{r['predictability_pct']}%"
+                if r["predictability_pct"] is not None else "n/a")
         lines.append(
-            f"| {r['id']} | {r.get('dates','')} | {r['planned_sp']} | "
-            f"{r['delivered_sp']} | {r['predictability_pct']}% |"
+            f"| {r['id']} | {r.get('dates','')} | {planned} | "
+            f"{r['delivered_sp']} | {pred} |"
         )
     lines.append("")
     return "\n".join(lines)

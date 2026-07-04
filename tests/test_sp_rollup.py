@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "plugin" / "edpa" / "scripts"))
 
-from _sp_rollup import iteration_sp  # noqa: E402
+from _sp_rollup import iteration_sp, predictability_pct  # noqa: E402
 from _md_frontmatter import save_md_item  # noqa: E402
 
 
@@ -45,3 +45,35 @@ def test_iteration_sp_ignores_items_without_iteration(tmp_path: Path) -> None:
 
 def test_iteration_sp_empty_when_no_backlog(tmp_path: Path) -> None:
     assert iteration_sp(tmp_path / ".edpa") == {}
+
+
+# ---------------------------------------------------------------------------
+# predictability_pct — D-60. Predictability measures how close delivery landed
+# to the PLANNING-TIME plan, symmetric in both directions (100 × min/max):
+# overdelivering unplanned scope is a plan miss exactly like underdelivering.
+# No plan → None (rendered "n/a"), never a vacuous 100%.
+# ---------------------------------------------------------------------------
+
+def test_predictability_overdelivery_is_not_100() -> None:
+    # E2E PI-2026-2.2: planned 26 on planning day, delivered 29 after an
+    # unplanned mid-PI defect landed → ~89.7%, not 100 (and not 111.5).
+    assert predictability_pct(26, 29) == 89.7
+
+
+def test_predictability_underdelivery_symmetric() -> None:
+    assert predictability_pct(29, 26) == 89.7
+    assert predictability_pct(75, 70) == 93.3  # matches legacy delivered/planned
+
+
+def test_predictability_exact_plan_is_100() -> None:
+    assert predictability_pct(10, 10) == 100.0
+
+
+def test_predictability_none_without_plan() -> None:
+    assert predictability_pct(None, 29) is None
+    assert predictability_pct(0, 29) is None
+    assert predictability_pct(26, None) is None
+
+
+def test_predictability_zero_delivery() -> None:
+    assert predictability_pct(26, 0) == 0.0

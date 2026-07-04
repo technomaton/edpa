@@ -154,6 +154,10 @@ def _sibling_path():
 with _sibling_path():
     from id_counter import (  # noqa: E402
         DIR_TO_TYPE as _DIR_TO_TYPE,
+        # Delivery-tracked scope for flow metrics (D-67): the same
+        # {dir: Type} subset the engine credits — includes defects/,
+        # excludes Events/Risks (PI-planning artefacts) and legacy Tasks.
+        ENGINE_CREDIT_DIRS as _ENGINE_CREDIT_DIRS,
         PREFIX_TO_DIR as _PREFIX_TO_DIR,
         TYPE_DIRS,
         # Coarse per-project mutex for item read-modify-write cycles
@@ -372,8 +376,10 @@ async def list_tools() -> list[Tool]:
             name="edpa_flow_metrics",
             description=(
                 "Compute flow metrics: cycle time, lead time, throughput, and "
-                "average age of open items. Requires timestamp data from a prior "
-                "sync pull."
+                "average age of open items. Reads created_at/closed_at stamps "
+                "(written by edpa_item_create / edpa_item_transition); items "
+                "missing created_at fall back to their earliest evidence[] "
+                "timestamp."
             ),
             inputSchema={
                 "type": "object",
@@ -386,10 +392,12 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": (
                             "Filter by item level. Only delivery-tracked types "
-                            "(Story/Feature/Epic/Initiative) carry flow "
+                            "(Story/Feature/Epic/Initiative/Defect) carry flow "
                             "timestamps."
                         ),
-                        "enum": ["Story", "Feature", "Epic", "Initiative"],
+                        # Kept equal to the handler's delivery-tracked scan
+                        # scope (id_counter.ENGINE_CREDIT_DIRS, D-67).
+                        "enum": list(_ENGINE_CREDIT_DIRS.values()),
                     },
                 },
                 "additionalProperties": False,
@@ -401,7 +409,8 @@ async def list_tools() -> list[Tool]:
                 "Create a new backlog item. Allocates the next local ID via "
                 "id_counter (no gh call), validates parent type hierarchy "
                 "(Story→Feature→Epic→Initiative), and writes "
-                ".edpa/backlog/{type}/{ID}.md with frontmatter + body."
+                ".edpa/backlog/{type}/{ID}.md with frontmatter + body. "
+                "Auto-stamps created_at (UTC) — flow metrics read it."
             ),
             inputSchema={
                 "type": "object",
@@ -412,7 +421,14 @@ async def list_tools() -> list[Tool]:
                     "parent": {"type": "string"},
                     "iteration": {"type": "string"},
                     "assignee": {"type": "string"},
-                    "status": {"type": "string"},
+                    "status": {
+                        "type": "string",
+                        "description": (
+                            "Initial status — validated against the per-type "
+                            "workflow (same table as edpa_item_transition). "
+                            "Defaults to Funnel."
+                        ),
+                    },
                     "js": {"type": "integer", "minimum": 0},
                     "bv": {"type": "integer", "minimum": 0},
                     "tc": {"type": "integer", "minimum": 0},
@@ -428,7 +444,10 @@ async def list_tools() -> list[Tool]:
             description=(
                 "Update one or more frontmatter fields on an existing item. "
                 "Atomic — all fields applied or none. Use edpa_item_transition "
-                "for status changes (it also stamps closed_at on Done)."
+                "for status changes (it also stamps closed_at on Done). "
+                "Assigning/re-sizing a Story/Defect restamps "
+                "planning.planned_sp on affected iterations that have not "
+                "started yet; once an iteration is active its plan is frozen."
             ),
             inputSchema={
                 "type": "object",
@@ -514,7 +533,13 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="edpa_iteration_close",
             description=(
-                "Mark an iteration as closed in its YAML file. Does NOT run "
+                "Mark an iteration as closed in its YAML file and stamp its "
+                "delivery block (delivered_sp/velocity = sum of js over Done "
+                "Story/Defect items in the iteration; existing values are "
+                "kept). Never writes planning.planned_sp — that is stamped at "
+                "planning time and frozen when the iteration starts; if it is "
+                "missing at close, leave it missing (predictability reports "
+                "n/a) rather than backfilling planned=delivered. Does NOT run "
                 "the engine or generate reports — those are orchestrated by "
                 "the edpa:close-iteration skill."
             ),
@@ -1136,6 +1161,25 @@ def _parse_timestamp(value: object) -> datetime | None:
         return None
 
 
+def _earliest_evidence_ts(data: dict) -> datetime | None:
+    """Earliest parseable ``evidence[].at`` timestamp on an item, or None.
+
+    D-61 fallback: items written before created_at stamping existed (or by
+    paths that bypassed the MCP write layer) have no ``created_at``. Their
+    first evidence signal is the earliest observable trace of the item's
+    life, so flow metrics use it as the created-at proxy instead of
+    skipping the item. Malformed entries are ignored, never fatal.
+    """
+    evidence = data.get("evidence")
+    if not isinstance(evidence, list):
+        return None
+    stamps = [
+        ts for entry in evidence if isinstance(entry, dict)
+        if (ts := _parse_timestamp(entry.get("at"))) is not None
+    ]
+    return min(stamps) if stamps else None
+
+
 def _handle_flow_metrics(
     edpa_root: Path,
     iteration: str | None,
@@ -1147,13 +1191,6 @@ def _handle_flow_metrics(
         return [TextContent(type="text", text=json.dumps(
             {"error": "No backlog directory found."}, indent=2))]
 
-    type_dirs = {
-        "stories": "Story",
-        "features": "Feature",
-        "epics": "Epic",
-        "initiatives": "Initiative",
-    }
-
     now = datetime.now(timezone.utc)
     cycle_times: list[float] = []
     open_ages: list[float] = []
@@ -1162,8 +1199,10 @@ def _handle_flow_metrics(
     skipped = 0
 
     # flow_metrics intentionally covers only delivery-tracked types (Story,
-    # Feature, Epic, Initiative) — Task/Event/Risk have no derived hours.
-    for dir_name, item_level in type_dirs.items():
+    # Feature, Epic, Initiative, Defect) — Task/Event/Risk have no derived
+    # hours. Canonical scope from id_counter; a local pre-D-52 copy here had
+    # drifted and skipped defects/ entirely (D-67).
+    for dir_name, item_level in _ENGINE_CREDIT_DIRS.items():
         type_dir = backlog_dir / dir_name
         if not type_dir.exists():
             continue
@@ -1183,6 +1222,9 @@ def _handle_flow_metrics(
             is_done = status.lower() == "done"
 
             created = _parse_timestamp(data.get("created_at"))
+            if created is None:
+                # D-61: heal pre-stamping items from their evidence trail.
+                created = _earliest_evidence_ts(data)
             closed = _parse_timestamp(data.get("closed_at"))
 
             if is_done:
@@ -1468,6 +1510,20 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
     if assignee is not None and _safe_person_id(assignee) is None:
         return _err(f"invalid assignee id {assignee!r}")
 
+    # D-65: validate the requested status against the same per-type workflow
+    # table edpa_item_transition enforces (_allowed_statuses, portfolio vs
+    # delivery) — create must not accept what validate_syntax then flags.
+    # Checked before the lock so a rejected status never burns an ID.
+    # Event/Risk carry no workflow table (None) — unvalidated, as in
+    # transitions.
+    status = args.get("status") or "Funnel"
+    allowed = _allowed_statuses(item_type)
+    if allowed is not None and status not in allowed:
+        return _err(
+            f"status {status!r} not valid for {item_type}; "
+            f"allowed: {list(allowed)}"
+        )
+
     repo_root = edpa_root.parent
     try:
         with _backlog_write_lock(edpa_root):
@@ -1480,7 +1536,12 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
                 "id": new_id,
                 "type": item_type,
                 "title": title.strip(),
-                "status": args.get("status") or "Funnel",
+                "status": status,
+                # D-61: stamp creation time at the single write layer
+                # (ADR-002 — backlog.py cmd_add routes through here too) so
+                # flow metrics have a start-of-life timestamp. Same helper
+                # as the closed_at stamp in _handle_item_transition.
+                "created_at": _utc_now_iso(),
             }
             if parent:
                 item["parent"] = parent
@@ -1505,6 +1566,11 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
     except _BacklogLockTimeout as exc:
         return _err(str(exc))
     _load_yaml_cache_clear()
+
+    # D-60: a Story/Defect created into a not-yet-started iteration is
+    # planning-time scope — restamp that iteration's planning.planned_sp.
+    if iteration and TYPE_DIRS.get(item_type) in ("stories", "defects"):
+        _refresh_planned_sp(edpa_root, [iteration])
 
     logger.info("edpa_item_create: id=%s type=%s", new_id, item_type)
     return _ok({
@@ -1550,6 +1616,7 @@ def _handle_item_update(edpa_root: Path, args: dict) -> list[TextContent]:
     try:
         with _backlog_write_lock(edpa_root):
             item = _load_md_item(path) or {}
+            prev_iteration = item.get("iteration")
             body = item.pop("body", "") if isinstance(item, dict) else ""
             item.update(fields)
             # V2.1 — keep WSJF fields explicit (write 0 if any are still missing
@@ -1564,6 +1631,13 @@ def _handle_item_update(edpa_root: Path, args: dict) -> list[TextContent]:
     except _BacklogLockTimeout as exc:
         return _err(str(exc))
     _load_yaml_cache_clear()
+
+    # D-60: (re)assigning or re-sizing a Story/Defect during planning restamps
+    # planning.planned_sp on every affected iteration that has not started yet
+    # (both the one it left and the one it joined).
+    if (TYPE_DIRS.get(item.get("type")) in ("stories", "defects")
+            and ("iteration" in fields or "js" in fields)):
+        _refresh_planned_sp(edpa_root, {prev_iteration, item.get("iteration")})
 
     logger.info("edpa_item_update: id=%s fields=%s", safe_id, list(fields))
     return _ok({"id": safe_id, "updated": list(fields)})
@@ -1651,6 +1725,49 @@ def _handle_item_link_parent(edpa_root: Path, args: dict) -> list[TextContent]:
     return _ok({"id": safe_id, "parent": safe_parent})
 
 
+def _refresh_planned_sp(edpa_root: Path, iteration_ids) -> None:
+    """D-60: stamp ``planning.planned_sp`` while an iteration is still being
+    planned.
+
+    planned_sp is the scope committed at PLANNING time. Every Story/Defect
+    assignment or js re-size that goes through the write layer restamps it
+    from the item rollup (Σ js of Story/Defect items assigned to the
+    iteration) — but only while the iteration is in a pre-start status. The
+    moment it goes active the plan freezes: unplanned mid-iteration items
+    change delivered_sp only (stamped at close, D-57), never planned_sp, so
+    predictability keeps measuring delivery against the original commitment.
+    Nothing may backfill planned_sp at close; a missing stamp reports as
+    "n/a", never as a vacuous 100%.
+    """
+    derived = None
+    for it_id in sorted({str(i) for i in iteration_ids if i}):
+        safe = _safe_iteration_id(it_id)
+        if safe is None:
+            continue
+        iter_path = edpa_root / "iterations" / f"{safe}.yaml"
+        if not iter_path.exists():
+            continue
+        with open(iter_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        status = (data.get("iteration") or {}).get("status") or data.get("status")
+        if status in ("active", "closed"):
+            continue  # planning frozen once the iteration starts
+        if derived is None:
+            with _sibling_path():
+                from _sp_rollup import iteration_sp  # noqa: E402
+            derived = iteration_sp(edpa_root)
+        planned = int((derived.get(safe) or {}).get("planned_sp", 0))
+        planning = data.get("planning")
+        if not isinstance(planning, dict):
+            planning = {}
+        if planning.get("planned_sp") == planned:
+            continue  # already current — skip the write
+        planning["planned_sp"] = planned
+        data["planning"] = planning
+        _write_yaml_atomic(iter_path, data)
+        logger.info("planned_sp stamp: iteration=%s planned_sp=%s", safe, planned)
+
+
 @_idempotent("edpa_iteration_create")
 def _handle_iteration_create(edpa_root: Path, args: dict) -> list[TextContent]:
     raw_id = args.get("id", "")
@@ -1710,10 +1827,34 @@ def _handle_iteration_close(edpa_root: Path, args: dict) -> list[TextContent]:
     # top-level status (pi_close, reports, board lifecycle view, e2e verifier).
     # Set both so every consumer agrees the iteration is closed.
     data["status"] = "closed"
+    # D-57: stamp the delivery block at close so velocity consumers
+    # (forecast.py, velocity.py, pi_close.py) read real numbers instead of 0.
+    # delivered_sp = Σ js of Done Story/Defect items assigned to this
+    # iteration — the shared _sp_rollup definition that pi_close/pi_metrics
+    # already use as their fallback. Hand-stamped values win: only missing
+    # keys are filled in.
+    # D-60: close writes the delivery block ONLY. planning.planned_sp is
+    # stamped at planning time (_refresh_planned_sp) and frozen once the
+    # iteration starts — backfilling it here (planned := delivered) would
+    # make predictability vacuously 100%. If it is absent now, it stays
+    # absent and predictability reports n/a.
+    delivery = data.get("delivery")
+    if not isinstance(delivery, dict):
+        delivery = {}
+    if delivery.get("delivered_sp") is None:
+        with _sibling_path():
+            from _sp_rollup import iteration_sp  # noqa: E402
+        derived = iteration_sp(edpa_root).get(safe_id) or {}
+        delivery["delivered_sp"] = int(derived.get("delivered_sp", 0))
+    if delivery.get("velocity") is None:
+        delivery["velocity"] = delivery["delivered_sp"]
+    data["delivery"] = delivery
     _write_yaml_atomic(iter_path, data)
 
-    logger.info("edpa_iteration_close: id=%s", safe_id)
-    return _ok({"id": safe_id, "status": "closed"})
+    logger.info("edpa_iteration_close: id=%s delivered_sp=%s",
+                safe_id, delivery["delivered_sp"])
+    return _ok({"id": safe_id, "status": "closed",
+                "delivered_sp": delivery["delivered_sp"]})
 
 
 @_idempotent("edpa_pi_create")

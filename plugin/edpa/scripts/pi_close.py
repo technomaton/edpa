@@ -5,7 +5,9 @@ EDPA PI Close — aggregate iteration results into PI-level summary.
 Reads:
   - .edpa/iterations/PI-YYYY-M.{1,2,3}.yaml (closed iteration plans)
   - .edpa/reports/iteration-PI-YYYY-M.{1,2,3}/edpa_results.json (optional)
-  - .edpa/backlog/features/*.yaml (to identify Features completed in PI)
+  - .edpa/backlog/features/*.md (Features completed in PI — own iteration/pi
+    field, or any child story/defect whose iteration falls inside the PI)
+  - .edpa/backlog/{stories,defects}/*.md (parent refs for that attribution)
 
 Writes:
   - .edpa/reports/pi-PI-YYYY-M/pi_results.json
@@ -37,10 +39,13 @@ except ImportError:
     sys.exit(1)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _sp_rollup import iteration_sp  # noqa: E402
+# _DELIVERY_DIRS: the item dirs SP rolls up from (stories + defects) — the
+# same set feature→PI attribution walks for child iterations (D-59).
+from _sp_rollup import _DELIVERY_DIRS, iteration_sp, predictability_pct  # noqa: E402
 
 
 from _yaml_io import load_yaml as _shared_load_yaml  # noqa: E402
+from _results_compat import registry_capacity_by_id  # noqa: E402
 
 
 def load_yaml(path: Path):
@@ -113,6 +118,16 @@ def find_iterations(edpa_root: Path, pi_id: str):
     return sorted(iter_dir.glob(f"{pi_id}.*.yaml"))
 
 
+def registry_capacity_per_iteration(edpa_root) -> float:
+    """Team capacity per iteration from ``config/people.yaml``.
+
+    Sum of per-person ``capacity_per_iteration`` (legacy ``capacity``
+    fallback) via the shared registry reader. 0 when the registry is
+    missing or empty.
+    """
+    return sum(registry_capacity_by_id(Path(edpa_root)).values())
+
+
 def aggregate_iterations(iteration_files):
     """Aggregate planning + delivery metrics across iterations."""
     iterations = []
@@ -122,9 +137,15 @@ def aggregate_iterations(iteration_files):
     spillover_ids = []
     unplanned_ids = []
 
+    edpa_root = iteration_files[0].resolve().parent.parent if iteration_files else None
     # SP rollup derived from backlog item `js` (fallback when iteration YAMLs
     # carry no explicit planning.planned_sp / delivery.delivered_sp).
-    sp = iteration_sp(iteration_files[0].resolve().parent.parent) if iteration_files else {}
+    sp = iteration_sp(edpa_root) if edpa_root else {}
+    # Nothing writes planning.capacity today, so summing it alone reported
+    # total_capacity_hours=0 for every PI (D-58). Fall back to the people
+    # registry (sum of capacity_per_iteration) for each iteration without
+    # an explicit planning.capacity override.
+    registry_capacity = registry_capacity_per_iteration(edpa_root) if edpa_root else 0
 
     for f in iteration_files:
         data = load_yaml(f)
@@ -135,14 +156,22 @@ def aggregate_iterations(iteration_files):
         delivery = data.get("delivery", {})
 
         derived = sp.get(it.get("id"), {})
-        planned = planning.get("planned_sp") or derived.get("planned_sp", 0)
+        # planned_sp (D-60): ONLY the planning-time stamp counts. The rollup
+        # tracks the CURRENT item→iteration assignment — incl. unplanned
+        # mid-iteration scope — so deriving planned from it (or backfilling
+        # planned=delivered at close) made predictability vacuously 100%.
+        # Missing stamp → null planned, n/a predictability.
+        planned = planning.get("planned_sp")
         delivered = delivery.get("delivered_sp") or derived.get("delivered_sp", 0)
-        capacity = planning.get("capacity", 0) or 0
-        predictability = (
-            round(100 * delivered / planned, 1) if planned else None
-        )
+        # planning.capacity is an explicit per-iteration override (an
+        # explicit 0 — e.g. a down iteration — is a real value and kept);
+        # absent → people-registry total for the iteration.
+        capacity = planning.get("capacity")
+        if capacity is None:
+            capacity = registry_capacity
+        predictability = predictability_pct(planned, delivered)
 
-        total_planned += planned
+        total_planned += planned or 0
         total_delivered += delivered
         total_capacity += capacity
         spillover_ids.extend(delivery.get("spillover", []) or [])
@@ -163,8 +192,16 @@ def aggregate_iterations(iteration_files):
             "unplanned_count": len(delivery.get("unplanned", []) or []),
         })
 
+    # Average of the per-iteration predictabilities that are defined (D-60).
+    # A totals-based ratio would compare stamped planned SP against delivered
+    # SP that includes UNSTAMPED iterations — apples to oranges as soon as one
+    # iteration lacks a planning-time stamp. No stamped iteration → None (n/a).
+    pred_values = [
+        it["predictability_pct"] for it in iterations
+        if it["predictability_pct"] is not None
+    ]
     avg_predictability = (
-        round(100 * total_delivered / total_planned, 1) if total_planned else None
+        round(sum(pred_values) / len(pred_values), 1) if pred_values else None
     )
 
     return {
@@ -210,22 +247,62 @@ def aggregate_engine_results(edpa_root: Path, pi_id: str, iteration_ids):
     ]
 
 
+def _pi_member(iteration_id, pi_id: str) -> bool:
+    """True when ``iteration_id`` is ``pi_id`` itself or one of its
+    iterations (``PI-2026-1`` / ``PI-2026-1.N``).
+
+    A raw ``startswith(pi_id)`` is wrong here:
+    ``"PI-2026-10.1".startswith("PI-2026-1")`` is True.
+    """
+    it = str(iteration_id) if iteration_id else ""
+    return it == pi_id or it.startswith(pi_id + ".")
+
+
+def _child_iterations_by_parent(edpa_root: Path) -> dict:
+    """``{parent_id: {iteration ids}}`` over delivery items (stories +
+    defects) — the ``parent`` refs features are attributed through."""
+    out: dict = {}
+    for sub in _DELIVERY_DIRS:
+        d = edpa_root / "backlog" / sub
+        if not d.is_dir():
+            continue
+        for f in sorted(d.glob("*.md")):
+            data = load_yaml(f) or {}
+            parent = data.get("parent")
+            it = data.get("iteration")
+            if parent and it:
+                out.setdefault(str(parent), set()).add(str(it))
+    return out
+
+
 def features_completed(edpa_root: Path, pi_id: str):
-    """Features with iteration in this PI and status=Done."""
+    """Done features attributed to this PI.
+
+    Features are planned at PI level and typically carry no ``iteration``
+    of their own, so matching only the feature's own field returned []
+    even with every feature Done (D-59). A Done feature belongs to the PI
+    when its own ``iteration``/``pi`` field matches, OR any child
+    Story/Defect (via ``parent`` refs) ran in one of the PI's iterations.
+    """
     feat_dir = edpa_root / "backlog" / "features"
     if not feat_dir.is_dir():
         return []
+    child_iters = _child_iterations_by_parent(edpa_root)
     done = []
     for f in sorted(feat_dir.glob("*.md")):
         data = load_yaml(f)
-        if not data:
+        if not data or data.get("status") != "Done":
             continue
-        it = data.get("iteration", "")
-        if not it.startswith(pi_id):
-            continue
-        if data.get("status") == "Done":
+        fid = data.get("id", f.stem)
+        in_pi = (
+            _pi_member(data.get("iteration"), pi_id)
+            or _pi_member(data.get("pi"), pi_id)
+            or any(_pi_member(it, pi_id)
+                   for it in child_iters.get(str(fid), ()))
+        )
+        if in_pi:
             done.append({
-                "id": data.get("id", f.stem),
+                "id": fid,
                 "title": data.get("title", ""),
                 "wsjf": data.get("wsjf"),
                 "js": data.get("js"),
@@ -263,6 +340,11 @@ def build_pi_results(edpa_root: Path, pi_id: str):
     }, None
 
 
+def _fmt_pct(value) -> str:
+    """Predictability for humans: None (no planning-time stamp) → "n/a"."""
+    return "n/a" if value is None else f"{value}%"
+
+
 def render_summary_md(result: dict) -> str:
     pi = result["pi"]
     s = result["summary"]
@@ -276,7 +358,7 @@ def render_summary_md(result: dict) -> str:
         f"- Iterations closed: **{s['iteration_count']}**",
         f"- Planned SP: **{s['total_planned_sp']}**",
         f"- Delivered SP: **{s['total_delivered_sp']}**",
-        f"- Average predictability: **{s['avg_predictability_pct']}%**",
+        f"- Average predictability: **{_fmt_pct(s['avg_predictability_pct'])}**",
         f"- Capacity hours: **{s['total_capacity_hours']}**",
         f"- Spillover: **{s['total_spillover']}**, Unplanned: **{s['total_unplanned']}**",
         "",
@@ -289,9 +371,11 @@ def render_summary_md(result: dict) -> str:
     from _pi_loader import format_iteration_dates  # noqa: E402
 
     for it in result["iterations"]:
+        planned = it["planned_sp"] if it["planned_sp"] is not None else "n/a"
         lines.append(
-            f"| {it['id']} | {format_iteration_dates(it)} | {it['planned_sp']} | "
-            f"{it['delivered_sp']} | {it['predictability_pct']}% | {it['velocity']} |"
+            f"| {it['id']} | {format_iteration_dates(it)} | {planned} | "
+            f"{it['delivered_sp']} | {_fmt_pct(it['predictability_pct'])} | "
+            f"{it['velocity']} |"
         )
 
     if result["features_completed"]:
@@ -418,7 +502,7 @@ def main():
                 else "no PI metadata file")
         print(f"PI {args.pi} closed: {res['iteration_count']} iterations, "
               f"{s['total_delivered_sp']}/{s['total_planned_sp']} SP, "
-              f"{s['avg_predictability_pct']}% predictability ({flip})")
+              f"{_fmt_pct(s['avg_predictability_pct'])} predictability ({flip})")
         print(f"  -> {res['results_path']}")
         print(f"  -> {res['summary_path']}")
         if res["forced"]:
@@ -458,7 +542,7 @@ def main():
 
     print(f"PI {args.pi}: {result['summary']['iteration_count']} iterations, "
           f"{result['summary']['total_delivered_sp']}/{result['summary']['total_planned_sp']} SP, "
-          f"{result['summary']['avg_predictability_pct']}% predictability")
+          f"{_fmt_pct(result['summary']['avg_predictability_pct'])} predictability")
     print(f"  -> {results_path}")
     print(f"  -> {summary_path}")
     return 0

@@ -148,6 +148,48 @@ def test_create_wsjf_computed_when_all_inputs_present(edpa_root: Path) -> None:
     assert md["wsjf"] == round((8 + 3 + 2) / 5, 2)
 
 
+# ---------------------------------------------------------------------------
+# created_at stamping (D-61)
+# ---------------------------------------------------------------------------
+
+def test_create_stamps_created_at(edpa_root: Path) -> None:
+    """D-61: every new item gets a tz-aware ISO created_at at create time.
+
+    Without it no creation path ever wrote created_at, so edpa_flow_metrics
+    put every Done item into skipped_no_timestamps and cycle/lead time
+    counts were structurally 0. Stamping in _handle_item_create (the single
+    write layer, ADR-002) covers backlog.py cmd_add too — it routes here."""
+    from datetime import datetime, timezone
+    # _utc_now_iso() truncates to whole seconds — floor the lower bound too.
+    before = datetime.now(timezone.utc).replace(microsecond=0)
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "Stamped",
+    }))
+    after = datetime.now(timezone.utc)
+    md = _read_md(edpa_root, "I-1")
+    assert "created_at" in md, "created_at missing on freshly created item"
+    stamped = mcp_server._parse_timestamp(md["created_at"])
+    assert stamped is not None, f"created_at unparseable: {md['created_at']!r}"
+    assert stamped.tzinfo is not None, "created_at must be timezone-aware"
+    assert before <= stamped <= after
+
+
+def test_create_stamps_created_at_on_every_type(edpa_root: Path) -> None:
+    """D-61: the stamp is unconditional — all backlog types get it."""
+    _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "I"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Epic", "title": "E", "parent": "I-1"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Story", "title": "S", "parent": "F-1"}))
+    for item_id in ("I-1", "E-1", "F-1", "S-1"):
+        md = _read_md(edpa_root, item_id)
+        assert mcp_server._parse_timestamp(md.get("created_at")) is not None, (
+            f"{item_id}: created_at missing or unparseable"
+        )
+
+
 def test_update_zero_fills_missing_wsjf_fields_on_legacy_items(edpa_root: Path) -> None:
     """Legacy items written before V2.1 may lack js/bv/tc/rr_oe. An
     update operation backfills them to 0 so subsequent reads are
@@ -239,6 +281,76 @@ def test_create_parent_type_mismatch(edpa_root: Path) -> None:
     })
     assert _is_err(result)
     assert "expected" in result[0].text
+
+
+# Status workflow validation at create (D-65)
+
+def test_create_rejects_workflow_invalid_status(edpa_root: Path) -> None:
+    """D-65: Feature is a delivery type — portfolio-only 'Ready' must be
+    rejected at create with the allowed list. Previously create accepted
+    any status and validate_syntax flagged the item afterwards (create
+    allowed what validate forbids). Same table as edpa_item_transition."""
+    _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "I"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Epic", "title": "E", "parent": "I-1"}))
+    result = _handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1", "status": "Ready",
+    })
+    assert _is_err(result)
+    text = result[0].text
+    assert "'Ready'" in text and "Feature" in text
+    for status in mcp_server.DELIVERY_STATUSES:
+        assert status in text, f"error must list allowed status {status}"
+    # Rejected before the lock/allocation — no file written, no ID burned.
+    assert not list((edpa_root / "backlog" / "features").glob("*.md"))
+    data = _parse(_handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1",
+    }))
+    assert data["id"] == "F-1"
+
+
+def test_create_rejects_delivery_status_on_portfolio_type(edpa_root: Path) -> None:
+    """Mirror case: 'Backlog' is delivery-only — invalid for Initiative."""
+    result = _handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "I", "status": "Backlog",
+    })
+    assert _is_err(result)
+    for status in mcp_server.PORTFOLIO_STATUSES:
+        assert status in result[0].text, f"error must list {status}"
+
+
+def test_create_rejects_legacy_status(edpa_root: Path) -> None:
+    """Legacy statuses (Active/Closed/Accepted) are validator-tolerated on
+    migrated backlogs but never creatable — same rule as transitions."""
+    assert _is_err(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "I", "status": "Active",
+    }))
+
+
+def test_create_accepts_valid_status_per_workflow(edpa_root: Path) -> None:
+    """Story+Funnel passes (delivery workflow); Initiative+Ready passes
+    (portfolio workflow) — the check is per-type, not a global union."""
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "I", "status": "Ready"}))
+    assert _read_md(edpa_root, "I-1")["status"] == "Ready"
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Epic", "title": "E", "parent": "I-1"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1"}))
+    data = _parse(_handle_item_create(edpa_root, {
+        "type": "Story", "title": "S", "parent": "F-1", "status": "Funnel",
+    }))
+    assert _read_md(edpa_root, data["id"])["status"] == "Funnel"
+
+
+def test_create_default_status_still_funnel(edpa_root: Path) -> None:
+    """Default unaffected by D-65: absent and explicit-None statuses both
+    land as Funnel (backlog.py cmd_add passes `or "Funnel"` too)."""
+    _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "A"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "B", "status": None}))
+    assert _read_md(edpa_root, "I-1")["status"] == "Funnel"
+    assert _read_md(edpa_root, "I-2")["status"] == "Funnel"
 
 
 def test_create_with_body(edpa_root: Path) -> None:
@@ -847,6 +959,214 @@ def test_iteration_close_idempotent(edpa_root: Path) -> None:
 
 def test_iteration_close_missing_errors(edpa_root: Path) -> None:
     assert _is_err(_handle_iteration_close(edpa_root, {"id": "PI-2099-1.1"}))
+
+
+# D-57: close must stamp the delivery block (delivered_sp/velocity) so the
+# velocity consumers (forecast.py, velocity.py, pi_close.py) see real numbers
+# instead of 0. delivered_sp = Σ js of Done Story/Defect items assigned to
+# the closing iteration — same definition as _sp_rollup.iteration_sp.
+
+def _write_backlog_item(edpa_root: Path, sub: str, iid: str, *, js: int,
+                        status: str, iteration: str) -> None:
+    itype = {"stories": "Story", "defects": "Defect"}.get(sub, "Story")
+    (edpa_root / "backlog" / sub / f"{iid}.md").write_text(
+        f"---\nid: {iid}\ntype: {itype}\njs: {js}\n"
+        f"status: {status}\niteration: {iteration}\n---\n",
+        encoding="utf-8",
+    )
+
+
+def test_iteration_close_stamps_delivery_block(edpa_root: Path) -> None:
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    _write_backlog_item(edpa_root, "stories", "S-1", js=5, status="Done",
+                        iteration="PI-2026-2.1")
+    _write_backlog_item(edpa_root, "defects", "D-1", js=2, status="Done",
+                        iteration="PI-2026-2.1")
+    _write_backlog_item(edpa_root, "stories", "S-2", js=3, status="Implementing",
+                        iteration="PI-2026-2.1")  # not Done — excluded
+    _write_backlog_item(edpa_root, "stories", "S-3", js=8, status="Done",
+                        iteration="PI-2026-2.2")  # other iteration — excluded
+
+    data = _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-2.1"}))
+    assert data["delivered_sp"] == 7
+    parsed = yaml.safe_load(
+        (edpa_root / "iterations" / "PI-2026-2.1.yaml").read_text()
+    )
+    assert parsed["delivery"]["delivered_sp"] == 7
+    assert parsed["delivery"]["velocity"] == 7
+
+
+def test_iteration_close_stamps_zero_delivery_on_empty_backlog(edpa_root: Path) -> None:
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    data = _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-2.1"}))
+    assert data["delivered_sp"] == 0
+    parsed = yaml.safe_load(
+        (edpa_root / "iterations" / "PI-2026-2.1.yaml").read_text()
+    )
+    assert parsed["delivery"] == {"delivered_sp": 0, "velocity": 0}
+
+
+# D-60: planning.planned_sp is stamped at PLANNING time — while the iteration
+# has not started, every Story/Defect assignment or js re-size through the
+# write layer restamps it from the item rollup. The moment the iteration goes
+# active the plan freezes; close writes delivered_sp ONLY and never creates or
+# overwrites planning.planned_sp (the E2E run backfilled planned=delivered at
+# close, which made predictability vacuously 100%).
+
+def _set_iteration_status(edpa_root: Path, it_id: str, status: str) -> None:
+    """Flip lifecycle status the way the close-iteration flow does on disk."""
+    iter_path = edpa_root / "iterations" / f"{it_id}.yaml"
+    data = yaml.safe_load(iter_path.read_text())
+    data["iteration"]["status"] = status
+    iter_path.write_text(yaml.safe_dump(data, sort_keys=False))
+
+
+def _iter_yaml(edpa_root: Path, it_id: str) -> dict:
+    return yaml.safe_load((edpa_root / "iterations" / f"{it_id}.yaml").read_text())
+
+
+def _mk_feature(edpa_root: Path) -> str:
+    """Initiative→Epic→Feature chain; returns the Feature id (Story parent)."""
+    ini = _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "Platform"}))["id"]
+    epic = _parse(_handle_item_create(edpa_root, {
+        "type": "Epic", "title": "Ingestion", "parent": ini}))["id"]
+    return _parse(_handle_item_create(edpa_root, {
+        "type": "Feature", "title": "MQTT", "parent": epic}))["id"]
+
+
+def test_item_create_stamps_planned_sp_during_planning(edpa_root: Path) -> None:
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.2", "start_date": "2026-04-27", "end_date": "2026-05-15",
+    }))
+    feature = _mk_feature(edpa_root)
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Story", "title": "Ingest", "parent": feature,
+        "iteration": "PI-2026-2.2", "js": 13,
+    }))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Story", "title": "Buffer", "parent": feature,
+        "iteration": "PI-2026-2.2", "js": 13,
+    }))
+    assert _iter_yaml(edpa_root, "PI-2026-2.2")["planning"]["planned_sp"] == 26
+
+
+def test_item_update_restamps_planned_sp_across_iterations(edpa_root: Path) -> None:
+    for n in (1, 2):
+        _parse(_handle_iteration_create(edpa_root, {
+            "id": f"PI-2026-2.{n}", "start_date": "2026-04-06",
+            "end_date": "2026-04-24",
+        }))
+    feature = _mk_feature(edpa_root)
+    data = _parse(_handle_item_create(edpa_root, {
+        "type": "Story", "title": "Ingest", "parent": feature,
+        "iteration": "PI-2026-2.1", "js": 5,
+    }))
+    sid = data["id"]
+    assert _iter_yaml(edpa_root, "PI-2026-2.1")["planning"]["planned_sp"] == 5
+
+    # Re-plan: move to 2.2 — both iterations restamp while still in planning.
+    _parse(_handle_item_update(edpa_root, {
+        "item_id": sid, "fields": {"iteration": "PI-2026-2.2"},
+    }))
+    assert _iter_yaml(edpa_root, "PI-2026-2.1")["planning"]["planned_sp"] == 0
+    assert _iter_yaml(edpa_root, "PI-2026-2.2")["planning"]["planned_sp"] == 5
+
+    # Re-size during planning restamps too.
+    _parse(_handle_item_update(edpa_root, {
+        "item_id": sid, "fields": {"js": 8},
+    }))
+    assert _iter_yaml(edpa_root, "PI-2026-2.2")["planning"]["planned_sp"] == 8
+
+
+def test_planned_sp_freezes_once_iteration_active(edpa_root: Path) -> None:
+    """The E2E PI-2026-2.2 scenario: planned 26 on planning day; an unplanned
+    mid-PI defect (js 3) lands while the iteration is active; close stamps
+    delivered 29 but planned stays 26 → predictability ~89.7, not 100."""
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.2", "start_date": "2026-04-27", "end_date": "2026-05-15",
+    }))
+    feature = _mk_feature(edpa_root)
+    for title, js in (("Ingest", 13), ("Buffer", 13)):
+        data = _parse(_handle_item_create(edpa_root, {
+            "type": "Story", "title": title, "parent": feature,
+            "iteration": "PI-2026-2.2", "js": js,
+        }))
+        _parse(_handle_item_transition(edpa_root, {
+            "item_id": data["id"], "status": "Done",
+        }))
+    assert _iter_yaml(edpa_root, "PI-2026-2.2")["planning"]["planned_sp"] == 26
+
+    _set_iteration_status(edpa_root, "PI-2026-2.2", "active")
+
+    # Unplanned mid-PI defect: must NOT move the frozen plan.
+    data = _parse(_handle_item_create(edpa_root, {
+        "type": "Defect", "title": "Hotfix", "iteration": "PI-2026-2.2", "js": 3,
+    }))
+    _parse(_handle_item_transition(edpa_root, {"item_id": data["id"], "status": "Done"}))
+    assert _iter_yaml(edpa_root, "PI-2026-2.2")["planning"]["planned_sp"] == 26
+
+    resp = _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-2.2"}))
+    assert resp["delivered_sp"] == 29
+    parsed = _iter_yaml(edpa_root, "PI-2026-2.2")
+    assert parsed["planning"]["planned_sp"] == 26   # never backfilled to 29
+    assert parsed["delivery"]["delivered_sp"] == 29
+
+    from _sp_rollup import predictability_pct
+    assert predictability_pct(parsed["planning"]["planned_sp"],
+                              parsed["delivery"]["delivered_sp"]) == 89.7
+
+
+def test_iteration_close_never_creates_planned_sp(edpa_root: Path) -> None:
+    """No planning-time stamp (items assigned outside the write layer) →
+    close must leave planning absent, not backfill planned=delivered."""
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    _write_backlog_item(edpa_root, "stories", "S-1", js=5, status="Done",
+                        iteration="PI-2026-2.1")
+    data = _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-2.1"}))
+    assert data["delivered_sp"] == 5
+    parsed = _iter_yaml(edpa_root, "PI-2026-2.1")
+    assert "planning" not in parsed
+    assert parsed["delivery"]["delivered_sp"] == 5
+
+
+def test_portfolio_item_assignment_does_not_stamp_planning(edpa_root: Path) -> None:
+    """Only Story/Defect js rolls into planned_sp — assigning a Feature must
+    not create a planning block (rollup counts delivery items only)."""
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "Platform 2026",
+        "iteration": "PI-2026-2.1", "js": 20,
+    }))
+    assert "planning" not in _iter_yaml(edpa_root, "PI-2026-2.1")
+
+
+def test_iteration_close_preserves_hand_stamped_delivery(edpa_root: Path) -> None:
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    # Hand-stamped delivered_sp (e.g. imported history) must win over the
+    # backlog-derived value; missing velocity is filled from it.
+    iter_path = edpa_root / "iterations" / "PI-2026-2.1.yaml"
+    data = yaml.safe_load(iter_path.read_text())
+    data["delivery"] = {"delivered_sp": 42}
+    iter_path.write_text(yaml.safe_dump(data, sort_keys=False))
+    _write_backlog_item(edpa_root, "stories", "S-1", js=5, status="Done",
+                        iteration="PI-2026-2.1")  # would derive 5
+
+    resp = _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-2.1"}))
+    assert resp["delivered_sp"] == 42
+    parsed = yaml.safe_load(iter_path.read_text())
+    assert parsed["delivery"]["delivered_sp"] == 42
+    assert parsed["delivery"]["velocity"] == 42
 
 
 # ---------------------------------------------------------------------------

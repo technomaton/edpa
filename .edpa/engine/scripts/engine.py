@@ -747,6 +747,12 @@ def load_story_activity_events(edpa_root, iteration_id, heuristics,
       - no yaml_edit signals     → no activity to credit
       - story.js <= 0            → engine can't score zero-js items
       - factor <= 0              → C7.5 disabled by config
+      - neutralized signals      → weight==0 or tag out_of_iteration
+        (D-62): materialize-time gating (D-28/D-29) keeps out-of-window
+        signals in evidence[] for the audit trail but zeroes their
+        weight and tags them. They must not trigger/feed activity
+        credit — mirrors detect_contributors.aggregate_signals, which
+        never counts zero-weight signals toward cw.
 
     Returns (events, audit). events go into items[]; audit logged into
     edpa_results.json for inspection.
@@ -771,7 +777,15 @@ def load_story_activity_events(edpa_root, iteration_id, heuristics,
             continue
         if (data.get("status") or "").lower() in ("done", "closed", "accepted"):
             continue
-        sigs = yaml_edit_signals.get(story_id) or []
+        # D-62: only live signals credit. Gating-neutralized signals
+        # (weight 0, tag out_of_iteration) are audit-visible in
+        # evidence[] but non-crediting — same rule as
+        # detect_contributors.aggregate_signals (`if not weight: skip`).
+        sigs = [
+            s for s in (yaml_edit_signals.get(story_id) or [])
+            if s.get("weight")
+            and "out_of_iteration" not in (s.get("tags") or [])
+        ]
         if not sigs:
             continue
         raw_js = data.get("js") or data.get("job_size") or 0

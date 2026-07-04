@@ -2,10 +2,12 @@
 """
 EDPA Transition Detector — extract status transitions from git history.
 
-Walks `git log -p` over .edpa/backlog/{features,epics,initiatives}/*.yaml,
-identifies commits that changed a top-level `status:` field, and returns
-structured transition events. Used by engine `--mode gates` to credit
-work per status gate instead of only at final Done.
+Walks `git log -p` over the delivery-tracked backlog dirs
+(.edpa/backlog/{stories,features,epics,initiatives,defects}/), identifies
+commits that changed a top-level `status:` field, and returns structured
+transition events. Used by engine `--mode gates` to credit work per
+status gate instead of only at final Done, and by local_evidence to
+materialize weight-0 ``state_transition`` analytics signals.
 
 Usage:
     python3 .claude/edpa/scripts/transitions.py
@@ -36,16 +38,16 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).parent))
 try:
     from yaml_edit_signals import is_bot_author
+    # Transition-tracked scope ({dir: Type}) == the delivery-tracked
+    # engine-credit scope, imported from its canonical home (D-52) instead
+    # of a local copy — the pre-D-52 inline table here had drifted and
+    # lacked defects/, so Defect status flips emitted no state_transition
+    # evidence at all (D-67). Defects are delivery-tracked like Stories;
+    # events/ and risks/ are PI-planning artefacts (no derived hours) and
+    # legacy tasks/ are read-only — all deliberately untracked.
+    from id_counter import ENGINE_CREDIT_DIRS as TRACKED_DIRS
 finally:
     sys.path.pop(0)
-
-
-TRACKED_DIRS = {
-    "stories": "Story",
-    "features": "Feature",
-    "epics": "Epic",
-    "initiatives": "Initiative",
-}
 
 STATUS_LINE = re.compile(r"^([+-])status:\s*(\S+)")
 

@@ -13,13 +13,15 @@ Recommended format: Conventional Commits with ticket ID as scope —
 Pass conditions (any one is enough):
   1. Subject or body contains an EDPA item ID (regex ``[A-Z]{1,3}-\\d+``).
      The CC scope ``(S-42)`` satisfies this; a footer ``Refs: S-42`` also
-     works.
+     works. PI ids (``PI-2026`` / ``PI-2026-1``) are *not* item IDs and
+     don't count (D-64).
   2. Subject starts with an explicit escape hatch:
        ``no-ticket:`` / ``[no-ticket]`` / ``WIP:`` / ``wip:``
      (The escape stays in the commit msg as audit trail in git log.)
   3. Subject starts with an auto-generated prefix:
        ``chore(evidence):``    (local_evidence follow-up)
        ``chore(ci-materialization):``  (sync_pr_contributions follow-up)
+       ``chore(contributors):``  (detect_contributors --all-items --commit)
        ``Merge``               (merge commit)
        ``Revert``              (revert commit)
        ``Initial commit``      (git's default)
@@ -52,7 +54,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-_ITEM_REF_RE = re.compile(r"\b[A-Z]{1,3}-\d{1,9}\b")
+# Item refs only — never PI ids. "PI" is not a backlog prefix (id_counter
+# canonical map), yet 'PI-2026' inside 'PI-2026-1' matched the bare pattern,
+# so a ticketless commit passed the gate by mentioning a program increment
+# (D-64). (?!PI-) refuses PI tokens outright; the trailing (?!-\d) refuses
+# any token that continues with '-digits' (PI-2026-1, CVE-2026-1234, …).
+_ITEM_REF_RE = re.compile(r"\b(?!PI-)[A-Z]{1,3}-\d{1,9}\b(?!-\d)")
 
 _ESCAPE_PREFIXES = (
     "no-ticket:",
@@ -62,6 +69,9 @@ _ESCAPE_PREFIXES = (
 _AUTO_PREFIXES = (
     "chore(evidence):",
     "chore(ci-materialization):",
+    # D-66: detect_contributors --all-items --commit bookkeeping (also valid
+    # for a manual commit of contributor-refresh rewrites under this subject).
+    "chore(contributors):",
     "Merge ",
     "Merge branch",
     "Merge pull request",

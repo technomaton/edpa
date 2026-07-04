@@ -768,7 +768,7 @@ Kazdy PI:
 2. **Ground truth** -- zaznamenat alespon 20 novych zaznamu
 3. **CW kalibrace** -- `calibrate_signals.py`, vyhodnotit MAD
 4. **Velocity trend** -- porovnat delivery across iteraci
-5. **Predictability** -- (delivered_sp / planned_sp) across iteraci
+5. **Predictability** -- min/max(planned_sp, delivered_sp) across iteraci; planned_sp se razitkuje pri planovani (nikdy se nedopisuje pri close) -- bez razitka je predictability n/a
 
 ```bash
 # Status za celou iteraci

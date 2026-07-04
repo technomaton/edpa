@@ -103,6 +103,10 @@ def repo(tmp_path: Path) -> Path:
     (tmp_path / "h.txt").write_text("1")
     git(tmp_path, "add", "."); git(tmp_path, "commit", "-q", "-m",
         "feat(F-1): feature-level work", date=OLD)
+    # D-64: PI refs (scope or mention) must not collect phantom evidence.
+    (tmp_path / "i.txt").write_text("1")
+    git(tmp_path, "add", "."); git(tmp_path, "commit", "-q", "-m",
+        "docs(PI-2026): close notes for PI-2026-1", date=OLD)
     return tmp_path
 
 
@@ -115,6 +119,7 @@ def test_collect_evidence_subject_scope_only(repo: Path):
     assert "S-1" in ev and "S-2" in ev and "D-1" in ev
     assert "S-5" not in ev, "chore(evidence) auto-prefix must not count"
     assert "S-6" not in ev, "body-only mention must not count"
+    assert "PI-2026" not in ev, "PI ids are not item evidence (D-64)"
 
 
 def test_build_report_suggestions(repo: Path):

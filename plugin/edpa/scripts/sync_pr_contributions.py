@@ -56,8 +56,10 @@ try:
 finally:
     sys.path.pop(0)
 
-# Recognized EDPA item refs in PR title/body/branch.
-_ITEM_REF_RE = re.compile(r"\b([A-Z]{1,3}-\d{1,9})\b")
+# Recognized EDPA item refs in PR title/body/branch. D-64: PI ids are not
+# items — (?!PI-) skips them and (?!-\d) refuses tokens that continue with
+# '-digits' ('PI-2026' inside 'PI-2026-1').
+_ITEM_REF_RE = re.compile(r"\b(?!PI-)([A-Z]{1,3}-\d{1,9})\b(?!-\d)")
 
 # Defaults if cw_heuristics.yaml is missing. This script emits the
 # GH-side signals (pr_reviewer, issue_comment); commit_author is

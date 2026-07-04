@@ -38,6 +38,12 @@ except ImportError:
     print("ERROR: PyYAML required. pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _results_compat import person_reports, registry_capacity_by_id  # noqa: E402
+finally:
+    sys.path.pop(0)
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -277,8 +283,12 @@ def compute_insights(
     iteration_items = load_iteration_items(edpa_root, iteration_id)
 
     anomalies: list[dict] = []
+    # D-56: results may carry "people" (engine CLI) or "derived_reports"
+    # (frozen snapshot / legacy) — normalize, with people.yaml as capacity
+    # fallback for entries that carry none.
     anomalies += detect_capacity_overload(
-        results.get("derived_reports", []), overload_threshold,
+        person_reports(results, capacity_by_id=registry_capacity_by_id(edpa_root)),
+        overload_threshold,
     )
     anomalies += detect_job_size_creep(iteration_items, js_threshold)
     anomalies += detect_stalled_stories(iteration_items, stale_days, now_epoch)

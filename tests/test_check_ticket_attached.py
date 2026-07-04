@@ -58,6 +58,7 @@ def test_auto_prefixes_pass() -> None:
     for prefix in (
         "chore(evidence): S-5 from abc1234",
         "chore(ci-materialization): PR#1 signals",
+        "chore(contributors): refresh after PI-2026-1.3 close",
         "Merge branch 'feat/x' into main",
         "Merge pull request #1",
         'Revert "feat: add login"',
@@ -67,6 +68,17 @@ def test_auto_prefixes_pass() -> None:
     ):
         passes, _ = cta.check_message(prefix, ["src/x.py"])
         assert passes, f"expected pass with auto-prefix subject {prefix!r}"
+
+
+def test_contributors_refresh_auto_prefix_passes() -> None:
+    """D-66: `detect_contributors.py --all-items --commit` bookkeeping
+    commits (and manual commits under the same subject) rewrite derived
+    contributors[] blocks — machine bookkeeping, no ticket to demand."""
+    passes, reason = cta.check_message(
+        "chore(contributors): refresh after PI-2026-1.3 close",
+        [".edpa/backlog/stories/S-1.md", ".edpa/backlog/features/F-2.md"])
+    assert passes is True
+    assert "auto-prefix" in reason
 
 
 def test_only_operational_paths_pass() -> None:
@@ -100,6 +112,40 @@ def test_item_id_only_in_comment_does_not_pass() -> None:
     msg = "fix: x\n# S-5 is not a real reference here\n# closes S-1"
     passes, _ = cta.check_message(msg, ["src/x.py"])
     assert passes is False
+
+
+# ─── D-64: PI ids are not item refs ────────────────────────────────────────
+
+
+def test_pi_id_mention_does_not_satisfy_gate() -> None:
+    """'PI-2026' inside 'PI-2026-1' matched the old regex, so a ticketless
+    commit passed the gate by merely mentioning a PI id (D-64)."""
+    for msg in (
+        "update docs for PI-2026-1",
+        "planning notes for PI-2026",                # bare PI id
+        "chore: archive PI-2026-1.2 close report",   # iteration id
+    ):
+        passes, reason = cta.check_message(msg, ["src/x.py"])
+        assert passes is False, f"{msg!r} must not satisfy the gate"
+        assert "no EDPA item ID" in reason
+
+
+def test_token_continuing_with_dash_digits_is_not_an_item_ref() -> None:
+    """'CVE-2026' inside CVE-2026-1234 must not count as an item ref."""
+    passes, _ = cta.check_message("harden parser against CVE-2026-1234",
+                                  ["src/x.py"])
+    assert passes is False
+
+
+def test_cc_scope_still_passes_with_pi_hardening() -> None:
+    passes, _ = cta.check_message("fix(D-5): x", ["src/x.py"])
+    assert passes is True
+
+
+def test_body_only_item_id_still_passes_with_pi_hardening() -> None:
+    msg = "docs: PI-2026-1 planning notes\n\nRefs S-3."
+    passes, _ = cta.check_message(msg, ["src/x.py"])
+    assert passes is True
 
 
 # ─── Integration tests with real git repo ─────────────────────────────────
@@ -162,6 +208,13 @@ def test_integration_real_diff_with_ticket_passes(repo: Path) -> None:
     _stage(repo, [("src/feature.py", "# new feature\n")])
     rc = _run_check_with_msg(repo, "S-5: add feature endpoint")
     assert rc == 0
+
+
+def test_integration_pi_id_only_fails(repo: Path) -> None:
+    """Live E2E repro (D-64): a PI mention alone must not unlock the gate."""
+    _stage(repo, [("src/feature.py", "# new feature\n")])
+    rc = _run_check_with_msg(repo, "update docs for PI-2026-1")
+    assert rc == 1
 
 
 def test_integration_real_diff_with_no_ticket_escape_passes(

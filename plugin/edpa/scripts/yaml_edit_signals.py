@@ -96,6 +96,11 @@ TOOL_COMMIT_PATTERNS = [
     # Materialization's own evidence commits must never re-score (anti-loop).
     re.compile(r"^chore\(evidence\):", re.IGNORECASE),
     re.compile(r"^chore\(ci-materialization\):", re.IGNORECASE),
+    # D-66: contributor-refresh bookkeeping (detect_contributors --all-items
+    # --commit). Its contributors[] rewrites are _BOOKKEEPING_BLOCKS-excluded
+    # anyway; skipping the whole commit keeps the rule explicit for the
+    # window-scanning --materialize path too.
+    re.compile(r"^chore\(contributors\):", re.IGNORECASE),
 ]
 
 # Bulk migration commits get weight × 0.1. Pattern matches the leading

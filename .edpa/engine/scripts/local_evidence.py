@@ -18,7 +18,8 @@ What it does NOT emit (those still come from the optional CI workflow):
 
 Item attribution sources (in order of precedence):
 
-  1. EDPA item IDs in the commit subject/body (regex ``[A-Z]{1,3}-\\d+``)
+  1. EDPA item IDs in the commit subject/body (regex ``[A-Z]{1,3}-\\d+``;
+     PI ids like ``PI-2026-1`` are not items and never match — D-64)
   2. Item IDs derived from changed file paths
      (``.edpa/backlog/{type}/S-N.md`` → S-N)
 
@@ -29,7 +30,10 @@ attribution problem reaches this hook.
 
 Self-recursion guard: the follow-up commit this script creates has
 subject prefix ``chore(evidence):`` — the next post-commit invocation
-sees that, skips, and exits 0. No loops.
+sees that, skips, and exits 0. No loops. ``chore(contributors):``
+commits (detect_contributors --all-items --commit, D-66) are skipped
+the same way — contributor refreshes are derived bookkeeping, and
+crediting their author would spray commit_author across the backlog.
 
 Usage (typically called by .git/hooks/post-commit, not by humans):
     python3 .edpa/engine/scripts/local_evidence.py
@@ -68,7 +72,20 @@ finally:
 
 _SELF_COMMIT_PREFIX = "chore(evidence):"
 
-_ITEM_REF_RE = re.compile(r"\b([A-Z]{1,3}-\d{1,9})\b")
+# D-66: machine-bookkeeping subjects that must never emit evidence — our own
+# follow-up prefix (self-recursion guard) plus the contributors-refresh commit
+# from ``detect_contributors.py --all-items --commit``. That refresh rewrites
+# contributors[] on every item with evidence[]; crediting its author would
+# spray commit_author weight across the whole backlog at close time. The tool
+# already runs its commit with EDPA_NO_LOCAL_EVIDENCE=1 — this prefix check
+# keeps even a MANUAL ``chore(contributors):`` commit quiet.
+_BOOKKEEPING_PREFIXES = (_SELF_COMMIT_PREFIX, "chore(contributors):")
+
+# D-64: (?!PI-) — PI ids (PI-2026, PI-2026-1) are program increments, not
+# backlog items; without it 'PI-2026' matched inside 'PI-2026-1' and every
+# such commit emitted a phantom 'PI-2026 referenced but not found' warning.
+# (?!-\d) — a token continuing with '-digits' is never an item ref.
+_ITEM_REF_RE = re.compile(r"\b(?!PI-)([A-Z]{1,3}-\d{1,9})\b(?!-\d)")
 _BACKLOG_PATH_RE = re.compile(
     r"\.edpa/backlog/([^/]+)/([A-Z]{1,3}-\d{1,9})\.md$"
 )
@@ -535,46 +552,113 @@ GATED_TYPES = frozenset({
     "yaml_edit", "commit_author", "agent_contribution", "manual:commit_message",
 })
 
+# D-63: item types whose ``iteration:`` assignment maps to ONE concrete date
+# window (mirrors transitions.item_in_iteration): Story/Defect/Task are
+# exact-iteration; a Feature only when its assignment names an
+# ``iteration:``-shaped YAML directly (a pi-shaped YAML has no such block, so
+# the window stays unprovable and PI-spanning feature work is never gated).
+# Epic/Initiative (and unknown types) are cross-PI — no window, never gated.
+_WINDOWED_TYPES = ("Story", "Defect", "Task", "Feature")
+
+
+def _signal_ts(at) -> "datetime | None":
+    """Parse a signal's ISO ``at:`` into an aware UTC datetime, or None when
+    the timestamp is missing/unparsable (unprovable → caller must not gate)."""
+    if not at:
+        return None
+    from datetime import datetime, timezone
+    try:
+        ts = datetime.fromisoformat(str(at).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return ts.astimezone(timezone.utc)
+
+
+def _item_iteration_window(edpa_root: Path, item_type: str, item_iter: str):
+    """Resolve the UTC ``(start, end)`` window the item's OWN ``iteration:``
+    assignment spans, or None when it cannot be proven (cross-PI item type,
+    missing/malformed/pi-shaped YAML). Never raises: this feeds a gate that
+    runs inside the post-commit hook — unprovable must mean "keep weight",
+    not "crash the hook"."""
+    if item_type not in _WINDOWED_TYPES:
+        return None
+    f = Path(edpa_root) / "iterations" / f"{item_iter}.yaml"
+    if not f.is_file():
+        return None
+    from transitions import parse_iteration_dates
+    try:
+        return parse_iteration_dates(f)
+    except Exception:  # noqa: BLE001 — malformed/pi-shaped YAML → unprovable
+        return None
+
 
 def _neutralize_foreign_signals(item: dict, sigs: list[dict],
                                 item_path: Path,
-                                target_iteration: str | None) -> None:
-    """Zero-weight (analytics-only) any weighted signal in ``GATED_TYPES`` whose
-    host item PROVABLY belongs to an iteration OTHER than ``target_iteration`` —
-    so a commit that touches a foreign-iteration item (bulk backlog authoring,
-    grooming a closed story, or delivery that overflowed its iteration) never
-    scores credit there. Mutates ``sigs`` in place: the original weight is kept
-    in ``raw_weight`` and the signal is tagged ``out_of_iteration`` so the audit
-    trail stays reversible. detect_contributors skips zero-weight signals, so no
-    engine/aggregation change is needed.
+                                target_iteration: str | None,
+                                edpa_root: Path | None = None) -> None:
+    """Zero-weight (analytics-only) any weighted signal in ``GATED_TYPES`` that
+    PROVABLY does not belong to its host item's iteration — so a commit that
+    touches a foreign-iteration item (bulk backlog authoring, grooming a closed
+    story, close-day bookkeeping in the gap between iterations, or delivery
+    that overflowed its iteration) never scores credit there. Mutates ``sigs``
+    in place: the original weight is kept in ``raw_weight`` and the signal is
+    tagged ``out_of_iteration`` so the audit trail stays reversible.
+    detect_contributors skips zero-weight signals, so no engine/aggregation
+    change is needed.
 
-    D-28 gated ``yaml_edit`` only; D-29 generalises to ``commit_author`` and the
-    other weighted signal types under the axiom-preserving model (a Story fits
-    one iteration; overflow is gated here, not routed to another iteration).
+    Two complementary proofs, tried in order:
 
-    Shared by the materialize writer (target = the iteration being materialized)
-    and the live post-commit hook (target = the commit's own iteration, resolved
-    by author date). No-op when the placement is unsafe:
-      * ``target_iteration`` falsy/None — e.g. a commit outside every window;
-      * the item's ``iteration`` is blank (unassigned/unknown) — don't drop real
-        work; overflow cannot be proven without a window.
+      1. D-28/D-29 foreign-item rule: ``target_iteration`` (the commit's own
+         iteration, or the iteration being materialized) resolves AND the item
+         belongs to a different one → every weighted gated signal is zeroed.
+      2. D-63 window rule: when the foreign rule cannot fire (no resolvable
+         ``target_iteration`` — the commit sits in a gap between iterations, a
+         planning window, or past the timeline edge), each signal whose ``at:``
+         provably falls OUTSIDE the item's OWN iteration window is zeroed.
+         Before D-63 these kept full weight, permanently crediting planning-day
+         and close-day commits into iterations the work never happened in.
+
+    Shared by the materialize writer and the live post-commit hook. No-op when
+    the placement is unsafe/unprovable:
+      * the item's ``iteration`` is blank (unassigned/unknown) — don't drop
+        real work; overflow cannot be proven without a window;
+      * neither proof resolves (no target iteration AND the item's own window
+        is unresolvable — cross-PI types, missing/pi-shaped YAML, missing
+        ``at:``) — lenient fallback, never a router.
+
+    ``edpa_root`` locates ``iterations/*.yaml`` for the window rule; when not
+    given it is derived from ``item_path``'s canonical layout (ad-hoc paths in
+    unit tests then simply skip the window rule).
     """
-    if not target_iteration:
-        return
     item_iter = item.get("iteration", "")
     if not item_iter:
         return
     from transitions import item_in_iteration
     item_type = item.get("type") or _DIR_TO_TYPE.get(item_path.parent.name, "")
-    if item_in_iteration(item_type, item_iter, target_iteration):
-        return
+    foreign = bool(target_iteration) and not item_in_iteration(
+        item_type, item_iter, target_iteration)
+    window = None
+    if not foreign:
+        if edpa_root is None:
+            edpa_root = _lock_root_for_item(item_path)
+        window = (_item_iteration_window(edpa_root, item_type, item_iter)
+                  if edpa_root else None)
+        if window is None:
+            return  # nothing provable — keep weights (lenient fallback)
     for s in sigs:
-        if s.get("type") in GATED_TYPES and s.get("weight"):
-            s.setdefault("raw_weight", s["weight"])  # keep original for audit
-            s["weight"] = 0
-            tags = s.setdefault("tags", [])
-            if "out_of_iteration" not in tags:
-                tags.append("out_of_iteration")
+        if s.get("type") not in GATED_TYPES or not s.get("weight"):
+            continue
+        if not foreign:
+            ts = _signal_ts(s.get("at"))
+            if ts is None or window[0] <= ts <= window[1]:
+                continue  # in-window or unprovable timestamp — keep weight
+        s.setdefault("raw_weight", s["weight"])  # keep original for audit
+        s["weight"] = 0
+        tags = s.setdefault("tags", [])
+        if "out_of_iteration" not in tags:
+            tags.append("out_of_iteration")
 
 
 def cmd_materialize(edpa_root: Path, iteration_id: str) -> int:
@@ -613,8 +697,10 @@ def cmd_materialize(edpa_root: Path, iteration_id: str) -> int:
             if not p:
                 continue
             # D-28/D-29: neutralise weighted signals (yaml_edit, commit_author, …) on
-            # items belonging to a different iteration than the one being materialized.
-            _neutralize_foreign_signals(load_md(p) or {}, sigs, p, iteration_id)
+            # items belonging to a different iteration than the one being materialized
+            # (D-63: or provably outside the item's own iteration window).
+            _neutralize_foreign_signals(load_md(p) or {}, sigs, p, iteration_id,
+                                        edpa_root=edpa_root)
             if _apply_to_item(p, sigs):
                 touched.append(p)
     except BacklogLockTimeout as exc:
@@ -704,8 +790,10 @@ def main(argv=None) -> int:
     if not commit:
         return 0
 
-    # Self-recursion guard
-    if commit["subject"].startswith(_SELF_COMMIT_PREFIX):
+    # Self-recursion guard + machine-bookkeeping skip: chore(evidence): is our
+    # own follow-up; chore(contributors): is a contributor-refresh commit from
+    # detect_contributors --all-items --commit (D-66) — bookkeeping, not work.
+    if commit["subject"].startswith(_BOOKKEEPING_PREFIXES):
         return 0
 
     # Skip merge commits — they aggregate, not author
@@ -773,7 +861,9 @@ def main(argv=None) -> int:
     # backlog authoring, or delivery that overflowed its iteration). Resolve the
     # commit's own iteration by author date so its weighted signals (commit_author,
     # yaml_edit, …) on foreign-iteration items are neutralised — the live
-    # equivalent of the materialize guard.
+    # equivalent of the materialize guard. When the commit sits in NO window
+    # (gap between iterations, planning day, timeline edge) commit_iter stays
+    # None and the guard falls back to the item's own iteration window (D-63).
     commit_iter = None
     iso = (_git(["log", "-1", "--format=%aI", commit["sha"]]) or "").strip()
     if iso:
@@ -796,7 +886,8 @@ def main(argv=None) -> int:
                     file=sys.stderr,
                 )
                 continue
-            _neutralize_foreign_signals(load_md(p) or {}, sigs, p, commit_iter)
+            _neutralize_foreign_signals(load_md(p) or {}, sigs, p, commit_iter,
+                                        edpa_root=edpa_root)
             if _apply_to_item(p, sigs):
                 touched_paths.append(p)
     except BacklogLockTimeout as exc:

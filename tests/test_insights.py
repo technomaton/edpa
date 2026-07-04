@@ -37,12 +37,15 @@ from insights import (  # noqa: E402
 # Fixtures
 # ---------------------------------------------------------------------------
 
-def _make_results(tmp_path: Path, iteration: str, reports: list[dict]) -> Path:
+def _make_results(tmp_path: Path, iteration: str, reports: list[dict],
+                  key: str = "derived_reports") -> Path:
+    """Write edpa_results.json. `key` selects the producer shape:
+    "derived_reports" (frozen snapshot) or "people" (engine CLI, D-56)."""
     out = tmp_path / "reports" / f"iteration-{iteration}"
     out.mkdir(parents=True)
     payload = {
         "iteration": iteration,
-        "derived_reports": reports,
+        key: reports,
         "items": [],
     }
     (out / "edpa_results.json").write_text(json.dumps(payload), encoding="utf-8")
@@ -289,6 +292,40 @@ def test_compute_insights_thresholds_in_report(tmp_path):
     assert report["thresholds"]["overload_pct"] == 15
     assert report["thresholds"]["js_max"] == 5
     assert report["thresholds"]["stale_days"] == 3
+
+
+def test_compute_insights_engine_people_shape(tmp_path):
+    """D-56 regression: stock engine CLI writes "people" (entries keyed "id"),
+    not "derived_reports" — overload detection returned nothing on real runs."""
+    _make_results(tmp_path, "PI-2026-1.4", [
+        {"id": "bob", "name": "Bob", "role": "Dev", "capacity": 40.0,
+         "total_derived": 50.0, "items": [], "invariant_ok": True},
+    ], key="people")
+    report = compute_insights(tmp_path, "PI-2026-1.4", now_epoch=10_000_000_000.0)
+    assert report["anomaly_count"] == 1
+    anomaly = report["anomalies"][0]
+    assert anomaly["type"] == "capacity_overload"
+    assert anomaly["person"] == "bob"
+    assert anomaly["severity"] == "critical"
+
+
+def test_compute_insights_engine_shape_capacity_from_people_yaml(tmp_path):
+    """D-56: entries without capacity fall back to the people.yaml registry."""
+    _make_results(tmp_path, "PI-2026-1.5", [
+        {"id": "carol", "name": "Carol", "total_derived": 50.0, "items": []},
+    ], key="people")
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    (cfg / "people.yaml").write_text(
+        "people:\n"
+        "  - id: carol\n"
+        "    name: Carol\n"
+        "    capacity_per_iteration: 40\n",
+        encoding="utf-8",
+    )
+    report = compute_insights(tmp_path, "PI-2026-1.5", now_epoch=10_000_000_000.0)
+    types = {a["type"] for a in report["anomalies"]}
+    assert "capacity_overload" in types
 
 
 # ---------------------------------------------------------------------------
