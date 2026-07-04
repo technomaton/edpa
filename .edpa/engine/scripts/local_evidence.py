@@ -50,6 +50,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -566,7 +567,6 @@ def _signal_ts(at) -> "datetime | None":
     the timestamp is missing/unparsable (unprovable → caller must not gate)."""
     if not at:
         return None
-    from datetime import datetime, timezone
     try:
         ts = datetime.fromisoformat(str(at).replace("Z", "+00:00"))
     except ValueError:
