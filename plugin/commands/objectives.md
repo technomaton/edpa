@@ -88,6 +88,22 @@ Examples:
    grouped by team → kind (committed first, then stretch). Include BV, status,
    and per-team confidence vote.
 
+## Script fallback (no MCP server)
+
+The three write actions also run as a plain CLI — the **same library write path**
+as the MCP tools, for non-Claude-Code users, CI, or when the MCP server isn't
+running (mirrors `create_pi.py` / `pi_close.py`):
+
+```bash
+python3 .edpa/engine/scripts/objectives.py set    <pi> <team> <kind> "<title>" [--bv N] [--status S]
+python3 .edpa/engine/scripts/objectives.py remove <pi> <team> <kind> "<title>"
+python3 .edpa/engine/scripts/objectives.py vote   <pi> <team> <confidence>
+```
+
+It writes the same `.edpa/pi-objectives/<pi>.yaml` and auto-commits
+`chore(pi-objectives): …` (pass `--no-commit` to skip the commit, `--edpa-root DIR`
+to target a specific `.edpa/`). For `show`, just read the YAML directly.
+
 ## Notes
 
 - Objectives live in `.edpa/pi-objectives/<pi>.yaml`. If the file does not exist,
