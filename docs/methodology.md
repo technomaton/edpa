@@ -140,7 +140,9 @@ weights sum into `contribution_score`, which normalizes to per-item
 #### 5.3.2 YAML-edit structural signals (v1.17)
 
 Every commit touching `.edpa/backlog/<type>/<id>.md` is itself
-evidence of work on that item. Detection is **structural** (count
+evidence of work on that item. Default weights below reflect the
+D-36 calibration; the live values are read from
+`.edpa/config/cw_heuristics.yaml` (`yaml_edit_weights:`). Detection is **structural** (count
 list bullets, top-level blocks, scalar changes) — it never tries to
 semantically classify content (operator field-naming drift makes
 that brittle). Auditor reviewing per-signal `ref` opens the commit
@@ -148,11 +150,11 @@ and sees the actual diff.
 
 | Signal type | Default weight | Source | Auditor `ref` |
 |-------------|---------------:|--------|---------------|
-| `yaml_edit:create` | 5.00 | New file with +id+type+title | `commit/<sha>/<file>` |
-| `yaml_edit:block_add` | 2.00 | Per top-level nested block added | `commit/<sha>/<file>` |
-| `yaml_edit:list_grow` | 1.00 (cap 10) | Per net `- ` bullet added | `commit/<sha>/<file>` |
-| `yaml_edit:scalar_change` | 0.50 | Per top-level scalar set | `commit/<sha>/<file>` |
-| `yaml_edit:lines_volume` | min(3.0, n/30) | Substantive-edit proxy | `commit/<sha>/<file>` |
+| `yaml_edit:create` | 2.00 | New file with +id+type+title | `commit/<sha>/<file>` |
+| `yaml_edit:block_add` | 1.00 | Per top-level nested block added | `commit/<sha>/<file>` |
+| `yaml_edit:list_grow` | 0.50 (cap 10) | Per net `- ` bullet added | `commit/<sha>/<file>` |
+| `yaml_edit:scalar_change` | 0.25 | Per top-level scalar set | `commit/<sha>/<file>` |
+| `yaml_edit:lines_volume` | min(1.0, n/40) | Substantive-edit proxy | `commit/<sha>/<file>` |
 | `yaml_edit:revert` | -0.50 | Per net-removed block (negative) | `commit/<sha>/<file>` |
 | `state_transition` | 0 (analytics) | Status change who/when/from→to (delivery lead time / time-in-state); gate scoring derives from it | `commit/<sha>/<id>/<from>-><to>` |
 

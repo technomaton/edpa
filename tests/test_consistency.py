@@ -580,3 +580,46 @@ def test_vendored_engine_content_in_sync():
         "Note: the re-vendor copytree never deletes, so files listed as "
         "'orphan only in .edpa/engine' must be deleted by hand."
     )
+
+
+def test_command_docs_have_frontmatter_and_mcp_allowlists():
+    """D-55 (H skip from the audit): every plugin command doc must carry YAML
+    frontmatter with allowed-tools, and every edpa_* MCP tool the doc tells
+    the agent to call must be allowlisted with its fully-qualified name —
+    otherwise each call costs a permission prompt (or fails headless)."""
+    import re
+
+    server_src = (ROOT / "plugin/edpa/scripts/mcp_server.py").read_text(encoding="utf-8")
+    tools = set(re.findall(r'name="(edpa_[a-z_]+)"', server_src))
+    assert len(tools) >= 25, f"tool extraction broke: {len(tools)} found"
+
+    problems = []
+    for md in sorted((ROOT / "plugin" / "commands").glob("*.md")):
+        text = md.read_text(encoding="utf-8")
+        m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+        if not m:
+            problems.append(f"{md.name}: missing YAML frontmatter")
+            continue
+        am = re.search(r"^allowed-tools:\s*(.+)$", m.group(1), re.M)
+        if not am:
+            problems.append(f"{md.name}: frontmatter lacks allowed-tools")
+            continue
+        allowed, body = am.group(1), text[m.end():]
+
+        called = set()
+        for t_ in tools:
+            # instructed calls: "Call edpa_x", "call the edpa_x tool", "edpa_x(",
+            # or an explicit fully-qualified mention anywhere in the body
+            if re.search(rf"[Cc]all[^\n]*\b{t_}\b", body) or re.search(rf"\b{t_}\(", body):
+                called.add(t_)
+        for fq in re.findall(r"mcp__plugin_edpa_edpa__(edpa_[a-z_]+)", body):
+            called.add(fq)
+
+        missing = sorted(t_ for t_ in called
+                         if f"mcp__plugin_edpa_edpa__{t_}" not in allowed)
+        if missing:
+            problems.append(f"{md.name}: allowed-tools missing {missing}")
+
+    assert not problems, (
+        "command-doc allowlist drift:\n  " + "\n  ".join(problems)
+    )
