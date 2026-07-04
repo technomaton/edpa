@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.18.0 — 2026-07-05
+
+Website: the English site is now complete and cross-linked.
+
+### Added
+
+- **English Journey & Tutorial pages (S-250, S-251).** `en/journey.astro` and
+  `en/tutorial.astro` are faithful translations of the Czech originals — the
+  two pages D-47 found were linked from EN navigation but never existed.
+- **EN navigation + hreflang (S-252).** Journey and Tutorial are back in the EN
+  "Get Started" dropdown and the language switcher; `Layout` emits
+  `hreflang` cs/en/x-default alternates for every dual-locale route (and
+  correctly omits them for cs-only routes like `/docs/`).
+
 ## 2.17.0 — 2026-07-04
 
 Batch 5: five residual defects from the E2E fix chain, including the
