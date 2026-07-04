@@ -41,6 +41,7 @@ from _sp_rollup import iteration_sp  # noqa: E402
 
 
 from _yaml_io import load_yaml as _shared_load_yaml  # noqa: E402
+from _results_compat import registry_capacity_by_id  # noqa: E402
 
 
 def load_yaml(path: Path):
@@ -113,6 +114,16 @@ def find_iterations(edpa_root: Path, pi_id: str):
     return sorted(iter_dir.glob(f"{pi_id}.*.yaml"))
 
 
+def registry_capacity_per_iteration(edpa_root) -> float:
+    """Team capacity per iteration from ``config/people.yaml``.
+
+    Sum of per-person ``capacity_per_iteration`` (legacy ``capacity``
+    fallback) via the shared registry reader. 0 when the registry is
+    missing or empty.
+    """
+    return sum(registry_capacity_by_id(Path(edpa_root)).values())
+
+
 def aggregate_iterations(iteration_files):
     """Aggregate planning + delivery metrics across iterations."""
     iterations = []
@@ -122,9 +133,15 @@ def aggregate_iterations(iteration_files):
     spillover_ids = []
     unplanned_ids = []
 
+    edpa_root = iteration_files[0].resolve().parent.parent if iteration_files else None
     # SP rollup derived from backlog item `js` (fallback when iteration YAMLs
     # carry no explicit planning.planned_sp / delivery.delivered_sp).
-    sp = iteration_sp(iteration_files[0].resolve().parent.parent) if iteration_files else {}
+    sp = iteration_sp(edpa_root) if edpa_root else {}
+    # Nothing writes planning.capacity today, so summing it alone reported
+    # total_capacity_hours=0 for every PI (D-58). Fall back to the people
+    # registry (sum of capacity_per_iteration) for each iteration without
+    # an explicit planning.capacity override.
+    registry_capacity = registry_capacity_per_iteration(edpa_root) if edpa_root else 0
 
     for f in iteration_files:
         data = load_yaml(f)
@@ -137,7 +154,12 @@ def aggregate_iterations(iteration_files):
         derived = sp.get(it.get("id"), {})
         planned = planning.get("planned_sp") or derived.get("planned_sp", 0)
         delivered = delivery.get("delivered_sp") or derived.get("delivered_sp", 0)
-        capacity = planning.get("capacity", 0) or 0
+        # planning.capacity is an explicit per-iteration override (an
+        # explicit 0 — e.g. a down iteration — is a real value and kept);
+        # absent → people-registry total for the iteration.
+        capacity = planning.get("capacity")
+        if capacity is None:
+            capacity = registry_capacity
         predictability = (
             round(100 * delivered / planned, 1) if planned else None
         )
