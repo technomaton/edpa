@@ -268,3 +268,91 @@ def test_gate_keeps_pr_signal_on_unassigned_item(tmp_path: Path) -> None:
         edpa, item, edpa / "backlog" / "stories" / "S-1.md", sigs)
     assert sigs[0]["weight"] == 2.25
     assert "out_of_iteration" not in sigs[0].get("tags", [])
+
+
+# ---------------------------------------------------------------------------
+# D-70: mirror D-63's *item-own-window* rule on the GH-side gate. The pre-D-70
+# gate routed each timestamp via find_iteration_for_timestamp, so an event that
+# fell in a GAP between iterations (or past the timeline edge) resolved to no
+# iteration and kept full weight — the GH-side of the skew D-63 fixed on the
+# commit-side signals. The gate must now resolve the item's OWN window and gate
+# any signal provably outside it, while still keeping weight when the window is
+# unprovable (missing iteration YAML / unparsable ts).
+# ---------------------------------------------------------------------------
+
+def test_apply_gates_review_in_iteration_gap(tmp_path: Path) -> None:
+    """D-70: a review landing in the May GAP (after PI-2026-1.1 ends Apr 30,
+    before PI-2026-3.1 starts Jun 1 — no iteration YAML covers it) but provably
+    after the item's OWN window is gated to weight 0. Pre-D-70 this kept full
+    weight because find_iteration_for_timestamp returned None in the gap."""
+    edpa = _edpa_with_iterations(tmp_path)  # S-1 in PI-2026-1.1 (Apr 1-30)
+    pr = _pr_payload(title="S-1: gap-day review", body="", reviews=[
+        {"id": "RV1", "author": {"login": "bob"},
+         "submittedAt": "2026-05-15T10:00:00Z"}])  # May gap -> no iteration
+    weights = spc._load_weights(edpa)
+    spc.apply_signals(edpa, spc.event_to_signals(pr, weights))
+    rv = [s for s in load_md(edpa / "backlog" / "stories" / "S-1.md")["evidence"]
+          if s["type"] == "pr_reviewer"]
+    assert rv and rv[0]["weight"] == 0
+    assert "out_of_iteration" in rv[0]["tags"]
+    assert rv[0]["raw_weight"] > 0
+
+
+def test_apply_gates_comment_past_timeline_edge(tmp_path: Path) -> None:
+    """D-70: an issue_comment past the last iteration's end (Aug, after Jun 30)
+    is gated too — the window helper proves it is outside the item's April
+    window even though no later iteration exists to route the timestamp to.
+    Also exercises the issue_comment signal type through the gate."""
+    edpa = _edpa_with_iterations(tmp_path)  # S-1 in PI-2026-1.1 (Apr 1-30)
+    pr = _pr_payload(title="S-1: late comment", body="", comments=[
+        {"id": "C1", "author": {"login": "carol"},
+         "createdAt": "2026-08-01T09:00:00Z"}])  # past Jun 30 timeline edge
+    weights = spc._load_weights(edpa)
+    spc.apply_signals(edpa, spc.event_to_signals(pr, weights))
+    cm = [s for s in load_md(edpa / "backlog" / "stories" / "S-1.md")["evidence"]
+          if s["type"] == "issue_comment"]
+    assert cm and cm[0]["weight"] == 0
+    assert "out_of_iteration" in cm[0]["tags"]
+    assert cm[0]["raw_weight"] > 0
+
+
+def test_gate_keeps_review_inside_window_via_helper(tmp_path: Path) -> None:
+    """D-70: a review inside the item's own window keeps full weight and is
+    never tagged (the in-window branch of the D-63 rule)."""
+    edpa = _edpa_with_iterations(tmp_path)  # S-1 in PI-2026-1.1 (Apr 1-30)
+    item = {"type": "Story", "iteration": "PI-2026-1.1"}
+    sigs = [{"type": "pr_reviewer", "weight": 2.25,
+             "at": "2026-04-10T10:00:00Z"}]  # inside April window
+    spc._gate_out_of_iteration(
+        edpa, item, edpa / "backlog" / "stories" / "S-1.md", sigs)
+    assert sigs[0]["weight"] == 2.25
+    assert "out_of_iteration" not in sigs[0].get("tags", [])
+
+
+def test_gate_keeps_pr_signal_when_item_window_unprovable(tmp_path: Path) -> None:
+    """D-70: when the item's OWN iteration window is unprovable — its iteration
+    YAML is missing (cross-PI, typo, not-yet-created, pi-shaped) — keep full
+    weight, never gate. Mirrors D-63's lenient fallback (_item_iteration_window
+    returns None). Pre-D-70 the gate wrongly zeroed this: it routed the Apr-10
+    ts to the real PI-2026-1.1 YAML and, since that != the item's phantom
+    iteration, gated it."""
+    edpa = _edpa_with_iterations(tmp_path, item_iteration="PI-2026-9.9")
+    item = {"type": "Story", "iteration": "PI-2026-9.9"}  # no PI-2026-9.9.yaml
+    sigs = [{"type": "pr_reviewer", "weight": 2.25,
+             "at": "2026-04-10T10:00:00Z"}]  # falls in the *real* April YAML
+    spc._gate_out_of_iteration(
+        edpa, item, edpa / "backlog" / "stories" / "S-1.md", sigs)
+    assert sigs[0]["weight"] == 2.25
+    assert "out_of_iteration" not in sigs[0].get("tags", [])
+
+
+def test_gate_keeps_pr_signal_on_unparsable_timestamp(tmp_path: Path) -> None:
+    """D-70: an unparsable ``at:`` is unprovable — keep full weight (never gate
+    on a timestamp we cannot place). Mirrors D-63 (_signal_ts -> None)."""
+    edpa = _edpa_with_iterations(tmp_path)  # S-1 in PI-2026-1.1 (Apr 1-30)
+    item = {"type": "Story", "iteration": "PI-2026-1.1"}
+    sigs = [{"type": "pr_reviewer", "weight": 2.25, "at": "not-a-timestamp"}]
+    spc._gate_out_of_iteration(
+        edpa, item, edpa / "backlog" / "stories" / "S-1.md", sigs)
+    assert sigs[0]["weight"] == 2.25
+    assert "out_of_iteration" not in sigs[0].get("tags", [])

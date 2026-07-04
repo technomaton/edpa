@@ -238,43 +238,51 @@ def _dedupe_signals(existing: list[dict], new: list[dict]) -> list[dict]:
 
 def _gate_out_of_iteration(edpa_root: Path, item: dict, item_path: Path,
                            sigs: list[dict]) -> None:
-    """D-33: zero a GH-side weighted signal whose ``at:`` falls in an iteration
-    OTHER than the one its host item belongs to — the out-of-iteration gate
-    mirroring the commit-side D-29 guard (``local_evidence._neutralize_foreign_
-    signals``), applied here because PR-thread signals (pr_reviewer,
-    issue_comment) bypass the post-commit hook. Resolved PER SIGNAL: reviews /
-    comments on one item can land in different iteration windows. The original
+    """D-33/D-70: zero a GH-side weighted signal (pr_reviewer, issue_comment)
+    whose ``at:`` provably falls OUTSIDE the host item's OWN iteration window —
+    the out-of-iteration gate mirroring the commit-side guard
+    (``local_evidence._neutralize_foreign_signals``), applied here because
+    PR-thread signals bypass the post-commit hook. Resolved PER SIGNAL: reviews
+    / comments on one item can land in different iteration windows. The original
     weight is kept in ``raw_weight`` and the signal tagged ``out_of_iteration``
     so the gate stays reversible (detect_contributors skips weight-0 signals).
 
-    No-op when the item's ``iteration:`` is blank (overflow can't be proven
-    without a window) or the signal's ``at:`` resolves to no iteration window
-    (timeline edge — kept at full weight, never re-routed).
+    D-70: proves "outside" against the item's OWN iteration window (the D-63
+    rule) instead of routing each timestamp to whichever iteration happens to
+    contain it. The pre-D-70 gate used ``find_iteration_for_timestamp``, which
+    returns None for a timestamp in a GAP between iterations (or past the
+    timeline edge) — so a PR event landing after the item's window ended but in
+    an uncovered period kept full weight, the GH-side of the skew D-63 fixed on
+    commit signals. Now such an event is gated because it is provably after the
+    item's window end.
+
+    No-op (weight kept) when the placement is unprovable, per the D-63 rule:
+      * the item's ``iteration:`` is blank (overflow can't be proven);
+      * the item's own window is unresolvable — cross-PI item type, missing /
+        malformed / pi-shaped iteration YAML (``_item_iteration_window`` → None);
+      * the signal's ``at:`` is missing/unparsable (``_signal_ts`` → None).
     """
     item_iter = item.get("iteration", "")
     if not item_iter:
         return
-    from datetime import datetime
-    from transitions import find_iteration_for_timestamp, item_in_iteration
+    # D-70: reuse D-63's window + timestamp helpers verbatim — the same date
+    # math both paths must agree on; do not duplicate it here.
+    from local_evidence import _item_iteration_window, _signal_ts
     item_type = item.get("type") or ""
+    window = _item_iteration_window(edpa_root, item_type, item_iter)
+    if window is None:
+        return  # unprovable window — keep weights (lenient fallback)
     for s in sigs:
         if not s.get("weight"):
             continue
-        at = s.get("at")
-        try:
-            # GH timestamps use a trailing 'Z'; normalise for fromisoformat
-            # (Python < 3.11 rejects 'Z'). D-30 made the window helpers tz-safe.
-            target = find_iteration_for_timestamp(
-                edpa_root, datetime.fromisoformat(at.replace("Z", "+00:00")))
-        except (ValueError, TypeError, AttributeError):
-            target = None
-        if not target:
-            continue
-        if item_in_iteration(item_type, item_iter, target):
-            continue
+        ts = _signal_ts(s.get("at"))
+        if ts is None or window[0] <= ts <= window[1]:
+            continue  # in-window or unparsable timestamp — keep weight
         s.setdefault("raw_weight", s["weight"])  # keep original for audit
         s["weight"] = 0
-        s.setdefault("tags", []).append("out_of_iteration")
+        tags = s.setdefault("tags", [])
+        if "out_of_iteration" not in tags:
+            tags.append("out_of_iteration")
 
 
 def apply_signals(edpa_root: Path, signals: list[dict]) -> dict[str, int]:
