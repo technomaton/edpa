@@ -59,6 +59,7 @@ def _make_backlog(tmp_path: Path, items: list[dict]) -> Path:
         "Feature": "features",
         "Epic": "epics",
         "Initiative": "initiatives",
+        "Defect": "defects",
     }
     for item in items:
         dir_name = type_to_dir[item["type"]]
@@ -370,6 +371,60 @@ class TestFlowMetricsLevelFilter:
         assert data["cycle_time"]["count"] == 1
         assert data["cycle_time"]["min"] == 9.0
         assert data["items_detail"][0]["id"] == "F-1"
+
+
+# edpa_flow_metrics — defects are delivery-tracked (D-67)
+
+
+class TestFlowMetricsDefects:
+    """D-67 regression: Defects are delivery-tracked (they earn engine
+    credit and carry created_at/closed_at like Stories), yet the flow
+    scan's dir list skipped backlog/defects/ — defects were invisible to
+    cycle-time/age/throughput analytics."""
+
+    def test_done_defect_gets_cycle_time(self, tmp_path):
+        mcp_server._load_yaml_cache_clear()
+        edpa = _make_backlog(tmp_path, [
+            {
+                "id": "D-1", "type": "Defect", "title": "Reconnect race",
+                "status": "Done", "iteration": "PI-1.1",
+                "created_at": "2026-03-01T00:00:00Z",
+                "closed_at": "2026-03-04T00:00:00Z",
+            },
+        ])
+        data = parse_result(_handle_flow_metrics(edpa, None, None))
+        assert data["throughput"]["total_done"] == 1
+        detail = {i["id"]: i for i in data["items_detail"]}
+        assert detail["D-1"]["cycle_time_days"] == 3.0
+
+    def test_level_filter_defect(self, tmp_path):
+        mcp_server._load_yaml_cache_clear()
+        edpa = _make_backlog(tmp_path, [
+            {
+                "id": "D-1", "type": "Defect", "title": "Bug",
+                "status": "In Progress",
+                "created_at": "2026-01-01T00:00:00Z",
+            },
+            {
+                "id": "S-1", "type": "Story", "title": "StoryItem",
+                "status": "Done",
+                "created_at": "2026-03-01T00:00:00Z",
+                "closed_at": "2026-03-05T00:00:00Z",
+            },
+        ])
+        data = parse_result(_handle_flow_metrics(edpa, None, "Defect"))
+        ids = {i["id"] for i in data["items_detail"]}
+        assert ids == {"D-1"}
+        assert data["open_items_age"]["count"] == 1
+
+    def test_level_enum_advertises_defect(self):
+        """The tool schema's level enum must include Defect so callers can
+        filter on it (kept equal to the handler's delivery-tracked scope)."""
+        tools = asyncio.run(mcp_server.list_tools())
+        schema = next(
+            t for t in tools if t.name == "edpa_flow_metrics").inputSchema
+        assert set(schema["properties"]["level"]["enum"]) == {
+            "Story", "Feature", "Epic", "Initiative", "Defect"}
 
 
 # ---------------------------------------------------------------------------

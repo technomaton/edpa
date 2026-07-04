@@ -154,6 +154,10 @@ def _sibling_path():
 with _sibling_path():
     from id_counter import (  # noqa: E402
         DIR_TO_TYPE as _DIR_TO_TYPE,
+        # Delivery-tracked scope for flow metrics (D-67): the same
+        # {dir: Type} subset the engine credits — includes defects/,
+        # excludes Events/Risks (PI-planning artefacts) and legacy Tasks.
+        ENGINE_CREDIT_DIRS as _ENGINE_CREDIT_DIRS,
         PREFIX_TO_DIR as _PREFIX_TO_DIR,
         TYPE_DIRS,
         # Coarse per-project mutex for item read-modify-write cycles
@@ -388,10 +392,12 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": (
                             "Filter by item level. Only delivery-tracked types "
-                            "(Story/Feature/Epic/Initiative) carry flow "
+                            "(Story/Feature/Epic/Initiative/Defect) carry flow "
                             "timestamps."
                         ),
-                        "enum": ["Story", "Feature", "Epic", "Initiative"],
+                        # Kept equal to the handler's delivery-tracked scan
+                        # scope (id_counter.ENGINE_CREDIT_DIRS, D-67).
+                        "enum": list(_ENGINE_CREDIT_DIRS.values()),
                     },
                 },
                 "additionalProperties": False,
@@ -1185,13 +1191,6 @@ def _handle_flow_metrics(
         return [TextContent(type="text", text=json.dumps(
             {"error": "No backlog directory found."}, indent=2))]
 
-    type_dirs = {
-        "stories": "Story",
-        "features": "Feature",
-        "epics": "Epic",
-        "initiatives": "Initiative",
-    }
-
     now = datetime.now(timezone.utc)
     cycle_times: list[float] = []
     open_ages: list[float] = []
@@ -1200,8 +1199,10 @@ def _handle_flow_metrics(
     skipped = 0
 
     # flow_metrics intentionally covers only delivery-tracked types (Story,
-    # Feature, Epic, Initiative) — Task/Event/Risk have no derived hours.
-    for dir_name, item_level in type_dirs.items():
+    # Feature, Epic, Initiative, Defect) — Task/Event/Risk have no derived
+    # hours. Canonical scope from id_counter; a local pre-D-52 copy here had
+    # drifted and skipped defects/ entirely (D-67).
+    for dir_name, item_level in _ENGINE_CREDIT_DIRS.items():
         type_dir = backlog_dir / dir_name
         if not type_dir.exists():
             continue

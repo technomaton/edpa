@@ -497,6 +497,35 @@ def test_emit_writes_state_transition_signal(repo: Path) -> None:
     assert any(s["type"] == "commit_author" for s in sigs)
 
 
+def test_emit_writes_state_transition_signal_for_defect(repo: Path) -> None:
+    """D-67 regression: a commit that flips a Defect's status emits a
+    weight-0 state_transition, exactly like a Story — defects are
+    delivery-tracked. In the E2E run D-1..D-3 carried commit evidence but
+    transitions=[] because transitions.py's tracked-dir list (a drifted
+    pre-D-52 copy) lacked backlog/defects/."""
+    save_md_item(repo / ".edpa/backlog/defects/D-9.md", {
+        "id": "D-9", "type": "Defect", "title": "Reconnect race",
+        "status": "Implementing",
+    })
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m", "add D-9"], cwd=repo, env_extra={
+        "GIT_AUTHOR_DATE": "2026-05-25T10:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-05-25T10:00:00+00:00"})
+    _commit_status_flip(repo, ".edpa/backlog/defects/D-9.md", "Done",
+                        "D-9: mark done")
+    rc = _run_emitter(repo)
+    assert rc == 0
+    sigs = load_md(repo / ".edpa/backlog/defects/D-9.md")["evidence"]
+    trans = [s for s in sigs if s["type"] == "state_transition"]
+    assert len(trans) == 1
+    t = trans[0]
+    assert t["from_status"] == "Implementing"
+    assert t["to_status"] == "Done"
+    assert t["weight"] == 0
+    assert t["person"] == "alice"
+    assert "D-9/Implementing->Done" in t["ref"]
+
+
 def test_state_transition_excluded_from_cw() -> None:
     """Zero-weight state_transition must not alter contributors[] cw."""
     from detect_contributors import aggregate_signals

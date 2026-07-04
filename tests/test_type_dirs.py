@@ -33,6 +33,7 @@ import engine  # noqa: E402
 import id_counter  # noqa: E402
 import local_evidence  # noqa: E402
 import sync_pr_contributions  # noqa: E402
+import transitions  # noqa: E402
 import validate_syntax  # noqa: E402
 
 
@@ -132,6 +133,16 @@ def test_local_evidence_uses_canonical_tables():
 
 def test_sync_pr_contributions_uses_canonical_tables():
     assert sync_pr_contributions.PREFIX_TO_DIR is id_counter.PREFIX_TO_DIR
+
+
+def test_transitions_uses_canonical_tables():
+    """D-67 regression: transitions.py carried a drifted pre-D-52 copy of
+    the tracked-dir map without defects/ — Defect status flips emitted no
+    state_transition evidence (E2E: D-1..D-3 had commit evidence but
+    transitions=[]). The transition-tracked scope IS the delivery-tracked
+    engine-credit scope: Events/Risks are PI-planning artefacts and Tasks
+    are legacy read-only, all deliberately untracked."""
+    assert transitions.TRACKED_DIRS is id_counter.ENGINE_CREDIT_DIRS
 
 
 def test_detect_contributors_uses_canonical_tables():

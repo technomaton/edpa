@@ -144,6 +144,53 @@ def test_detects_subsequent_transition(tmp_path):
     assert moves[0]["to_status"] == "Analyzing"
 
 
+def test_detects_defect_transitions(tmp_path):
+    """D-67 regression: defect status flips must be detected. transitions.py
+    carried a drifted pre-D-52 copy of the tracked-dir list without
+    backlog/defects/, so Defects (delivery-tracked, engine-credited) emitted
+    no transitions at all — invisible to state_transition evidence and
+    time-in-state analytics while stories/features were covered."""
+    repo, edpa = _make_repo(tmp_path)
+    (edpa / "backlog" / "defects").mkdir()
+    (edpa / "backlog" / "defects" / "D-1.md").write_text(
+        "---\nid: D-1\ntype: Defect\ntitle: T\nparent: F-1\njs: 3\n"
+        "status: Backlog\niteration: PI-2026-1.1\n---\n"
+    )
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "add D-1",
+         env_extra={"GIT_AUTHOR_DATE": "2026-04-07T09:00:00",
+                    "GIT_COMMITTER_DATE": "2026-04-07T09:00:00"})
+    _change_status(repo, edpa, "backlog/defects/D-1.md", "Done",
+                   "2026-04-09T12:00:00")
+    ts = transitions.detect_transitions(edpa)
+    moves = [(t["from_status"], t["to_status"], t["item_type"])
+             for t in ts if t["item_id"] == "D-1"]
+    assert moves == [(None, "Backlog", "Defect"),
+                     ("Backlog", "Done", "Defect")]
+
+
+def test_event_and_risk_transitions_stay_untracked(tmp_path):
+    """Events/Risks are PI-planning artefacts — no derived hours, no engine
+    credit (id_counter.ENGINE_CREDIT_DIRS excludes them by design), so their
+    status flips deliberately emit no transitions."""
+    repo, edpa = _make_repo(tmp_path)
+    for sub, item_id in (("events", "EV-1"), ("risks", "R-1")):
+        (edpa / "backlog" / sub).mkdir()
+        (edpa / "backlog" / sub / f"{item_id}.md").write_text(
+            f"---\nid: {item_id}\ntitle: T\nstatus: Funnel\n---\n"
+        )
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "add event + risk",
+         env_extra={"GIT_AUTHOR_DATE": "2026-04-07T09:00:00",
+                    "GIT_COMMITTER_DATE": "2026-04-07T09:00:00"})
+    _change_status(repo, edpa, "backlog/events/EV-1.md", "Done",
+                   "2026-04-09T12:00:00")
+    _change_status(repo, edpa, "backlog/risks/R-1.md", "Done",
+                   "2026-04-09T12:00:00")
+    ts = transitions.detect_transitions(edpa)
+    assert not [t for t in ts if t["item_id"] in ("EV-1", "R-1")]
+
+
 def test_iteration_window_filter(tmp_path):
     repo, edpa = _make_repo(tmp_path)
     _change_status(repo, edpa, "backlog/features/F-1.md", "Analyzing",
