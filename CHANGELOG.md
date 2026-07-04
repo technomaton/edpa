@@ -1,5 +1,37 @@
 # Changelog
 
+## 2.17.0 — 2026-07-04
+
+Batch 5: five residual defects from the E2E fix chain, including the
+parent-axis fix deferred from D-69. Three were judgment calls investigated
+before changing behavior.
+
+### Fixed
+
+- **`backlog validate` rejected valid top-level items (D-72).** Its hierarchy
+  checker required a parent for every non-Initiative item, flagging
+  parentless Defect/Event/Risk as errors — contradicting create, `validate_syntax`,
+  and the documented "land at top level" rule. Now sourced from the shared
+  `parent_required` flag.
+- **Story-activity credit leaked across iterations (D-73).** The engine's
+  synthetic `S-<id>@activity` item copied the story's all-time `contributors[]`
+  shares; it now recomputes shares from only the in-iteration, non-neutralized
+  signals (consistent with D-62), so earlier-iteration work no longer earns
+  credit in a later one.
+- **Board had no place for risks (D-75).** Risks now render in their own board
+  section keyed on ROAM disposition (resolved/owned/accepted/mitigated) rather
+  than being silently dropped; `forecast` velocity history also accepts
+  top-level `status: closed` iterations, not just the nested form.
+- **PI-shaped ids gave a confusing error (D-76).** The MCP id validator now
+  rejects `PI-2026`-shaped tokens up front with a clear message instead of a
+  downstream not-found.
+
+### Hardened
+
+- **Bookkeeping commits earn no edit weight (D-74).** Locked in with a
+  regression test that `chore(evidence):` / `chore(contributors):` list growth
+  produces no `yaml_edit` credit (already handled in two places; now guarded).
+
 ## 2.16.0 — 2026-07-04
 
 Batch 4: four residual defects surfaced (but deliberately deferred) by the
