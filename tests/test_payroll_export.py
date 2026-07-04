@@ -195,6 +195,89 @@ def test_export_missing_edpa_yaml(workspace):
     assert all(r["code"] == "" for r in rows)
 
 
+# Engine CLI output shape (D-56). Stock `engine.py --edpa-root` writes key
+# "people" with entries keyed "id" — NOT the frozen-snapshot shape
+# ("derived_reports" + "capacity_registry") used by SAMPLE_RESULTS above.
+# Mirrors a real E2E run's .edpa/reports/iteration-*/edpa_results.json.
+ENGINE_RESULTS = {
+    "iteration": ITERATION_ID,
+    "computed_at": "2026-07-04T11:31:22.058995+00:00",
+    "methodology": "EDPA 2.14.0",
+    "planning_factor": 0.8,
+    "people": [
+        {
+            "id": "alice",
+            "name": "Alice",
+            "role": "Dev",
+            "capacity": 40,
+            "total_derived": 38.5,
+            "items": [
+                {"id": "S-1", "level": "Story", "js": 5, "cw": 0.607, "rs": 1.0,
+                 "score": 3.035, "evidence": ["commit_author", "yaml_edit"],
+                 "ratio": 1.0, "hours": 38.5},
+            ],
+            "invariant_ok": True,
+        },
+        {
+            "id": "bob",
+            "name": "Bob",
+            "role": "Arch",
+            "capacity": 20,
+            "total_derived": 19.0,
+            "items": [
+                {"id": "S-2", "level": "Story", "js": 8, "cw": 1.0, "rs": 1.0,
+                 "score": 8.0, "evidence": ["commit_author"],
+                 "ratio": 1.0, "hours": 19.0},
+            ],
+            "invariant_ok": True,
+        },
+    ],
+    "team_total": 57.5,
+    "all_invariants_passed": True,
+    "gate_events": [],
+    "story_activity_events": [],
+}
+
+
+@pytest.fixture
+def engine_workspace(workspace):
+    """Workspace whose edpa_results.json is stock engine CLI output."""
+    (workspace / "reports" / f"iteration-{ITERATION_ID}" / "edpa_results.json").write_text(
+        json.dumps(ENGINE_RESULTS), encoding="utf-8"
+    )
+    return workspace
+
+
+def test_build_rows_engine_people_shape(engine_workspace):
+    """D-56 regression: engine CLI writes "people" — payroll returned 0 rows."""
+    results = load_results(engine_workspace, ITERATION_ID)
+    people = load_people_config(engine_workspace)
+    rows = build_rows(results, people, "CODE-1", "CZK")
+    assert len(rows) == 2
+    alice = next(r for r in rows if r["person"] == "alice")
+    assert alice["name"] == "Alice"
+    assert alice["role"] == "Dev"
+    assert alice["hours"] == 38.5
+    assert alice["rate"] == 1500
+    assert alice["cost"] == pytest.approx(38.5 * 1500)
+    # Engine output has no capacity_registry — team must come from people.yaml
+    assert alice["team"] == "Alpha"
+
+
+def test_export_engine_people_shape(engine_workspace):
+    """D-56 regression: full export over engine-shaped results is non-empty."""
+    result = export(engine_workspace, ITERATION_ID, currency="CZK")
+    assert result["rows"] == 2
+    assert result["total_hours"] == pytest.approx(38.5 + 19.0)
+    rows = list(csv.DictReader(
+        Path(result["path"]).read_text(encoding="utf-8").splitlines()
+    ))
+    assert len(rows) == 2
+    by_person = {r["person"]: r for r in rows}
+    assert float(by_person["alice"]["cost"]) == pytest.approx(38.5 * 1500)
+    assert by_person["bob"]["cost"] == ""  # no rate on file
+
+
 def test_build_rows_reads_capacity_registry(workspace):
     """Engine v1.14+ uses capacity_registry key (not capacity_config) in results JSON."""
     # Simulate real engine output key

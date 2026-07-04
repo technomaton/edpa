@@ -27,6 +27,12 @@ except ImportError:
     print("ERROR: PyYAML required. pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _results_compat import person_reports  # noqa: E402
+finally:
+    sys.path.pop(0)
+
 
 def load_results(edpa_root: Path, iteration_id: str) -> dict:
     path = edpa_root / "reports" / f"iteration-{iteration_id}" / "edpa_results.json"
@@ -77,14 +83,21 @@ def load_project_code(edpa_root: Path) -> str:
 
 
 def build_rows(results: dict, people_cfg: dict, project_code: str, currency: str) -> list[dict]:
-    """Build one row per person from derived_reports + people config."""
-    # Build team lookup from capacity_registry (engine v1.14+); capacity_config = legacy fallback
+    """Build one row per person from the results file + people config.
+
+    Accepts both per-person shapes (D-56): engine CLI ``people`` (entries
+    keyed ``id``) and frozen-snapshot / legacy ``derived_reports`` (entries
+    keyed ``person``) — see _results_compat.person_reports.
+    """
+    # Team lookup: capacity_registry (snapshots, engine v1.14+) or legacy
+    # capacity_config when present in the results file; stock engine CLI
+    # output carries neither, so people.yaml (people_cfg) wins below.
     cap_people = (results.get("capacity_registry") or results.get("capacity_config") or {}).get("people") or []
     team_by_id = {p["id"]: p.get("team", "") for p in cap_people if isinstance(p, dict)}
 
     iteration_id = results.get("iteration", "")
     rows = []
-    for dr in results.get("derived_reports") or []:
+    for dr in person_reports(results):
         pid = dr.get("person", "")
         pcfg = people_cfg.get(pid, {})
         team = pcfg.get("team") or team_by_id.get(pid, "")
