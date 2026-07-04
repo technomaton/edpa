@@ -415,7 +415,14 @@ async def list_tools() -> list[Tool]:
                     "parent": {"type": "string"},
                     "iteration": {"type": "string"},
                     "assignee": {"type": "string"},
-                    "status": {"type": "string"},
+                    "status": {
+                        "type": "string",
+                        "description": (
+                            "Initial status — validated against the per-type "
+                            "workflow (same table as edpa_item_transition). "
+                            "Defaults to Funnel."
+                        ),
+                    },
                     "js": {"type": "integer", "minimum": 0},
                     "bv": {"type": "integer", "minimum": 0},
                     "tc": {"type": "integer", "minimum": 0},
@@ -1502,6 +1509,20 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
     if assignee is not None and _safe_person_id(assignee) is None:
         return _err(f"invalid assignee id {assignee!r}")
 
+    # D-65: validate the requested status against the same per-type workflow
+    # table edpa_item_transition enforces (_allowed_statuses, portfolio vs
+    # delivery) — create must not accept what validate_syntax then flags.
+    # Checked before the lock so a rejected status never burns an ID.
+    # Event/Risk carry no workflow table (None) — unvalidated, as in
+    # transitions.
+    status = args.get("status") or "Funnel"
+    allowed = _allowed_statuses(item_type)
+    if allowed is not None and status not in allowed:
+        return _err(
+            f"status {status!r} not valid for {item_type}; "
+            f"allowed: {list(allowed)}"
+        )
+
     repo_root = edpa_root.parent
     try:
         with _backlog_write_lock(edpa_root):
@@ -1514,7 +1535,7 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
                 "id": new_id,
                 "type": item_type,
                 "title": title.strip(),
-                "status": args.get("status") or "Funnel",
+                "status": status,
                 # D-61: stamp creation time at the single write layer
                 # (ADR-002 — backlog.py cmd_add routes through here too) so
                 # flow metrics have a start-of-life timestamp. Same helper

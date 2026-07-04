@@ -175,6 +175,36 @@ def test_local_story_under_feature(tmp_path, silence_git):
     assert data["wsjf"] == round((8 + 3 + 2) / 5, 2)
 
 
+def test_local_add_rejects_workflow_invalid_status(tmp_path, silence_git, capsys):
+    """D-65 repro: ``backlog add Feature --status Ready`` previously wrote an
+    item that ``backlog validate`` then flagged as an error (Ready is a
+    portfolio status; Feature follows the delivery workflow). cmd_add routes
+    through mcp_server._handle_item_create (ADR-002), which now rejects the
+    status up front with the allowed list — nothing lands on disk."""
+    root = _write_workspace(
+        tmp_path,
+        initiatives=[{"id": "I-1", "type": "Initiative", "title": "Root",
+                      "status": "Funnel"}],
+    )
+    from _md_frontmatter import save_md
+    save_md(root / ".edpa" / "backlog" / "epics" / "E-1.md",
+            {"id": "E-1", "type": "Epic", "title": "Auth epic",
+             "status": "Funnel", "parent": "I-1"}, body="")
+    bl = backlog.load_backlog(root)
+
+    with pytest.raises(SystemExit) as exc:
+        backlog.cmd_add(root, bl, _args(
+            type="Feature", title="Premature", parent="E-1", status="Ready",
+        ))
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert "'Ready'" in out and "Feature" in out
+    assert "Backlog" in out  # error names the allowed delivery statuses
+    # Create failed before allocation — no item file, no counter bump.
+    assert not list((root / ".edpa" / "backlog" / "features").glob("*.md"))
+    assert not (root / ".edpa" / "config" / "id_counters.yaml").exists()
+
+
 def test_local_writes_contributors_block(tmp_path, silence_git):
     """``--contributor PERSON:ROLE:CW`` lands in the YAML as ``{person, cw}``.
     ROLE is validated but NOT persisted — the legacy ``as:`` field was dropped

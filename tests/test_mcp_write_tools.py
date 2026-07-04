@@ -283,6 +283,76 @@ def test_create_parent_type_mismatch(edpa_root: Path) -> None:
     assert "expected" in result[0].text
 
 
+# Status workflow validation at create (D-65)
+
+def test_create_rejects_workflow_invalid_status(edpa_root: Path) -> None:
+    """D-65: Feature is a delivery type — portfolio-only 'Ready' must be
+    rejected at create with the allowed list. Previously create accepted
+    any status and validate_syntax flagged the item afterwards (create
+    allowed what validate forbids). Same table as edpa_item_transition."""
+    _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "I"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Epic", "title": "E", "parent": "I-1"}))
+    result = _handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1", "status": "Ready",
+    })
+    assert _is_err(result)
+    text = result[0].text
+    assert "'Ready'" in text and "Feature" in text
+    for status in mcp_server.DELIVERY_STATUSES:
+        assert status in text, f"error must list allowed status {status}"
+    # Rejected before the lock/allocation — no file written, no ID burned.
+    assert not list((edpa_root / "backlog" / "features").glob("*.md"))
+    data = _parse(_handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1",
+    }))
+    assert data["id"] == "F-1"
+
+
+def test_create_rejects_delivery_status_on_portfolio_type(edpa_root: Path) -> None:
+    """Mirror case: 'Backlog' is delivery-only — invalid for Initiative."""
+    result = _handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "I", "status": "Backlog",
+    })
+    assert _is_err(result)
+    for status in mcp_server.PORTFOLIO_STATUSES:
+        assert status in result[0].text, f"error must list {status}"
+
+
+def test_create_rejects_legacy_status(edpa_root: Path) -> None:
+    """Legacy statuses (Active/Closed/Accepted) are validator-tolerated on
+    migrated backlogs but never creatable — same rule as transitions."""
+    assert _is_err(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "I", "status": "Active",
+    }))
+
+
+def test_create_accepts_valid_status_per_workflow(edpa_root: Path) -> None:
+    """Story+Funnel passes (delivery workflow); Initiative+Ready passes
+    (portfolio workflow) — the check is per-type, not a global union."""
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "I", "status": "Ready"}))
+    assert _read_md(edpa_root, "I-1")["status"] == "Ready"
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Epic", "title": "E", "parent": "I-1"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1"}))
+    data = _parse(_handle_item_create(edpa_root, {
+        "type": "Story", "title": "S", "parent": "F-1", "status": "Funnel",
+    }))
+    assert _read_md(edpa_root, data["id"])["status"] == "Funnel"
+
+
+def test_create_default_status_still_funnel(edpa_root: Path) -> None:
+    """Default unaffected by D-65: absent and explicit-None statuses both
+    land as Funnel (backlog.py cmd_add passes `or "Funnel"` too)."""
+    _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "A"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "B", "status": None}))
+    assert _read_md(edpa_root, "I-1")["status"] == "Funnel"
+    assert _read_md(edpa_root, "I-2")["status"] == "Funnel"
+
+
 def test_create_with_body(edpa_root: Path) -> None:
     _parse(_handle_item_create(edpa_root, {
         "type": "Initiative", "title": "I", "body": "## Description\nPilot phase.\n",
