@@ -257,6 +257,19 @@ def test_board_default_output_path(project):
     assert 'data-id="S-1"' in out.read_text(encoding="utf-8")
 
 
+def test_board_level_help_matches_reality(project):
+    """D-68: the --level help claimed "(default: story)" but no default is set,
+    so a no-arg board renders ALL levels (locked by
+    test_board_renders_one_card_per_item). The help text must describe that
+    reality rather than a default the code does not apply."""
+    proc = _run_board(project, "--help")
+    assert proc.returncode == 0
+    # argparse wraps help across lines — collapse whitespace before matching
+    help_text = " ".join(proc.stdout.split())
+    assert "(default: all levels)" in help_text
+    assert "(default: story)" not in help_text
+
+
 def test_board_empty_backlog_fails(tmp_path):
     _plant_config(tmp_path)
     proc = _run_board(tmp_path)
