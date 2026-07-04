@@ -182,6 +182,84 @@ def test_features_completed_via_child_iterations(tmp_path: Path) -> None:
     assert [f["id"] for f in result["features_completed"]] == ["F-1", "F-2"]
 
 
+def _write_iteration_raw(edpa: Path, it_id: str, *, planned_sp=None,
+                         delivered_sp=None) -> None:
+    """Closed iteration with planning/delivery blocks only when given."""
+    it_dir = edpa / "iterations"
+    it_dir.mkdir(parents=True, exist_ok=True)
+    doc: dict = {
+        "iteration": {"id": it_id, "pi": it_id.rsplit(".", 1)[0],
+                      "status": "closed", "type": "Iteration"},
+        "status": "closed",
+    }
+    if planned_sp is not None:
+        doc["planning"] = {"planned_sp": planned_sp}
+    if delivered_sp is not None:
+        doc["delivery"] = {"delivered_sp": delivered_sp, "velocity": delivered_sp}
+    (it_dir / f"{it_id}.yaml").write_text(
+        yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
+
+
+def test_predictability_not_100_when_unplanned_scope_lands(tmp_path: Path) -> None:
+    """D-60 (E2E PI-2026-2.2): planned 26 at planning time, delivered 29 after
+    an unplanned mid-PI defect. Close must not backfill planned=delivered, and
+    the rollup must report ~89.7% — deviation from plan — not 100%."""
+    edpa = tmp_path / ".edpa"
+    _write_iteration_raw(edpa, "PI-2026-2.2", planned_sp=26, delivered_sp=29)
+
+    result, err = pi_close.build_pi_results(edpa, "PI-2026-2")
+    assert err is None
+    it = result["iterations"][0]
+    assert it["planned_sp"] == 26
+    assert it["delivered_sp"] == 29
+    assert it["predictability_pct"] == 89.7
+    assert result["summary"]["avg_predictability_pct"] == 89.7
+
+
+def test_predictability_na_without_planning_stamp(tmp_path: Path) -> None:
+    """D-60: no planning-time stamp → planned stays null and predictability
+    reports n/a. The old code derived planned from CURRENT item assignment
+    (which equals delivered once everything is Done) → vacuous 100%."""
+    edpa = tmp_path / ".edpa"
+    _write_iteration_raw(edpa, "PI-2026-2.2")  # neither planning nor delivery
+    # All items Done — the rollup would "derive" planned == delivered == 29.
+    _write_backlog_item(edpa, "stories", "S-1", type="Story", js=13,
+                        status="Done", iteration="PI-2026-2.2")
+    _write_backlog_item(edpa, "stories", "S-2", type="Story", js=13,
+                        status="Done", iteration="PI-2026-2.2")
+    _write_backlog_item(edpa, "defects", "D-1", type="Defect", js=3,
+                        status="Done", iteration="PI-2026-2.2")
+
+    result, err = pi_close.build_pi_results(edpa, "PI-2026-2")
+    assert err is None
+    it = result["iterations"][0]
+    assert it["planned_sp"] is None
+    assert it["delivered_sp"] == 29                # rollup fallback kept (D-57)
+    assert it["predictability_pct"] is None        # n/a, NOT 100.0
+    assert result["summary"]["total_planned_sp"] == 0
+    assert result["summary"]["avg_predictability_pct"] is None
+
+    md = pi_close.render_summary_md(result)
+    assert "n/a" in md
+    assert "None%" not in md
+
+
+def test_avg_predictability_averages_stamped_iterations_only(tmp_path: Path) -> None:
+    """D-60: the PI average is the mean of the per-iteration predictabilities
+    that exist. A totals ratio would compare stamped planned SP against
+    delivered SP including UNSTAMPED iterations (26 planned vs 29+8 delivered
+    → bogus 70.3%); the unstamped iteration must simply not contribute."""
+    edpa = tmp_path / ".edpa"
+    _write_iteration_raw(edpa, "PI-2026-2.2", planned_sp=26, delivered_sp=29)
+    _write_iteration_raw(edpa, "PI-2026-2.3", delivered_sp=8)  # no stamp
+
+    result, err = pi_close.build_pi_results(edpa, "PI-2026-2")
+    assert err is None
+    assert result["summary"]["avg_predictability_pct"] == 89.7
+    assert result["summary"]["total_delivered_sp"] == 37
+    assert result["summary"]["total_planned_sp"] == 26
+
+
 def test_features_completed_own_field_status_and_prefix_guards(tmp_path: Path) -> None:
     """Own ``iteration``/``pi`` fields still attribute; a non-Done feature
     never counts (even with Done children in the PI); ``PI-2026-1`` must

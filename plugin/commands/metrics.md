@@ -52,7 +52,7 @@ Increments. Use it in Inspect&Adapt to spot trends before committing to the next
 
 | Column | Meaning |
 |---|---|
-| **Predictability** | `delivered_sp / planned_sp × 100`. 100% = fully met commitments. |
+| **Predictability** | `min(planned_sp, delivered_sp) / max(planned_sp, delivered_sp) × 100` — deviation from the planning-time plan in either direction (unplanned overdelivery counts as a miss too). 100% = delivered exactly the committed plan. `—` (n/a) when no `planning.planned_sp` stamp exists — planned scope is stamped when items are assigned during planning and is never backfilled at close. |
 | **Avg Velocity** | Average delivered SP per closed iteration in this PI. |
 | **Confidence** | Average of all team confidence votes (1 = very low, 5 = very high). |
 | **Objectives** | `done / committed` PI objectives across all teams. |

@@ -41,7 +41,7 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # _DELIVERY_DIRS: the item dirs SP rolls up from (stories + defects) — the
 # same set feature→PI attribution walks for child iterations (D-59).
-from _sp_rollup import _DELIVERY_DIRS, iteration_sp  # noqa: E402
+from _sp_rollup import _DELIVERY_DIRS, iteration_sp, predictability_pct  # noqa: E402
 
 
 from _yaml_io import load_yaml as _shared_load_yaml  # noqa: E402
@@ -156,7 +156,12 @@ def aggregate_iterations(iteration_files):
         delivery = data.get("delivery", {})
 
         derived = sp.get(it.get("id"), {})
-        planned = planning.get("planned_sp") or derived.get("planned_sp", 0)
+        # planned_sp (D-60): ONLY the planning-time stamp counts. The rollup
+        # tracks the CURRENT item→iteration assignment — incl. unplanned
+        # mid-iteration scope — so deriving planned from it (or backfilling
+        # planned=delivered at close) made predictability vacuously 100%.
+        # Missing stamp → null planned, n/a predictability.
+        planned = planning.get("planned_sp")
         delivered = delivery.get("delivered_sp") or derived.get("delivered_sp", 0)
         # planning.capacity is an explicit per-iteration override (an
         # explicit 0 — e.g. a down iteration — is a real value and kept);
@@ -164,11 +169,9 @@ def aggregate_iterations(iteration_files):
         capacity = planning.get("capacity")
         if capacity is None:
             capacity = registry_capacity
-        predictability = (
-            round(100 * delivered / planned, 1) if planned else None
-        )
+        predictability = predictability_pct(planned, delivered)
 
-        total_planned += planned
+        total_planned += planned or 0
         total_delivered += delivered
         total_capacity += capacity
         spillover_ids.extend(delivery.get("spillover", []) or [])
@@ -189,8 +192,16 @@ def aggregate_iterations(iteration_files):
             "unplanned_count": len(delivery.get("unplanned", []) or []),
         })
 
+    # Average of the per-iteration predictabilities that are defined (D-60).
+    # A totals-based ratio would compare stamped planned SP against delivered
+    # SP that includes UNSTAMPED iterations — apples to oranges as soon as one
+    # iteration lacks a planning-time stamp. No stamped iteration → None (n/a).
+    pred_values = [
+        it["predictability_pct"] for it in iterations
+        if it["predictability_pct"] is not None
+    ]
     avg_predictability = (
-        round(100 * total_delivered / total_planned, 1) if total_planned else None
+        round(sum(pred_values) / len(pred_values), 1) if pred_values else None
     )
 
     return {
@@ -329,6 +340,11 @@ def build_pi_results(edpa_root: Path, pi_id: str):
     }, None
 
 
+def _fmt_pct(value) -> str:
+    """Predictability for humans: None (no planning-time stamp) → "n/a"."""
+    return "n/a" if value is None else f"{value}%"
+
+
 def render_summary_md(result: dict) -> str:
     pi = result["pi"]
     s = result["summary"]
@@ -342,7 +358,7 @@ def render_summary_md(result: dict) -> str:
         f"- Iterations closed: **{s['iteration_count']}**",
         f"- Planned SP: **{s['total_planned_sp']}**",
         f"- Delivered SP: **{s['total_delivered_sp']}**",
-        f"- Average predictability: **{s['avg_predictability_pct']}%**",
+        f"- Average predictability: **{_fmt_pct(s['avg_predictability_pct'])}**",
         f"- Capacity hours: **{s['total_capacity_hours']}**",
         f"- Spillover: **{s['total_spillover']}**, Unplanned: **{s['total_unplanned']}**",
         "",
@@ -355,9 +371,11 @@ def render_summary_md(result: dict) -> str:
     from _pi_loader import format_iteration_dates  # noqa: E402
 
     for it in result["iterations"]:
+        planned = it["planned_sp"] if it["planned_sp"] is not None else "n/a"
         lines.append(
-            f"| {it['id']} | {format_iteration_dates(it)} | {it['planned_sp']} | "
-            f"{it['delivered_sp']} | {it['predictability_pct']}% | {it['velocity']} |"
+            f"| {it['id']} | {format_iteration_dates(it)} | {planned} | "
+            f"{it['delivered_sp']} | {_fmt_pct(it['predictability_pct'])} | "
+            f"{it['velocity']} |"
         )
 
     if result["features_completed"]:
@@ -484,7 +502,7 @@ def main():
                 else "no PI metadata file")
         print(f"PI {args.pi} closed: {res['iteration_count']} iterations, "
               f"{s['total_delivered_sp']}/{s['total_planned_sp']} SP, "
-              f"{s['avg_predictability_pct']}% predictability ({flip})")
+              f"{_fmt_pct(s['avg_predictability_pct'])} predictability ({flip})")
         print(f"  -> {res['results_path']}")
         print(f"  -> {res['summary_path']}")
         if res["forced"]:
@@ -524,7 +542,7 @@ def main():
 
     print(f"PI {args.pi}: {result['summary']['iteration_count']} iterations, "
           f"{result['summary']['total_delivered_sp']}/{result['summary']['total_planned_sp']} SP, "
-          f"{result['summary']['avg_predictability_pct']}% predictability")
+          f"{_fmt_pct(result['summary']['avg_predictability_pct'])} predictability")
     print(f"  -> {results_path}")
     print(f"  -> {summary_path}")
     return 0

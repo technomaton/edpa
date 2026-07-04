@@ -43,7 +43,7 @@ except ImportError:
     sys.exit(1)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _sp_rollup import iteration_sp  # noqa: E402
+from _sp_rollup import iteration_sp, predictability_pct  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -174,12 +174,16 @@ def compute_pi_metrics(edpa_root: Path, pi_block: dict) -> dict:
     closed_iters = [it for it in iterations if it.get("status") == "closed"]
     active_iters = [it for it in iterations if it.get("status") == "active"]
 
-    # Planned SP: sum planning.planned_sp; fall back to rollup
-    planned_sp = 0
-    for it in iterations:
-        yaml_planned = it.get("_planning", {}).get("planned_sp") or 0
-        rollup_planned = sp_rollup.get(it.get("id", ""), {}).get("planned_sp", 0)
-        planned_sp += int(yaml_planned) or int(rollup_planned)
+    # Planned SP (D-60): only explicit planning-time stamps count — the item
+    # rollup tracks CURRENT assignment (incl. unplanned mid-PI additions),
+    # which equals delivered once everything lands and made predictability
+    # vacuously 100%. No stamp on any iteration → None (renders "—"/n-a).
+    planned_stamps = [
+        int(it.get("_planning", {}).get("planned_sp"))
+        for it in iterations
+        if it.get("_planning", {}).get("planned_sp") is not None
+    ]
+    planned_sp = sum(planned_stamps) if planned_stamps else None
 
     # Delivered SP: sum delivery.delivered_sp from closed iterations; fall back to rollup
     delivered_sp = 0
@@ -188,9 +192,7 @@ def compute_pi_metrics(edpa_root: Path, pi_block: dict) -> dict:
         rollup_delivered = sp_rollup.get(it.get("id", ""), {}).get("delivered_sp", 0)
         delivered_sp += int(yaml_delivered) or int(rollup_delivered)
 
-    predictability = (
-        round(delivered_sp / planned_sp * 100, 1) if planned_sp > 0 else None
-    )
+    predictability = predictability_pct(planned_sp, delivered_sp)
     avg_velocity = (
         round(delivered_sp / len(closed_iters), 1) if closed_iters else None
     )
@@ -254,6 +256,7 @@ def render_md(report: dict) -> str:
         "|---|---|---:|---:|---:|---:|---:|---|\n"
     )
     for m in pis:
+        planned = m["planned_sp"] if m["planned_sp"] is not None else "—"
         pred = f"{m['predictability_pct']:.1f}%" if m["predictability_pct"] is not None else "—"
         vel = f"{m['avg_velocity']:.1f}" if m["avg_velocity"] is not None else "—"
         conf_avg = f"{m['confidence_avg']:.1f}/5" if m["confidence_avg"] is not None else "—"
@@ -263,7 +266,7 @@ def render_md(report: dict) -> str:
             else "—"
         )
         lines.append(
-            f"| {m['pi']} | {m['status']} | {m['planned_sp']} | {m['delivered_sp']} "
+            f"| {m['pi']} | {m['status']} | {planned} | {m['delivered_sp']} "
             f"| {pred} | {vel} | {conf_avg} | {obj} |\n"
         )
 

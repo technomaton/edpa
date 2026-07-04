@@ -898,6 +898,145 @@ def test_iteration_close_stamps_zero_delivery_on_empty_backlog(edpa_root: Path) 
     assert parsed["delivery"] == {"delivered_sp": 0, "velocity": 0}
 
 
+# D-60: planning.planned_sp is stamped at PLANNING time — while the iteration
+# has not started, every Story/Defect assignment or js re-size through the
+# write layer restamps it from the item rollup. The moment the iteration goes
+# active the plan freezes; close writes delivered_sp ONLY and never creates or
+# overwrites planning.planned_sp (the E2E run backfilled planned=delivered at
+# close, which made predictability vacuously 100%).
+
+def _set_iteration_status(edpa_root: Path, it_id: str, status: str) -> None:
+    """Flip lifecycle status the way the close-iteration flow does on disk."""
+    iter_path = edpa_root / "iterations" / f"{it_id}.yaml"
+    data = yaml.safe_load(iter_path.read_text())
+    data["iteration"]["status"] = status
+    iter_path.write_text(yaml.safe_dump(data, sort_keys=False))
+
+
+def _iter_yaml(edpa_root: Path, it_id: str) -> dict:
+    return yaml.safe_load((edpa_root / "iterations" / f"{it_id}.yaml").read_text())
+
+
+def _mk_feature(edpa_root: Path) -> str:
+    """Initiative→Epic→Feature chain; returns the Feature id (Story parent)."""
+    ini = _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "Platform"}))["id"]
+    epic = _parse(_handle_item_create(edpa_root, {
+        "type": "Epic", "title": "Ingestion", "parent": ini}))["id"]
+    return _parse(_handle_item_create(edpa_root, {
+        "type": "Feature", "title": "MQTT", "parent": epic}))["id"]
+
+
+def test_item_create_stamps_planned_sp_during_planning(edpa_root: Path) -> None:
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.2", "start_date": "2026-04-27", "end_date": "2026-05-15",
+    }))
+    feature = _mk_feature(edpa_root)
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Story", "title": "Ingest", "parent": feature,
+        "iteration": "PI-2026-2.2", "js": 13,
+    }))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Story", "title": "Buffer", "parent": feature,
+        "iteration": "PI-2026-2.2", "js": 13,
+    }))
+    assert _iter_yaml(edpa_root, "PI-2026-2.2")["planning"]["planned_sp"] == 26
+
+
+def test_item_update_restamps_planned_sp_across_iterations(edpa_root: Path) -> None:
+    for n in (1, 2):
+        _parse(_handle_iteration_create(edpa_root, {
+            "id": f"PI-2026-2.{n}", "start_date": "2026-04-06",
+            "end_date": "2026-04-24",
+        }))
+    feature = _mk_feature(edpa_root)
+    data = _parse(_handle_item_create(edpa_root, {
+        "type": "Story", "title": "Ingest", "parent": feature,
+        "iteration": "PI-2026-2.1", "js": 5,
+    }))
+    sid = data["id"]
+    assert _iter_yaml(edpa_root, "PI-2026-2.1")["planning"]["planned_sp"] == 5
+
+    # Re-plan: move to 2.2 — both iterations restamp while still in planning.
+    _parse(_handle_item_update(edpa_root, {
+        "item_id": sid, "fields": {"iteration": "PI-2026-2.2"},
+    }))
+    assert _iter_yaml(edpa_root, "PI-2026-2.1")["planning"]["planned_sp"] == 0
+    assert _iter_yaml(edpa_root, "PI-2026-2.2")["planning"]["planned_sp"] == 5
+
+    # Re-size during planning restamps too.
+    _parse(_handle_item_update(edpa_root, {
+        "item_id": sid, "fields": {"js": 8},
+    }))
+    assert _iter_yaml(edpa_root, "PI-2026-2.2")["planning"]["planned_sp"] == 8
+
+
+def test_planned_sp_freezes_once_iteration_active(edpa_root: Path) -> None:
+    """The E2E PI-2026-2.2 scenario: planned 26 on planning day; an unplanned
+    mid-PI defect (js 3) lands while the iteration is active; close stamps
+    delivered 29 but planned stays 26 → predictability ~89.7, not 100."""
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.2", "start_date": "2026-04-27", "end_date": "2026-05-15",
+    }))
+    feature = _mk_feature(edpa_root)
+    for title, js in (("Ingest", 13), ("Buffer", 13)):
+        data = _parse(_handle_item_create(edpa_root, {
+            "type": "Story", "title": title, "parent": feature,
+            "iteration": "PI-2026-2.2", "js": js,
+        }))
+        _parse(_handle_item_transition(edpa_root, {
+            "item_id": data["id"], "status": "Done",
+        }))
+    assert _iter_yaml(edpa_root, "PI-2026-2.2")["planning"]["planned_sp"] == 26
+
+    _set_iteration_status(edpa_root, "PI-2026-2.2", "active")
+
+    # Unplanned mid-PI defect: must NOT move the frozen plan.
+    data = _parse(_handle_item_create(edpa_root, {
+        "type": "Defect", "title": "Hotfix", "iteration": "PI-2026-2.2", "js": 3,
+    }))
+    _parse(_handle_item_transition(edpa_root, {"item_id": data["id"], "status": "Done"}))
+    assert _iter_yaml(edpa_root, "PI-2026-2.2")["planning"]["planned_sp"] == 26
+
+    resp = _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-2.2"}))
+    assert resp["delivered_sp"] == 29
+    parsed = _iter_yaml(edpa_root, "PI-2026-2.2")
+    assert parsed["planning"]["planned_sp"] == 26   # never backfilled to 29
+    assert parsed["delivery"]["delivered_sp"] == 29
+
+    from _sp_rollup import predictability_pct
+    assert predictability_pct(parsed["planning"]["planned_sp"],
+                              parsed["delivery"]["delivered_sp"]) == 89.7
+
+
+def test_iteration_close_never_creates_planned_sp(edpa_root: Path) -> None:
+    """No planning-time stamp (items assigned outside the write layer) →
+    close must leave planning absent, not backfill planned=delivered."""
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    _write_backlog_item(edpa_root, "stories", "S-1", js=5, status="Done",
+                        iteration="PI-2026-2.1")
+    data = _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-2.1"}))
+    assert data["delivered_sp"] == 5
+    parsed = _iter_yaml(edpa_root, "PI-2026-2.1")
+    assert "planning" not in parsed
+    assert parsed["delivery"]["delivered_sp"] == 5
+
+
+def test_portfolio_item_assignment_does_not_stamp_planning(edpa_root: Path) -> None:
+    """Only Story/Defect js rolls into planned_sp — assigning a Feature must
+    not create a planning block (rollup counts delivery items only)."""
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "Platform 2026",
+        "iteration": "PI-2026-2.1", "js": 20,
+    }))
+    assert "planning" not in _iter_yaml(edpa_root, "PI-2026-2.1")
+
+
 def test_iteration_close_preserves_hand_stamped_delivery(edpa_root: Path) -> None:
     _parse(_handle_iteration_create(edpa_root, {
         "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
