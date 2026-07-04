@@ -275,6 +275,17 @@ def test_create_parent_must_exist(edpa_root: Path) -> None:
     assert "not found" in result[0].text
 
 
+def test_create_parent_rejects_pi_shaped_id(edpa_root: Path) -> None:
+    """D-76: a PI-shaped parent ('PI-2026') is not a valid item id. The create
+    handler must reject it as an invalid parent id up front, not fall through
+    to a confusing 'parent ... not found'."""
+    result = _handle_item_create(edpa_root, {
+        "type": "Story", "title": "x", "parent": "PI-2026",
+    })
+    assert _is_err(result)
+    assert "invalid parent id" in result[0].text
+
+
 def test_create_parent_type_mismatch(edpa_root: Path) -> None:
     _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "I1"}))
     result = _handle_item_create(edpa_root, {
