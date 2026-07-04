@@ -1,0 +1,326 @@
+---
+import '../../styles/global.css';
+import '../../styles/presentation.css';
+import Header from '../../components/Header.astro';
+
+const title = 'EDPA — User Journey';
+const description = 'EDPA user journey presentation — 15 slides covering a team\'s path from manual timesheets to automated reporting.';
+import { VERSION } from '../../lib/version';
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content={description} />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>{title} | EDPA v{VERSION}</title>
+</head>
+<body class="presentation-body">
+  <Header currentPath="/en/journey/" />
+  <div class="deck" id="deck"></div>
+  <div class="pres-nav">
+    <div class="nav-l"><span class="logo">EDPA v{VERSION}</span><span class="nav-label">&middot; User Journey</span></div>
+    <div class="nav-c" id="dots"></div>
+    <div class="nav-r">
+      <button class="pres-btn" id="btnPrev">&larr; Back</button>
+      <span class="pg" id="pgN">1/15</span>
+      <button class="pres-btn" id="btnNext">Next &rarr;</button>
+    </div>
+  </div>
+
+<script>
+import { initSlideDeck } from '../../scripts/slide-engine';
+
+const S=[
+
+// 0 — Your team today
+`<div style="text-align:center;max-width:850px;margin:0 auto">
+<div class="s-tag fade">Slide 1 &middot; Your team today</div>
+<div class="s-h1 fade d1" style="font-size:44px;background:linear-gradient(135deg,var(--or),var(--rd));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Manual timesheets, nobody likes them.</div>
+<div class="s-sub fade d2" style="margin:0 auto">What if hours were derived automatically from what the team actually does?</div>
+<div class="sg sg3 fade d3" style="max-width:750px;margin:20px auto 0">
+<div class="sc o"><div class="sc-i">&#x1F4DD;</div><div class="sc-t">Today</div><div class="sc-l">Manual time reporting<br>Subjective, non-auditable<br>Tedious admin</div></div>
+<div class="sc g"><div class="sc-i">&#x2192;</div><div class="sc-t">Tomorrow</div><div class="sc-l">Automatic derivation<br>From delivery evidence<br>Mathematically verified</div></div>
+<div class="sc a"><div class="sc-i">&#x2705;</div><div class="sc-t">Result</div><div class="sc-l">Accurate timesheets<br>Zero admin<br>The team focuses on work</div></div>
+</div>
+<div class="qt fade d4">What if we changed that?</div>
+</div>`,
+
+// 1 — EDPA in 30 seconds
+`<div class="s-tag fade">Slide 2 &middot; EDPA in 30 seconds</div>
+<div class="s-h1 fade d1">Whoever contributes gets the hours. Automatically.</div>
+<div class="s-sub fade d2">EDPA (Evidence-Driven Proportional Allocation) derives work hours from delivery evidence &mdash; commits, reviews, comments. Mathematically guaranteed.</div>
+<div class="sg sg4 fade d3">
+<div class="sc a"><div class="sc-t">1. Evidence</div><div class="sc-v" style="color:var(--ac2)">Git</div><div class="sc-l">Commits, PRs, reviews, comments &mdash; real work</div></div>
+<div class="sc c"><div class="sc-t">2. Weights</div><div class="sc-v" style="color:var(--cy)">CW</div><div class="sc-l">Contribution Weights &mdash; every signal has a weight</div></div>
+<div class="sc g"><div class="sc-t">3. Score</div><div class="sc-v" style="color:var(--gn)">Σ</div><div class="sc-l">Proportional allocation based on the score</div></div>
+<div class="sc y"><div class="sc-t">4. Timesheet</div><div class="sc-v" style="color:var(--yl)">h</div><div class="sc-l">Hours per iteration, per-person and per-item</div></div>
+</div>
+<div class="fm fade d4">Evidence &rarr; CW &times; signal &rarr; Score &rarr; hours = (score / ∑scores) &times; capacity</div>`,
+
+// 2 — Day 1: Setup
+`<div class="s-tag fade">Slide 3 &middot; Day 1: Setup</div>
+<div class="s-h1 fade d1">15 minutes and you're running</div>
+<div class="s-sub fade d2">Repo, team, backlog &mdash; set it all up over a single coffee.</div>
+<div class="sg sg3 fade d3">
+<div class="sc a" style="min-height:170px"><div class="sc-i">&#x1F4E6;</div><div class="sc-t">1. Install</div><div class="sc-l"><code>curl edpa.technomaton.com/install.sh | sh</code><br><br>Install the EDPA plugin. All scripts and configuration are ready to go.</div></div>
+<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F465;</div><div class="sc-t">2. Team</div><div class="sc-l"><code>.edpa/config/people.yaml</code><br><br>Define team members, roles, capacity. One YAML file.</div></div>
+<div class="sc g" style="min-height:170px"><div class="sc-i">&#x1F4CB;</div><div class="sc-t">3. Backlog</div><div class="sc-l"><code>.edpa/backlog/*.md</code><br><br>Create backlog items. Each item = one .md file with YAML front-matter.</div></div>
+</div>
+<div class="s-note fade d4"><b>Result:</b> A running repo with a team and backlog. In 15 minutes.</div>`,
+
+// 3 — Local setup
+`<div class="s-tag fade">Slide 4 &middot; Local setup</div>
+<div class="s-h1 fade d1">One command vendors the engine into your repo</div>
+<div class="s-sub fade d2"><code>/edpa:setup</code> &mdash; no GitHub Project, no Issue Types, no custom fields. Local and in Git.</div>
+<div class="sg sg3 fade d3">
+<div class="sc a" style="min-height:170px"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">Engine</div><div class="sc-v" style="font-size:14px;color:var(--ac2)">.edpa/engine/</div><div class="sc-l">Vendored scripts, schemas and templates. Computation runs locally &mdash; no external service.</div></div>
+<div class="sc c" style="min-height:170px"><div class="sc-i">&#x1F4C1;</div><div class="sc-t">Configuration</div><div class="sc-v" style="font-size:14px;color:var(--cy)">.edpa/config/</div><div class="sc-l"><code>edpa.yaml</code>, <code>people.yaml</code> and <code>id_counters.yaml</code> &mdash; seeded automatically.</div></div>
+<div class="sc g" style="min-height:170px"><div class="sc-i">&#x1FA9D;</div><div class="sc-t">Git hooks</div><div class="sc-v" style="font-size:14px;color:var(--gn)">post-commit</div><div class="sc-l">Optionally installs hooks &mdash; evidence is captured on every commit.</div></div>
+</div>
+<div class="fm fade d4">/edpa:setup &rarr; .edpa/engine/ + .edpa/config/ + git hooks &mdash; in minutes, no GitHub</div>`,
+
+// 4 — Backlog in Git
+`<div class="s-tag fade">Slide 5 &middot; Backlog in Git</div>
+<div class="s-h1 fade d1">1 file = 1 backlog item</div>
+<div class="s-sub fade d2">The backlog is version-controlled in Git. No external database, no vendor lock-in.</div>
+<div class="cols fade d3">
+<div class="col">
+<div class="sc c" style="padding:14px">
+<div class="sc-t">backlog/str-099.md</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cy);line-height:1.8;white-space:pre">---
+type: story
+id: STR-099
+title: "Implement login flow"
+parent: FEA-042
+estimate: 5
+priority: high
+assignee: urbanek
+---</div>
+</div>
+<div class="s-note" style="margin-top:10px"><b>Tip:</b> .md files with YAML front-matter are easy to merge and review in a PR.</div>
+</div>
+<div class="col">
+<div class="sc a" style="padding:14px">
+<div class="sc-t">edpa_backlog.py tree</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ac2);line-height:1.8;white-space:pre">INI-001 Platform v2
+  EPC-010 Authentication
+    FEA-042 Login flow
+      STR-099 Login impl.
+      STR-100 Token refresh
+    FEA-043 SSO integration
+  EPC-011 Dashboard
+    FEA-050 Widgets</div>
+</div>
+</div>
+</div>`,
+
+// 5 — Evidence-driven
+`<div class="s-tag fade">Slide 6 &middot; Evidence-driven</div>
+<div class="s-h1 fade d1">Hours from local evidence in Git</div>
+<div class="s-sub fade d2">No timesheets. A post-commit hook and <code>/edpa:materialize</code> write commits, edits and state transitions into <code>evidence[]</code> &mdash; the engine then reads them and computes CW.</div>
+<div class="sg sg3 fade d3">
+<div class="sc a"><div class="sc-t">commit_author</div><div class="sc-l"><b>Commits</b> with an item ID in the branch, title or message.<br><br>Plus PR reviews &mdash; real delivery.</div></div>
+<div class="sc c"><div class="sc-t">yaml_edit</div><div class="sc-l"><b>Edits</b> to <code>.edpa/backlog/*.md</code>: a new file, an added block, an AC bullet, a changed scalar.<br><br>A structural delta = a work signal.</div></div>
+<div class="sc g"><div class="sc-t">gate transitions</div><div class="sc-l"><b>State transitions</b> on a Feature/Epic/Initiative (e.g. Implementing&rarr;Validating) credited within the iteration window.</div></div>
+</div>
+<div class="fm fade d4">materialize &rarr; evidence[] (commit_author &middot; yaml_edit &middot; state_transition) &rarr; CW &mdash; all from Git, no GitHub required</div>`,
+
+// 6 — Week 1: The team works
+`<div class="s-tag fade">Slide 7 &middot; Week 1: The team works</div>
+<div class="s-h1 fade d1">Branch, commit, PR, review</div>
+<div class="s-sub fade d2">The team works as usual. EDPA collects evidence automatically in the background.</div>
+<div class="sg sg4 fade d3">
+<div class="sc a" style="min-height:140px"><div class="sc-t">1. Branch</div><div class="sc-v" style="font-size:14px;color:var(--ac2)">feat/STR-099</div><div class="sc-l">Branch naming convention based on the issue ID.</div></div>
+<div class="sc c" style="min-height:140px"><div class="sc-t">2. Commit</div><div class="sc-v" style="font-size:14px;color:var(--cy)">fix(STR-099): ...</div><div class="sc-l">Conventional commits referencing the issue.</div></div>
+<div class="sc g" style="min-height:140px"><div class="sc-t">3. PR</div><div class="sc-v" style="font-size:14px;color:var(--gn)">#42 Login flow</div><div class="sc-l">Pull request linked to the issue. Closes #STR-099.</div></div>
+<div class="sc y" style="min-height:140px"><div class="sc-t">4. Review</div><div class="sc-v" style="font-size:14px;color:var(--yl)">Approved</div><div class="sc-l">Code review = another evidence signal for the reviewer.</div></div>
+</div>
+<div class="qt fade d4">The team does nothing extra. All evidence arises naturally from everyday work.</div>`,
+
+// 7 — Evidence detection
+`<div class="s-tag fade">Slide 8 &middot; Evidence Detection</div>
+<div class="s-h1 fade d1">From a Git signal to hours</div>
+<div class="s-sub fade d2">An animated flow: how EDPA turns everyday work into accurate timesheets.</div>
+<div style="display:flex;align-items:center;gap:0;margin:20px 0;flex-wrap:wrap;justify-content:center">
+<div class="sc c fade d1" style="padding:14px 18px;text-align:center;min-width:140px"><div class="sc-t">Git Signals</div><div style="font-size:13px;color:var(--cy)">commit, PR, review<br>comment, approve</div></div>
+<div class="fade d2" style="font-size:28px;color:var(--t3);padding:0 8px">&rarr;</div>
+<div class="sc a fade d2" style="padding:14px 18px;text-align:center;min-width:140px"><div class="sc-t">CW Weights</div><div style="font-size:13px;color:var(--ac2)">commit: 4.0<br>review: 2.2<br>comment: 1.5</div></div>
+<div class="fade d3" style="font-size:28px;color:var(--t3);padding:0 8px">&rarr;</div>
+<div class="sc g fade d3" style="padding:14px 18px;text-align:center;min-width:140px"><div class="sc-t">Score</div><div style="font-size:13px;color:var(--gn)">Urbánek: 14.2<br>Novák: 11.8<br>Dvořák: 9.4</div></div>
+<div class="fade d4" style="font-size:28px;color:var(--t3);padding:0 8px">&rarr;</div>
+<div class="sc y fade d4" style="padding:14px 18px;text-align:center;min-width:140px"><div class="sc-t">Hours</div><div style="font-size:13px;color:var(--yl)">Urbánek: 64h<br>Novák: 53h<br>Dvořák: 42h</div></div>
+</div>
+<div class="fm fade d5">hours_i = (score_i / ∑ scores) &times; total_capacity</div>
+<div class="s-note fade d5">Every signal has a configurable weight (CW). The team calibrates the weights during retrospectives.</div>`,
+
+// 8 — End of iteration
+`<div class="s-tag fade">Slide 9 &middot; End of iteration</div>
+<div class="s-h1 fade d1">1 command &mdash; timesheets, snapshot, report</div>
+<div class="s-sub fade d2">At the end of each iteration you run a single script. Everything else is automatic.</div>
+<div class="cols fade d3">
+<div class="col">
+<div class="sc g" style="padding:16px">
+<div class="sc-t">Command</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gn);line-height:2;white-space:pre">$ python3 .edpa/engine/scripts/engine.py \\
+    --iteration PI1-I2 \\
+    --team .edpa/config/people.yaml \\
+    --output .edpa/reports/</div>
+</div>
+</div>
+<div class="col">
+<div class="sg" style="gap:8px">
+<div class="sc a" style="padding:10px"><div class="sc-l"><b>&#x1F4CA; Timesheets</b><br>Per-person and per-item breakdown of hours</div></div>
+<div class="sc c" style="padding:10px"><div class="sc-l"><b>&#x1F4F8; Snapshot</b><br>A frozen evidence state for audit</div></div>
+<div class="sc y" style="padding:10px"><div class="sc-l"><b>&#x1F4DD; Report</b><br>A Markdown report for stakeholders</div></div>
+</div>
+</div>
+</div>
+<div class="qt fade d4">One command replaces hours of manual reporting for the entire team.</div>`,
+
+// 9 — Urbanek timesheet
+`<div class="s-tag fade">Slide 10 &middot; Urbánek's timesheet</div>
+<div class="s-h1 fade d1">Per-person timesheet with items</div>
+<div class="s-sub fade d2">A sample timesheet for one team member for iteration PI1-I2.</div>
+<div class="cols fade d3">
+<div class="col" style="flex:2">
+<div class="sc a" style="padding:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+<div><span class="sc-t" style="display:block">Timesheet</span><b style="font-size:18px">Jan Urbánek</b></div>
+<div style="text-align:right"><span class="tg tg-b">PI1-I2</span><br><span style="font-size:12px;color:var(--t3)">2 weeks</span></div>
+</div>
+<table>
+<thead><tr><th>Issue</th><th>Type</th><th>Signals</th><th style="text-align:right">Hours</th></tr></thead>
+<tbody>
+<tr><td>STR-099 Login flow</td><td><span class="tg tg-g">Story</span></td><td>8 commits, 1 PR, 2 reviews</td><td style="text-align:right;color:var(--gn)"><b>18.4h</b></td></tr>
+<tr><td>STR-100 Token refresh</td><td><span class="tg tg-g">Story</span></td><td>5 commits, 1 PR</td><td style="text-align:right;color:var(--gn)"><b>12.1h</b></td></tr>
+<tr><td>STR-105 Error handling</td><td><span class="tg tg-g">Story</span></td><td>6 commits, 1 PR, 3 reviews</td><td style="text-align:right;color:var(--gn)"><b>16.8h</b></td></tr>
+<tr><td>FEA-042 Code review</td><td><span class="tg tg-b">Feature</span></td><td>4 reviews, 6 comments</td><td style="text-align:right;color:var(--gn)"><b>9.2h</b></td></tr>
+<tr style="background:rgba(99,102,241,.05)"><td colspan="3"><b>TOTAL</b></td><td style="text-align:right;color:var(--ac2)"><b>56.5h</b></td></tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="col" style="flex:1">
+<div class="sc c" style="padding:14px;margin-bottom:8px"><div class="sc-t">Capacity</div><div class="sc-v" style="color:var(--cy)">60h</div><div class="sc-l">Allocation for the iteration</div></div>
+<div class="sc g" style="padding:14px;margin-bottom:8px"><div class="sc-t">Reported</div><div class="sc-v" style="color:var(--gn)">56.5h</div><div class="sc-l">94.2% utilization</div></div>
+<div class="sc y" style="padding:14px"><div class="sc-t">Score</div><div class="sc-v" style="color:var(--yl)">14.2</div><div class="sc-l">Evidence-based</div></div>
+</div>
+</div>`,
+
+// 10 — Dual-view
+`<div class="s-tag fade">Slide 11 &middot; Dual-view</div>
+<div class="s-h1 fade d1">Per-person + Per-item</div>
+<div class="s-sub fade d2">Two views of the same data &mdash; a timesheet for a person and a cost card for an item.</div>
+<div class="sg sg2 fade d3">
+<div class="sc a" style="padding:16px">
+<div class="sc-t" style="color:var(--ac2);margin-bottom:10px">Per-person timesheet</div>
+<div class="sc-l" style="margin-bottom:8px"><b>Jan Urbánek</b> &mdash; PI1-I2</div>
+<table>
+<thead><tr><th>Issue</th><th style="text-align:right">Hours</th></tr></thead>
+<tbody>
+<tr><td>STR-099 Login flow</td><td style="text-align:right">18.4h</td></tr>
+<tr><td>STR-100 Token refresh</td><td style="text-align:right">12.1h</td></tr>
+<tr><td>STR-105 Error handling</td><td style="text-align:right">16.8h</td></tr>
+<tr style="background:rgba(99,102,241,.05)"><td><b>TOTAL</b></td><td style="text-align:right;color:var(--ac2)"><b>47.3h</b></td></tr>
+</tbody>
+</table>
+<div style="margin-top:8px;font-size:12px;color:var(--t3)">Use: time reporting, invoicing</div>
+</div>
+<div class="sc g" style="padding:16px">
+<div class="sc-t" style="color:var(--gn);margin-bottom:10px">Per-item cost card</div>
+<div class="sc-l" style="margin-bottom:8px"><b>FEA-042 Login flow</b></div>
+<table>
+<thead><tr><th>Team member</th><th style="text-align:right">Hours</th></tr></thead>
+<tbody>
+<tr><td>Urbánek (dev)</td><td style="text-align:right">30.5h</td></tr>
+<tr><td>Novák (review)</td><td style="text-align:right">8.2h</td></tr>
+<tr><td>Dvořák (test)</td><td style="text-align:right">5.1h</td></tr>
+<tr style="background:rgba(52,211,153,.05)"><td><b>TOTAL</b></td><td style="text-align:right;color:var(--gn)"><b>43.8h</b></td></tr>
+</tbody>
+</table>
+<div style="margin-top:8px;font-size:12px;color:var(--t3)">Use: cost analysis, budgeting</div>
+</div>
+</div>
+<div class="s-note fade d4"><b>Same data, two views.</b> Person-view for reporting, item-view for cost analysis of backlog items.</div>`,
+
+// 11 — Retrospective
+`<div class="s-tag fade">Slide 12 &middot; Retrospective</div>
+<div class="s-h1 fade d1">The team corrects, the system learns</div>
+<div class="s-sub fade d2">At the end of each iteration the team compares the EDPA output with reality and adjusts the CW weights.</div>
+<div class="sg sg3 fade d3">
+<div class="sc c"><div class="sc-i">&#x1F4CA;</div><div class="sc-t">1. Ground Truth</div><div class="sc-l">The team enters the actual hours (ground truth). <b>Just once per iteration</b> &mdash; not daily.</div></div>
+<div class="sc y"><div class="sc-i">&#x1F50D;</div><div class="sc-t">2. Comparison</div><div class="sc-l">EDPA computes the <b>MAD</b> (Mean Absolute Deviation) between the estimate and reality.<br><br><code>MAD = avg(|edpa_h - real_h|)</code></div></div>
+<div class="sc g"><div class="sc-i">&#x2699;&#xFE0F;</div><div class="sc-t">3. CW Calibration</div><div class="sc-l">The team adjusts the signal weights so the MAD drops in the next iteration. <b>Feedback loop.</b></div></div>
+</div>
+<div class="fm fade d4">MAD = (1/n) &times; ∑ |edpa_hours_i - actual_hours_i|
+Target: MAD < 2h per person per iteration</div>
+<div class="qt fade d5">A retrospective isn't criticism &mdash; it's sensor calibration.</div>`,
+
+// 12 — Auto-calibration
+`<div class="s-tag fade">Slide 13 &middot; Auto-calibration</div>
+<div class="s-h1 fade d1">Karpathy loop: the heuristic learns</div>
+<div class="s-sub fade d2">Every retrospective generates new data. The system converges toward accuracy.</div>
+<div class="cols fade d3">
+<div class="col">
+<div class="sc a" style="padding:16px">
+<div class="sc-t">Karpathy Loop</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ac2);line-height:2.2;white-space:pre">1. Collect evidence (Git signals)
+2. Compute hours (CW model)
+3. Compare with ground truth
+4. Gradient: ΔCW = f(MAD)
+5. Update weights
+6. GOTO 1</div>
+</div>
+</div>
+<div class="col">
+<div class="sg" style="gap:8px">
+<div class="sc o" style="padding:10px"><div class="sc-t">Iteration 1</div><div style="display:flex;justify-content:space-between"><span class="sc-l">MAD</span><span style="color:var(--or);font-weight:700;font-family:'JetBrains Mono',monospace">4.8h</span></div></div>
+<div class="sc y" style="padding:10px"><div class="sc-t">Iteration 2</div><div style="display:flex;justify-content:space-between"><span class="sc-l">MAD</span><span style="color:var(--yl);font-weight:700;font-family:'JetBrains Mono',monospace">3.1h</span></div></div>
+<div class="sc g" style="padding:10px"><div class="sc-t">Iteration 3</div><div style="display:flex;justify-content:space-between"><span class="sc-l">MAD</span><span style="color:var(--gn);font-weight:700;font-family:'JetBrains Mono',monospace">1.9h</span></div></div>
+<div class="sc g" style="padding:10px"><div class="sc-t">Iteration 4</div><div style="display:flex;justify-content:space-between"><span class="sc-l">MAD</span><span style="color:var(--gn);font-weight:700;font-family:'JetBrains Mono',monospace">1.4h</span></div></div>
+<div class="sc g" style="padding:10px;border:1px solid var(--gn)"><div class="sc-t">Iteration 5+</div><div style="display:flex;justify-content:space-between"><span class="sc-l">MAD</span><span style="color:var(--gn);font-weight:700;font-family:'JetBrains Mono',monospace">&lt; 1h</span></div></div>
+</div>
+</div>
+</div>
+<div class="s-note fade d4"><b>MAD drops with every iteration.</b> After 3&ndash;4 iterations the system converges and the timesheets are accurate.</div>`,
+
+// 13 — After 2 PIs
+`<div class="s-tag fade">Slide 14 &middot; After 2 PIs</div>
+<div class="s-h1 fade d1">Predictability &gt; 80%, the team converges</div>
+<div class="s-sub fade d2">After two Program Increments the team has a calibrated model and accurate timesheets.</div>
+<div class="sg sg3 fade d3">
+<div class="sc g" style="text-align:center;padding:20px"><div class="sc-t">Predictability</div><div class="sc-v" style="font-size:36px;color:var(--gn)">&gt; 80%</div><div class="sc-l">Agreement between EDPA output and reality</div></div>
+<div class="sc a" style="text-align:center;padding:20px"><div class="sc-t">MAD</div><div class="sc-v" style="font-size:36px;color:var(--ac2)">&lt; 1.5h</div><div class="sc-l">Average deviation per person</div></div>
+<div class="sc c" style="text-align:center;padding:20px"><div class="sc-t">Admin</div><div class="sc-v" style="font-size:36px;color:var(--cy)">0h</div><div class="sc-l">Zero reporting overhead</div></div>
+</div>
+<div class="sg sg2 fade d4" style="margin-top:14px">
+<div class="sc y" style="padding:14px"><div class="sc-t">What the team gains</div><div class="sc-l"><b>More time for real work</b> &mdash; no filling in timesheets<br><b>Fair assessment</b> &mdash; evidence-based, not subjective<br><b>Transparency</b> &mdash; everyone sees how the hours came to be</div></div>
+<div class="sc y" style="padding:14px"><div class="sc-t">What management gains</div><div class="sc-l"><b>Auditability</b> &mdash; every hour is traceable to evidence<br><b>Cost data</b> &mdash; per-item cost tracking<br><b>Predictability</b> &mdash; timesheet reliability grows</div></div>
+</div>`,
+
+// 14 — Start today
+`<div style="text-align:center;max-width:850px;margin:0 auto">
+<div class="s-tag fade">Slide 15 &middot; Start today</div>
+<div class="s-h1 fade d1" style="font-size:44px;background:linear-gradient(135deg,var(--gn),var(--cy));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Start today</div>
+<div class="s-sub fade d2" style="margin:0 auto">One command and you have a working demo.</div>
+<div class="sc g fade d3" style="max-width:650px;margin:20px auto;padding:20px;text-align:left">
+<div class="sc-t">Quick Start</div>
+<div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--gn);line-height:2.2;white-space:pre">pip install pyyaml
+python3 .edpa/engine/scripts/engine.py --demo</div>
+</div>
+<div class="sg sg3 fade d4" style="max-width:700px;margin:16px auto 0">
+<div class="sc a" style="text-align:center;padding:12px"><div class="sc-t">GitHub</div><div style="font-size:12px;color:var(--ac2)">Open source repo<br>MIT license</div></div>
+<div class="sc c" style="text-align:center;padding:12px"><div class="sc-t">Documentation</div><div style="font-size:12px;color:var(--cy)">Methodology + API<br>Examples</div></div>
+<div class="sc g" style="text-align:center;padding:12px"><div class="sc-t">Support</div><div style="font-size:12px;color:var(--gn)">GitHub Issues<br>Discussions</div></div>
+</div>
+<div class="qt fade d5">Hours derived from reality. No timesheets. Mathematically guaranteed.</div>
+</div>`
+
+];
+
+initSlideDeck(S);
+</script>
+</body>
+</html>
