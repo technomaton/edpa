@@ -18,7 +18,8 @@ What it does NOT emit (those still come from the optional CI workflow):
 
 Item attribution sources (in order of precedence):
 
-  1. EDPA item IDs in the commit subject/body (regex ``[A-Z]{1,3}-\\d+``)
+  1. EDPA item IDs in the commit subject/body (regex ``[A-Z]{1,3}-\\d+``;
+     PI ids like ``PI-2026-1`` are not items and never match — D-64)
   2. Item IDs derived from changed file paths
      (``.edpa/backlog/{type}/S-N.md`` → S-N)
 
@@ -68,7 +69,11 @@ finally:
 
 _SELF_COMMIT_PREFIX = "chore(evidence):"
 
-_ITEM_REF_RE = re.compile(r"\b([A-Z]{1,3}-\d{1,9})\b")
+# D-64: (?!PI-) — PI ids (PI-2026, PI-2026-1) are program increments, not
+# backlog items; without it 'PI-2026' matched inside 'PI-2026-1' and every
+# such commit emitted a phantom 'PI-2026 referenced but not found' warning.
+# (?!-\d) — a token continuing with '-digits' is never an item ref.
+_ITEM_REF_RE = re.compile(r"\b(?!PI-)([A-Z]{1,3}-\d{1,9})\b(?!-\d)")
 _BACKLOG_PATH_RE = re.compile(
     r"\.edpa/backlog/([^/]+)/([A-Z]{1,3}-\d{1,9})\.md$"
 )

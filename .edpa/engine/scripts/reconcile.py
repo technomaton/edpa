@@ -46,8 +46,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _md_frontmatter import load_md, update_frontmatter_field  # noqa: E402
 from id_counter import backlog_write_lock  # noqa: E402
 
-ITEM_REF_RE = re.compile(r"\b[A-Z]{1,3}-\d{1,9}\b")
-CC_SCOPE_RE = re.compile(r"^\w+!?\(([A-Z]{1,3}-\d{1,9})\)")
+# D-64: (?!PI-) + (?!-\d) — PI ids (PI-2026 / PI-2026-1) are not backlog
+# items and must not collect phantom evidence.
+ITEM_REF_RE = re.compile(r"\b(?!PI-)[A-Z]{1,3}-\d{1,9}\b(?!-\d)")
+CC_SCOPE_RE = re.compile(r"^\w+!?\((?!PI-)([A-Z]{1,3}-\d{1,9})\)")
 AUTO_PREFIXES = ("chore(evidence):", "chore(ci-materialization):",
                  "Merge ", "Revert ", "fixup!", "squash!")
 

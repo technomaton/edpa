@@ -139,6 +139,30 @@ def test_detect_items_dedupes_across_sources(repo: Path) -> None:
     assert le.detect_items(commit) == ["S-1"]
 
 
+def test_detect_items_ignores_pi_ids(repo: Path) -> None:
+    """PI ids are program increments, not backlog items: neither the
+    'PI-2026' substring inside 'PI-2026-1' nor a bare PI ref may be
+    detected — they produced phantom 'PI-2026 referenced but not found'
+    warnings on every such commit (D-64)."""
+    _make_commit(repo,
+                 "docs: system demo notes for PI-2026-1\n\npart of PI-2026",
+                 [("docs/demo.md", "notes\n")])
+    commit = le._head_commit(repo)
+    assert le.detect_items(commit) == []
+
+
+def test_detect_items_keeps_real_ids_next_to_pi_ids(repo: Path) -> None:
+    _make_commit(repo, "fix(D-5): adjust close report for PI-2026-1",
+                 [("src/x.py", "x\n")])
+    commit = le._head_commit(repo)
+    assert le.detect_items(commit) == ["D-5"]
+
+
+def test_scope_item_ids_ignores_pi_scope() -> None:
+    assert le._scope_item_ids("chore(PI-2026-1): close iteration") == set()
+    assert le._scope_item_ids("fix(D-5): x for PI-2026-1") == {"D-5"}
+
+
 # ─── Person resolution ────────────────────────────────────────────────────
 
 

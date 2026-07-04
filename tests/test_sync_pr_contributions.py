@@ -66,6 +66,12 @@ def test_extract_dedupes_within_one_string() -> None:
     assert spc.extract_item_ids("S-1 closes S-1 again") == ["S-1"]
 
 
+def test_extract_ignores_pi_ids() -> None:
+    """D-64: 'PI-2026' inside 'PI-2026-1' is a PI ref, not an item ref."""
+    assert spc.extract_item_ids("Part of PI-2026-1, implements S-3") == ["S-3"]
+    assert spc.extract_item_ids("PI-2026 planning notes") == []
+
+
 # ---------------------------------------------------------------------------
 # event_to_signals
 # ---------------------------------------------------------------------------

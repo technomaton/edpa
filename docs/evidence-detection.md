@@ -100,7 +100,9 @@ receives hours.
 
 Credit follows **work, not mention**. A commit's candidate items are
 all EDPA IDs (`[A-Z]{1,3}-\d+`) in its subject and body, plus the IDs
-of any `.edpa/backlog/<type>/<id>.md` files it changed. Of those, an
+of any `.edpa/backlog/<type>/<id>.md` files it changed. PI ids are not
+items and never match — neither bare `PI-2026` nor the `PI-2026`
+substring inside `PI-2026-1` (D-64). Of those, an
 item earns full `commit_author` / `agent_contribution` / `/contribute`
 weight only if it is **worked on**:
 
