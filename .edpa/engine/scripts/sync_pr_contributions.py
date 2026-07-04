@@ -51,7 +51,7 @@ sys.path.insert(0, str(ROOT))
 try:
     # Canonical item-id prefix → backlog directory map (Krok 2, incl. the
     # legacy T→tasks entry so PR refs to migrated Task items materialize).
-    from id_counter import PREFIX_TO_DIR  # noqa: E402
+    from id_counter import PREFIX_TO_DIR, backlog_write_lock  # noqa: E402
     from _md_frontmatter import load_md, save_md_item  # noqa: E402
 finally:
     sys.path.pop(0)
@@ -289,24 +289,25 @@ def apply_signals(edpa_root: Path, signals: list[dict]) -> dict[str, int]:
         path = find_item_path(edpa_root, item_id)
         if not path:
             continue
-        item = load_md(path) or {}
-        # D-33: gate GH-side signals that landed outside the item's own
-        # iteration window (PR-thread events bypass the commit-side D-29 hook).
-        _gate_out_of_iteration(edpa_root, item, path, new_signals)
-        # V2.1 rename: ci_signals[] → evidence[]. Read from either
-        # (backward-compat for items written by V2.0); always write
-        # to evidence[] and drop any legacy ci_signals[] entry so the
-        # YAML converges on the new shape.
-        existing = item.get("evidence")
-        if existing is None:
-            existing = item.get("ci_signals") or []
-        if not isinstance(existing, list):
-            existing = []
-        merged = _dedupe_signals(existing, new_signals)
-        item["evidence"] = merged
-        if "ci_signals" in item:
-            del item["ci_signals"]
-        save_md_item(path, item)
+        with backlog_write_lock(edpa_root):
+            item = load_md(path) or {}
+            # D-33: gate GH-side signals that landed outside the item's own
+            # iteration window (PR-thread events bypass the commit-side D-29 hook).
+            _gate_out_of_iteration(edpa_root, item, path, new_signals)
+            # V2.1 rename: ci_signals[] → evidence[]. Read from either
+            # (backward-compat for items written by V2.0); always write
+            # to evidence[] and drop any legacy ci_signals[] entry so the
+            # YAML converges on the new shape.
+            existing = item.get("evidence")
+            if existing is None:
+                existing = item.get("ci_signals") or []
+            if not isinstance(existing, list):
+                existing = []
+            merged = _dedupe_signals(existing, new_signals)
+            item["evidence"] = merged
+            if "ci_signals" in item:
+                del item["ci_signals"]
+            save_md_item(path, item)
         summary[item_id] = len(merged)
     return summary
 

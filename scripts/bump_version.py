@@ -190,15 +190,8 @@ def main():
                  else "name-anchored pattern not found — fix by hand")
     print(f"  {lock_mark} web/package-lock.json ({lock_note})")
 
-    # 2. Literal references
-    targets = [
-        REPO_ROOT / "plugin/skills/reports/SKILL.md",
-        REPO_ROOT / "plugin/skills/setup/SKILL.md",
-    ]
-    for t in targets:
-        n = bump_literal(t, old, new, args.apply)
-        rel = t.relative_to(REPO_ROOT)
-        print(f"  {'✓' if n else '·'} {rel}  ({n} replacement(s))")
+    # 2. Literal references — none since S-248 (SKILL.md files carry no
+    # version literals; wizard version now comes from web/src/lib/version.ts).
 
     # 2b. Pattern-stamped references (drift-proof: matches ANY previous version)
     n_scripts = len(list((REPO_ROOT / "plugin/edpa/scripts").glob("*.py")))

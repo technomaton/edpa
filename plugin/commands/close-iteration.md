@@ -123,8 +123,10 @@ Invoke the existing skills in sequence:
    the team rollup `timesheet-team.md`, and freezes the audit
    snapshot under `.edpa/snapshots/<iteration-id>.json`.
 
-Engine + reports already auto-commit the results, so no extra
-commit at this layer.
+Neither engine nor reports auto-commits its outputs — commit the
+generated files (`edpa_results.json`, `edpa-results.xlsx`,
+`timesheet-*.md`, the snapshot) as part of the close, e.g.
+`git commit -m "chore(<iteration-item>): close-iteration outputs"`.
 
 ## Closed-iteration safety
 

@@ -44,6 +44,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _md_frontmatter import load_md, update_frontmatter_field  # noqa: E402
+from id_counter import backlog_write_lock  # noqa: E402
 
 ITEM_REF_RE = re.compile(r"\b[A-Z]{1,3}-\d{1,9}\b")
 CC_SCOPE_RE = re.compile(r"^\w+!?\(([A-Z]{1,3}-\d{1,9})\)")
@@ -193,11 +194,13 @@ def apply_suggestions(report: dict) -> int:
     n = 0
     for s in report["stuck"]:
         path = Path(s["_path"])
-        update_frontmatter_field(path, "status", s["suggested"])
-        if s["suggested"] == "Done" and s["closed_at"]:
-            item = load_md(path)
-            if item is not None and not item.get("closed_at"):
-                update_frontmatter_field(path, "closed_at", s["closed_at"])
+        # <root>/.edpa/backlog/<type>/<id>.md -> parents[2] == .edpa
+        with backlog_write_lock(path.resolve().parents[2]):
+            update_frontmatter_field(path, "status", s["suggested"])
+            if s["suggested"] == "Done" and s["closed_at"]:
+                item = load_md(path)
+                if item is not None and not item.get("closed_at"):
+                    update_frontmatter_field(path, "closed_at", s["closed_at"])
         n += 1
     return n
 

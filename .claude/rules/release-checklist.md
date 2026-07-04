@@ -8,9 +8,10 @@ When releasing a new EDPA version, complete ALL steps — do not consider the re
 4. **Push** — push all changes to `main`
 5. **Documentation** — update all affected docs:
    - Core docs: `docs/mcp.md`, `docs/RUNBOOK.md`, `docs/quick-start.md`, `README.md`
+   - Evidence/audit docs: `docs/evidence-detection.md`, `docs/audit-references.md`, `docs/audit-trail.md`, `docs/contribute-directive.md`
    - Plugin docs: `plugin/README.md`, relevant `plugin/skills/*/SKILL.md` files
    - Metadata: `.claude-plugin/marketplace.json`
    - Website: Astro pages in `web/src/pages/` (both CZ and EN versions)
-6. **Web build + deploy** — run `vercel build --prod --cwd <path-to-web>` (NOT `astro build` — that skips `.vercel/output/`), then `vercel deploy --prebuilt --prod --cwd <path-to-web>`
-7. **Verify web version** — run `curl -s https://edpa.technomaton.com/ | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+'` to confirm the correct version is live (do not trust WebFetch — it caches for 15 min)
+6. **Web deploy (automatic)** — pushing the `v{version}` tag triggers the `deploy-web` job in `.github/workflows/release.yml` (stable tags only; needs `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` repo secrets — if absent the job skips with a warning). Manual fallback: `vercel build --prod --cwd <path-to-web>` (NOT `astro build` — that skips `.vercel/output/`), then `vercel deploy --prebuilt --prod --cwd <path-to-web>`
+7. **Verify web version** — the `deploy-web` job curl-verifies the live version itself; on manual fallback run `curl -s https://edpa.technomaton.com/ | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+'` (do not trust WebFetch — it caches for 15 min)
 8. **GitHub release** — create via `gh release create v{version}` with release notes from CHANGELOG

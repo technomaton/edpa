@@ -819,3 +819,16 @@ def test_post_commit_hook_keeps_commit_author_outside_all_windows(repo: Path) ->
           if s["type"] == "commit_author"]
     assert ca and all(s["weight"] > 0 for s in ca), "no-window commit keeps full weight"
     assert all("out_of_iteration" not in s.get("tags", []) for s in ca)
+
+
+def test_resolve_person_tolerates_blank_people_fields():
+    """D-55: a present-but-blank email:/name:/github: in people.yaml parses as
+    None; _resolve_person must not crash on .lower() and must still match on
+    the remaining fields."""
+    people = [
+        {"id": "alice", "email": None, "name": None, "github": None},
+        {"id": "bob", "email": "bob@x.dev", "name": "Bob", "github": "bobgh"},
+    ]
+    assert le._resolve_person("bob@x.dev", "", people) == "bob"
+    assert le._resolve_person("alice@x.dev", "", people) == "alice"
+    assert le._resolve_person("ghost@x.dev", "Ghost", people) is None

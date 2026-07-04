@@ -564,16 +564,20 @@ def write_contributors(item_path: Path,
     _sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
         from _md_frontmatter import load_md, update_frontmatter_field
+        from id_counter import backlog_write_lock
     finally:
         _sys.path.pop(0)
 
-    data = load_md(item_path) or {}
-    old = data.get("contributors", []) or []
-    if old == new_contributors:
-        return False
-    if not dry_run:
-        update_frontmatter_field(item_path, "contributors", new_contributors)
-    return True
+    # <root>/.edpa/backlog/<type>/<id>.md -> parents[2] == .edpa
+    edpa_root = Path(item_path).resolve().parents[2]
+    with backlog_write_lock(edpa_root):
+        data = load_md(item_path) or {}
+        old = data.get("contributors", []) or []
+        if old == new_contributors:
+            return False
+        if not dry_run:
+            update_frontmatter_field(item_path, "contributors", new_contributors)
+        return True
 
 
 # ─── Per-item processing ────────────────────────────────────────────────────

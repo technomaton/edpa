@@ -170,18 +170,18 @@ def _resolve_person(email: str, name: str, people: list[dict]) -> str | None:
     for p in people:
         if not isinstance(p, dict):
             continue
-        if p.get("email", "").lower() == e and e:
+        if (p.get("email") or "").lower() == e and e:
             return p.get("id")
     for p in people:
-        if isinstance(p, dict) and p.get("name", "").lower() == n and n:
+        if isinstance(p, dict) and (p.get("name") or "").lower() == n and n:
             return p.get("id")
     if local:
         for p in people:
             if not isinstance(p, dict):
                 continue
-            if p.get("id", "").lower() == local:
+            if (p.get("id") or "").lower() == local:
                 return p.get("id")
-            if p.get("github", "").lower() == local:
+            if (p.get("github") or "").lower() == local:
                 return p.get("id")
     return None
 
