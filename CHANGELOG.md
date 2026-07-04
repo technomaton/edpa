@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.16.0 — 2026-07-04
+
+Batch 4: four residual defects surfaced (but deliberately deferred) by the
+E2E fix chain, fixed in parallel.
+
+### Added
+
+- **`edpa_iteration_activate` (D-69).** A tool + `/edpa:activate` command to set
+  an iteration active and demote the previously active one in the same PI — the
+  E2E showed this was only possible by hand-editing YAML.
+- **`objectives.py` CLI (D-71).** A proper argparse entry point for objective
+  set/remove and confidence votes, so objectives work without the MCP server.
+
+### Fixed
+
+- **Report readers were snapshot-blind (D-68).** `reports`, `explain` and
+  `pi_close` now read person data through `_results_compat`, so they work on
+  both the engine (`people`) and frozen-snapshot (`derived_reports`) shapes —
+  the inverse of the D-56 payroll/insights fix. `board.py --level` help/docs now
+  say "all levels" to match actual behavior.
+- **Create/validate status parity (D-69).** `edpa_item_create` validates Event
+  and Risk statuses against their workflow (previously any status was accepted),
+  matching `edpa_item_transition` and `validate_syntax`.
+- **PR-side attribution windowing (D-70).** `sync_pr_contributions` now applies
+  the same out-of-iteration-window gating D-63 gave local signals, so
+  out-of-window PR-review / issue-comment signals no longer keep full weight.
+
 ## 2.15.0 — 2026-07-04
 
 Twelve defects found by a full end-to-end simulation ("EDGE": independent
