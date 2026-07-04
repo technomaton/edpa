@@ -21,6 +21,7 @@ Pass conditions (any one is enough):
   3. Subject starts with an auto-generated prefix:
        ``chore(evidence):``    (local_evidence follow-up)
        ``chore(ci-materialization):``  (sync_pr_contributions follow-up)
+       ``chore(contributors):``  (detect_contributors --all-items --commit)
        ``Merge``               (merge commit)
        ``Revert``              (revert commit)
        ``Initial commit``      (git's default)
@@ -68,6 +69,9 @@ _ESCAPE_PREFIXES = (
 _AUTO_PREFIXES = (
     "chore(evidence):",
     "chore(ci-materialization):",
+    # D-66: detect_contributors --all-items --commit bookkeeping (also valid
+    # for a manual commit of contributor-refresh rewrites under this subject).
+    "chore(contributors):",
     "Merge ",
     "Merge branch",
     "Merge pull request",

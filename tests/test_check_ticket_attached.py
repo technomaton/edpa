@@ -58,6 +58,7 @@ def test_auto_prefixes_pass() -> None:
     for prefix in (
         "chore(evidence): S-5 from abc1234",
         "chore(ci-materialization): PR#1 signals",
+        "chore(contributors): refresh after PI-2026-1.3 close",
         "Merge branch 'feat/x' into main",
         "Merge pull request #1",
         'Revert "feat: add login"',
@@ -67,6 +68,17 @@ def test_auto_prefixes_pass() -> None:
     ):
         passes, _ = cta.check_message(prefix, ["src/x.py"])
         assert passes, f"expected pass with auto-prefix subject {prefix!r}"
+
+
+def test_contributors_refresh_auto_prefix_passes() -> None:
+    """D-66: `detect_contributors.py --all-items --commit` bookkeeping
+    commits (and manual commits under the same subject) rewrite derived
+    contributors[] blocks — machine bookkeeping, no ticket to demand."""
+    passes, reason = cta.check_message(
+        "chore(contributors): refresh after PI-2026-1.3 close",
+        [".edpa/backlog/stories/S-1.md", ".edpa/backlog/features/F-2.md"])
+    assert passes is True
+    assert "auto-prefix" in reason
 
 
 def test_only_operational_paths_pass() -> None:

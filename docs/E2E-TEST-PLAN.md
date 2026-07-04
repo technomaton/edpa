@@ -417,14 +417,18 @@ ne `evidence[]`; bez normalizace vrátí 0 h.
 
 ```bash
 cd "$TARGET"
-python3 .edpa/engine/scripts/detect_contributors.py --all-items
+python3 .edpa/engine/scripts/detect_contributors.py --all-items \
+  --commit --context "PI-2026-1.1 close"
 ```
 
 **Pass kritéria:**
 - ✅ Pro každou položku s `evidence[]` se zapíše `contributors[]` se `cw`
   (Σ napříč osobami = 1.0) + `contribution_score` (raw sum signal weights)
 - ✅ Položky bez `evidence[]` jsou no-op (idempotentní)
-- ✅ Auto-commit `chore(contributors): …`
+- ✅ S `--commit` (D-66): auto-commit `chore(contributors): refresh after
+  <context>` obsahuje JEN přepsané soubory a evidence hook je potlačený
+  (`EDPA_NO_LOCAL_EVIDENCE=1`); bez `--commit` zůstávají soubory
+  nekomitnuté ve working tree
 - ✅ Role-váhy: owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15,
   evidence_threshold 1.0
 

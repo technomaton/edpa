@@ -383,6 +383,32 @@ def test_emit_self_commit_skipped(repo: Path) -> None:
     assert log.count("chore(evidence)") == 1
 
 
+def test_emit_contributors_refresh_commit_skipped(repo: Path) -> None:
+    """D-66: 'chore(contributors):' bookkeeping commits (created by
+    detect_contributors --all-items --commit, or manually under the same
+    subject) must never emit evidence. The refresh rewrites contributors[]
+    on every item with evidence[], so crediting the commit's author would
+    spray commit_author weight across the whole backlog at close time."""
+    p = repo / ".edpa/backlog/stories/S-1.md"
+    data = load_md(p)
+    data["contributors"] = [{"person": "alice", "cw": 1.0,
+                             "contribution_score": 4.0, "signals": []}]
+    save_md_item(p, data)
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-q", "-m",
+          "chore(contributors): refresh after PI-2026-1.3 close"], cwd=repo)
+
+    rc = _run_emitter(repo)
+    assert rc == 0
+    s1 = load_md(p)
+    assert "evidence" not in s1, (
+        f"bookkeeping commit credited its author: {s1.get('evidence')}"
+    )
+    # No follow-up chore(evidence) commit either.
+    log = _git(["log", "--format=%s", "-2"], cwd=repo).stdout
+    assert "chore(evidence)" not in log
+
+
 def test_emit_no_item_refs_is_noop(repo: Path) -> None:
     _make_commit(repo, "chore: bump version", [("VERSION", "1.0\n")])
     rc = _run_emitter(repo)

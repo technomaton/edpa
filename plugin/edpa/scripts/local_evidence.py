@@ -30,7 +30,10 @@ attribution problem reaches this hook.
 
 Self-recursion guard: the follow-up commit this script creates has
 subject prefix ``chore(evidence):`` — the next post-commit invocation
-sees that, skips, and exits 0. No loops.
+sees that, skips, and exits 0. No loops. ``chore(contributors):``
+commits (detect_contributors --all-items --commit, D-66) are skipped
+the same way — contributor refreshes are derived bookkeeping, and
+crediting their author would spray commit_author across the backlog.
 
 Usage (typically called by .git/hooks/post-commit, not by humans):
     python3 .edpa/engine/scripts/local_evidence.py
@@ -68,6 +71,15 @@ finally:
 
 
 _SELF_COMMIT_PREFIX = "chore(evidence):"
+
+# D-66: machine-bookkeeping subjects that must never emit evidence — our own
+# follow-up prefix (self-recursion guard) plus the contributors-refresh commit
+# from ``detect_contributors.py --all-items --commit``. That refresh rewrites
+# contributors[] on every item with evidence[]; crediting its author would
+# spray commit_author weight across the whole backlog at close time. The tool
+# already runs its commit with EDPA_NO_LOCAL_EVIDENCE=1 — this prefix check
+# keeps even a MANUAL ``chore(contributors):`` commit quiet.
+_BOOKKEEPING_PREFIXES = (_SELF_COMMIT_PREFIX, "chore(contributors):")
 
 # D-64: (?!PI-) — PI ids (PI-2026, PI-2026-1) are program increments, not
 # backlog items; without it 'PI-2026' matched inside 'PI-2026-1' and every
@@ -778,8 +790,10 @@ def main(argv=None) -> int:
     if not commit:
         return 0
 
-    # Self-recursion guard
-    if commit["subject"].startswith(_SELF_COMMIT_PREFIX):
+    # Self-recursion guard + machine-bookkeeping skip: chore(evidence): is our
+    # own follow-up; chore(contributors): is a contributor-refresh commit from
+    # detect_contributors --all-items --commit (D-66) — bookkeeping, not work.
+    if commit["subject"].startswith(_BOOKKEEPING_PREFIXES):
         return 0
 
     # Skip merge commits — they aggregate, not author

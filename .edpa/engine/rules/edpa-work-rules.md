@@ -84,7 +84,7 @@ The `commit-msg-ticket-attached` hook fails commits that:
 - modify non-operational code paths AND
 - have no EDPA item ID anywhere in the subject/body AND
 - don't use an escape prefix (`no-ticket:`, `WIP:`, `[no-ticket]`) AND
-- don't use an auto-prefix (`chore(evidence):`, `chore(ci-materialization):`, `Merge`, `Revert`, `Initial commit`, `fixup!`, `squash!`)
+- don't use an auto-prefix (`chore(evidence):`, `chore(ci-materialization):`, `chore(contributors):`, `Merge`, `Revert`, `Initial commit`, `fixup!`, `squash!`)
 
 The CC scope (`feat(S-42):`) is the canonical way to satisfy the
 ticket-ID requirement, but the hook is format-tolerant: any `S-42`
@@ -103,6 +103,8 @@ work unattributed in next iteration's `/edpa:engine` allocation.
   `package.json` bumps, `.github/` workflow tweaks, etc.
 - **Auto-generated commits:** `chore(evidence):` (from
   `local_evidence.py`), `chore(ci-materialization):` (from CI),
+  `chore(contributors):` (from `detect_contributors.py --all-items
+  --commit` — contributor refresh, evidence hook suppressed),
   `Merge …`, `Revert …`, `fixup!`/`squash!`.
 - **Empty diff** (e.g. `git commit --amend --no-edit`).
 
