@@ -223,7 +223,7 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 | `edpa_item_link_dep` | Add/remove dependency edges (cycle detection) | `/edpa:link-dep` |
 | `edpa_item_roam` | ROAM-classify a Risk item | `/edpa:roam` |
 | `edpa_iteration_create` | Create a new iteration YAML | — |
-| `edpa_iteration_close` | Mark an iteration closed (audit state) | `/edpa:close-iteration` |
+| `edpa_iteration_close` | Mark an iteration closed (audit state) + stamp `delivery.delivered_sp`/`velocity` from Done items | `/edpa:close-iteration` |
 | `edpa_materialize` | Persist git-derived signals (`state_transition`, `yaml_edit`) into `evidence[]` — idempotent, deduped by `ref` (ignores `EDPA_NO_LOCAL_EVIDENCE`) | `/edpa:materialize` |
 | `edpa_pi_create` | Create the PI-level metadata file | `/edpa:create-pi` |
 | `edpa_pi_close` | Close a PI: guard iterations, flip `pi.status`, write rollup | `/edpa:close-pi` |

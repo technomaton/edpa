@@ -849,6 +849,75 @@ def test_iteration_close_missing_errors(edpa_root: Path) -> None:
     assert _is_err(_handle_iteration_close(edpa_root, {"id": "PI-2099-1.1"}))
 
 
+# D-57: close must stamp the delivery block (delivered_sp/velocity) so the
+# velocity consumers (forecast.py, velocity.py, pi_close.py) see real numbers
+# instead of 0. delivered_sp = Σ js of Done Story/Defect items assigned to
+# the closing iteration — same definition as _sp_rollup.iteration_sp.
+
+def _write_backlog_item(edpa_root: Path, sub: str, iid: str, *, js: int,
+                        status: str, iteration: str) -> None:
+    itype = {"stories": "Story", "defects": "Defect"}.get(sub, "Story")
+    (edpa_root / "backlog" / sub / f"{iid}.md").write_text(
+        f"---\nid: {iid}\ntype: {itype}\njs: {js}\n"
+        f"status: {status}\niteration: {iteration}\n---\n",
+        encoding="utf-8",
+    )
+
+
+def test_iteration_close_stamps_delivery_block(edpa_root: Path) -> None:
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    _write_backlog_item(edpa_root, "stories", "S-1", js=5, status="Done",
+                        iteration="PI-2026-2.1")
+    _write_backlog_item(edpa_root, "defects", "D-1", js=2, status="Done",
+                        iteration="PI-2026-2.1")
+    _write_backlog_item(edpa_root, "stories", "S-2", js=3, status="Implementing",
+                        iteration="PI-2026-2.1")  # not Done — excluded
+    _write_backlog_item(edpa_root, "stories", "S-3", js=8, status="Done",
+                        iteration="PI-2026-2.2")  # other iteration — excluded
+
+    data = _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-2.1"}))
+    assert data["delivered_sp"] == 7
+    parsed = yaml.safe_load(
+        (edpa_root / "iterations" / "PI-2026-2.1.yaml").read_text()
+    )
+    assert parsed["delivery"]["delivered_sp"] == 7
+    assert parsed["delivery"]["velocity"] == 7
+
+
+def test_iteration_close_stamps_zero_delivery_on_empty_backlog(edpa_root: Path) -> None:
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    data = _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-2.1"}))
+    assert data["delivered_sp"] == 0
+    parsed = yaml.safe_load(
+        (edpa_root / "iterations" / "PI-2026-2.1.yaml").read_text()
+    )
+    assert parsed["delivery"] == {"delivered_sp": 0, "velocity": 0}
+
+
+def test_iteration_close_preserves_hand_stamped_delivery(edpa_root: Path) -> None:
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": "PI-2026-2.1", "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+    # Hand-stamped delivered_sp (e.g. imported history) must win over the
+    # backlog-derived value; missing velocity is filled from it.
+    iter_path = edpa_root / "iterations" / "PI-2026-2.1.yaml"
+    data = yaml.safe_load(iter_path.read_text())
+    data["delivery"] = {"delivered_sp": 42}
+    iter_path.write_text(yaml.safe_dump(data, sort_keys=False))
+    _write_backlog_item(edpa_root, "stories", "S-1", js=5, status="Done",
+                        iteration="PI-2026-2.1")  # would derive 5
+
+    resp = _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-2.1"}))
+    assert resp["delivered_sp"] == 42
+    parsed = yaml.safe_load(iter_path.read_text())
+    assert parsed["delivery"]["delivered_sp"] == 42
+    assert parsed["delivery"]["velocity"] == 42
+
+
 # ---------------------------------------------------------------------------
 # edpa_people_upsert
 # ---------------------------------------------------------------------------

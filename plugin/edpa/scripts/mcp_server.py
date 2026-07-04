@@ -514,9 +514,11 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="edpa_iteration_close",
             description=(
-                "Mark an iteration as closed in its YAML file. Does NOT run "
-                "the engine or generate reports — those are orchestrated by "
-                "the edpa:close-iteration skill."
+                "Mark an iteration as closed in its YAML file and stamp its "
+                "delivery block (delivered_sp/velocity = sum of js over Done "
+                "Story/Defect items in the iteration; existing values are "
+                "kept). Does NOT run the engine or generate reports — those "
+                "are orchestrated by the edpa:close-iteration skill."
             ),
             inputSchema={
                 "type": "object",
@@ -1710,10 +1712,29 @@ def _handle_iteration_close(edpa_root: Path, args: dict) -> list[TextContent]:
     # top-level status (pi_close, reports, board lifecycle view, e2e verifier).
     # Set both so every consumer agrees the iteration is closed.
     data["status"] = "closed"
+    # D-57: stamp the delivery block at close so velocity consumers
+    # (forecast.py, velocity.py, pi_close.py) read real numbers instead of 0.
+    # delivered_sp = Σ js of Done Story/Defect items assigned to this
+    # iteration — the shared _sp_rollup definition that pi_close/pi_metrics
+    # already use as their fallback. Hand-stamped values win: only missing
+    # keys are filled in.
+    delivery = data.get("delivery")
+    if not isinstance(delivery, dict):
+        delivery = {}
+    if delivery.get("delivered_sp") is None:
+        with _sibling_path():
+            from _sp_rollup import iteration_sp  # noqa: E402
+        derived = iteration_sp(edpa_root).get(safe_id) or {}
+        delivery["delivered_sp"] = int(derived.get("delivered_sp", 0))
+    if delivery.get("velocity") is None:
+        delivery["velocity"] = delivery["delivered_sp"]
+    data["delivery"] = delivery
     _write_yaml_atomic(iter_path, data)
 
-    logger.info("edpa_iteration_close: id=%s", safe_id)
-    return _ok({"id": safe_id, "status": "closed"})
+    logger.info("edpa_iteration_close: id=%s delivered_sp=%s",
+                safe_id, delivery["delivered_sp"])
+    return _ok({"id": safe_id, "status": "closed",
+                "delivered_sp": delivery["delivered_sp"]})
 
 
 @_idempotent("edpa_pi_create")

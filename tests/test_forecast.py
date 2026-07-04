@@ -40,11 +40,33 @@ pi:
   status: active
 """
 
+# Exactly what edpa_iteration_close wrote before D-57: lifecycle status only
+# (nested + top-level), no delivery block.
+ITER_YAML_NO_DELIVERY = """\
+iteration:
+  id: {id}
+  pi: {pi}
+  start_date: 2026-04-06
+  end_date: 2026-04-13
+  status: {status}
+status: {status}
+"""
+
 STORY_MD = """\
 ---
 id: {id}
 type: Story
 parent: F-100
+js: {js}
+status: {status}
+iteration: {iteration}
+---
+"""
+
+DEFECT_MD = """\
+---
+id: {id}
+type: Defect
 js: {js}
 status: {status}
 iteration: {iteration}
@@ -69,6 +91,25 @@ def _write_story(edpa_root, sid, js, status, iteration):
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{sid}.md").write_text(
         STORY_MD.format(id=sid, js=js, status=status, iteration=iteration),
+        encoding="utf-8",
+    )
+
+
+def _write_defect(edpa_root, did, js, status, iteration):
+    d = edpa_root / "backlog" / "defects"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{did}.md").write_text(
+        DEFECT_MD.format(id=did, js=js, status=status, iteration=iteration),
+        encoding="utf-8",
+    )
+
+
+def _write_iteration_no_delivery(edpa_root, it_id, pi, status):
+    """Iteration YAML as written by edpa_iteration_close pre-D-57 (no delivery)."""
+    (edpa_root / "iterations").mkdir(parents=True, exist_ok=True)
+    f = edpa_root / "iterations" / f"{it_id}.yaml"
+    f.write_text(
+        ITER_YAML_NO_DELIVERY.format(id=it_id, pi=pi, status=status),
         encoding="utf-8",
     )
 
@@ -153,6 +194,59 @@ def test_load_velocity_history_skips_pi_level_file(edpa_root):
 
 def test_load_velocity_history_empty(edpa_root):
     assert load_velocity_history(edpa_root, window=3) == []
+
+
+# D-57 regression: edpa_iteration_close historically wrote no delivery block,
+# so every closed iteration read as 0 velocity. Closed iterations without a
+# delivery block must fall back to the backlog rollup (Σ js of Done
+# Story/Defect items assigned to that iteration).
+
+def test_load_velocity_history_derives_from_backlog_without_delivery_block(edpa_root):
+    _write_iteration_no_delivery(edpa_root, "PI-2026-1.1", "PI-2026-1", "closed")
+    _write_iteration_no_delivery(edpa_root, "PI-2026-1.2", "PI-2026-1", "closed")
+    _write_story(edpa_root, "S-1", 5, "Done", "PI-2026-1.1")
+    _write_story(edpa_root, "S-2", 3, "Done", "PI-2026-1.1")
+    _write_story(edpa_root, "S-3", 2, "Implementing", "PI-2026-1.1")  # not Done
+    _write_defect(edpa_root, "D-1", 1, "Done", "PI-2026-1.1")  # defects count too
+    _write_story(edpa_root, "S-4", 13, "Done", "PI-2026-1.2")
+    vels = load_velocity_history(edpa_root, window=5)
+    assert vels == [9.0, 13.0]
+
+
+def test_load_velocity_history_stamped_block_wins_over_backlog(edpa_root):
+    # Iteration with an explicit delivery block keeps it; only the blockless
+    # one is derived from the backlog.
+    _write_iteration(edpa_root, "PI-2026-1.1", "PI-2026-1", "closed", 20)
+    _write_iteration_no_delivery(edpa_root, "PI-2026-1.2", "PI-2026-1", "closed")
+    _write_story(edpa_root, "S-1", 7, "Done", "PI-2026-1.1")  # ignored: stamp wins
+    _write_story(edpa_root, "S-2", 4, "Done", "PI-2026-1.2")  # derived
+    vels = load_velocity_history(edpa_root, window=5)
+    assert vels == [20.0, 4.0]
+
+
+def test_load_velocity_history_explicit_zero_not_rederived(edpa_root):
+    # An explicit delivered_sp/velocity of 0 is a real (audited) zero — the
+    # backlog fallback only applies when the keys are absent.
+    _write_iteration(edpa_root, "PI-2026-1.1", "PI-2026-1", "closed", 0)
+    _write_story(edpa_root, "S-1", 5, "Done", "PI-2026-1.1")
+    vels = load_velocity_history(edpa_root, window=3)
+    assert vels == [0.0]
+
+
+def test_forecast_pi_on_close_tool_output(edpa_root):
+    """E2E shape: iterations closed by the MCP tool (no delivery block) plus
+    Done backlog items must yield a real velocity baseline, not [0, 0, 0]."""
+    for i, sp in enumerate([26, 35, 28], start=1):
+        _write_iteration_no_delivery(edpa_root, f"PI-2026-1.{i}", "PI-2026-1", "closed")
+        _write_story(edpa_root, f"S-{i}", sp, "Done", f"PI-2026-1.{i}")
+    _write_iteration_no_delivery(edpa_root, "PI-2026-2.1", "PI-2026-2", "active")
+    _write_story(edpa_root, "S-10", 8, "Implementing", "PI-2026-2.1")
+
+    result = forecast_pi(edpa_root, "PI-2026-2", window=3, simulations=200, seed=0)
+    assert result["velocity_samples"] == [26.0, 35.0, 28.0]
+    assert result["velocity_mean"] > 0
+    # With ~30 SP mean velocity and 8 SP remaining, completion is near-certain.
+    assert result["completion_probability"] > 90.0
 
 
 # ---------------------------------------------------------------------------
