@@ -450,7 +450,12 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
     # Required fields
     for field in schema["required"]:
         if field == "parent":
-            # `parent: null` is acceptable for items where parent is optional
+            # `parent: null` is acceptable for items where parent is optional.
+            # D-69: parent_required must mirror the create side (mcp_server.
+            # PARENT_RULES) and backlog.py `add --help` — the Epic/Feature/Story
+            # spine requires a parent; Defect/Event/Risk (and Initiative/Task)
+            # "land at top level" (parent_required=False). Keep the two axes in
+            # sync so create never allows what validate then rejects.
             if "parent" not in data:
                 if schema["parent_required"]:
                     errors.append(f"{path}: missing required field 'parent'")

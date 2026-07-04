@@ -208,6 +208,46 @@ def test_explain_item_not_attributed(workspace):
     assert md.startswith("ERROR:")
 
 
+# ---------------------------------------------------------------------------
+# D-68: frozen-snapshot (derived_reports) shape
+# ---------------------------------------------------------------------------
+
+# Frozen snapshots (engine._snapshot_payload) / pre-v1.14 results carry
+# `derived_reports` (entries keyed `person`, no per-item `items` list), not
+# `people`. explain must route the person lookup through
+# _results_compat.person_reports so a snapshot-shaped results dict still
+# resolves the person (inverse of D-56). Before the fix explain read only
+# results["people"] and returned "ERROR: person not found" for every snapshot.
+DERIVED_REPORTS_RESULTS = {
+    "iteration": ITERATION_ID,
+    "methodology": "EDPA 2.6.0",
+    "snapshot_version": 1,
+    "frozen": True,
+    "capacity_registry": {"people": [{"id": "alice", "name": "Alice", "role": "Dev"}]},
+    "derived_reports": [
+        {"person": "alice", "name": "Alice", "role": "Dev",
+         "capacity": 40, "total_derived": 40.0, "items_count": 2,
+         "invariant_ok": True},
+    ],
+}
+
+
+def test_explain_derived_reports_snapshot_shape(tmp_path):
+    edpa = tmp_path / ".edpa"
+    (edpa / "reports" / f"iteration-{ITERATION_ID}").mkdir(parents=True)
+    (edpa / "reports" / f"iteration-{ITERATION_ID}" / "edpa_results.json").write_text(
+        json.dumps(DERIVED_REPORTS_RESULTS), encoding="utf-8"
+    )
+    results = load_results(edpa, ITERATION_ID)
+    md = explain_person(results, "alice", edpa)
+    assert not md.startswith("ERROR:")
+    assert "Alice" in md and "Dev" in md
+    assert "Capacity: **40h**" in md
+    assert "Derived: **40.0h**" in md
+    # invariant footer still renders from the snapshot's total/capacity
+    assert "✓" in md
+
+
 def test_explain_missing_backlog_graceful(tmp_path):
     """Works even if backlog files are missing — signals section shows fallback."""
     edpa = tmp_path / ".edpa"

@@ -554,6 +554,26 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="edpa_iteration_activate",
+            description=(
+                "Mark an iteration as active in its YAML file — sets both the "
+                "nested iteration.status and the top-level status to 'active' — "
+                "and demote any other currently-active iteration in the same PI "
+                "back to 'planned', enforcing the single-active-iteration "
+                "invariant. Never touches closed iterations and never stamps "
+                "delivery; use edpa_iteration_close to finish an iteration."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "idempotency_key": {"type": "string", "maxLength": 128},
+                },
+                "required": ["id"],
+                "additionalProperties": False,
+            },
+        ),
+        Tool(
             name="edpa_item_link_dep",
             description=(
                 "Add or remove a dependency on a backlog item. depends_on=[B] "
@@ -1373,6 +1393,14 @@ def _allowed_statuses(item_type: str) -> tuple[str, ...] | None:
         return PORTFOLIO_STATUSES
     if item_type in DELIVERY_TYPES:
         return DELIVERY_STATUSES
+    # D-69: Event and Risk carry the delivery workflow states too —
+    # validate_syntax.ITEM_SCHEMA assigns them DELIVERY_STATUSES, so the write
+    # layer must enforce the same set or edpa_item_create/transition would
+    # accept a status validate later flags. (A Risk's real lifecycle is its
+    # roam_status, but when a `status` is present it must be a delivery state.)
+    # Both create and transition go through here, so parity is automatic.
+    if item_type in ("Event", "Risk"):
+        return DELIVERY_STATUSES
     return None
 
 
@@ -1514,8 +1542,9 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
     # table edpa_item_transition enforces (_allowed_statuses, portfolio vs
     # delivery) — create must not accept what validate_syntax then flags.
     # Checked before the lock so a rejected status never burns an ID.
-    # Event/Risk carry no workflow table (None) — unvalidated, as in
-    # transitions.
+    # D-69: Event/Risk now resolve to DELIVERY_STATUSES here too (see
+    # _allowed_statuses) — only Initiative-less types with no schema workflow
+    # stay unvalidated.
     status = args.get("status") or "Funnel"
     allowed = _allowed_statuses(item_type)
     if allowed is not None and status not in allowed:
@@ -1855,6 +1884,80 @@ def _handle_iteration_close(edpa_root: Path, args: dict) -> list[TextContent]:
                 safe_id, delivery["delivered_sp"])
     return _ok({"id": safe_id, "status": "closed",
                 "delivered_sp": delivery["delivered_sp"]})
+
+
+def _iteration_pi_of(it_id: str, block: dict) -> str:
+    """The PI an iteration belongs to: the stamped `pi` field wins, else derive
+    it from the id (PI-2026-1.3 → PI-2026-1; a dot-less id is its own PI)."""
+    return block.get("pi") or (it_id.rsplit(".", 1)[0] if "." in it_id else it_id)
+
+
+@_idempotent("edpa_iteration_activate")
+def _handle_iteration_activate(edpa_root: Path, args: dict) -> list[TextContent]:
+    """Mark an iteration active and enforce the single-active-per-PI invariant.
+
+    The E2E had no tool for this and had to hand-edit YAML. Sets both the nested
+    iteration.status and the top-level status to 'active' (the same dual-write
+    edpa_iteration_close uses, so loader-lifted readers and top-level consumers —
+    board, reports, the e2e verifier — all agree). Any OTHER currently-active
+    iteration in the same PI is demoted back to 'planned'. Closed iterations are
+    never touched (terminal state), and nothing is closed here (that stamps
+    delivery). Goes through the same _write_yaml_atomic writer as create/close.
+    """
+    raw_id = args.get("id", "")
+    safe_id = _safe_iteration_id(raw_id)
+    if safe_id is None:
+        return _err(f"invalid iteration id {raw_id!r}; expected pattern PI-YYYY-N[.M]")
+
+    iter_dir = edpa_root / "iterations"
+    iter_path = iter_dir / f"{safe_id}.yaml"
+    if not iter_path.exists():
+        return _err(f"iteration {safe_id} not found")
+
+    with open(iter_path, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    block = data.get("iteration")
+    if not isinstance(block, dict):
+        return _err(
+            f"{safe_id} is not an iteration (no `iteration:` block — looks like "
+            f"a PI metadata file); nothing to activate"
+        )
+
+    target_pi = _iteration_pi_of(safe_id, block)
+
+    # Demote any other active iteration in the same PI (single-active invariant).
+    deactivated: list[str] = []
+    for sib_path in sorted(iter_dir.glob("*.yaml")):
+        if sib_path.name == iter_path.name:
+            continue
+        with open(sib_path, encoding="utf-8") as f:
+            sib = yaml.safe_load(f) or {}
+        sib_block = sib.get("iteration")
+        if not isinstance(sib_block, dict):
+            continue  # PI metadata file — skip
+        if _iteration_pi_of(sib_path.stem, sib_block) != target_pi:
+            continue
+        if sib_block.get("status") == "active" or sib.get("status") == "active":
+            sib_block["status"] = "planned"
+            sib["iteration"] = sib_block
+            if "status" in sib:
+                sib["status"] = "planned"
+            _write_yaml_atomic(sib_path, sib)
+            deactivated.append(sib_path.stem)
+
+    block["status"] = "active"
+    data["iteration"] = block
+    data["status"] = "active"
+    _write_yaml_atomic(iter_path, data)
+
+    logger.info("edpa_iteration_activate: id=%s pi=%s deactivated=%s",
+                safe_id, target_pi, deactivated)
+    return _ok({
+        "id": safe_id,
+        "status": "active",
+        "pi": target_pi,
+        "deactivated": deactivated,
+    })
 
 
 @_idempotent("edpa_pi_create")
@@ -2388,6 +2491,7 @@ TOOL_HANDLERS = {
     "edpa_confidence_vote": _handle_confidence_vote,
     "edpa_iteration_create": _handle_iteration_create,
     "edpa_iteration_close": _handle_iteration_close,
+    "edpa_iteration_activate": _handle_iteration_activate,
     "edpa_materialize": _handle_materialize,
     "edpa_pi_create": _handle_pi_create,
     "edpa_pi_close": _handle_pi_close,

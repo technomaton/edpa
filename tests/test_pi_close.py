@@ -133,6 +133,43 @@ def test_aggregate_engine_results_reads_people_total_derived(tmp_path: Path) -> 
     assert by_person["bob"] == 5.5
 
 
+def _write_results_snapshot(edpa: Path, iteration_id: str, reports: list) -> None:
+    """Frozen-snapshot edpa_results.json: `derived_reports` (entries keyed
+    `person`), no top-level `people` — engine._snapshot_payload / pre-v1.14."""
+    rep = edpa / "reports" / f"iteration-{iteration_id}"
+    rep.mkdir(parents=True, exist_ok=True)
+    (rep / "edpa_results.json").write_text(
+        json.dumps({"iteration": iteration_id, "derived_reports": reports,
+                    "snapshot_version": 1, "frozen": True}),
+        encoding="utf-8")
+
+
+def test_aggregate_engine_results_reads_derived_reports_snapshot(tmp_path: Path) -> None:
+    """D-68 (inverse of D-32/D-56): a frozen-snapshot results file carries
+    `derived_reports` (entries keyed `person`), not `people`. PI close must
+    route through _results_compat.person_reports so those hours still roll up
+    and sum across the PI's iterations. Before the fix it read only `people`
+    and rolled up ZERO."""
+    edpa = tmp_path / ".edpa"
+    _write_results_snapshot(edpa, "PI-2026-1.1", [
+        {"person": "alice", "name": "Alice", "role": "Dev", "capacity": 60,
+         "total_derived": 10.0, "items_count": 4, "invariant_ok": True},
+        {"person": "bob", "name": "Bob", "role": "Arch", "capacity": 40,
+         "total_derived": 5.5, "items_count": 2, "invariant_ok": True},
+    ])
+    _write_results_snapshot(edpa, "PI-2026-1.2", [
+        {"person": "alice", "name": "Alice", "role": "Dev", "capacity": 60,
+         "total_derived": 3.0, "items_count": 1, "invariant_ok": True},
+    ])
+
+    out = pi_close.aggregate_engine_results(
+        edpa, "PI-2026-1", ["PI-2026-1.1", "PI-2026-1.2"])
+    assert out is not None
+    by_person = {e["person"]: e["derived_hours"] for e in out}
+    assert by_person["alice"] == 13.0  # 10.0 + 3.0 summed across iterations
+    assert by_person["bob"] == 5.5
+
+
 def test_aggregate_engine_results_none_when_no_results(tmp_path: Path) -> None:
     """No edpa_results.json on disk → None (handled gracefully)."""
     edpa = tmp_path / ".edpa"

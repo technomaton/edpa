@@ -17,10 +17,21 @@ planning ``ObjectivesData`` contract consumed by the board:
 Consumed by the ``edpa_objective_set`` / ``edpa_objective_remove`` /
 ``edpa_confidence_vote`` MCP tools. ``edpa_dir`` is the ``.edpa/`` directory
 (the convention used by create_pi.py and the MCP handlers).
+
+Also runnable as a plain CLI (same library write path, no MCP server needed —
+mirrors create_pi.py / pi_close.py)::
+
+    python3 objectives.py set    PI-2026-1 alpha committed "Deliver OMOP parser" --bv 8
+    python3 objectives.py remove PI-2026-1 alpha committed "Deliver OMOP parser"
+    python3 objectives.py vote   PI-2026-1 alpha 4
+
+The CLI discovers ``.edpa/`` from the current directory upward, or takes an
+explicit ``--edpa-root``; pass ``--no-commit`` to skip the git auto-commit.
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import sys
@@ -160,3 +171,175 @@ def set_confidence(edpa_dir, pi, team, confidence) -> dict:
     t["confidence"] = confidence
     save(edpa_dir, pi, data)
     return {"pi": pi, "team": team, "confidence": confidence}
+
+
+# -- CLI ----------------------------------------------------------------------
+# Everything below is CLI-only. The library functions above are imported by
+# mcp_server, which must keep stdout pristine for JSON-RPC framing — so the
+# ``_console`` UTF-8 reconfigure and ``_auto_commit`` are imported lazily inside
+# ``main()``, never at module top. (Mirrors create_pi.py / pi_close.py.)
+class C:
+    RESET = "\033[0m"
+    DIM = "\033[2m"
+    OK = "\033[32m"
+    WARN = "\033[33m"
+    ERR = "\033[31m"
+
+
+def _isatty() -> bool:
+    return sys.stdout.isatty() and "NO_COLOR" not in os.environ
+
+
+def _c(text: str, code: str) -> str:
+    return f"{code}{text}{C.RESET}" if _isatty() else text
+
+
+def die(msg, code=1):
+    print(f"{_c('✗', C.ERR)} {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def info(msg):
+    print(f"{_c('·', C.DIM)} {msg}")
+
+
+def ok(msg):
+    print(f"{_c('✓', C.OK)} {msg}")
+
+
+def warn(msg):
+    print(f"{_c('⚠', C.WARN)} {msg}")
+
+
+def find_edpa_root() -> Path:
+    """Locate the ``.edpa/`` directory from cwd upward (mirrors
+    create_pi.find_edpa_root). Returns the ``.edpa`` dir or dies."""
+    cur = Path.cwd().resolve()
+    for parent in [cur, *cur.parents]:
+        if (parent / ".edpa").is_dir():
+            return parent / ".edpa"
+    die("No .edpa/ directory found from current working directory upward.")
+
+
+def _resolve_edpa_dir(edpa_root) -> Path:
+    """The ``.edpa`` directory the library writes under: an explicit
+    ``--edpa-root`` (pi_close.py style) when given, else cwd discovery."""
+    if edpa_root:
+        p = Path(edpa_root)
+        if not p.is_dir():
+            die(f"--edpa-root {edpa_root!r} is not a directory")
+        return p
+    return find_edpa_root()
+
+
+def _do_set(edpa_dir: Path, args) -> tuple[dict, str]:
+    r = set_objective(edpa_dir, args.pi, args.team, args.kind, args.title,
+                      bv=args.bv, status=args.status)
+    ok(f"{r['action']} {r['kind']} objective {r['title']!r} for {r['team']} "
+       f"in {r['pi']} (bv={r['bv']}, status={r['status']})")
+    return r, (f"chore(pi-objectives): set {r['kind']} objective "
+               f"for {r['team']} in {r['pi']}")
+
+
+def _do_remove(edpa_dir: Path, args) -> tuple[dict, str]:
+    r = remove_objective(edpa_dir, args.pi, args.team, args.kind, args.title)
+    ok(f"removed {r['kind']} objective {r['title']!r} for {r['team']} "
+       f"in {r['pi']}")
+    return r, (f"chore(pi-objectives): remove {r['kind']} objective "
+               f"for {r['team']} in {r['pi']}")
+
+
+def _do_vote(edpa_dir: Path, args) -> tuple[dict, str]:
+    r = set_confidence(edpa_dir, args.pi, args.team, args.confidence)
+    ok(f"confidence vote {r['confidence']} for {r['team']} in {r['pi']}")
+    return r, (f"chore(pi-objectives): confidence vote {r['confidence']} "
+               f"for {r['team']} in {r['pi']}")
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(
+        prog="objectives",
+        description="EDPA PI objectives — set/remove objectives and cast team "
+                    "confidence votes in .edpa/pi-objectives/<PI>.yaml, the "
+                    "same write path as the edpa_objective_set / "
+                    "edpa_objective_remove / edpa_confidence_vote MCP tools.")
+    # --edpa-root / --no-commit live on every subcommand (shared parent) so they
+    # trail the positionals, like the --no-commit on create_pi.py / pi_close.py.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--edpa-root", dest="edpa_root", default=None,
+                        help="path to the .edpa/ directory (default: "
+                             "discovered from the current directory upward)")
+    common.add_argument("--no-commit", action="store_true",
+                        help="write the YAML but skip the git add/commit")
+    sub = ap.add_subparsers(dest="command", metavar="{set,remove,vote}")
+
+    p_set = sub.add_parser("set", parents=[common],
+                           help="add or update an objective (upsert by title)")
+    p_set.add_argument("pi", help="PI id, e.g. PI-2026-1")
+    p_set.add_argument("team", help="team name")
+    p_set.add_argument("kind", choices=KINDS, help="committed | stretch")
+    p_set.add_argument("title", help="objective title")
+    p_set.add_argument("--bv", type=int, default=None,
+                       help="business value 1-10 (default 5)")
+    p_set.add_argument("--status", choices=OBJ_STATUSES, default=None,
+                       help="planned | in_progress | done (default planned)")
+
+    p_rm = sub.add_parser("remove", parents=[common],
+                          help="remove an objective by (team, kind, title)")
+    p_rm.add_argument("pi", help="PI id, e.g. PI-2026-1")
+    p_rm.add_argument("team", help="team name")
+    p_rm.add_argument("kind", choices=KINDS, help="committed | stretch")
+    p_rm.add_argument("title", help="objective title")
+
+    p_vote = sub.add_parser("vote", parents=[common],
+                            help="set a team's confidence vote (1-5)")
+    p_vote.add_argument("pi", help="PI id, e.g. PI-2026-1")
+    p_vote.add_argument("team", help="team name")
+    p_vote.add_argument("confidence", type=int, help="confidence 1-5")
+    return ap
+
+
+def main(argv=None) -> int:
+    try:  # best-effort UTF-8 stdio on legacy Windows consoles — CLI only
+        import _console  # noqa: F401
+    except ImportError:
+        pass
+
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    if not args.command:
+        parser.print_help()
+        return 0
+
+    edpa_dir = _resolve_edpa_dir(args.edpa_root)
+    try:
+        if args.command == "set":
+            result, message = _do_set(edpa_dir, args)
+        elif args.command == "remove":
+            result, message = _do_remove(edpa_dir, args)
+        else:  # vote
+            result, message = _do_vote(edpa_dir, args)
+    except ValueError as exc:
+        die(str(exc))
+
+    path = _path(edpa_dir, result["pi"])
+    if args.no_commit:
+        info(f"--no-commit: {path} left uncommitted in the working tree")
+        return 0
+
+    try:
+        from _auto_commit import maybe_commit
+        status = maybe_commit([str(path)], message, root=str(edpa_dir.parent))
+    except ImportError:
+        warn("_auto_commit unavailable — commit manually.")
+        return 0
+    if status == "committed":
+        ok(f"Committed: {message}")
+    elif status == "skipped":
+        warn("auto-commit skipped (no git, or git user.name/email unset) "
+             "— commit manually.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

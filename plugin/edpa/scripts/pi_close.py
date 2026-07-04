@@ -45,7 +45,7 @@ from _sp_rollup import _DELIVERY_DIRS, iteration_sp, predictability_pct  # noqa:
 
 
 from _yaml_io import load_yaml as _shared_load_yaml  # noqa: E402
-from _results_compat import registry_capacity_by_id  # noqa: E402
+from _results_compat import person_reports, registry_capacity_by_id  # noqa: E402
 
 
 def load_yaml(path: Path):
@@ -232,8 +232,10 @@ def aggregate_engine_results(edpa_root: Path, pi_id: str, iteration_ids):
         # edpa_results.json schema (engine.py:1587-1595): top-level `people`,
         # each entry keyed `id` + `total_derived` (D-32 — was reading the
         # non-existent `allocations`/`person`/`derived_hours`, summing zero).
-        for entry in data.get("people", []) or []:
-            person = entry.get("id")
+        # D-68: frozen snapshots instead carry `derived_reports` (entries keyed
+        # `person`); _results_compat.person_reports normalizes both shapes.
+        for entry in person_reports(data):
+            person = entry.get("person")
             hours = entry.get("total_derived", 0) or 0
             if person:
                 per_person[person]["hours"] += hours

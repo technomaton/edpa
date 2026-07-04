@@ -25,6 +25,12 @@ except ImportError:
     print("ERROR: PyYAML required. pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _results_compat import person_reports  # noqa: E402
+finally:
+    sys.path.pop(0)
+
 
 # ---------------------------------------------------------------------------
 # Loading helpers
@@ -88,9 +94,12 @@ def explain_person(
     """Generate a narrative markdown explaining one person's allocation."""
     iteration_id = results.get("iteration", "?")
 
-    # Find person in people[] (engine output is keyed by `id`, not `person`)
+    # D-68: engine output keys people under `people` (entries keyed `id`);
+    # frozen snapshots key them under `derived_reports` (entries keyed
+    # `person`). _results_compat.person_reports normalizes both, guaranteeing
+    # a `person` key to match on.
     dr = next(
-        (r for r in (results.get("people") or []) if r.get("id") == person_id),
+        (r for r in person_reports(results) if r.get("person") == person_id),
         None,
     )
     if dr is None:

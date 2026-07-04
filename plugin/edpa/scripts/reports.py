@@ -31,6 +31,25 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from _results_compat import person_reports  # noqa: E402
+finally:
+    sys.path.pop(0)
+
+
+def _item_count(person: dict) -> int:
+    """Items credited to a person, tolerant of both result shapes (D-68).
+
+    Engine CLI entries carry a full ``items`` list; frozen snapshots carry
+    only a precomputed ``items_count`` (no per-item detail). Prefer the list
+    when present, else the count, else 0.
+    """
+    items = person.get("items")
+    if items is not None:
+        return len(items)
+    return person.get("items_count", 0) or 0
+
 
 # v1.11: role labels are derived at display time from signal types.
 # The data store no longer carries `as: owner/key/...` per contributor;
@@ -144,7 +163,8 @@ def _format_person_md(person: dict, results: dict) -> str:
     # template no longer prints it — emitting `Mode: ?` on every timesheet
     # confused auditors who reasonably asked "what mode are we in?".
     lines = [
-        f"# Timesheet — {person.get('name', person.get('id', '?'))} "
+        f"# Timesheet — "
+        f"{person.get('name') or person.get('person') or person.get('id') or '?'} "
         f"({person.get('role', '?')})",
         "",
         f"- Iteration: **{iteration}**",
@@ -186,8 +206,13 @@ def _format_team_md(results: dict) -> str:
     iteration = results.get("iteration", "?")
     methodology = results.get("methodology", "EDPA")
     pf = results.get("planning_factor", 0.8)
-    people = results.get("people", []) or []
-    team_total = results.get("team_total", 0)
+    # D-68: engine CLI output keys people under `people`; frozen snapshots key
+    # them under `derived_reports` (entries keyed `person`). Normalize both.
+    people = person_reports(results)
+    # Snapshots carry no top-level team_total — sum the person reports instead.
+    team_total = results.get("team_total")
+    if team_total is None:
+        team_total = sum(p.get("total_derived", 0) or 0 for p in people)
     capacity_total = sum(p.get("capacity", 0) for p in people)
     # Show the Override column only when at least one person had an
     # override applied — keeps reports clean for the common case where
@@ -216,21 +241,22 @@ def _format_team_md(results: dict) -> str:
         ]
     for p in people:
         invariant = "OK" if p.get("invariant_ok", True) else "FAIL"
+        name = p.get("name") or p.get("person") or p.get("id") or "?"
         if has_overrides:
             override_cell = _format_override_summary(
                 p.get("capacity_override"),
                 p.get("capacity_baseline", p.get("capacity", 0))) or "—"
             lines.append(
-                f"| {p.get('name', p.get('id', '?'))} | {p.get('role', '?')} | "
+                f"| {name} | {p.get('role', '?')} | "
                 f"{p.get('capacity', 0)}h | {override_cell} | "
                 f"{p.get('total_derived', 0)}h | "
-                f"{len(p.get('items', []) or [])} | {invariant} |"
+                f"{_item_count(p)} | {invariant} |"
             )
         else:
             lines.append(
-                f"| {p.get('name', p.get('id', '?'))} | {p.get('role', '?')} | "
+                f"| {name} | {p.get('role', '?')} | "
                 f"{p.get('capacity', 0)}h | {p.get('total_derived', 0)}h | "
-                f"{len(p.get('items', []) or [])} | {invariant} |"
+                f"{_item_count(p)} | {invariant} |"
             )
     lines.append("")
     return "\n".join(lines) + "\n"
@@ -250,8 +276,9 @@ def write_iteration_reports(edpa_root: Path, iteration_id: str,
     out_dir.mkdir(parents=True, exist_ok=True)
 
     written = []
-    for p in results.get("people", []) or []:
-        pid = p.get("id") or p.get("name", "person").lower().replace(" ", "-")
+    for p in person_reports(results):
+        pid = (p.get("person") or p.get("id")
+               or p.get("name", "person").lower().replace(" ", "-"))
         path = out_dir / f"timesheet-{pid}.md"
         path.write_text(_format_person_md(p, results), encoding="utf-8")
         written.append((pid, p.get("total_derived", 0), path))
@@ -298,8 +325,9 @@ def write_pi_summary(edpa_root: Path, pi_id: str,
         results_path = base / f"iteration-{iter_id}" / "edpa_results.json"
         results = _load_results(results_path)
         iteration_results.append(results)
-        for p in results.get("people", []) or []:
-            pid = p.get("id") or p.get("name", "?")
+        # D-68: normalize engine (`people`) + snapshot (`derived_reports`).
+        for p in person_reports(results):
+            pid = p.get("person") or p.get("id") or p.get("name", "?")
             agg = person_totals.setdefault(pid, {
                 "id": pid,
                 "name": p.get("name", pid),
@@ -314,7 +342,7 @@ def write_pi_summary(edpa_root: Path, pi_id: str,
                 "iteration": iter_id,
                 "capacity": p.get("capacity", 0),
                 "derived": p.get("total_derived", 0),
-                "items": len(p.get("items", []) or []),
+                "items": _item_count(p),
             })
 
     lines = [
@@ -339,9 +367,14 @@ def write_pi_summary(edpa_root: Path, pi_id: str,
     for r in iteration_results:
         # `mode` retired in v1.14 — was producing "(None)" in every
         # bullet for the post-v1.14 single-path engine output.
+        # D-68: snapshots carry no team_total — sum the person reports.
+        team_total = r.get("team_total")
+        if team_total is None:
+            team_total = sum(
+                p.get("total_derived", 0) or 0 for p in person_reports(r))
         lines.append(
             f"- **{r.get('iteration')}**: "
-            f"team_total={r.get('team_total', 0)}h, "
+            f"team_total={team_total}h, "
             f"invariants_passed={r.get('all_invariants_passed', '?')}"
         )
 

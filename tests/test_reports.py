@@ -269,6 +269,101 @@ def test_pi_summary(tmp_path):
         assert iter_id in text, iter_id
 
 
+# ---------------------------------------------------------------------------
+# D-68: frozen-snapshot (derived_reports) shape
+#
+# engine.py writes top-level `people` (entries keyed `id`, per-item `items`
+# list). Frozen snapshots (engine._snapshot_payload) and pre-v1.14 results
+# files instead carry `derived_reports` (entries keyed `person`, item count as
+# `items_count`, NO per-item list) + a top-level capacity_registry and no
+# team_total. reports.py must route every person read through
+# _results_compat.person_reports so a snapshot-shaped edpa_results.json still
+# materialises timesheets + a populated team rollup (inverse of D-56). Before
+# the fix reports.py read only results["people"] and emitted empty reports.
+# ---------------------------------------------------------------------------
+
+def _snapshot_report(person, name, role, capacity, derived, items_count):
+    return {
+        "person": person, "name": name, "role": role,
+        "capacity": capacity, "total_derived": derived,
+        "items_count": items_count, "invariant_ok": True,
+    }
+
+
+def _snapshot_results(iteration, reports):
+    return {
+        "iteration": iteration,
+        "methodology": "EDPA-SNAP",
+        "snapshot_version": 1,
+        "frozen": True,
+        "capacity_registry": {"people": [
+            {"id": r["person"], "name": r["name"], "role": r["role"]}
+            for r in reports
+        ]},
+        "derived_reports": reports,
+    }
+
+
+def _snapshot_people():
+    return [
+        _snapshot_report("alice", "Alice Dev", "Dev", 40, 38.0, 2),
+        _snapshot_report("bob-arch", "Bob Arch", "Arch", 20, 20.0, 1),
+        _snapshot_report("carol", "Carol QA", "QA", 10, 10.0, 1),
+    ]
+
+
+def test_iteration_reports_snapshot_shape(tmp_path):
+    """A frozen-snapshot edpa_results.json (derived_reports, entries keyed
+    `person`, no top-level `people`/`team_total`) must still produce
+    per-person timesheets + a populated team rollup."""
+    edpa = tmp_path / ".edpa"
+    (edpa / "config").mkdir(parents=True)
+    (edpa / "config" / "people.yaml").write_text(PEOPLE_YAML, encoding="utf-8")
+    _plant(edpa, "PI-2026-1.1", _snapshot_results("PI-2026-1.1", _snapshot_people()))
+
+    proc = _run_reports(tmp_path, "PI-2026-1.1")
+    assert proc.returncode == 0, proc.stderr
+
+    out = _iter_dir(tmp_path)
+    # timesheet filename comes from the normalized `person` id, not `id`
+    person = (out / "timesheet-alice.md").read_text(encoding="utf-8")
+    assert "# Timesheet — Alice Dev (Dev)" in person
+    assert "- Capacity: **40h**" in person
+    assert "- Derived: **38.0h**" in person
+    assert "**Total: 38.0h / 40h capacity**" in person
+
+    team = (out / "timesheet-team.md").read_text(encoding="utf-8")
+    assert "- Team capacity: **70h**" in team
+    # team_total is absent from snapshots — derived by summing person reports
+    assert "- Team derived: **68.0h**" in team
+    # item count falls back to items_count when there is no per-item `items`
+    assert "| Alice Dev | Dev | 40h | 38.0h | 2 | OK |" in team
+    assert "| Bob Arch | Arch | 20h | 20.0h | 1 | OK |" in team
+
+
+def test_pi_summary_snapshot_shape(tmp_path):
+    """PI aggregation (write_pi_summary) reads each iteration's results via
+    person_reports, so snapshot-shaped derived_reports aggregate too."""
+    edpa = tmp_path / ".edpa"
+    (edpa / "config").mkdir(parents=True)
+    (edpa / "config" / "people.yaml").write_text(PEOPLE_YAML, encoding="utf-8")
+    _plant(edpa, "PI-2026-1.1", _snapshot_results("PI-2026-1.1", _snapshot_people()))
+    _plant(edpa, "PI-2026-1.2", _snapshot_results(
+        "PI-2026-1.2",
+        [_snapshot_report("alice", "Alice Dev", "Dev", 40, 40.0, 3)]))
+
+    proc = _run_reports(tmp_path, "--pi", "PI-2026-1")
+    assert proc.returncode == 0, proc.stderr
+    assert "2 iteration(s) aggregated" in proc.stdout
+
+    text = (edpa / "reports" / "pi-PI-2026-1" /
+            "pi-summary-PI-2026-1.md").read_text(encoding="utf-8")
+    assert "| Person | Role | Capacity Σ | Derived Σ | Iterations |" in text
+    # alice: 40 + 40 capacity, 38.0 + 40.0 derived, across 2 iterations
+    assert "| Alice Dev | Dev | 80h | 78.0h | 2 |" in text
+    assert "| Bob Arch | Arch | 20h | 20.0h | 1 |" in text
+
+
 def test_missing_results_exit2(project):
     proc = _run_reports(project, "PI-2026-9.9")
     assert proc.returncode == 2

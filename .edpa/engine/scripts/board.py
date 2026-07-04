@@ -3,10 +3,10 @@
 EDPA Board — Generate a self-contained HTML Kanban snapshot from .edpa/backlog/.
 
 Usage:
-    python plugin/edpa/scripts/board.py                          # Default: all stories
+    python plugin/edpa/scripts/board.py                          # Default: all levels
     python plugin/edpa/scripts/board.py --open                   # Generate & open in browser
     python plugin/edpa/scripts/board.py --iteration PI-2026-1.4  # Filter by iteration
-    python plugin/edpa/scripts/board.py --level feature          # Show features instead
+    python plugin/edpa/scripts/board.py --level feature          # Show only features
     python plugin/edpa/scripts/board.py --output /tmp/board.html # Custom output path
 """
 
@@ -538,7 +538,7 @@ def main():
     parser.add_argument("--output", "-o", help="Output file path (default: .edpa/board.html)")
     parser.add_argument("--open", action="store_true", help="Open in browser after generating")
     parser.add_argument("--iteration", "-i", help="Filter by iteration prefix (e.g. PI-2026-1.4)")
-    parser.add_argument("--level", "-l", help="Item level: initiative, epic, feature, story (default: story)")
+    parser.add_argument("--level", "-l", help="Item level: initiative, epic, feature, story (default: all levels)")
     args = parser.parse_args()
 
     root = find_repo_root()
