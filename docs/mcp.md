@@ -5,7 +5,7 @@ read + write access to `.edpa/` project data — config, iterations, people,
 backlog — over the standard MCP `stdio` transport. Any MCP-aware client
 (Claude Code, Cursor, Codex CLI, custom Python/TS clients) can use it.
 
-**Production-ready since v1.3.0-beta; current as of v2.13.0** (read + write
+**Production-ready since v1.3.0-beta; current as of v2.14.0** (read + write
 tools — see the tool tables below). Validated handlers, schema-checked
 inputs, item-ID path-traversal guard, stderr logging, version-aware identity.
 
