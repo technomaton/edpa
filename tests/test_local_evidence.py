@@ -797,28 +797,156 @@ def test_neutralize_foreign_signals_gates_all_weighted_types() -> None:
     assert "out_of_iteration" not in by_type["state_transition"].get("tags", [])
 
 
-def test_post_commit_hook_keeps_commit_author_outside_all_windows(repo: Path) -> None:
-    """D-29 / decision #2: a commit whose author date falls in NO iteration
-    window (under a contiguous calendar the only real gap is the edge of the
-    project timeline) resolves commit_iter=None, so the gate no-ops and the
-    commit_author keeps full weight — a lenient fallback, never a router."""
+def test_post_commit_hook_gates_commit_author_outside_all_windows(repo: Path) -> None:
+    """D-63 (supersedes the D-29 decision-#2 leniency): a commit whose author
+    date falls in NO iteration window (edge of the project timeline, or the gap
+    between iterations) resolves commit_iter=None — but when the touched item
+    HAS an ``iteration:`` whose window is resolvable, the commit provably sits
+    outside the item's own window, so its ``commit_author`` (and the
+    ``agent_contribution`` derived from the same commit) is neutralised to
+    weight 0 + ``out_of_iteration``. The entry stays recorded for audit."""
     _write_iter(repo, "PI-2026-3.1", "2026-06-15", "2026-06-30")
     _commit_edit(repo, ".edpa/backlog/stories/S-1.md",
                  {"iteration": "PI-2026-3.1", "status": "Done", "js": 5},
                  "S-1: setup", "2026-06-16T09:00:00+00:00")
-    # A late edit committed in DECEMBER — after every defined iteration → no window.
+    # A late edit committed in DECEMBER — after every defined iteration → no
+    # commit window, but S-1's own PI-2026-3.1 window proves it out-of-window.
     d = load_md(repo / ".edpa/backlog/stories/S-1.md")
     d["bv"] = 9
     save_md_item(repo / ".edpa/backlog/stories/S-1.md", d)
     _git(["add", "."], cwd=repo)
-    _git(["commit", "-q", "-m", "late tweak on S-1"], cwd=repo, env_extra={
-        "GIT_AUTHOR_DATE": "2026-12-01T10:00:00+00:00",
-        "GIT_COMMITTER_DATE": "2026-12-01T10:00:00+00:00"})
+    _git(["commit", "-q", "-m",
+          "late tweak on S-1\n\n"
+          "Co-Authored-By: Claude <noreply@anthropic.com>"],
+         cwd=repo, env_extra={
+             "GIT_AUTHOR_DATE": "2026-12-01T10:00:00+00:00",
+             "GIT_COMMITTER_DATE": "2026-12-01T10:00:00+00:00"})
     assert _run_emitter(repo) == 0
-    ca = [s for s in load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
-          if s["type"] == "commit_author"]
-    assert ca and all(s["weight"] > 0 for s in ca), "no-window commit keeps full weight"
-    assert all("out_of_iteration" not in s.get("tags", []) for s in ca)
+    ev = load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+    ca = [s for s in ev if s["type"] == "commit_author"]
+    assert ca, "the out-of-window commit_author must still be recorded for audit"
+    assert all(s["weight"] == 0 for s in ca)
+    assert all("out_of_iteration" in s.get("tags", []) for s in ca)
+    assert all(s.get("raw_weight") for s in ca)  # original retained → reversible
+    ag = [s for s in ev if s["type"] == "agent_contribution"]
+    assert ag, "agent_contribution from the same commit must be recorded"
+    assert all(s["weight"] == 0 for s in ag)
+    assert all("out_of_iteration" in s.get("tags", []) for s in ag)
+
+
+def test_post_commit_hook_gates_gap_commit_between_iterations(repo: Path) -> None:
+    """D-63 regression (E2E shape): iteration calendars have gaps (the weekend
+    between PI-2026-1.1 ending Fri 01-23 and PI-2026-1.2 starting Mon 01-26).
+    A close/bookkeeping commit dated INSIDE the gap touches an item assigned to
+    the NEXT iteration: commit_iter resolves to None, so the old foreign-item
+    rule no-oped and commit_author kept full weight 4.0, permanently crediting
+    planning/close work into a window the work never happened in. The window
+    rule gates it; a genuine in-window commit on the same item keeps weight."""
+    _write_iter(repo, "PI-2026-1.1", "2026-01-05", "2026-01-23")
+    _write_iter(repo, "PI-2026-1.2", "2026-01-26", "2026-02-13")
+    # Planning assigns S-1 to the NEXT iteration (commit inside 1.1's window).
+    _commit_edit(repo, ".edpa/backlog/stories/S-1.md",
+                 {"iteration": "PI-2026-1.2", "status": "Backlog"},
+                 "S-1: plan into 1.2", "2026-01-06T09:00:00+00:00")
+
+    # Close-day bookkeeping commit in the GAP (Sat 01-24) touches S-1.
+    gap_sha = _commit_edit(repo, ".edpa/backlog/stories/S-1.md",
+                           {"bv": 8}, "close-out bookkeeping on S-1",
+                           "2026-01-24T10:30:00+01:00",
+                           email="bob@example.dev", name="Bob Architect")
+    assert _run_emitter(repo) == 0
+    # Genuine delivery commit INSIDE 1.2's window keeps full weight.
+    work_sha = _commit_edit(repo, ".edpa/backlog/stories/S-1.md",
+                            {"tc": 5, "status": "Implementing"}, "work on S-1",
+                            "2026-02-02T10:00:00+00:00",
+                            email="bob@example.dev", name="Bob Architect")
+    assert _run_emitter(repo) == 0
+
+    ev = load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
+    gap = [s for s in ev if s["type"] == "commit_author"
+           and s["ref"] == f"commit/{gap_sha[:7]}"]
+    assert gap, "the gap commit_author must still be recorded for audit"
+    assert all(s["weight"] == 0 for s in gap)
+    assert all("out_of_iteration" in s.get("tags", []) for s in gap)
+    assert all(s.get("raw_weight") == 4.0 for s in gap)
+    # The gap commit's yaml_edit shares the gate (same GATED_TYPES rule).
+    gap_ye = [s for s in ev if s["type"] == "yaml_edit"
+              and s.get("ref", "").startswith(f"commit/{gap_sha[:7]}")]
+    assert gap_ye and all(s["weight"] == 0 for s in gap_ye)
+    assert all("out_of_iteration" in s.get("tags", []) for s in gap_ye)
+    work = [s for s in ev if s["type"] == "commit_author"
+            and s["ref"] == f"commit/{work_sha[:7]}"]
+    assert work and all(s["weight"] > 0 for s in work)
+    assert all("out_of_iteration" not in s.get("tags", []) for s in work)
+
+
+def test_neutralize_gates_by_items_own_window_when_no_commit_iteration(
+        tmp_path: Path) -> None:
+    """D-63 unit: with no resolvable commit iteration (target=None) the guard
+    gates each weighted GATED_TYPES signal whose ``at`` provably falls outside
+    the item's OWN iteration window; in-window / unprovable timestamps keep
+    weight, state_transition stays untouched."""
+    edpa = tmp_path / ".edpa"
+    (edpa / "iterations").mkdir(parents=True)
+    (edpa / "iterations" / "PI-2026-1.2.yaml").write_text(yaml.safe_dump(
+        {"iteration": {"id": "PI-2026-1.2", "start_date": "2026-01-26",
+                       "end_date": "2026-02-13"}}))
+    item_path = edpa / "backlog" / "stories" / "S-1.md"
+    item = {"type": "Story", "iteration": "PI-2026-1.2"}
+    sigs = [
+        {"type": "commit_author", "weight": 4.0,
+         "at": "2026-01-24T10:30:00+01:00"},                      # gap → gate
+        {"type": "agent_contribution", "weight": 1.0,
+         "at": "2026-01-24T10:30:00+01:00"},                      # gap → gate
+        {"type": "commit_author", "weight": 4.0,
+         "at": "2026-02-02T10:00:00+00:00"},                      # in-window
+        {"type": "commit_author", "weight": 4.0},                 # no at → keep
+        {"type": "state_transition", "weight": 0,
+         "at": "2026-01-24T10:30:00+01:00"},                      # untouched
+    ]
+    le._neutralize_foreign_signals(item, sigs, item_path, None, edpa_root=edpa)
+    assert sigs[0]["weight"] == 0 and "out_of_iteration" in sigs[0]["tags"]
+    assert sigs[0]["raw_weight"] == 4.0
+    assert sigs[1]["weight"] == 0 and "out_of_iteration" in sigs[1]["tags"]
+    assert sigs[2]["weight"] == 4.0
+    assert "out_of_iteration" not in sigs[2].get("tags", [])
+    assert sigs[3]["weight"] == 4.0, "unprovable timestamp must keep weight"
+    assert "out_of_iteration" not in sigs[4].get("tags", [])
+
+
+def test_neutralize_window_rule_unprovable_cases_keep_weight(
+        tmp_path: Path) -> None:
+    """D-63 unit: the window rule never gates what it cannot prove — missing
+    iteration YAML, an Epic's cross-PI assignment, and a Feature assigned to a
+    pi-shaped YAML (no ``iteration:`` block) all keep full weight."""
+    edpa = tmp_path / ".edpa"
+    (edpa / "iterations").mkdir(parents=True)
+    (edpa / "iterations" / "PI-2026-1.yaml").write_text(yaml.safe_dump(
+        {"pi": {"id": "PI-2026-1", "start_date": "2026-01-05",
+                "end_date": "2026-03-06"}}))
+    out_at = "2026-12-01T10:00:00+00:00"
+
+    # 1. Story assigned to an iteration with NO YAML file → unprovable → keep.
+    sigs = [{"type": "commit_author", "weight": 4.0, "at": out_at}]
+    le._neutralize_foreign_signals(
+        {"type": "Story", "iteration": "PI-2027-9.9"}, sigs,
+        edpa / "backlog" / "stories" / "S-1.md", None, edpa_root=edpa)
+    assert sigs[0]["weight"] == 4.0
+
+    # 2. Epic: cross-PI membership — never window-gated.
+    sigs = [{"type": "commit_author", "weight": 4.0, "at": out_at}]
+    le._neutralize_foreign_signals(
+        {"type": "Epic", "iteration": "PI-2026-1"}, sigs,
+        edpa / "backlog" / "epics" / "E-1.md", None, edpa_root=edpa)
+    assert sigs[0]["weight"] == 4.0
+
+    # 3. Feature assigned to a PI whose YAML is pi-shaped (no iteration: block)
+    #    → window unresolvable → keep (never over-gate a PI-spanning feature).
+    sigs = [{"type": "commit_author", "weight": 4.0, "at": out_at}]
+    le._neutralize_foreign_signals(
+        {"type": "Feature", "iteration": "PI-2026-1"}, sigs,
+        edpa / "backlog" / "features" / "F-1.md", None, edpa_root=edpa)
+    assert sigs[0]["weight"] == 4.0
 
 
 def test_resolve_person_tolerates_blank_people_fields():

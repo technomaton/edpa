@@ -132,7 +132,7 @@ so they never touch `contribution_score` or `cw`:
 | Tag / type | Meaning |
 |------------|---------|
 | `referenced` | Item was mentioned in the commit message but not worked on (D-38) |
-| `out_of_iteration` | Weighted signal (`commit_author`, `yaml_edit`, `agent_contribution`, `manual:commit_message`) on an item that provably belongs to a *different* iteration than the commit's own (D-28/D-29); D-33 applies the same gate to CI-side `pr_reviewer` / `issue_comment` per each event's own `at:` timestamp |
+| `out_of_iteration` | Weighted signal (`commit_author`, `yaml_edit`, `agent_contribution`, `manual:commit_message`) on an item that provably belongs to a *different* iteration than the commit's own (D-28/D-29), or — when the commit resolves to no iteration at all (gap between iterations, planning day, timeline edge) — whose `at:` provably falls outside the item's *own* iteration window (D-63); D-33 applies the same gate to CI-side `pr_reviewer` / `issue_comment` per each event's own `at:` timestamp |
 | `state_transition` | Always weight 0 — analytics record by design |
 
 ## Who gets credited (person resolution)

@@ -87,7 +87,7 @@ an audit/analytics record. The original value is preserved in
 | Marker | Meaning |
 |--------|---------|
 | tag `referenced` | Item was merely mentioned in the commit message, not worked on (D-38) — full credit goes only to items in the commit's leading scope or whose backlog `.md` changed |
-| tag `out_of_iteration` | Weighted signal on an item provably belonging to a different iteration than the commit's own (D-28/D-29); for CI-side `pr_reviewer` / `issue_comment` the gate resolves per event `at:` timestamp (D-33) |
+| tag `out_of_iteration` | Weighted signal on an item provably belonging to a different iteration than the commit's own (D-28/D-29), or timestamped provably outside the item's own iteration window when the commit sits in no window at all (D-63); for CI-side `pr_reviewer` / `issue_comment` the gate resolves per event `at:` timestamp (D-33) |
 | type `state_transition` | Always weight 0 by design — analytics source, gate scoring derives engine-side |
 
 An auditor seeing `weight: 0` + `raw_weight: 4.0` + a tag should read

@@ -189,6 +189,15 @@ item's iteration window is gated to audit-only, never re-routed to another
 iteration — overflow is split into a new item instead. No engine change is
 needed; `aggregate_signals` already skips weight-0 signals.
 
+D-63: when the commit resolves to **no iteration at all** (the gap between two
+iterations, a planning day before the window opens, or past the timeline edge)
+the foreign-item comparison cannot fire; the gate then checks each signal's
+`at:` timestamp against the **item's own iteration window** and neutralises the
+ones that provably fall outside it (same weight 0 + `out_of_iteration` +
+`raw_weight` shape). Unprovable placements keep full weight: items with no
+`iteration:`, cross-PI Epics/Initiatives, a Feature assigned to a whole PI, or
+an unresolvable window/timestamp.
+
 `EDPA_NO_LOCAL_EVIDENCE=1` gates **only the automatic post-commit hook**
 — set it to stop commits materializing signals on the fly (bulk
 migrations, scripted history rewrites). The explicit `--materialize`
