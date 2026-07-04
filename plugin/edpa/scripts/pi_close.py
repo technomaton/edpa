@@ -5,7 +5,9 @@ EDPA PI Close — aggregate iteration results into PI-level summary.
 Reads:
   - .edpa/iterations/PI-YYYY-M.{1,2,3}.yaml (closed iteration plans)
   - .edpa/reports/iteration-PI-YYYY-M.{1,2,3}/edpa_results.json (optional)
-  - .edpa/backlog/features/*.yaml (to identify Features completed in PI)
+  - .edpa/backlog/features/*.md (Features completed in PI — own iteration/pi
+    field, or any child story/defect whose iteration falls inside the PI)
+  - .edpa/backlog/{stories,defects}/*.md (parent refs for that attribution)
 
 Writes:
   - .edpa/reports/pi-PI-YYYY-M/pi_results.json
@@ -37,7 +39,9 @@ except ImportError:
     sys.exit(1)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _sp_rollup import iteration_sp  # noqa: E402
+# _DELIVERY_DIRS: the item dirs SP rolls up from (stories + defects) — the
+# same set feature→PI attribution walks for child iterations (D-59).
+from _sp_rollup import _DELIVERY_DIRS, iteration_sp  # noqa: E402
 
 
 from _yaml_io import load_yaml as _shared_load_yaml  # noqa: E402
@@ -232,22 +236,62 @@ def aggregate_engine_results(edpa_root: Path, pi_id: str, iteration_ids):
     ]
 
 
+def _pi_member(iteration_id, pi_id: str) -> bool:
+    """True when ``iteration_id`` is ``pi_id`` itself or one of its
+    iterations (``PI-2026-1`` / ``PI-2026-1.N``).
+
+    A raw ``startswith(pi_id)`` is wrong here:
+    ``"PI-2026-10.1".startswith("PI-2026-1")`` is True.
+    """
+    it = str(iteration_id) if iteration_id else ""
+    return it == pi_id or it.startswith(pi_id + ".")
+
+
+def _child_iterations_by_parent(edpa_root: Path) -> dict:
+    """``{parent_id: {iteration ids}}`` over delivery items (stories +
+    defects) — the ``parent`` refs features are attributed through."""
+    out: dict = {}
+    for sub in _DELIVERY_DIRS:
+        d = edpa_root / "backlog" / sub
+        if not d.is_dir():
+            continue
+        for f in sorted(d.glob("*.md")):
+            data = load_yaml(f) or {}
+            parent = data.get("parent")
+            it = data.get("iteration")
+            if parent and it:
+                out.setdefault(str(parent), set()).add(str(it))
+    return out
+
+
 def features_completed(edpa_root: Path, pi_id: str):
-    """Features with iteration in this PI and status=Done."""
+    """Done features attributed to this PI.
+
+    Features are planned at PI level and typically carry no ``iteration``
+    of their own, so matching only the feature's own field returned []
+    even with every feature Done (D-59). A Done feature belongs to the PI
+    when its own ``iteration``/``pi`` field matches, OR any child
+    Story/Defect (via ``parent`` refs) ran in one of the PI's iterations.
+    """
     feat_dir = edpa_root / "backlog" / "features"
     if not feat_dir.is_dir():
         return []
+    child_iters = _child_iterations_by_parent(edpa_root)
     done = []
     for f in sorted(feat_dir.glob("*.md")):
         data = load_yaml(f)
-        if not data:
+        if not data or data.get("status") != "Done":
             continue
-        it = data.get("iteration", "")
-        if not it.startswith(pi_id):
-            continue
-        if data.get("status") == "Done":
+        fid = data.get("id", f.stem)
+        in_pi = (
+            _pi_member(data.get("iteration"), pi_id)
+            or _pi_member(data.get("pi"), pi_id)
+            or any(_pi_member(it, pi_id)
+                   for it in child_iters.get(str(fid), ()))
+        )
+        if in_pi:
             done.append({
-                "id": data.get("id", f.stem),
+                "id": fid,
                 "title": data.get("title", ""),
                 "wsjf": data.get("wsjf"),
                 "js": data.get("js"),

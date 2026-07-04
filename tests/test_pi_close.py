@@ -55,6 +55,16 @@ def _write_iteration(edpa: Path, it_id: str, capacity=None) -> None:
         yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
 
 
+def _write_backlog_item(edpa: Path, type_dir: str, item_id: str, **fields) -> None:
+    """Backlog item as .md frontmatter (the real on-disk item shape)."""
+    d = edpa / "backlog" / type_dir
+    d.mkdir(parents=True, exist_ok=True)
+    fm = {"id": item_id, **fields}
+    (d / f"{item_id}.md").write_text(
+        "---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n\nBody.\n",
+        encoding="utf-8")
+
+
 def test_total_capacity_hours_from_people_registry(tmp_path: Path) -> None:
     """D-58: the rollup summed only planning.capacity, which nothing writes,
     so every PI reported total_capacity_hours=0 even though people.yaml
@@ -128,3 +138,70 @@ def test_aggregate_engine_results_none_when_no_results(tmp_path: Path) -> None:
     edpa = tmp_path / ".edpa"
     (edpa / "reports").mkdir(parents=True)
     assert pi_close.aggregate_engine_results(edpa, "PI-2026-1", ["PI-2026-1.1"]) is None
+
+
+def test_features_completed_via_child_iterations(tmp_path: Path) -> None:
+    """D-59: features are planned at PI level and typically carry no
+    ``iteration`` of their own, so the own-field-only filter returned []
+    even with every feature Done (E2E: 6 Done features, all attributed
+    to their PI only through child stories/defects). A Done feature must
+    also attribute via child Story/Defect ``parent`` refs whose iteration
+    falls inside the PI."""
+    edpa = tmp_path / ".edpa"
+    # E2E shape: Done features carry no iteration; children carry it.
+    _write_backlog_item(edpa, "features", "F-1", type="Feature",
+                        title="MQTT ingestion", status="Done", parent="E-1",
+                        js=20, wsjf=1.3)
+    _write_backlog_item(edpa, "features", "F-2", type="Feature",
+                        title="Buffering", status="Done", parent="E-1",
+                        js=20, wsjf=1.7)
+    _write_backlog_item(edpa, "features", "F-5", type="Feature",
+                        title="Alerting", status="Done", parent="E-2",
+                        js=10, wsjf=1.1)
+    _write_backlog_item(edpa, "stories", "S-1", type="Story", parent="F-1",
+                        status="Done", iteration="PI-2026-1.1", js=5)
+    # No story for F-2 in this PI — a defect fixed there attributes too.
+    _write_backlog_item(edpa, "defects", "D-1", type="Defect", parent="F-2",
+                        status="Done", iteration="PI-2026-1.3", js=3)
+    # F-5's work ran entirely in the NEXT PI.
+    _write_backlog_item(edpa, "stories", "S-14", type="Story", parent="F-5",
+                        status="Done", iteration="PI-2026-2.1", js=5)
+
+    done = pi_close.features_completed(edpa, "PI-2026-1")
+    assert [f["id"] for f in done] == ["F-1", "F-2"]
+    assert done[0]["title"] == "MQTT ingestion"
+    assert done[0]["js"] == 20
+
+    assert [f["id"] for f in pi_close.features_completed(edpa, "PI-2026-2")] \
+        == ["F-5"]
+
+    # …and the attribution lands in the PI rollup report.
+    _write_iteration(edpa, "PI-2026-1.1")
+    result, err = pi_close.build_pi_results(edpa, "PI-2026-1")
+    assert err is None
+    assert [f["id"] for f in result["features_completed"]] == ["F-1", "F-2"]
+
+
+def test_features_completed_own_field_status_and_prefix_guards(tmp_path: Path) -> None:
+    """Own ``iteration``/``pi`` fields still attribute; a non-Done feature
+    never counts (even with Done children in the PI); ``PI-2026-1`` must
+    not prefix-match ``PI-2026-10.*``; a null iteration must not crash."""
+    edpa = tmp_path / ".edpa"
+    _write_backlog_item(edpa, "features", "F-1", type="Feature", title="A",
+                        status="Done", iteration="PI-2026-1.2")
+    _write_backlog_item(edpa, "features", "F-2", type="Feature", title="B",
+                        status="Done", pi="PI-2026-1")
+    # Done, but belongs to PI-2026-10 — a raw startswith would leak it in.
+    _write_backlog_item(edpa, "features", "F-3", type="Feature", title="C",
+                        status="Done", iteration="PI-2026-10.1")
+    # Child Done inside the PI, but the feature itself is not Done.
+    _write_backlog_item(edpa, "features", "F-4", type="Feature", title="D",
+                        status="Implementing")
+    _write_backlog_item(edpa, "stories", "S-40", type="Story", parent="F-4",
+                        status="Done", iteration="PI-2026-1.1", js=3)
+    # Done with an explicit null iteration — no crash, no match.
+    _write_backlog_item(edpa, "features", "F-6", type="Feature", title="E",
+                        status="Done", iteration=None)
+
+    done = pi_close.features_completed(edpa, "PI-2026-1")
+    assert [f["id"] for f in done] == ["F-1", "F-2"]
