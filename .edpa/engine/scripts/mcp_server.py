@@ -372,8 +372,10 @@ async def list_tools() -> list[Tool]:
             name="edpa_flow_metrics",
             description=(
                 "Compute flow metrics: cycle time, lead time, throughput, and "
-                "average age of open items. Requires timestamp data from a prior "
-                "sync pull."
+                "average age of open items. Reads created_at/closed_at stamps "
+                "(written by edpa_item_create / edpa_item_transition); items "
+                "missing created_at fall back to their earliest evidence[] "
+                "timestamp."
             ),
             inputSchema={
                 "type": "object",
@@ -401,7 +403,8 @@ async def list_tools() -> list[Tool]:
                 "Create a new backlog item. Allocates the next local ID via "
                 "id_counter (no gh call), validates parent type hierarchy "
                 "(Story→Feature→Epic→Initiative), and writes "
-                ".edpa/backlog/{type}/{ID}.md with frontmatter + body."
+                ".edpa/backlog/{type}/{ID}.md with frontmatter + body. "
+                "Auto-stamps created_at (UTC) — flow metrics read it."
             ),
             inputSchema={
                 "type": "object",
@@ -1145,6 +1148,25 @@ def _parse_timestamp(value: object) -> datetime | None:
         return None
 
 
+def _earliest_evidence_ts(data: dict) -> datetime | None:
+    """Earliest parseable ``evidence[].at`` timestamp on an item, or None.
+
+    D-61 fallback: items written before created_at stamping existed (or by
+    paths that bypassed the MCP write layer) have no ``created_at``. Their
+    first evidence signal is the earliest observable trace of the item's
+    life, so flow metrics use it as the created-at proxy instead of
+    skipping the item. Malformed entries are ignored, never fatal.
+    """
+    evidence = data.get("evidence")
+    if not isinstance(evidence, list):
+        return None
+    stamps = [
+        ts for entry in evidence if isinstance(entry, dict)
+        if (ts := _parse_timestamp(entry.get("at"))) is not None
+    ]
+    return min(stamps) if stamps else None
+
+
 def _handle_flow_metrics(
     edpa_root: Path,
     iteration: str | None,
@@ -1192,6 +1214,9 @@ def _handle_flow_metrics(
             is_done = status.lower() == "done"
 
             created = _parse_timestamp(data.get("created_at"))
+            if created is None:
+                # D-61: heal pre-stamping items from their evidence trail.
+                created = _earliest_evidence_ts(data)
             closed = _parse_timestamp(data.get("closed_at"))
 
             if is_done:
@@ -1490,6 +1515,11 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
                 "type": item_type,
                 "title": title.strip(),
                 "status": args.get("status") or "Funnel",
+                # D-61: stamp creation time at the single write layer
+                # (ADR-002 — backlog.py cmd_add routes through here too) so
+                # flow metrics have a start-of-life timestamp. Same helper
+                # as the closed_at stamp in _handle_item_transition.
+                "created_at": _utc_now_iso(),
             }
             if parent:
                 item["parent"] = parent

@@ -148,6 +148,48 @@ def test_create_wsjf_computed_when_all_inputs_present(edpa_root: Path) -> None:
     assert md["wsjf"] == round((8 + 3 + 2) / 5, 2)
 
 
+# ---------------------------------------------------------------------------
+# created_at stamping (D-61)
+# ---------------------------------------------------------------------------
+
+def test_create_stamps_created_at(edpa_root: Path) -> None:
+    """D-61: every new item gets a tz-aware ISO created_at at create time.
+
+    Without it no creation path ever wrote created_at, so edpa_flow_metrics
+    put every Done item into skipped_no_timestamps and cycle/lead time
+    counts were structurally 0. Stamping in _handle_item_create (the single
+    write layer, ADR-002) covers backlog.py cmd_add too — it routes here."""
+    from datetime import datetime, timezone
+    # _utc_now_iso() truncates to whole seconds — floor the lower bound too.
+    before = datetime.now(timezone.utc).replace(microsecond=0)
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Initiative", "title": "Stamped",
+    }))
+    after = datetime.now(timezone.utc)
+    md = _read_md(edpa_root, "I-1")
+    assert "created_at" in md, "created_at missing on freshly created item"
+    stamped = mcp_server._parse_timestamp(md["created_at"])
+    assert stamped is not None, f"created_at unparseable: {md['created_at']!r}"
+    assert stamped.tzinfo is not None, "created_at must be timezone-aware"
+    assert before <= stamped <= after
+
+
+def test_create_stamps_created_at_on_every_type(edpa_root: Path) -> None:
+    """D-61: the stamp is unconditional — all backlog types get it."""
+    _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "I"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Epic", "title": "E", "parent": "I-1"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1"}))
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Story", "title": "S", "parent": "F-1"}))
+    for item_id in ("I-1", "E-1", "F-1", "S-1"):
+        md = _read_md(edpa_root, item_id)
+        assert mcp_server._parse_timestamp(md.get("created_at")) is not None, (
+            f"{item_id}: created_at missing or unparseable"
+        )
+
+
 def test_update_zero_fills_missing_wsjf_fields_on_legacy_items(edpa_root: Path) -> None:
     """Legacy items written before V2.1 may lack js/bv/tc/rr_oe. An
     update operation backfills them to 0 so subsequent reads are

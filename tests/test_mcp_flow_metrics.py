@@ -207,6 +207,114 @@ class TestFlowMetricsNoTimestamps:
 
 
 # ---------------------------------------------------------------------------
+# edpa_flow_metrics — evidence[] fallback for missing created_at (D-61)
+# ---------------------------------------------------------------------------
+
+
+class TestFlowMetricsEvidenceFallback:
+    """D-61: items written before created_at stamping existed have no
+    created_at — but their evidence[] signals carry ``at`` timestamps.
+    The earliest one is the first observable trace of the item's life and
+    is used as the created-at proxy, so existing repos heal without a
+    migration (the E2E repo had 30/30 Done items skipped)."""
+
+    def test_done_item_falls_back_to_earliest_evidence(self, tmp_path):
+        mcp_server._load_yaml_cache_clear()
+        edpa = _make_backlog(tmp_path, [
+            {
+                "id": "S-1", "type": "Story", "title": "Legacy done",
+                "status": "Done", "iteration": "PI-1.1",
+                # deliberately unsorted: the LATER signal comes first
+                "evidence": [
+                    {"type": "commit_author", "person": "alice",
+                     "weight": 4.0, "ref": "commit/beef",
+                     "at": "2026-01-08T10:00:00+01:00"},
+                    {"type": "yaml_edit", "person": "david",
+                     "weight": 1.0, "ref": "commit/cafe/S-1.md",
+                     "at": "2026-01-05T00:00:00Z"},
+                ],
+                "closed_at": "2026-01-15T00:00:00Z",
+            },
+        ])
+        data = parse_result(_handle_flow_metrics(edpa, None, None))
+        assert data["skipped_no_timestamps"] == 0
+        ct = data["cycle_time"]
+        assert ct["count"] == 1
+        # earliest evidence at 2026-01-05T00:00Z → closed 2026-01-15T00:00Z
+        assert ct["min"] == 10.0
+        assert data["items_detail"][0]["cycle_time_days"] == 10.0
+
+    def test_open_item_falls_back_to_earliest_evidence(self, tmp_path):
+        mcp_server._load_yaml_cache_clear()
+        edpa = _make_backlog(tmp_path, [
+            {
+                "id": "S-1", "type": "Story", "title": "Legacy WIP",
+                "status": "In Progress",
+                "evidence": [
+                    {"type": "commit_author", "person": "alice",
+                     "weight": 4.0, "ref": "commit/f00d",
+                     "at": "2026-01-05T09:28:00+01:00"},
+                ],
+            },
+        ])
+        data = parse_result(_handle_flow_metrics(edpa, None, None))
+        assert data["skipped_no_timestamps"] == 0
+        assert data["open_items_age"]["count"] == 1
+        assert data["items_detail"][0]["age_days"] > 0
+
+    def test_explicit_created_at_wins_over_evidence(self, tmp_path):
+        """created_at, when present, is authoritative — evidence is only a
+        fallback (evidence can pre-date the item, e.g. re-attributed
+        commits)."""
+        mcp_server._load_yaml_cache_clear()
+        edpa = _make_backlog(tmp_path, [
+            {
+                "id": "S-1", "type": "Story", "title": "Stamped",
+                "status": "Done",
+                "created_at": "2026-01-10T00:00:00Z",
+                "evidence": [
+                    {"type": "commit_author", "person": "alice",
+                     "weight": 4.0, "ref": "commit/0ld",
+                     "at": "2026-01-01T00:00:00Z"},
+                ],
+                "closed_at": "2026-01-14T00:00:00Z",
+            },
+        ])
+        data = parse_result(_handle_flow_metrics(edpa, None, None))
+        ct = data["cycle_time"]
+        assert ct["count"] == 1
+        assert ct["min"] == 4.0  # from created_at, not the older evidence
+
+    def test_unusable_evidence_still_skipped(self, tmp_path):
+        """No created_at and no parseable evidence at → still skipped
+        (never guess); malformed entries must not crash the reader."""
+        mcp_server._load_yaml_cache_clear()
+        edpa = _make_backlog(tmp_path, [
+            {
+                "id": "S-1", "type": "Story", "title": "Hopeless",
+                "status": "Done",
+                "evidence": [
+                    {"type": "commit_author", "person": "alice",
+                     "weight": 4.0, "ref": "commit/aaa"},        # no at
+                    {"type": "yaml_edit", "person": "bob",
+                     "weight": 1.0, "at": "not-a-date"},         # garbage at
+                    "free-floating-string",                       # not a dict
+                ],
+                "closed_at": "2026-01-15T00:00:00Z",
+            },
+            {
+                "id": "S-2", "type": "Story", "title": "Evidence not a list",
+                "status": "Done",
+                "evidence": "corrupted-scalar",
+                "closed_at": "2026-01-15T00:00:00Z",
+            },
+        ])
+        data = parse_result(_handle_flow_metrics(edpa, None, None))
+        assert data["cycle_time"]["count"] == 0
+        assert data["skipped_no_timestamps"] == 2
+
+
+# ---------------------------------------------------------------------------
 # edpa_flow_metrics — iteration filter
 # ---------------------------------------------------------------------------
 
