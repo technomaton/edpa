@@ -20,8 +20,8 @@ const pathname = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astr
 const canonical = new URL(pathname, Astro.site);
 
 // Routes that exist in BOTH locales, keyed by their Czech (unprefixed) path.
-// journey/tutorial/docs are cs-only (mirrors czOnly in Header.astro), so they
-// get no hreflang alternates. x-default points at the Czech original.
+// /docs/ is still cs-only (mirrors czOnly in Header.astro), so it gets no
+// hreflang alternates. x-default points at the Czech original.
 const pairedRoutes = [
   '/',
   '/calculator/',
@@ -29,12 +29,14 @@ const pairedRoutes = [
   '/dashboard/kashealth/',
   '/evaluation/',
   '/guide/',
+  '/journey/',
   '/methodology/',
   '/playbook/',
   '/presentation/',
   '/presentation/kashealth/',
   '/setup/',
   '/start/',
+  '/tutorial/',
 ];
 const basePath = pathname.startsWith('/en/') ? pathname.slice(3) : pathname;
 const hasAlternate = pairedRoutes.includes(basePath);
