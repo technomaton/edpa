@@ -1,5 +1,74 @@
 # Changelog
 
+## 2.14.0 — 2026-07-04
+
+Round 2 of the 50-agent audit remediation (**F-126**): engine-core
+consolidation and write-locking, test coverage for the last untested
+user-facing CLIs, the evidence/audit doc family rewritten to V2, web EN
+parity + SEO + first dedup phase, and an automated, secrets-gated web
+deploy on release. Plus the `as:` data migration and audit follow-ups.
+
+### Added
+
+- **Backlog write lock (D-52).** One coarse per-project mutex
+  (`.edpa/.backlog.lock`) around every item read-modify-write cycle —
+  the MCP write handlers, the post-commit evidence emitter, and (D-55)
+  the remaining writers (`detect_contributors`, `sync_pr_contributions`,
+  `reconcile --apply`) — closing the lost-update window between the
+  long-running MCP server and git hooks.
+- **`board.py` and `reports.py` test suites (S-246).** 21 fast tests for
+  the two previously untested user-facing CLIs (979 LOC).
+- **Web SEO fundamentals (S-247).** Canonical URLs, Open Graph/Twitter
+  tags, cs/en `hreflang` pairs, `@astrojs/sitemap` + `robots.txt`, and a
+  keyboard-accessible nav dropdown.
+- **Automated web deploy on release (S-249).** A `deploy-web` job in
+  `release.yml` (stable tags only) builds and deploys the site via
+  Vercel and curl-verifies the live version; it skips with a warning
+  until the three `VERCEL_*` repo secrets exist. Release checklist steps
+  6–7 updated accordingly (D-55).
+- **CI polish (S-249).** Errors-only `ruff` job, a coverage floor on the
+  pytest job, the vestigial 'Build Plugin Release' workflow fixed and
+  renamed to 'Verify plugin structure', pinned dev dependencies, and a
+  `tools/pi-planning/README.md` documenting the bundle's build source.
+- **Command-doc allowlist guard (D-55).** A consistency test asserting
+  every plugin command doc carries frontmatter and allowlists the
+  fully-qualified MCP tools it instructs calling.
+
+### Changed
+
+- **Type→directory mapping consolidated (D-52).** `id_counter.py` is the
+  single canonical home of `TYPE_DIRS`/`TYPE_PREFIX` (+ derived maps);
+  the seven drifted copies across backlog/mcp_server/local_evidence/
+  sync_pr/detect_contributors/validate_syntax/engine/_people_loader now
+  import it. Fixes the `Risk` ID-allocation `KeyError`, restores `T-`
+  (legacy Task) attribution, extends assignee scans to defects/events/
+  risks/tasks, and removes the phantom `Task` engine credit.
+- **Evidence/audit doc family rewritten for V2 (D-53).**
+  `evidence-detection.md`, `audit-references.md`, `audit-trail.md` and
+  `contribute-directive.md` now document the local-first pipeline
+  (`yaml_edit:*`, `state_transition`, `agent_contribution`, real ref
+  formats) instead of the removed v1.11 GitHub-sync architecture.
+- **Web EN parity (D-54).** The "what's new" wave section and the
+  interactive evaluation filter ported to EN; stale copy (v2.4 claims,
+  outdated test counts) refreshed in both locales.
+- **Setup wizard deduplicated (S-248).** The ~540-line generator JS
+  pasted in both `setup.astro` locales now lives once in
+  `web/src/lib/setup-generator.ts`, with the emitted YAML version baked
+  in at build time from `plugin.json` — the two per-locale version
+  stamps are gone from `bump_version.py`.
+- **Docs corrections (D-55).** `methodology.md` §5.3.2 weight table now
+  matches the shipped D-36 defaults, and `close-iteration.md` no longer
+  claims engine/reports auto-commit their outputs.
+
+### Fixed
+
+- **Legacy `as:` contributor fields purged (D-51).** 90 v1.11-era `as:`
+  lines removed from 37 backlog items (parse-verified), so
+  `validate_on_save` no longer hard-errors on every edit of older items.
+- **`_resolve_person` crash on blank people fields (D-55).** A
+  present-but-empty `email:`/`name:`/`github:` in `people.yaml` no
+  longer raises on `.lower()` during evidence attribution.
+
 ## 2.13.0 — 2026-07-02
 
 Whole-repo remediation from a 50-agent audit (**F-126**), plus Python 3.10
