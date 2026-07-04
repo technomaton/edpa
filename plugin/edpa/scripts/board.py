@@ -56,6 +56,11 @@ def load_people(root):
 
 
 def load_items(root):
+    # Delivery-tracked types only. Risks are intentionally excluded here: a
+    # risk's lifecycle is its ROAM disposition (roam_status), not the
+    # Planned/In Progress/Done delivery status the board columns model — so
+    # placing a risk in a status column would misrepresent it. Risks are loaded
+    # separately (load_risks) and rendered in their own ROAM section (D-75).
     items = []
     for type_dir in ["initiatives", "epics", "features", "stories", "defects"]:
         dir_path = root / ".edpa" / "backlog" / type_dir
@@ -65,6 +70,20 @@ def load_items(root):
                 if item:
                     items.append(item)
     return items
+
+
+def load_risks(root):
+    """Load Risk items (.edpa/backlog/risks/*.md), kept separate from
+    load_items. Risks are program-board artefacts tracked by their ROAM
+    disposition, not by the delivery-status columns (D-75)."""
+    risks = []
+    dir_path = root / ".edpa" / "backlog" / "risks"
+    if dir_path.exists():
+        for f in sorted(dir_path.glob("*.md")):
+            item = _load_md(f)
+            if item:
+                risks.append(item)
+    return risks
 
 
 # -- Status mapping -------------------------------------------------------------
@@ -91,7 +110,23 @@ TYPE_COLORS = {
     "Feature":    {"bg": "var(--type-feature-bg)",     "fg": "var(--type-feature)"},
     "Story":      {"bg": "var(--type-story-bg)",       "fg": "var(--type-story)"},
     "Defect":     {"bg": "var(--type-defect-bg)",      "fg": "var(--type-defect)"},
+    "Risk":       {"bg": "var(--type-risk-bg)",        "fg": "var(--type-risk)"},
 }
+
+
+# -- Risk / ROAM ----------------------------------------------------------------
+# A risk's SAFe lifecycle is its ROAM disposition (Resolved / Owned / Accepted /
+# Mitigated), not a delivery status — so risks get their own board section keyed
+# on roam_status rather than a Planned/In Progress/Done column.
+ROAM_LABELS = {
+    "resolved":  "Resolved",
+    "owned":     "Owned",
+    "accepted":  "Accepted",
+    "mitigated": "Mitigated",
+}
+SEVERITY_LEVELS = {"high", "medium", "low"}
+# Sort order for the risks section: highest severity first, unknown last.
+SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
 # -- HTML generation ------------------------------------------------------------
@@ -183,7 +218,45 @@ def render_card(item, people, items_by_id):
 </article>"""
 
 
-def render_html(items, people, project_name, level_filter=None, iteration_filter=None):
+def render_risk_card(risk, people):
+    """Render a single Risk card for the ROAM section: a risk-colored id chip,
+    title, its ROAM disposition + severity badges, and the assignee avatar."""
+    tc = TYPE_COLORS["Risk"]
+    item_id = esc(risk.get("id", ""))
+    title = esc(risk.get("title", ""))
+    assignee_id = risk.get("assignee") or risk.get("owner", "")
+    assignee = people.get(assignee_id, {})
+    avatar = avatar_html(assignee, assignee_id, size=40, klass="card__avatar")
+
+    roam = str(risk.get("roam_status") or "").strip().lower()
+    if roam in ROAM_LABELS:
+        roam_badge = f'<span class="risk-roam roam--{roam}">{ROAM_LABELS[roam]}</span>'
+    else:
+        roam_badge = '<span class="risk-roam roam--none">Unclassified</span>'
+
+    severity = str(risk.get("severity") or "").strip().lower()
+    sev_badge = ""
+    if severity:
+        mod = f" risk-sev--{severity}" if severity in SEVERITY_LEVELS else ""
+        sev_badge = f'<span class="risk-sev{mod}">{esc(severity)}</span>'
+
+    return f"""<article class="card"
+        data-assignee="{esc(assignee_id)}"
+        data-iteration=""
+        data-type="Risk"
+        data-id="{item_id}">
+  <div class="card__head">
+    <span class="card__id" style="background:{tc['bg']};color:{tc['fg']}">{item_id}</span>
+  </div>
+  <h3 class="card__title">{title}</h3>
+  <div class="risk-badges">{roam_badge}{sev_badge}</div>
+  <div class="card__foot">
+    {avatar}
+  </div>
+</article>"""
+
+
+def render_html(items, people, project_name, level_filter=None, iteration_filter=None, risks=None):
     # Filter items
     filtered = items
     if level_filter:
@@ -198,7 +271,15 @@ def render_html(items, people, project_name, level_filter=None, iteration_filter
     # Collect unique iterations & assignees for filters
     iterations = sorted(set(i.get("iteration", "") for i in filtered if i.get("iteration")))
     assignees = sorted(set(i.get("assignee") or i.get("owner", "") for i in filtered if i.get("assignee") or i.get("owner")))
-    types = sorted(set(i.get("type", "Story") for i in filtered))
+    # Risks render in their own ROAM section, not the status columns. Show them
+    # on the full board; a --level drill-down is a delivery-level focus, so
+    # program-level risks are omitted then.
+    risks = risks or []
+    show_risks = bool(risks) and not level_filter
+    type_set = set(i.get("type", "Story") for i in filtered)
+    if show_risks:
+        type_set.add("Risk")  # let users isolate risks via the type filter
+    types = sorted(type_set)
 
     # Group by column
     columns = {col: [] for col, _ in STATUS_COLUMNS}
@@ -224,6 +305,27 @@ def render_html(items, people, project_name, level_filter=None, iteration_filter
   </div>
   <div class="column__list">{cards}</div>
 </div>\n"""
+
+    # Risks (ROAM) section — a distinct panel below the columns. Risks are
+    # keyed on their ROAM disposition + severity, never a delivery-status column.
+    risk_section = ""
+    if show_risks:
+        sorted_risks = sorted(
+            risks,
+            key=lambda r: (
+                SEVERITY_ORDER.get(str(r.get("severity") or "").strip().lower(), 3),
+                r.get("id", ""),
+            ),
+        )
+        risk_cards = "\n".join(render_risk_card(r, people) for r in sorted_risks)
+        risk_section = f"""<div class="risk-panel">
+  <div class="risk-panel__head">
+    <span class="risk-panel__title">Risks (ROAM)</span>
+    <span class="risk-panel__count">{len(sorted_risks)}</span>
+  </div>
+  <div class="risk-panel__list">{risk_cards}</div>
+</div>
+"""
 
     # Assignee chips
     assignee_chips = ""
@@ -275,6 +377,7 @@ def render_html(items, people, project_name, level_filter=None, iteration_filter
   --type-feature:#0891b2;--type-feature-bg:rgba(8,145,178,0.08);
   --type-story:#ea580c;--type-story-bg:rgba(234,88,12,0.08);
   --type-defect:#dc2626;--type-defect-bg:rgba(220,38,38,0.08);
+  --type-risk:#d97706;--type-risk-bg:rgba(217,119,6,0.08);
 }}
 /* -- Dark theme ----------------------------------------------------- */
 .dark{{
@@ -290,6 +393,7 @@ def render_html(items, people, project_name, level_filter=None, iteration_filter
   --type-feature:#22d3ee;--type-feature-bg:rgba(34,211,238,0.12);
   --type-story:#f97316;--type-story-bg:rgba(249,115,22,0.12);
   --type-defect:#f87171;--type-defect-bg:rgba(248,113,113,0.12);
+  --type-risk:#fbbf24;--type-risk-bg:rgba(251,191,36,0.12);
 }}
 body{{
   font-family:'DM Sans',system-ui,sans-serif;
@@ -384,6 +488,7 @@ body{{
 .card[data-type="Feature"]{{border-left-color:var(--type-feature);background:var(--type-feature-bg);}}
 .card[data-type="Story"]{{border-left-color:var(--type-story);background:var(--type-story-bg);}}
 .card[data-type="Defect"]{{border-left-color:var(--type-defect);background:var(--type-defect-bg);}}
+.card[data-type="Risk"]{{border-left-color:var(--type-risk);background:var(--type-risk-bg);}}
 .card:hover{{
   border-color:var(--ac);
   box-shadow:var(--shadow-hover);
@@ -395,6 +500,7 @@ body{{
 .card[data-type="Feature"]:hover{{border-left-color:var(--type-feature);}}
 .card[data-type="Story"]:hover{{border-left-color:var(--type-story);}}
 .card[data-type="Defect"]:hover{{border-left-color:var(--type-defect);}}
+.card[data-type="Risk"]:hover{{border-left-color:var(--type-risk);}}
 .card--done{{opacity:0.55;}}
 .card--done:hover{{opacity:0.85;}}
 .card.hidden{{display:none;}}
@@ -439,6 +545,43 @@ body{{
   font-family:'JetBrains Mono',monospace;font-size:0.6rem;
   color:var(--t2);
 }}
+/* -- Risks (ROAM) --------------------------------------------------- */
+.risk-panel{{
+  margin-top:16px;
+  background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);
+  padding:12px;box-shadow:var(--shadow);
+}}
+.risk-panel__head{{
+  display:flex;align-items:center;gap:8px;
+  padding-bottom:12px;margin-bottom:8px;border-bottom:1px solid var(--bd);
+}}
+.risk-panel__title{{
+  font-family:'JetBrains Mono',monospace;font-size:0.8rem;
+  font-weight:700;text-transform:uppercase;letter-spacing:0.05em;
+  color:var(--type-risk);
+}}
+.risk-panel__count{{
+  font-family:'JetBrains Mono',monospace;font-size:0.7rem;
+  background:var(--s3);color:var(--t2);padding:2px 8px;
+  border-radius:10px;margin-left:auto;
+}}
+.risk-panel__list{{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;
+}}
+.risk-badges{{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}}
+.risk-roam,.risk-sev{{
+  font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:700;
+  padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:0.03em;
+}}
+.roam--resolved{{background:rgba(5,150,105,0.12);color:var(--gn);}}
+.roam--owned{{background:rgba(99,102,241,0.12);color:var(--ac);}}
+.roam--mitigated{{background:rgba(8,145,178,0.12);color:var(--cy);}}
+.roam--accepted{{background:var(--s3);color:var(--t2);}}
+.roam--none{{background:var(--s3);color:var(--t3);}}
+.risk-sev{{background:var(--s3);color:var(--t2);}}
+.risk-sev--high{{background:rgba(220,38,38,0.12);color:var(--rd);}}
+.risk-sev--medium{{background:rgba(217,119,6,0.12);color:var(--yl);}}
+.risk-sev--low{{background:rgba(5,150,105,0.12);color:var(--gn);}}
 /* -- Footer --------------------------------------------------------- */
 .footer{{
   margin-top:24px;padding-top:12px;border-top:1px solid var(--bd);
@@ -471,6 +614,7 @@ body{{
 
 <div class="columns">{cols_html}</div>
 
+{risk_section}
 <div class="footer">
   <span>{total} items</span>
   <span>&middot;</span>
@@ -548,17 +692,21 @@ def main():
 
     people, project_name = load_people(root)
     items = load_items(root)
+    risks = load_risks(root)
 
-    if not items:
+    if not items and not risks:
         print("No backlog items found in .edpa/backlog/")
         sys.exit(1)
 
     level = args.level
-    html_content = render_html(items, people, project_name, level_filter=level, iteration_filter=args.iteration)
+    html_content = render_html(items, people, project_name, level_filter=level,
+                               iteration_filter=args.iteration, risks=risks)
 
     output = Path(args.output) if args.output else root / ".edpa" / "board.html"
     output.write_text(html_content, encoding="utf-8")
-    print(f"Board written to {output}  ({len(items)} items loaded)")
+    loaded = f"({len(items)} items loaded)" if not risks \
+        else f"({len(items)} items, {len(risks)} risks loaded)"
+    print(f"Board written to {output}  {loaded}")
 
     if args.open:
         if platform.system() == "Darwin":

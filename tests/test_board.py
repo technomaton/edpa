@@ -270,6 +270,107 @@ def test_board_level_help_matches_reality(project):
     assert "(default: story)" not in help_text
 
 
+# D-75: risks are part of a SAFe program board, but their lifecycle is the
+# ROAM disposition (roam_status), not the Planned/In Progress/Done delivery
+# status the columns model. board.py renders them in a dedicated "Risks (ROAM)"
+# section and keeps them out of the status columns.
+RISK_BACKLOG_FILES = {
+    "stories/S-9.md": (
+        "---\n"
+        "id: S-9\n"
+        "type: Story\n"
+        "title: Lone story\n"
+        "status: Planned\n"
+        "js: 3\n"
+        "iteration: PI-2026-1.1\n"
+        "assignee: alice\n"
+        "---\n"
+    ),
+    "risks/R-1.md": (
+        "---\n"
+        "id: R-1\n"
+        "type: Risk\n"
+        "title: Broker migration risk\n"
+        "status: Funnel\n"        # incidental portfolio status, NOT a column
+        "roam_status: owned\n"
+        "severity: high\n"
+        "assignee: bob\n"
+        "---\n"
+    ),
+    "risks/R-2.md": (
+        "---\n"
+        "id: R-2\n"
+        "type: Risk\n"
+        "title: Rate limit risk\n"
+        "status: Implementing\n"
+        "roam_status: mitigated\n"
+        "severity: medium\n"
+        "---\n"
+    ),
+}
+
+
+@pytest.fixture(scope="module")
+def risk_project(tmp_path_factory):
+    """Project with one delivery story plus two risks."""
+    root = tmp_path_factory.mktemp("board-risk-project")
+    _plant_config(root)
+    for rel, text in RISK_BACKLOG_FILES.items():
+        item = root / ".edpa" / "backlog" / rel
+        item.parent.mkdir(parents=True, exist_ok=True)
+        item.write_text(text, encoding="utf-8")
+    return root
+
+
+def test_board_renders_risks_in_roam_section(risk_project):
+    proc, html_text = _generate(risk_project, name="board-risk.html")
+    # loaded count reports risks separately from delivery items
+    assert "1 items, 2 risks loaded" in proc.stdout
+    # dedicated ROAM section is present (title span, not the CSS comment)
+    assert '<div class="risk-panel">' in html_text
+    assert '<span class="risk-panel__title">Risks (ROAM)</span>' in html_text
+    # Slice out the rendered panel (body-only; excludes the <head> CSS where the
+    # same class/attr names also appear) and assert against that.
+    panel = html_text[html_text.index('<div class="risk-panel__list">'):
+                      html_text.index('<div class="footer">')]
+    # both risks render exactly once, tagged as Risk cards
+    assert panel.count('data-id="R-1"') == 1
+    assert panel.count('data-id="R-2"') == 1
+    assert panel.count('data-type="Risk"') == 2
+    # each risk surfaces its ROAM disposition + severity
+    assert "roam--owned" in panel
+    assert "roam--mitigated" in panel
+    assert "risk-sev--high" in panel
+    assert "risk-sev--medium" in panel
+    # human-readable ROAM labels
+    assert "Owned" in panel
+    assert "Mitigated" in panel
+    # risks must NOT leak into the delivery-status columns: their lifecycle is
+    # ROAM, not Planned/In Progress/Done. Assert structurally by slicing out the
+    # columns block (everything before the risk panel).
+    cols = html_text[html_text.index('<div class="columns">'):
+                     html_text.index('<div class="risk-panel">')]
+    assert 'data-id="R-1"' not in cols
+    assert 'data-id="R-2"' not in cols
+    # the sole delivery item still lives in a status column
+    assert 'data-id="S-9"' in cols
+    # Risk is offered as a type-filter option so risks can be isolated
+    assert '<option value="Risk">Risk</option>' in html_text
+
+
+def test_board_risk_section_hidden_under_level_filter(risk_project):
+    # A --level drill-down is a delivery-level focus; program-level risks are
+    # omitted so the view stays scoped to the requested level.
+    _, html_text = _generate(
+        risk_project, "--level", "story", name="board-risk-story.html")
+    # no rendered panel (the CSS comment still mentions "Risks (ROAM)", so key
+    # off the structural marker, not the bare string)
+    assert '<div class="risk-panel">' not in html_text
+    assert 'data-id="R-1"' not in html_text
+    assert 'data-id="R-2"' not in html_text
+    assert 'data-id="S-9"' in html_text
+
+
 def test_board_empty_backlog_fails(tmp_path):
     _plant_config(tmp_path)
     proc = _run_board(tmp_path)
