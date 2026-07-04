@@ -39,6 +39,7 @@ from mcp_server import (  # noqa: E402
     _handle_objective_remove,
     _handle_objective_set,
     _handle_confidence_vote,
+    _handle_iteration_activate,
     _handle_iteration_close,
     _handle_iteration_create,
     _handle_people_upsert,
@@ -477,13 +478,51 @@ def test_transition_invalid_status_for_type(edpa_root: Path) -> None:
     assert "not valid for Initiative" in result[0].text
 
 
-def test_transition_event_skips_status_workflow(edpa_root: Path) -> None:
-    """Event/Risk have no enforced workflow → any string accepted."""
+def test_transition_event_validates_delivery_status(edpa_root: Path) -> None:
+    """D-69: Event/Risk now carry the delivery workflow states (the same set
+    validate_syntax.ITEM_SCHEMA assigns them), so edpa_item_transition validates
+    them like Feature/Story/Defect — a non-workflow status is rejected. This
+    keeps parity with edpa_item_create (both go through _allowed_statuses)."""
     _parse(_handle_item_create(edpa_root, {"type": "Event", "title": "Retro"}))
-    data = _parse(_handle_item_transition(edpa_root, {
+    bad = _handle_item_transition(edpa_root, {
         "item_id": "EV-1", "status": "completed",
+    })
+    assert _is_err(bad)
+    assert "not valid for Event" in bad[0].text
+    ok = _parse(_handle_item_transition(edpa_root, {
+        "item_id": "EV-1", "status": "Validating",
     }))
-    assert data["status"] == "completed"
+    assert ok["status"] == "Validating"
+
+
+def test_create_event_rejects_non_delivery_status(edpa_root: Path) -> None:
+    """D-69: create must not accept a status validate_syntax would later flag —
+    Event carries the delivery workflow states, so a bogus status is rejected
+    up front (before an ID is burned) instead of silently written."""
+    result = _handle_item_create(edpa_root, {
+        "type": "Event", "title": "Retro", "status": "completed",
+    })
+    assert _is_err(result)
+    assert "not valid for Event" in result[0].text
+
+
+def test_create_risk_rejects_portfolio_status(edpa_root: Path) -> None:
+    """D-69: Risk validates against the delivery set too — a portfolio-only
+    status (Reviewing) is rejected."""
+    result = _handle_item_create(edpa_root, {
+        "type": "Risk", "title": "Vendor lock", "status": "Reviewing",
+    })
+    assert _is_err(result)
+    assert "not valid for Risk" in result[0].text
+
+
+def test_create_event_accepts_delivery_status(edpa_root: Path) -> None:
+    """A real delivery workflow status is accepted and persisted for Event."""
+    data = _parse(_handle_item_create(edpa_root, {
+        "type": "Event", "title": "Sprint review", "status": "Validating",
+    }))
+    assert data["id"] == "EV-1"
+    assert _read_md(edpa_root, "EV-1")["status"] == "Validating"
 
 
 def test_find_item_file_locates_tasks_dir(edpa_root: Path) -> None:
@@ -1167,6 +1206,87 @@ def test_iteration_close_preserves_hand_stamped_delivery(edpa_root: Path) -> Non
     parsed = yaml.safe_load(iter_path.read_text())
     assert parsed["delivery"]["delivered_sp"] == 42
     assert parsed["delivery"]["velocity"] == 42
+
+
+# ---------------------------------------------------------------------------
+# edpa_iteration_activate (D-69) — the E2E had to hand-edit YAML to set an
+# iteration active; this tool does it through the single write layer and
+# enforces the single-active-iteration-per-PI invariant.
+# ---------------------------------------------------------------------------
+
+def _mk_iteration(edpa_root: Path, it_id: str) -> None:
+    _parse(_handle_iteration_create(edpa_root, {
+        "id": it_id, "start_date": "2026-07-06", "end_date": "2026-07-12",
+    }))
+
+
+def test_iteration_activate_sets_status_active(edpa_root: Path) -> None:
+    """Sets BOTH the nested iteration.status and the top-level status to
+    'active' (the dual-write iteration_close uses) so every consumer agrees."""
+    _mk_iteration(edpa_root, "PI-2026-1.1")
+    data = _parse(_handle_iteration_activate(edpa_root, {"id": "PI-2026-1.1"}))
+    assert data["status"] == "active"
+    assert data["pi"] == "PI-2026-1"
+    assert data["deactivated"] == []
+    parsed = _iter_yaml(edpa_root, "PI-2026-1.1")
+    assert parsed["iteration"]["status"] == "active"
+    assert parsed["status"] == "active"
+
+
+def test_iteration_activate_deactivates_sibling_in_same_pi(edpa_root: Path) -> None:
+    """Activating one iteration demotes any other ACTIVE iteration in the same
+    PI back to 'planned' — the single-active invariant the E2E hand-edited."""
+    _mk_iteration(edpa_root, "PI-2026-1.1")
+    _mk_iteration(edpa_root, "PI-2026-1.2")
+    _parse(_handle_iteration_activate(edpa_root, {"id": "PI-2026-1.1"}))
+    data = _parse(_handle_iteration_activate(edpa_root, {"id": "PI-2026-1.2"}))
+    assert data["deactivated"] == ["PI-2026-1.1"]
+    demoted = _iter_yaml(edpa_root, "PI-2026-1.1")
+    assert demoted["iteration"]["status"] == "planned"
+    assert demoted["status"] == "planned"
+    assert _iter_yaml(edpa_root, "PI-2026-1.2")["iteration"]["status"] == "active"
+
+
+def test_iteration_activate_leaves_other_pi_untouched(edpa_root: Path) -> None:
+    """Deactivation is scoped to the target's PI — an active iteration in a
+    DIFFERENT PI is not demoted."""
+    _mk_iteration(edpa_root, "PI-2026-1.1")
+    _mk_iteration(edpa_root, "PI-2026-2.1")
+    _parse(_handle_iteration_activate(edpa_root, {"id": "PI-2026-1.1"}))
+    data = _parse(_handle_iteration_activate(edpa_root, {"id": "PI-2026-2.1"}))
+    assert data["deactivated"] == []
+    assert _iter_yaml(edpa_root, "PI-2026-1.1")["iteration"]["status"] == "active"
+    assert _iter_yaml(edpa_root, "PI-2026-2.1")["iteration"]["status"] == "active"
+
+
+def test_iteration_activate_does_not_reopen_closed_sibling(edpa_root: Path) -> None:
+    """A CLOSED sibling stays closed — activate never touches terminal state
+    (and never stamps delivery the way close does)."""
+    _mk_iteration(edpa_root, "PI-2026-1.1")
+    _mk_iteration(edpa_root, "PI-2026-1.2")
+    _parse(_handle_iteration_close(edpa_root, {"id": "PI-2026-1.1"}))
+    data = _parse(_handle_iteration_activate(edpa_root, {"id": "PI-2026-1.2"}))
+    assert data["deactivated"] == []
+    assert _iter_yaml(edpa_root, "PI-2026-1.1")["iteration"]["status"] == "closed"
+
+
+def test_iteration_activate_missing_errors(edpa_root: Path) -> None:
+    assert _is_err(_handle_iteration_activate(edpa_root, {"id": "PI-2026-9.9"}))
+
+
+def test_iteration_activate_rejects_bad_id(edpa_root: Path) -> None:
+    assert _is_err(_handle_iteration_activate(edpa_root, {"id": "../etc/passwd"}))
+
+
+def test_iteration_activate_rejects_pi_meta_file(edpa_root: Path) -> None:
+    """A PI-level metadata file (top-level `pi:` block, no `iteration:`) is not
+    an iteration — activate refuses it rather than injecting an iteration block."""
+    (edpa_root / "iterations" / "PI-2026-1.yaml").write_text(
+        yaml.safe_dump({"pi": {"id": "PI-2026-1", "status": "planning"}}),
+        encoding="utf-8")
+    result = _handle_iteration_activate(edpa_root, {"id": "PI-2026-1"})
+    assert _is_err(result)
+    assert "not an iteration" in result[0].text
 
 
 # ---------------------------------------------------------------------------

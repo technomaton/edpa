@@ -232,6 +232,8 @@ class TestToolsAdvertised:
                 "edpa_objective_set", "edpa_objective_remove",
                 "edpa_confidence_vote",
                 "edpa_iteration_create", "edpa_iteration_close",
+                # D-69 (set an iteration active)
+                "edpa_iteration_activate",
                 "edpa_pi_create", "edpa_pi_close", "edpa_people_upsert",
                 # Read tools added in F1 / E2 / F2 / F4
                 "edpa_forecast_pi",

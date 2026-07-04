@@ -80,3 +80,40 @@ def test_roam_status_on_non_risk_ignored():
             "roam_status": "nonsense"}
     errors, _ = validate_backlog_schema(_path("events", "EV-1.md"), data)
     assert not any("roam_status" in e for e in errors), errors
+
+
+# ---------------------------------------------------------------------------
+# D-69: parent-axis create-vs-validate alignment.
+#
+# backlog.py `add --help` documents "Defect/Event/Risk land at top level — no
+# parent required" and mcp_server.PARENT_RULES maps all three to None (create
+# allows them parentless). validate_backlog_schema must agree: parent is
+# OPTIONAL for the top-level types and REQUIRED only for the Epic/Feature/Story
+# spine. These lock that contract so nobody flips parent_required back on for
+# Defect/Event/Risk and re-opens the create-vs-validate disagreement.
+# ---------------------------------------------------------------------------
+
+def test_parentless_top_level_types_pass():
+    """Defect/Event/Risk validate with no `parent` field (top-level items)."""
+    cases = [
+        ("defects", "Defect", "D-1", {"js": 3}),
+        ("events", "Event", "EV-1", {}),
+        ("risks", "Risk", "R-1", {}),
+    ]
+    for type_dir, itype, iid, extra in cases:
+        data = {"id": iid, "type": itype, "title": "X", "status": "Backlog", **extra}
+        errors, _ = validate_backlog_schema(_path(type_dir, f"{iid}.md"), data)
+        assert not any("parent" in e for e in errors), (itype, errors)
+
+
+def test_parentless_spine_types_fail():
+    """Epic/Feature/Story still REQUIRE a parent — only top-level types exempt."""
+    cases = [
+        ("epics", "Epic", "E-1", {}),
+        ("features", "Feature", "F-1", {"js": 3}),
+        ("stories", "Story", "S-1", {"js": 3, "iteration": "PI-2026-1.1"}),
+    ]
+    for type_dir, itype, iid, extra in cases:
+        data = {"id": iid, "type": itype, "title": "X", "status": "Backlog", **extra}
+        errors, _ = validate_backlog_schema(_path(type_dir, f"{iid}.md"), data)
+        assert any("parent" in e for e in errors), (itype, errors)
