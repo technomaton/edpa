@@ -2,7 +2,7 @@
 
 **Derive hours from Git evidence. No timesheets.**
 
-[![EDPA](https://img.shields.io/badge/EDPA-2.16.0-34d399)](docs/methodology.md)
+[![EDPA](https://img.shields.io/badge/EDPA-2.17.0-34d399)](docs/methodology.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/Made_for-GitHub-181717?logo=github)](https://github.com)
 
@@ -29,7 +29,7 @@ Monday morning: "What did I work on last week? Let me guess... 4h on S-200, mayb
 ```
 $ python3 .edpa/engine/scripts/engine.py --edpa-root .edpa --iteration PI-2026-1.3
 
-EDPA 2.16.0 — Iteration PI-2026-1.3
+EDPA 2.17.0 — Iteration PI-2026-1.3
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -94,7 +94,7 @@ Bootstrapping .edpa/ data tree...
   Created .edpa/config/people.yaml (edit with your team)
   Created .edpa/config/edpa.yaml (edit project.name + governance metadata)
 
-EDPA 2.16.0 installed.
+EDPA 2.17.0 installed.
 ```
 
 The installer vendors the engine to `.edpa/engine/` (it installs no pip
@@ -137,7 +137,7 @@ python3 .edpa/engine/scripts/engine.py --status
 ```
 
 ```
-EDPA 2.16.0 — Status
+EDPA 2.17.0 — Status
 ========================================
 ✓ .edpa/ found at .edpa
 ✓ people.yaml — 2 members, 1.5 FTE, 60h/iteration
@@ -221,7 +221,7 @@ Snapshot frozen: .edpa/snapshots/PI-2026-1.1.json
 Excel: .edpa/reports/iteration-PI-2026-1.1/edpa-results.xlsx
 
 ======================================================================
-EDPA 2.16.0 — Iteration PI-2026-1.1
+EDPA 2.17.0 — Iteration PI-2026-1.1
 ======================================================================
 Person                    Role     Capacity  Derived  Items   OK
 ----------------------------------------------------------------------
@@ -449,7 +449,7 @@ python3 .edpa/engine/scripts/backlog.py add --type Story --title "..."
 
 | Document | Description |
 |----------|-------------|
-| [Methodology](docs/methodology.md) | Full EDPA v2.16.0 specification |
+| [Methodology](docs/methodology.md) | Full EDPA v2.17.0 specification |
 | [Quick Start](docs/quick-start.md) | 10-minute setup guide |
 | [Operational Runbook](docs/RUNBOOK.md) | Every `/edpa:*` command end to end — setup, close-iteration, capacity, autocalib, board |
 | [Playbook](docs/playbook.md) | From empty repo to first closed PI — full operations guide (Czech) |
