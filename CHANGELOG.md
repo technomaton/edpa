@@ -1,5 +1,48 @@
 # Changelog
 
+## 2.15.0 — 2026-07-04
+
+Twelve defects found by a full end-to-end simulation ("EDGE": independent
+repo, real release-asset install, 4-person team + AI co-author, two complete
+PIs, 477 commits, adversarially verified) — fixed sequentially, each with a
+regression test. Suite grew 1,042 → 1,117.
+
+### Fixed
+
+- **Results-schema drift (D-56).** `payroll_export` and `insights` now read
+  both engine (`people`) and snapshot (`derived_reports`) shapes via a shared
+  `_results_compat` normalizer — stock payroll no longer returns 0 rows.
+- **Forecast had no velocity source (D-57).** `edpa_iteration_close` stamps a
+  `delivery` block (delivered_sp + velocity) at close; `forecast.py` falls
+  back to a backlog rollup for already-closed iterations.
+- **PI close rollups (D-58, D-59).** `total_capacity_hours` now comes from the
+  people registry (was always 0); `features_completed` attributes Done
+  features via child stories (was always empty).
+- **Predictability was vacuous (D-60).** `planned_sp` is stamped at planning
+  time and never overwritten at close; missing plan reports n/a instead of a
+  fake 100 %.
+- **Flow metrics were structurally empty (D-61).** Item creation stamps
+  `created_at`; the reader falls back to the earliest evidence timestamp for
+  pre-existing items.
+- **Attribution windowing (D-62, D-63).** The engine no longer credits
+  gating-neutralized (weight-0 / out_of_iteration) signals, and
+  `commit_author`/`agent_contribution` signals landing outside the item's
+  iteration window are now emitted at weight 0 with an audit tag.
+- **Ticket-gate bypass via PI ids (D-64).** The commit-msg gate and the
+  evidence ref parser no longer match `PI-2026` inside `PI-2026-1` — a
+  ticketless commit can't pass by mentioning a PI (and the hook stops logging
+  phantom PI refs).
+- **Create/validate disagreement (D-65).** `edpa_item_create` validates the
+  requested status against the item type's workflow and lists allowed states.
+- **Contributors-refresh hygiene (D-66).** `detect_contributors --all-items
+  --commit` commits its rewrites as suppressed-evidence bookkeeping
+  (`chore(contributors):`, now an auto-skip prefix); close docs match reality.
+- **Defects in flow analytics (D-67).** Defect status changes emit
+  `state_transition` evidence like stories/features.
+- **F821 caught by the new ruff job (D-63 follow-up).** A function-local
+  `datetime` import left the gating helper's annotation undefined — invisible
+  to tests, caught by CI on first contact.
+
 ## 2.14.0 — 2026-07-04
 
 Round 2 of the 50-agent audit remediation (**F-126**): engine-core
