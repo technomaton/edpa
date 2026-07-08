@@ -382,3 +382,128 @@ def test_board_outside_project_fails(tmp_path):
     proc = _run_board(tmp_path)
     assert proc.returncode == 1
     assert "cannot find .edpa" in proc.stdout
+
+
+# S-253: the header carries a reactive "iteration chip" surfacing the focused
+# iteration's PI designation + date range. Data comes from .edpa/iterations/
+# per-iteration files; the chip defaults to the active iteration and updates
+# client-side as the iteration dropdown changes. PI-parent files (a `pi:` block)
+# are skipped, and a project with no .edpa/iterations/ renders no chip at all.
+ITER_FILES = {
+    # PI-parent record — MUST be skipped (a `pi:` block, not `iteration:`).
+    "PI-2026-1.yaml": (
+        "pi:\n"
+        "  id: PI-2026-1\n"
+        "  status: closed\n"
+        "  start_date: 2026-04-06\n"
+        "  end_date: 2026-05-08\n"
+    ),
+    "PI-2026-1.1.yaml": (
+        "iteration:\n"
+        "  id: PI-2026-1.1\n"
+        "  pi: PI-2026-1\n"
+        "  start_date: 2026-04-06\n"
+        "  end_date: 2026-04-10\n"
+        "  status: closed\n"
+    ),
+    "PI-2026-1.2.yaml": (
+        "iteration:\n"
+        "  id: PI-2026-1.2\n"
+        "  pi: PI-2026-1\n"
+        "  start_date: 2026-04-13\n"
+        "  end_date: 2026-04-17\n"
+        "  status: active\n"
+    ),
+    "PI-2026-1.3.yaml": (
+        "iteration:\n"
+        "  id: PI-2026-1.3\n"
+        "  pi: PI-2026-1\n"
+        "  start_date: 2026-04-20\n"
+        "  end_date: 2026-04-24\n"
+        "  status: planned\n"
+    ),
+}
+
+
+def _plant_iterations(root, files):
+    it_dir = root / ".edpa" / "iterations"
+    it_dir.mkdir(parents=True, exist_ok=True)
+    for name, text in files.items():
+        (it_dir / name).write_text(text, encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def iter_project(tmp_path_factory):
+    """Backlog + a .edpa/iterations/ tree: one active iteration among
+    closed/planned, plus a PI-parent file the loader must skip."""
+    root = tmp_path_factory.mktemp("board-iter-project")
+    _plant_config(root)
+    for rel, text in BACKLOG_FILES.items():
+        item = root / ".edpa" / "backlog" / rel
+        item.parent.mkdir(parents=True, exist_ok=True)
+        item.write_text(text, encoding="utf-8")
+    _plant_iterations(root, ITER_FILES)
+    return root
+
+
+@pytest.fixture(scope="module")
+def iter_board(iter_project):
+    return _generate(iter_project, name="board-iter-chip.html")
+
+
+def test_board_iteration_chip_rendered(iter_board):
+    _, html_text = iter_board
+    # the chip container is present in the header
+    assert 'id="iterChip"' in html_text
+    # per-iteration metadata is embedded as a JS map the chip reads client-side
+    assert '"PI-2026-1.2"' in html_text
+    assert '"pi": "PI-2026-1"' in html_text
+    assert '"start": "2026-04-13"' in html_text
+    assert '"end": "2026-04-17"' in html_text
+    # the chip is wired to refresh from the iteration dropdown
+    assert "updateIterChip()" in html_text
+
+
+def test_board_iteration_chip_defaults_to_active(iter_board):
+    _, html_text = iter_board
+    # among closed/active/planned, the chip lands on the active iteration
+    assert 'DEFAULT_ITER = "PI-2026-1.2"' in html_text
+
+
+def test_board_iteration_chip_skips_pi_parent_file(iter_board):
+    _, html_text = iter_board
+    # the PI-parent record (PI-2026-1.yaml) is not a per-iteration entry — its
+    # bare id must never appear as a key in the ITERATIONS map
+    assert '"PI-2026-1":' not in html_text
+
+
+def test_board_iteration_chip_absent_without_iterations_dir(full_board):
+    # the base project fixture plants no .edpa/iterations/ — the chip is omitted
+    # and the embedded map is empty, so the board still renders cleanly
+    _, html_text = full_board
+    assert 'id="iterChip"' not in html_text
+    assert "const ITERATIONS = {}" in html_text
+
+
+def test_board_iteration_chip_fallback_latest_when_none_active(tmp_path):
+    # no iteration is active → the chip falls back to the latest by start_date
+    _plant_config(tmp_path)
+    for rel, text in BACKLOG_FILES.items():
+        item = tmp_path / ".edpa" / "backlog" / rel
+        item.parent.mkdir(parents=True, exist_ok=True)
+        item.write_text(text, encoding="utf-8")
+    _plant_iterations(tmp_path, {
+        "PI-2026-1.1.yaml": (
+            "iteration:\n  id: PI-2026-1.1\n  pi: PI-2026-1\n"
+            "  start_date: 2026-04-06\n  end_date: 2026-04-10\n  status: closed\n"
+        ),
+        "PI-2026-1.2.yaml": (
+            "iteration:\n  id: PI-2026-1.2\n  pi: PI-2026-1\n"
+            "  start_date: 2026-04-13\n  end_date: 2026-04-17\n  status: closed\n"
+        ),
+    })
+    out = tmp_path / "board.html"
+    proc = _run_board(tmp_path, "--output", str(out))
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    html_text = out.read_text(encoding="utf-8")
+    assert 'DEFAULT_ITER = "PI-2026-1.2"' in html_text
