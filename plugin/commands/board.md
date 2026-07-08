@@ -24,6 +24,13 @@ python3 .edpa/engine/scripts/board.py --open
 
 ## What it renders
 
+- **Iteration chip** (header) — surfaces the focused iteration's PI designation
+  and date range (e.g. `PI-2026-1 · Iter 4 · 27 Apr – 1 May 2026`), with a
+  pulsing dot when that iteration is the active one. It reads
+  `.edpa/iterations/*.yaml`, defaults to the active iteration (latest by
+  start_date), and updates live as the iteration dropdown changes — so
+  `--iteration PI-2026-1.4` initialises it to that iteration. Omitted when the
+  project has no `.edpa/iterations/` metadata.
 - **Delivery columns** (Planned / In Progress / Done) hold Initiatives, Epics,
   Features, Stories, and Defects, grouped by delivery status and sorted by WSJF.
 - **Risks (ROAM) section** — a separate panel below the columns lists Risk

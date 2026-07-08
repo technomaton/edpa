@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import html
+import json
 import os
 import platform
 import subprocess
@@ -84,6 +85,55 @@ def load_risks(root):
             if item:
                 risks.append(item)
     return risks
+
+
+def load_iterations(root):
+    """Read .edpa/iterations/*.yaml into a map keyed by iteration id:
+    {id: {pi, start, end, status, num}}. Only per-iteration files (an
+    `iteration:` block) are kept; PI-parent records (a `pi:` block) are skipped
+    — the header chip surfaces a single iteration's PI + span, not a whole-PI
+    record. A missing dir or a malformed file degrades to an empty map so the
+    board still renders (the chip is simply omitted). Powers the reactive
+    iteration chip (S-253)."""
+    result = {}
+    dir_path = root / ".edpa" / "iterations"
+    if not dir_path.exists():
+        return result
+    for f in sorted(dir_path.glob("*.yaml")):
+        try:
+            data = yaml.safe_load(open(f, encoding="utf-8")) or {}
+        except Exception:
+            continue
+        it = data.get("iteration")
+        if not isinstance(it, dict):
+            continue  # PI-parent (`pi:` block) or malformed — not an iteration
+        iid = str(it.get("id") or f.stem)
+        num = None
+        if "." in iid:
+            suffix = iid.rsplit(".", 1)[-1]
+            if suffix.isdigit():
+                num = int(suffix)
+        result[iid] = {
+            "pi": str(it.get("pi") or ""),
+            # start_date/end_date parse as datetime.date; str() → ISO "YYYY-MM-DD"
+            "start": str(it.get("start_date") or ""),
+            "end": str(it.get("end_date") or ""),
+            "status": str(it.get("status") or "").strip().lower(),
+            "num": num,
+        }
+    return result
+
+
+def pick_default_iteration(iterations):
+    """The iteration the chip lands on when no specific one is selected: the
+    latest `active` iteration by start_date; if none is active, the latest
+    iteration overall. '' when there are no iterations. ISO date strings sort
+    chronologically, with the id as a stable tiebreak."""
+    if not iterations:
+        return ""
+    active = {k: v for k, v in iterations.items() if v.get("status") == "active"}
+    pool = active or iterations
+    return max(pool, key=lambda k: (pool[k].get("start") or "", k))
 
 
 # -- Status mapping -------------------------------------------------------------
@@ -256,7 +306,7 @@ def render_risk_card(risk, people):
 </article>"""
 
 
-def render_html(items, people, project_name, level_filter=None, iteration_filter=None, risks=None):
+def render_html(items, people, project_name, level_filter=None, iteration_filter=None, risks=None, iters_meta=None):
     # Filter items
     filtered = items
     if level_filter:
@@ -351,6 +401,19 @@ def render_html(items, people, project_name, level_filter=None, iteration_filter
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     total = len(filtered)
 
+    # Iteration chip (S-253): an empty container the client-side script fills
+    # from the ITERATIONS map, defaulting to the active iteration and syncing to
+    # the iteration dropdown. Omitted entirely when there is no iteration data.
+    # (iters_meta is the .edpa/iterations/ metadata map — distinct from the
+    # local `iterations` list of dropdown option ids above.)
+    iters_meta = iters_meta or {}
+    default_iter = pick_default_iteration(iters_meta)
+    iter_chip_html = '<div class="iter-chip" id="iterChip"></div>' if iters_meta else ''
+    iter_data_js = (
+        f"const ITERATIONS = {json.dumps(iters_meta, ensure_ascii=False, sort_keys=True)};\n"
+        f"const DEFAULT_ITER = {json.dumps(default_iter)};"
+    )
+
     return f"""<!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -412,6 +475,16 @@ body{{
   font-weight:700;color:var(--ac2);flex-shrink:0;
 }}
 .header__meta{{font-size:0.8rem;color:var(--t2);}}
+/* -- Iteration chip (S-253) ----------------------------------------- */
+.iter-chip{{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:'JetBrains Mono',monospace;font-size:0.72rem;
+  background:var(--s1);color:var(--t2);border:1px solid var(--bd);
+  border-radius:8px;padding:5px 10px;box-shadow:var(--shadow);
+  white-space:nowrap;
+}}
+.iter-chip__pi{{color:var(--ac2);font-weight:700;}}
+.iter-chip__dot{{width:7px;height:7px;border-radius:50%;flex-shrink:0;}}
 .filters{{
   display:flex;flex-wrap:wrap;align-items:center;gap:8px;
   margin-left:auto;
@@ -603,6 +676,7 @@ body{{
 <div class="header">
   <span class="header__title">EDPA Board</span>
   <span class="header__meta">{esc(project_name)} &middot; {now}</span>
+  {iter_chip_html}
   <div class="filters">
     <select id="fIteration" onchange="applyFilters()">{iter_options}</select>
     <select id="fType" onchange="applyFilters()">{type_options}</select>
@@ -633,6 +707,42 @@ function toggleTheme() {{
 if (localStorage.getItem('edpa-board-theme') === 'dark') {{
   document.body.classList.add('dark');
   document.getElementById('themeToggle').innerHTML = '&#9788;';
+}}
+
+// Iteration chip (S-253): fill the header chip from the ITERATIONS map,
+// defaulting to the active iteration and re-syncing whenever the iteration
+// dropdown changes (wired via applyFilters + an initial call below).
+{iter_data_js}
+const ITER_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function iterFmtDate(iso, withYear) {{
+  const p = (iso || '').split('-');
+  if (p.length !== 3) return iso || '';
+  const day = parseInt(p[2], 10);
+  const mon = ITER_MONTHS[parseInt(p[1], 10) - 1] || '';
+  if (isNaN(day) || !mon) return iso || '';
+  return withYear ? (day + ' ' + mon + ' ' + p[0]) : (day + ' ' + mon);
+}}
+function iterFmtRange(start, end) {{
+  if (!start && !end) return '';
+  if (!start) return iterFmtDate(end, true);
+  if (!end) return iterFmtDate(start, true);
+  const sameYear = start.slice(0, 4) === end.slice(0, 4);
+  return iterFmtDate(start, !sameYear) + ' \\u2013 ' + iterFmtDate(end, true);
+}}
+function updateIterChip() {{
+  const chip = document.getElementById('iterChip');
+  if (!chip) return;
+  const sel = document.getElementById('fIteration');
+  const id = (sel && sel.value) ? sel.value : DEFAULT_ITER;
+  const it = ITERATIONS[id];
+  if (!it) {{ chip.style.display = 'none'; return; }}
+  chip.style.display = '';
+  const dot = it.status === 'active'
+    ? '<span class="iter-chip__dot dot--progress"></span>' : '';
+  const iter = (it.num != null) ? (' &middot; Iter ' + it.num) : '';
+  const range = iterFmtRange(it.start, it.end);
+  const dates = range ? (' &middot; ' + range) : '';
+  chip.innerHTML = dot + '<span class="iter-chip__pi">' + (it.pi || id) + '</span>' + iter + dates;
 }}
 
 const chips = document.querySelectorAll('.chip--assignee');
@@ -669,7 +779,12 @@ function applyFilters() {{
     const visible = col.querySelectorAll('.card:not(.hidden)').length;
     col.querySelector('.column__count').textContent = visible;
   }});
+
+  updateIterChip();
 }}
+
+// Initial paint (also handles a --iteration pre-selected dropdown).
+updateIterChip();
 </script>
 </body>
 </html>"""
@@ -693,6 +808,7 @@ def main():
     people, project_name = load_people(root)
     items = load_items(root)
     risks = load_risks(root)
+    iterations = load_iterations(root)
 
     if not items and not risks:
         print("No backlog items found in .edpa/backlog/")
@@ -700,7 +816,8 @@ def main():
 
     level = args.level
     html_content = render_html(items, people, project_name, level_filter=level,
-                               iteration_filter=args.iteration, risks=risks)
+                               iteration_filter=args.iteration, risks=risks,
+                               iters_meta=iterations)
 
     output = Path(args.output) if args.output else root / ".edpa" / "board.html"
     output.write_text(html_content, encoding="utf-8")
