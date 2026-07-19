@@ -375,7 +375,7 @@ git checkout -b chore/T-050-ci-pipeline</code></pre>
     <p>Registrace hooků je idempotentní a self-refreshing (SessionStart auto-update je po update pluginu znovu zaregistruje). Cizí (ne-EDPA) hooky se nikdy nepřepisují — přeskočí se s varováním. Stav hooků (aktivní / chybějící / cizí / lefthook) zkontroluješ kdykoli read-only doctorem:</p>
     <pre><code>python3 .edpa/engine/scripts/project_setup.py --check-hooks
 python3 .edpa/engine/scripts/project_setup.py --refresh-hooks   # jen znovu zaregistruje</code></pre>
-    <div class="note"><strong>lefthook:</strong> pokud projekt používá <code>lefthook.yml</code> (lefthook vlastní <code>.git/hooks/</code>), EDPA do <code>.git/hooks/</code> <strong>nezapisuje</strong> — místo toho vytiskne hotový snippet, který vložíš do <code>lefthook.yml</code>, a pak spustíš <code>lefthook install</code>. Pozor: <code>pre-push</code> musí mít <code>use_stdin: true</code>, jinak lefthook visí.</div>
+    <div class="note"><strong>lefthook:</strong> pokud projekt používá <code>lefthook.yml</code> (lefthook vlastní <code>.git/hooks/</code>), EDPA do <code>.git/hooks/</code> <strong>nezapisuje</strong> — místo toho zadrátuje do <code>lefthook.yml</code> jediný řádek <code>extends: .edpa/engine/lefthook-edpa.yml</code>, a pak spustíš <code>lefthook install</code>. Ten řádek je jediné, co EDPA v tvém lefthook configu kdy změní; starý ručně vložený blok nechává být. Díky tomu k tobě opravy hooků dorazí s <code>/plugin update</code>. Pozor: <code>pre-push</code> musí mít <code>use_stdin: true</code>, jinak lefthook visí — fragment to má.</div>
     <pre><code>pre-commit:
   commands:
     edpa-id-safety:

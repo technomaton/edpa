@@ -4,7 +4,8 @@
 # the documented `sh .edpa/engine/scripts/hooks/install.sh` path.
 #
 # It installs into .git/hooks/ (ownership-tracked, foreign hooks left alone)
-# or prints a paste-ready snippet when lefthook is detected. The old
+# or, when lefthook is detected, wires one `extends:` line into the lefthook
+# config — the only edit EDPA makes to that file. The old
 # `git config core.hooksPath` mechanism is gone: it pointed at a stale path
 # and silently fought lefthook / the .git/hooks/ copy path.
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"

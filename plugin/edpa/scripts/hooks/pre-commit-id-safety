@@ -4,7 +4,7 @@
 # Layer 5 from docs/v2/plan.md.
 #
 # Install: /edpa:setup --with-hooks (or project_setup.py --with-hooks). Detects
-# lefthook and prints a paste-ready snippet instead of writing .git/hooks/.
+# lefthook and wires an `extends:` line into its config instead of .git/hooks/.
 #
 # Exit 1 to block commit on any ID safety violation.
 

@@ -184,7 +184,7 @@ import Layout from '../layouts/Layout.astro';
         </div>
 
         <div class="form-card launch-note">
-          <p class="launch-note-text"><code>--with-hooks</code> registruje 4 git hooky (pre-commit, commit-msg, post-commit, pre-push) do <code>.git/hooks/</code>. Registrace je idempotentni a cizi hooky se nikdy neprepisuji. Pokud projekt pouziva <strong>lefthook</strong> (<code>lefthook.yml</code> vlastni <code>.git/hooks/</code>), EDPA misto toho vytiskne hotovy snippet — vloz ho do <code>lefthook.yml</code> a spust <code>lefthook install</code>. Stav hooku kdykoli overis pres <code>project_setup.py --check-hooks</code>.</p>
+          <p class="launch-note-text"><code>--with-hooks</code> registruje 4 git hooky (pre-commit, commit-msg, post-commit, pre-push) do <code>.git/hooks/</code>. Registrace je idempotentni a cizi hooky se nikdy neprepisuji. Pokud projekt pouziva <strong>lefthook</strong> (<code>lefthook.yml</code> vlastni <code>.git/hooks/</code>), EDPA misto toho zapise do <code>lefthook.yml</code> jediny radek <code>extends: .edpa/engine/lefthook-edpa.yml</code> — a nic jineho v tom souboru nemeni — pak spust <code>lefthook install</code>. Stav hooku kdykoli overis pres <code>project_setup.py --check-hooks</code>.</p>
           <pre class="launch-pre">pre-commit:
   commands:
     edpa-id-safety:
