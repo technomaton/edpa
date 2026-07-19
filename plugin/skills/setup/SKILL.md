@@ -70,9 +70,10 @@ Resulting layout:
     after running setup.
   - **Registration is robust + lefthook-aware:**
     - Under **lefthook** (`lefthook.yml` present, which owns `.git/hooks/`),
-      EDPA does **not** write `.git/hooks/` — it prints a paste-ready snippet
-      (with `use_stdin: true` on pre-push, or the push hangs) to add to
-      `lefthook.yml`, then run `lefthook install`.
+      EDPA does **not** write `.git/hooks/`. Recommended: add one line —
+      `extends: [.edpa/engine/lefthook-edpa.yml]` — then `lefthook install`;
+      it tracks plugin updates with no re-paste. A full paste-in snippet (with
+      `use_stdin: true` on pre-push, or the push hangs) is the fallback.
     - A **foreign** hook already occupying a slot is never clobbered — EDPA
       skips it and prints the exact line to chain itself in by hand.
     - **Idempotent + self-refreshing:** re-running `--with-hooks` (or

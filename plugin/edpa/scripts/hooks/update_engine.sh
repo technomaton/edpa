@@ -144,6 +144,14 @@ VENDOR rules "$PLUGIN_ROOT"
 echo "$PLUGIN_VERSION" > "$TARGET/VERSION"
 chmod +x "$TARGET/scripts/hooks/"* 2>/dev/null || true
 
+# Single-file lefthook fragment for `extends:` — vendored to the engine root so
+# a one-line extends in the user's lefthook.yml wires in all four hooks and
+# tracks plugin updates (no re-paste). VENDOR only handles subdirs, so copy it
+# explicitly.
+if [ -f "$PLUGIN_SRC/lefthook-edpa.yml" ]; then
+  cp "$PLUGIN_SRC/lefthook-edpa.yml" "$TARGET/lefthook-edpa.yml"
+fi
+
 # Self-heal git hooks after an engine update. A version bump can leave
 # .git/hooks/ holding a stale snapshot, or another tool (e.g. lefthook) may
 # have clobbered EDPA's hooks — which silently stops contribution evidence
@@ -157,6 +165,18 @@ _has_lefthook() {
   return 1
 }
 if _has_lefthook; then
+  # If the repo wires EDPA via `extends:` to the vendored fragment, lefthook's
+  # sync only watches the MAIN config's mtime — the fragment just changed under
+  # it, so drop lefthook's checksum (a git-internal file, never the user's
+  # config) to force a re-sync on the next git op. Only when the fragment is
+  # actually referenced, so inline-paste users aren't nudged into a needless
+  # reinstall.
+  for _lf in lefthook.yml lefthook.yaml .lefthook.yml .lefthook.yaml lefthook.toml lefthook.json; do
+    if [ -f "$PROJECT/$_lf" ] && grep -q "lefthook-edpa.yml" "$PROJECT/$_lf" 2>/dev/null; then
+      rm -f "$PROJECT/.git/info/lefthook.checksum"
+      break
+    fi
+  done
   # Content-aware audit: silent when 0/4 (repo never opted in) or 4/4 (all
   # wired), loud + specific only on a partial paste (guards silently missing).
   # Non-blocking (|| true) — advisory only, must never break a session start.

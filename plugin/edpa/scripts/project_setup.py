@@ -143,6 +143,12 @@ def vendor_engine(root: Path) -> bool:
     rules_src = src.parent / "rules"
     if rules_src.exists():
         shutil.copytree(rules_src, target / "rules", dirs_exist_ok=True)
+    # Single-file lefthook fragment for `extends:` — lives at the engine root
+    # (stable path .edpa/engine/lefthook-edpa.yml) so a one-line extends wires in
+    # all four hooks and tracks plugin updates.
+    fragment = src / LEFTHOOK_FRAGMENT_NAME
+    if fragment.exists():
+        shutil.copy(fragment, target / LEFTHOOK_FRAGMENT_NAME)
     version = _plugin_version(src)
     if version:
         (target / "VERSION").write_text(version + "\n", encoding="utf-8")
@@ -330,10 +336,17 @@ _LEFTHOOK_CONFIGS = (
     "lefthook.toml", "lefthook.json",
 )
 
-# Paste-ready lefthook config. pre-push reads its refs on stdin, so its command
-# MUST set ``use_stdin: true`` — without it lefthook keeps a pseudo-TTY open and
-# hangs the push. {1}/{2} are the args git passes the hook (commit-msg: the
-# message file; pre-push: remote name + URL).
+# Vendored lefthook fragment. A one-line ``extends:`` to this path wires in all
+# four hooks from a file EDPA re-vendors on every session, so hook changes
+# propagate on ``/plugin update`` without the user re-pasting anything — the
+# recommended path. The full paste-in snippet below stays as a fallback.
+LEFTHOOK_FRAGMENT_NAME = "lefthook-edpa.yml"
+LEFTHOOK_FRAGMENT_REL = f".edpa/engine/{LEFTHOOK_FRAGMENT_NAME}"
+
+# Paste-ready lefthook config (fallback for when extends isn't wanted). pre-push
+# reads its refs on stdin, so its command MUST set ``use_stdin: true`` — without
+# it lefthook keeps a pseudo-TTY open and hangs the push. {1}/{2} are the args
+# git passes the hook (commit-msg: the message file; pre-push: remote + URL).
 LEFTHOOK_SNIPPET = """\
 # --- EDPA-managed hooks: paste into lefthook.yml, then run `lefthook install` ---
 # Merge these `commands:` under any matching hook keys you already have;
@@ -367,28 +380,73 @@ def detect_lefthook(root: Path) -> Path | None:
     return None
 
 
+def _lefthook_extends_paths(text: str) -> list[str]:
+    """Best-effort file paths referenced under a top-level ``extends:`` key.
+
+    Handles the block-list form::
+
+        extends:
+          - .edpa/engine/lefthook-edpa.yml
+
+    and the inline-flow form ``extends: [a.yml, b.yml]``. A small line scanner,
+    not a YAML parser, so a partial or comment-heavy config never raises.
+    """
+    paths: list[str] = []
+    lines = text.splitlines()
+    i, n = 0, len(lines)
+    while i < n:
+        if re.match(r"^extends\s*:", lines[i]):
+            inline = re.search(r"\[(.*?)\]", lines[i])
+            if inline:
+                paths += [p.strip().strip("'\"") for p in inline.group(1).split(",")
+                          if p.strip()]
+            j = i + 1
+            while j < n:
+                if not lines[j].strip():
+                    j += 1
+                    continue
+                item = re.match(r"^\s+-\s*(.+?)\s*$", lines[j])
+                if not item:
+                    break
+                paths.append(item.group(1).strip().strip("'\""))
+                j += 1
+            i = j
+            continue
+        i += 1
+    return paths
+
+
 def lefthook_hook_status(cfg_path: Path) -> tuple[list[str], list[str]]:
     """Which EDPA hooks are wired into a lefthook config, and which are missing.
 
     EDPA cannot register into lefthook itself (it owns .git/hooks/), so it hands
-    the user a paste-ready snippet. A *partial* paste — only some of the four
-    ``run:`` lines copied in — silently drops the guard hooks, and until now
-    nothing detected it. Each EDPA hook's vendored script basename
-    (``pre-commit-id-safety`` …) is unique and appears verbatim in its ``run:``
-    line, so a plain substring scan over the raw config text is enough to tell
-    wired from missing — no YAML parser, dependency-free, and format-agnostic
-    (works for .yml/.yaml/.toml/.json, survives reordering and comments).
+    the user a paste-ready snippet (or the recommended one-line ``extends:`` to
+    the vendored fragment). A *partial* paste — only some of the four ``run:``
+    lines copied in — silently drops the guard hooks, and until now nothing
+    detected it. Each EDPA hook's vendored script basename (``pre-commit-id-safety``
+    …) is unique and appears verbatim in its ``run:`` line, so a plain substring
+    scan over the raw config text tells wired from missing — no YAML parser,
+    dependency-free, format-agnostic (.yml/.yaml/.toml/.json, survives reorder
+    and comments). ``extends:`` includes are followed so an extends-based setup —
+    where the run: lines live in the fragment, not the main config — reads as
+    fully wired instead of a false "0 of 4 missing".
 
     Returns ``(registered, missing)`` as git-hook names, in _HOOK_SPECS order.
     """
-    try:
-        text = cfg_path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        text = ""
+    def _read(p: Path) -> str:
+        try:
+            return p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return ""
+
+    text = _read(cfg_path)
+    corpus = text
+    for rel in _lefthook_extends_paths(text):
+        corpus += "\n" + _read(cfg_path.parent / rel)
     registered: list[str] = []
     missing: list[str] = []
     for hook, src_name, _ in _HOOK_SPECS:
-        (registered if src_name in text else missing).append(hook)
+        (registered if src_name in corpus else missing).append(hook)
     return registered, missing
 
 
@@ -457,8 +515,14 @@ def install_hooks(root: Path, *, refresh: bool = False,
             info(f"No EDPA hooks registered in {lefthook_cfg.name} yet "
                  f"(0 of {total}).")
         if not check_only:
-            info("EDPA does not edit your lefthook config. Add this block, "
-                 "then run `lefthook install`:")
+            info("EDPA does not edit your lefthook config. Recommended — add one "
+                 "line referencing the vendored fragment, then `lefthook install`:")
+            print()
+            print("extends:")
+            print(f"  - {LEFTHOOK_FRAGMENT_REL}")
+            print()
+            info("This tracks plugin updates automatically (no re-paste). Or paste "
+                 "the full block as a fallback:")
             print()
             print(LEFTHOOK_SNIPPET)
         info("Re-check anytime: python3 .edpa/engine/scripts/project_setup.py "

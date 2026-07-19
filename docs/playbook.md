@@ -450,6 +450,15 @@ Povolene prefixy: `S` (Story), `F` (Feature), `E` (Epic), `T` (Task), `D` (Defec
 
 Registrace je idempotentni a sebe-obnovujici: EDPA znacka sve hooky sentinelem `EDPA-MANAGED-HOOK`, opakovany `--with-hooks` (nebo `--refresh-hooks`) je osvezi a cizi (ne-EDPA) hook v dane pozici **nikdy nepreplacne** -- vypise hlasku + radek k rucnimu zaretezeni (`sh .edpa/engine/scripts/hooks/<hook> "$@"`). Pokud je v repu **lefthook** (`lefthook.yml`), `.git/hooks/` vlastni lefthook, takze EDPA tam nezapisuje a misto toho vypise hotovy snippet do `lefthook.yml`; pote spust `lefthook install`. Stav hooku overis read-only pres `--check-hooks` (kazdy hook jako active / missing / foreign, pripadne flag lefthook).
 
+**Doporuceno** -- misto lepeni celeho bloku pridej do `lefthook.yml` jediny radek na vendorovany fragment, pak `lefthook install`; zmeny hooku se pak propaguji samy pri `/plugin update` (bez re-paste, EDPA invaliduje lefthook checksum):
+
+```yaml
+extends:
+  - .edpa/engine/lefthook-edpa.yml
+```
+
+Nebo cely blok jako fallback:
+
 ```yaml
 # lefthook.yml -- EDPA hooky (pre-push MUSI mit use_stdin: true, jinak push zatuhne)
 pre-commit:

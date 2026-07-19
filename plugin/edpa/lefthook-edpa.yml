@@ -1,0 +1,29 @@
+# EDPA-managed lefthook hooks — DO NOT EDIT.
+# Vendored from the plugin into .edpa/engine/lefthook-edpa.yml on every session
+# (update_engine.sh), so hook changes propagate on `/plugin update` without a
+# re-paste. Wire it up ONCE by adding to your own lefthook.yml:
+#
+#   extends:
+#     - .edpa/engine/lefthook-edpa.yml
+#
+# then run `lefthook install`. Command names are unique (edpa-*) so lefthook
+# merges them into any pre-commit you already have instead of replacing it.
+# pre-push reads its refs on stdin, so its command sets `use_stdin: true` —
+# without it lefthook holds a pseudo-TTY open and hangs the push.
+pre-commit:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety
+commit-msg:
+  commands:
+    edpa-ticket-attached:
+      run: sh .edpa/engine/scripts/hooks/commit-msg-ticket-attached {1}
+post-commit:
+  commands:
+    edpa-evidence:
+      run: sh .edpa/engine/scripts/hooks/post-commit-evidence
+pre-push:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-push-id-safety {1} {2}
+      use_stdin: true

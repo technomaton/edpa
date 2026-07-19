@@ -297,3 +297,54 @@ def test_lefthook_audit_no_lefthook_is_silent(tmp_path: Path, capsys) -> None:
     captured = capsys.readouterr()
     assert captured.err == ""
     assert captured.out == ""
+
+
+# ─── Extends-aware detection (the vendored fragment lives outside lefthook.yml) ─
+
+
+def _write_fragment(root: Path) -> Path:
+    frag = root / ".edpa" / "engine" / "lefthook-edpa.yml"
+    frag.parent.mkdir(parents=True, exist_ok=True)
+    frag.write_text(_FULL_LEFTHOOK)  # carries the four run: basenames
+    return frag
+
+
+def test_extends_paths_parses_block_and_inline() -> None:
+    block = "extends:\n  - .edpa/engine/lefthook-edpa.yml\n  - other.yml\n"
+    assert ps._lefthook_extends_paths(block) == [
+        ".edpa/engine/lefthook-edpa.yml", "other.yml"]
+    inline = "extends: [.edpa/engine/lefthook-edpa.yml, other.yml]\n"
+    assert ps._lefthook_extends_paths(inline) == [
+        ".edpa/engine/lefthook-edpa.yml", "other.yml"]
+    assert ps._lefthook_extends_paths("pre-commit:\n  commands: {}\n") == []
+
+
+def test_lefthook_hook_status_follows_extends(tmp_path: Path) -> None:
+    # Main config holds ZERO run: lines — all four live in the extended fragment.
+    _write_fragment(tmp_path)
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text("extends:\n  - .edpa/engine/lefthook-edpa.yml\n")
+    registered, missing = ps.lefthook_hook_status(cfg)
+    assert set(registered) == set(HOOK_NAMES), "extends fragment misread as missing"
+    assert missing == []
+
+
+def test_lefthook_audit_extends_is_silent(tmp_path: Path, capsys) -> None:
+    # extends → 4/4 → SessionStart audit must stay quiet, not false-alarm.
+    _write_fragment(tmp_path)
+    (tmp_path / "lefthook.yml").write_text(
+        "extends: [.edpa/engine/lefthook-edpa.yml]\n")
+    assert ps.lefthook_audit(tmp_path) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out == ""
+
+
+def test_lefthook_extends_missing_fragment_does_not_crash(tmp_path: Path) -> None:
+    # A dangling extends (fragment not vendored yet) is best-effort: no run:
+    # lines found anywhere → treated as not-opted-in, never raises.
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text("extends:\n  - .edpa/engine/lefthook-edpa.yml\n")
+    registered, missing = ps.lefthook_hook_status(cfg)
+    assert registered == []
+    assert set(missing) == set(HOOK_NAMES)
