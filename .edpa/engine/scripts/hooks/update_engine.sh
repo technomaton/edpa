@@ -78,6 +78,32 @@ if [ "$PLUGIN_VERSION" = "$LOCAL_VERSION" ]; then
     fi
   }
   _warn_legacy_yaml
+
+  # Every-session partial-paste guard (D-77). The rich python audit further down
+  # only runs on a version change (cold path), but a partial lefthook paste
+  # happens at setup and must surface promptly — every session, not just after a
+  # `/plugin update`. Cheap shell tripwire: count EDPA hook basenames wired into
+  # the lefthook config (following the extends fragment, if referenced) and spawn
+  # python ONLY on a partial wiring (1..3 of 4) for the full UNGUARDED message.
+  # 0/4 (not opted in) and 4/4 (correct) stay silent and python-free. Basenames
+  # mirror _HOOK_SPECS in project_setup.py.
+  for _lf in lefthook.yml lefthook.yaml .lefthook.yml .lefthook.yaml lefthook.toml lefthook.json; do
+    [ -f "$PROJECT/$_lf" ] || continue
+    _corpus=$(cat "$PROJECT/$_lf" 2>/dev/null)
+    case "$_corpus" in
+      *lefthook-edpa.yml*)
+        _corpus="$_corpus
+$(cat "$PROJECT/.edpa/engine/lefthook-edpa.yml" 2>/dev/null)" ;;
+    esac
+    _wired=0
+    for _b in pre-commit-id-safety commit-msg-ticket-attached post-commit-evidence pre-push-id-safety; do
+      case "$_corpus" in *"$_b"*) _wired=$((_wired + 1)) ;; esac
+    done
+    if [ "$_wired" -gt 0 ] && [ "$_wired" -lt 4 ]; then
+      python3 "$TARGET/scripts/project_setup.py" --lefthook-audit --root "$PROJECT" 1>&2 || true
+    fi
+    break
+  done
   exit 0
 fi
 
