@@ -1,5 +1,41 @@
 # Changelog
 
+## 2.19.0 — 2026-07-19
+
+Lefthook hook-registration robustness, plus removal of a foreign
+context-engineering tool.
+
+### Fixed
+
+- **Partial lefthook hook paste went undetected (D-77).** EDPA hands lefthook
+  users a paste-ready snippet of four hooks; a partial paste (only some `run:`
+  lines copied) silently dropped the guard hooks and nothing flagged it.
+  `install_hooks` / the new `--lefthook-audit` now read the lefthook config and
+  report registered vs. missing EDPA hooks (dependency-free basename scan; works
+  for `.yml/.yaml/.toml/.json`, survives reorder and comments): 4/4 → OK, 1–3/4 →
+  loud `UNGUARDED` naming the missing guards, 0/4 → offer setup. `update_engine.sh`
+  surfaces a partial paste **every session** via a cheap warm-path tripwire that
+  only spawns the audit when the wiring is actually partial.
+
+### Added
+
+- **Extends-based lefthook registration (S-254).** A vendored fragment
+  `.edpa/engine/lefthook-edpa.yml` lets users wire in all four hooks with a single
+  `extends:` line instead of pasting fifteen. Hook changes then propagate on
+  `/plugin update` — `update_engine.sh` invalidates lefthook's checksum (a
+  git-internal file, never the user's config) since lefthook's fast-path watches
+  only the main config's mtime, not the fragment. Detection follows `extends:`
+  includes so an extends setup reads as 4/4, not a false "0 of 4". Docs (RUNBOOK,
+  playbook, setup SKILL) present extends as recommended, the full snippet as
+  fallback.
+
+### Removed
+
+- **lean-ctx foreign context-engineering tool.** Removed its self-installed
+  steering rules across `.claude/rules/`, `.kiro/steering/`, `AGENTS.md`, and the
+  root `LEAN-CTX.md` — which instructed agents to route file reads and shell
+  through its MCP server — plus the `.lean-ctx/` cache and its `.gitignore` entry.
+
 ## 2.18.0 — 2026-07-05
 
 Website: the English site is now complete and cross-linked.
