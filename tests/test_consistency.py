@@ -642,9 +642,12 @@ def test_lefthook_fragment_matches_snippet_and_vendored():
     assert frag_src.exists(), "plugin/edpa/lefthook-edpa.yml missing"
 
     def run_cmds(text):
+        # Comment lines are prose about the config, not config — a header
+        # sentence containing "run:" must not register as a command.
         return sorted(
             line.split("run:", 1)[1].strip()
-            for line in text.splitlines() if "run:" in line
+            for line in text.splitlines()
+            if "run:" in line and not line.lstrip().startswith("#")
         )
 
     assert run_cmds(frag_src.read_text(encoding="utf-8")) == run_cmds(ps.LEFTHOOK_SNIPPET), (

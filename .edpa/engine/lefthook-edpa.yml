@@ -6,8 +6,14 @@
 #   extends:
 #     - .edpa/engine/lefthook-edpa.yml
 #
-# then run `lefthook install`. Command names are unique (edpa-*) so lefthook
+# then run `lefthook install`. Command names are namespaced (edpa-*) so lefthook
 # merges them into any pre-commit you already have instead of replacing it.
+#
+# On a name collision this fragment WINS — a command you define under an edpa-*
+# name in your own lefthook.yml is replaced by the version below, silently.
+# Migrating from the old paste-in snippet is therefore a no-op (its run: lines
+# are identical to these), but a hand-rolled edpa-* command of your own will
+# stop running while still looking active in your config.
 # pre-push reads its refs on stdin, so its command sets `use_stdin: true` —
 # without it lefthook holds a pseudo-TTY open and hangs the push.
 pre-commit:

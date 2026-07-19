@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Pre-sentinel git hooks were classified as foreign forever (D-78).**
+  `install_hooks` decided ownership purely on the `EDPA-MANAGED-HOOK` sentinel,
+  so hooks installed before that sentinel landed — same executable body, older
+  comment header — read as somebody else's files. Two consequences, both silent:
+  `--refresh-hooks` never overwrote them, so hook fixes from `/plugin update`
+  stopped propagating into the repo; and `--check-hooks` reported a fully-wired
+  repo as 4/4 `NOT EDPA-managed`, which trains users to ignore the doctor. EDPA's
+  own repository was in exactly this state. Ownership is now decided on the
+  comment-stripped body: a hook whose runnable lines match the vendored source is
+  adopted as `legacy` and re-stamped (lossless — only the header changes), while
+  a hook with any altered command stays foreign and untouched as before.
+- **Lefthook fragment/snippet consistency guard matched prose.** Its `run:`
+  extractor scanned every line including comments, so a header sentence
+  mentioning `run:` registered as a phantom command and failed the test.
+
+### Changed
+
+- **Documented lefthook's `extends:` precedence.** On a command-name collision
+  the vendored fragment wins and silently replaces a same-named command in your
+  own `lefthook.yml`. Migrating from the old paste-in snippet is a no-op — its
+  `run:` lines are byte-identical to the fragment's — but a hand-rolled `edpa-*`
+  command of your own stops running while still looking active in your config.
+  The fragment header now says so.
+
 ## 2.19.0 — 2026-07-19
 
 Lefthook hook-registration robustness, plus removal of a foreign

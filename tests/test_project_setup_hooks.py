@@ -97,6 +97,59 @@ def test_no_refresh_leaves_edpa_owned_untouched(tmp_path: Path) -> None:
     assert "KEEP-ME" in pc.read_text(), "non-refresh run clobbered an EDPA hook"
 
 
+# ─── Pre-sentinel (legacy) hooks — D-78 ────────────────────────────────────────
+#
+# Hooks installed before EDPA_HOOK_SENTINEL existed carry the same executable
+# body under an older comment header. Classified on the sentinel alone they read
+# as "foreign" forever: refresh never re-stamps them, so plugin hook fixes stop
+# propagating, and --check-hooks reports a correctly-wired repo as 4/4 unwired.
+
+
+def _legacy_variant(src_text: str) -> str:
+    """A pre-sentinel EDPA hook: identical runnable lines, older header."""
+    kept = [ln for ln in src_text.splitlines()
+            if ps.EDPA_HOOK_SENTINEL not in ln]
+    return "\n".join(kept + ["# Install: symlink into .git/hooks/ (old docs)"]) + "\n"
+
+
+def _seed_legacy(tmp_path: Path, hook: str, src_name: str) -> tuple[Path, Path]:
+    hooks = _git_hooks(tmp_path)
+    src = ps._hook_src_dir(tmp_path) / src_name
+    dst = hooks / hook
+    dst.write_text(_legacy_variant(src.read_text()))
+    return dst, src
+
+
+def test_legacy_hook_restamped_without_refresh(tmp_path: Path) -> None:
+    dst, src = _seed_legacy(tmp_path, "post-commit", "post-commit-evidence")
+    ps.install_hooks(tmp_path, refresh=False)
+    assert ps.EDPA_HOOK_SENTINEL in dst.read_text(), "legacy hook not re-stamped"
+    assert dst.read_text() == src.read_text(), "re-stamp did not match source"
+
+
+def test_legacy_hook_not_reported_foreign(tmp_path: Path, capsys) -> None:
+    _seed_legacy(tmp_path, "post-commit", "post-commit-evidence")
+    ps.install_hooks(tmp_path, check_only=True)
+    out = capsys.readouterr().out
+    assert "NOT EDPA-managed" not in out, "legacy hook misreported as foreign"
+    assert "pre-sentinel" in out
+
+
+def test_legacy_check_only_writes_nothing(tmp_path: Path) -> None:
+    dst, _ = _seed_legacy(tmp_path, "post-commit", "post-commit-evidence")
+    before = dst.read_text()
+    ps.install_hooks(tmp_path, check_only=True)
+    assert dst.read_text() == before, "check_only re-stamped a hook"
+
+
+def test_body_match_ignores_comments_not_code(tmp_path: Path) -> None:
+    """The adoption rule keys on runnable lines — a changed command is foreign."""
+    dst, src = _seed_legacy(tmp_path, "post-commit", "post-commit-evidence")
+    assert ps._hook_ownership(dst, src) == ps._OWN_LEGACY
+    dst.write_text(dst.read_text().replace("python3", "python2"))
+    assert ps._hook_ownership(dst, src) == ps._OWN_FOREIGN
+
+
 # ─── Foreign hook protection ───────────────────────────────────────────────────
 
 

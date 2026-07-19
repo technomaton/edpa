@@ -458,12 +458,39 @@ def _hook_src_dir(root: Path) -> Path:
     return src_dir
 
 
-def _is_edpa_owned(path: Path) -> bool:
-    """True if an installed hook carries EDPA's sentinel (vs. a foreign hook)."""
+# How an installed hook relates to EDPA. "legacy" is an EDPA hook from before
+# EDPA_HOOK_SENTINEL existed: identical executable body, older comment header.
+# Without this third state it classifies as "foreign" forever — so refresh never
+# re-stamps it, plugin hook fixes stop propagating into the repo, and
+# --check-hooks reports a correctly-wired repo as fully unwired (D-78).
+_OWN_EDPA, _OWN_LEGACY, _OWN_FOREIGN = "edpa", "legacy", "foreign"
+
+
+def _hook_body(text: str) -> str:
+    """A hook script's executable lines — comments and blank lines stripped.
+
+    Lets a hook be recognised by what it *does* rather than what its header
+    claims, which is what makes pre-sentinel EDPA hooks identifiable.
+    """
+    return "\n".join(
+        line.strip() for line in text.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    )
+
+
+def _hook_ownership(dst: Path, src: Path) -> str:
+    """Classify an installed hook against the vendored source for its slot."""
     try:
-        return EDPA_HOOK_SENTINEL in path.read_text(encoding="utf-8", errors="ignore")
+        text = dst.read_text(encoding="utf-8", errors="ignore")
     except OSError:
-        return False
+        return _OWN_FOREIGN
+    if EDPA_HOOK_SENTINEL in text:
+        return _OWN_EDPA
+    try:
+        src_text = src.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return _OWN_FOREIGN
+    return _OWN_LEGACY if _hook_body(text) == _hook_body(src_text) else _OWN_FOREIGN
 
 
 def install_hooks(root: Path, *, refresh: bool = False,
@@ -480,6 +507,9 @@ def install_hooks(root: Path, *, refresh: bool = False,
       * dst EDPA-owned    → ``refresh`` overwrites with the current version so a
         plugin update propagates hook fixes (update_engine.sh self-heal path);
         otherwise reported as already active.
+      * dst legacy        → an EDPA hook predating the sentinel (same body,
+        older header). Re-stamped unconditionally — lossless, and it restores
+        the propagation path the missing sentinel had cut off (D-78).
       * dst foreign       → never touched; loud warning with manual chain-in
         instructions.
 
@@ -532,7 +562,9 @@ def install_hooks(root: Path, *, refresh: bool = False,
     src_dir = _hook_src_dir(root)
     installed: list[str] = []
     refreshed: list[str] = []
+    restamped: list[str] = []
     active: list[str] = []
+    legacy: list[str] = []
     missing: list[str] = []
     foreign: list[str] = []
     for hook, src_name, _ in _HOOK_SPECS:
@@ -547,22 +579,37 @@ def install_hooks(root: Path, *, refresh: bool = False,
                 shutil.copy(src, dst)
                 dst.chmod(0o755)
                 installed.append(hook)
-        elif _is_edpa_owned(dst):
-            if not check_only and refresh:
-                shutil.copy(src, dst)
-                dst.chmod(0o755)
-                refreshed.append(hook)
-            else:
-                active.append(hook)
-        else:
+            continue
+        own = _hook_ownership(dst, src)
+        if own == _OWN_FOREIGN:
             foreign.append(hook)
+        elif check_only:
+            (legacy if own == _OWN_LEGACY else active).append(hook)
+        elif refresh or own == _OWN_LEGACY:
+            # A legacy hook is re-stamped even without ``refresh``: its body is
+            # identical to the source by definition, so the write only replaces
+            # the header — lossless, and it heals the repo at the first
+            # --with-hooks instead of waiting for a refresh run.
+            shutil.copy(src, dst)
+            dst.chmod(0o755)
+            (restamped if own == _OWN_LEGACY else refreshed).append(hook)
+        else:
+            active.append(hook)
 
     if installed:
         ok(f"Installed git hooks: {', '.join(installed)}")
     if refreshed:
         ok(f"Refreshed git hooks: {', '.join(refreshed)}")
+    if restamped:
+        ok(f"Re-stamped pre-sentinel EDPA hooks: {', '.join(restamped)}")
+        info("   same script body, older header — now tracked, so plugin hook "
+             "fixes propagate here again")
     if active:
         (ok if check_only else info)(f"Active EDPA hooks: {', '.join(active)}")
+    if legacy:
+        ok(f"Active EDPA hooks (pre-sentinel): {', '.join(legacy)}")
+        info("   run /edpa:setup --with-hooks to re-stamp them — until then "
+             "plugin hook updates will not propagate")
     if missing:
         warn(f"Missing EDPA hooks: {', '.join(missing)} — run "
              f"/edpa:setup --with-hooks")
@@ -572,7 +619,8 @@ def install_hooks(root: Path, *, refresh: bool = False,
         info(f"   purpose not wired: {_HOOK_PURPOSE[hook]}")
         info(f"   chain EDPA in by adding to .git/hooks/{hook}:  "
              f"sh .edpa/engine/scripts/hooks/{_HOOK_SRC[hook]} \"$@\"")
-    if not (installed or refreshed or active or missing or foreign):
+    if not (installed or refreshed or restamped or active or legacy
+            or missing or foreign):
         info("No EDPA hook sources found (engine not vendored?) — nothing to do")
     return True
 
