@@ -82,8 +82,10 @@ engine + `.edpa/` tree.
 **Flags (all recommended for team workflows):**
 - `--with-hooks` — pre-commit + commit-msg + post-commit + pre-push git hooks
   (ID safety, ticket-attached, local `commit_author` evidence emission). Detects
-  lefthook and prints a paste-ready snippet instead of touching `.git/hooks/`;
-  never clobbers a foreign hook. See **Git hooks** below.
+  lefthook and wires `extends: .edpa/engine/lefthook-edpa.yml` into your
+  lefthook config instead of touching `.git/hooks/` — that one line is the only
+  thing EDPA ever writes there. Never clobbers a foreign hook. See **Git hooks**
+  below.
 - `--with-ci` — copies `edpa-contribution-sync.yml`; materializes PR-thread
   signals (`pr_reviewer`, `issue_comment`) into `evidence[]` after merge.
   Optional, GitHub-only — local commit evidence flows without it.
@@ -532,9 +534,13 @@ flags lefthook):
 python3 .edpa/engine/scripts/project_setup.py --check-hooks
 ```
 
-If your repo uses **lefthook**, `--with-hooks` prints a paste-ready snippet
-instead of writing `.git/hooks/`; add it to `lefthook.yml` and run
-`lefthook install` (see §1 → *Git hooks — registration, lefthook, verification*).
+If your repo uses **lefthook**, `--with-hooks` adds one `extends:` entry to your
+lefthook config instead of writing `.git/hooks/` — then run `lefthook install`.
+EDPA changes nothing else in that file; a hand-pasted EDPA block from an older
+setup is left exactly where it is (harmless — the fragment wins the name
+collision and its `run:` lines are identical). A `lefthook.toml`/`.json` cannot
+be edited safely, so those still get the paste-ready snippet printed (see §1 →
+*Git hooks — registration, lefthook, verification*).
 
 See [`docs/dev-collisions.md`](dev-collisions.md) for decision tree, common collision shapes (single / multi / parent-chain / cascading), troubleshooting, and the `--target develop` flag for Git Flow projects.
 

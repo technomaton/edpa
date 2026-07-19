@@ -163,7 +163,7 @@ When teams have multiple devs creating backlog items in parallel branches, ID co
 | 7 — CI workflow | server | PR open/sync | `edpa-collision-check.yml` (comments on PR + fails check) |
 | Recovery | local | after conflict | `renumber_collisions.py --apply` (renames + updates parents + bumps counter) |
 
-Hook registration (`--with-hooks` / `--refresh-hooks`) is idempotent and lefthook-aware: EDPA tags its own hooks with an `EDPA-MANAGED-HOOK` sentinel, never clobbers a foreign hook already in a slot, and — if a `lefthook.yml` is present — prints a paste-ready snippet instead of writing to `.git/hooks/`. Verify any time with the read-only doctor `project_setup.py --check-hooks` (reports each hook as active / missing / foreign, or flags lefthook).
+Hook registration (`--with-hooks` / `--refresh-hooks`) is idempotent and lefthook-aware: EDPA tags its own hooks with an `EDPA-MANAGED-HOOK` sentinel, never clobbers a foreign hook already in a slot, and — if a `lefthook.yml` is present — wires a single `extends: .edpa/engine/lefthook-edpa.yml` entry into it instead of writing to `.git/hooks/`. That entry is the only thing EDPA ever changes in a lefthook config; repos still on an older hand-pasted block are migrated onto it at the next `/plugin update`, and the stale block is left untouched (harmless — the fragment wins the name collision with identical `run:` lines). Verify any time with the read-only doctor `project_setup.py --check-hooks` (reports each hook as active / missing / foreign, or flags lefthook).
 
 **Quick setup** (one-time per project):
 

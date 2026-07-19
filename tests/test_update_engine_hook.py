@@ -264,6 +264,49 @@ def test_self_heal_skipped_when_no_edpa_hooks(tmp_path):
         assert not (hooks / name).exists(), f"{name} forced onto opt-out repo"
 
 
+def test_plugin_update_migrates_lefthook_repo_onto_extends(tmp_path):
+    """S-255: a repo on a hand-pasted block is migrated to extends: on update.
+
+    A pasted block is a frozen copy that never sees another hook fix, so this is
+    what makes /plugin update actually deliver. The stale block is deliberately
+    left in place — the fragment wins the name collision with identical run:
+    lines, so removing it would be a cosmetic edit to the user's file.
+    """
+    _seed_engine(tmp_path, version="1.0.0")
+    _git_hooks(tmp_path)
+    pasted = (
+        "# my hooks\n"
+        "pre-commit:\n"
+        "  commands:\n"
+        "    edpa-id-safety:\n"
+        "      run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety\n"
+    )
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text(pasted)
+
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    after = cfg.read_text()
+    assert "lefthook-edpa.yml" in after, "repo was not migrated onto extends:"
+    assert "wired" in result.stderr, "the config edit was made silently"
+    for line in pasted.splitlines():
+        assert line in after, f"pasted block was modified: {line!r} lost"
+
+
+def test_extends_migration_is_idempotent_across_updates(tmp_path):
+    """The wire step runs every update; it must not accumulate entries."""
+    _seed_engine(tmp_path, version="1.0.0")
+    _git_hooks(tmp_path)
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text("pre-commit:\n  commands:\n    lint:\n      run: x\n")
+    _run(tmp_path)
+    first = cfg.read_text()
+    (tmp_path / ".edpa/engine/VERSION").write_text("1.0.0")  # force another update
+    _run(tmp_path)
+    assert cfg.read_text() == first, "second update rewrote the config"
+    assert first.count("lefthook-edpa.yml") == 1, "extends entry duplicated"
+
+
 def test_self_heal_lefthook_silent_when_not_opted_in(tmp_path):
     """Under lefthook with no EDPA hooks pasted (0/4), the audit stays silent —
     the repo never opted in, so don't nag. .git/hooks/ is never touched."""
@@ -277,22 +320,39 @@ def test_self_heal_lefthook_silent_when_not_opted_in(tmp_path):
         assert not (hooks / name).exists(), f"{name} written under lefthook"
 
 
-def test_self_heal_lefthook_warns_on_partial_paste(tmp_path):
-    """A partial lefthook paste (only the evidence hook wired, guards missing)
-    is the silent blind spot — SessionStart must now flag it loudly on stderr,
-    while still never editing .git/hooks/ (lefthook owns it)."""
+PARTIAL_PASTE = (
+    "post-commit:\n  commands:\n    edpa-evidence:\n"
+    "      run: sh .edpa/engine/scripts/hooks/post-commit-evidence\n"
+)
+
+
+def test_partial_paste_is_healed_not_just_reported(tmp_path):
+    """A partial paste used to be reported as UNGUARDED (D-77); on the update
+    path it is now repaired instead — wiring extends: brings all four guards in
+    at once, so there is nothing left to warn about. .git/hooks/ stays untouched
+    either way (lefthook owns it)."""
     _seed_engine(tmp_path, version="1.0.0")
     hooks = _git_hooks(tmp_path)
-    (tmp_path / "lefthook.yml").write_text(
-        "post-commit:\n  commands:\n    edpa-evidence:\n"
-        "      run: sh .edpa/engine/scripts/hooks/post-commit-evidence\n"
-    )
+    (tmp_path / "lefthook.yml").write_text(PARTIAL_PASTE)
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "wired" in result.stderr
+    assert "UNGUARDED" not in result.stderr, "warned about a state it just fixed"
+    assert "lefthook-edpa.yml" in (tmp_path / "lefthook.yml").read_text()
+    for name in ("pre-commit", "pre-push", "commit-msg", "post-commit"):
+        assert not (hooks / name).exists(), f"{name} written under lefthook"
+
+
+def test_partial_paste_still_warns_when_config_cannot_be_wired(tmp_path):
+    """.toml cannot be line-edited, so that repo keeps the loud D-77 warning —
+    the auto-heal must not silence the case it cannot actually fix."""
+    _seed_engine(tmp_path, version="1.0.0")
+    (tmp_path / ".git" / "hooks").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "lefthook.toml").write_text(PARTIAL_PASTE)
     result = _run(tmp_path)
     assert result.returncode == 0, result.stderr
     assert "UNGUARDED" in result.stderr
     assert "commit-msg" in result.stderr  # a named missing guard
-    for name in ("pre-commit", "pre-push", "commit-msg", "post-commit"):
-        assert not (hooks / name).exists(), f"{name} written under lefthook"
 
 
 # ─── Every-session partial-paste guard on the WARM path (D-77) ───────────────

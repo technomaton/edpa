@@ -30,6 +30,23 @@
 
 ### Changed
 
+- **`extends:` is now the default lefthook registration path, and EDPA wires it
+  itself (S-255).** Previously EDPA printed a snippet and left it to the user;
+  a pasted block is a frozen copy that never receives another hook fix, which is
+  why fixes shipped via `/plugin update` did not arrive. `--with-hooks` and the
+  SessionStart update now add `extends: .edpa/engine/lefthook-edpa.yml` to the
+  lefthook config directly, migrating repos still on a hand-pasted block.
+
+  **That entry is the only thing EDPA ever changes in a lefthook config** —
+  nothing removed, reordered or reformatted. A stale hand-pasted EDPA block is
+  deliberately left in place: the fragment wins the command-name collision and
+  its `run:` lines are byte-identical, so the merged config is the same either
+  way (verified against lefthook 1.7.22 and 2.1.10). The edit is idempotent,
+  announced on stderr, and preserves comments and formatting.
+
+  `lefthook.toml`/`.json` cannot be line-edited safely, so those still get the
+  paste-ready snippet printed — and keep the loud `UNGUARDED` warning on a
+  partial paste, since that is a state EDPA cannot repair for them.
 - **Documented lefthook's `extends:` precedence.** On a command-name collision
   the vendored fragment wins and silently replaces a same-named command in your
   own `lefthook.yml`. Migrating from the old paste-in snippet is a no-op — its

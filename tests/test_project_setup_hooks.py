@@ -170,21 +170,157 @@ def test_foreign_hook_never_clobbered(tmp_path: Path, capsys) -> None:
     assert "post-commit-evidence" in out  # the manual chain-in source path
 
 
+# ─── extends: auto-wiring — S-255 ──────────────────────────────────────────────
+#
+# extends: is the default registration path and EDPA writes it itself. The hard
+# boundary these tests pin: that one entry is the ONLY thing EDPA may change in
+# a config the user owns.
+
+import yaml  # noqa: E402
+
+FRAG = ps.LEFTHOOK_FRAGMENT_REL
+
+
+def _wire(tmp_path: Path, body: str, name: str = "lefthook.yml"):
+    cfg = tmp_path / name
+    cfg.write_text(body)
+    return cfg, ps.ensure_lefthook_extends(cfg)
+
+
+def test_wire_adds_block_when_no_extends_key(tmp_path: Path) -> None:
+    cfg, result = _wire(tmp_path, "pre-commit:\n  commands:\n    lint:\n      run: x\n")
+    assert result == "added"
+    assert yaml.safe_load(cfg.read_text())["extends"] == [FRAG]
+
+
+def test_wire_appends_to_existing_block_list(tmp_path: Path) -> None:
+    cfg, result = _wire(tmp_path, "extends:\n  - shared/base.yml\n\npre-commit:\n  parallel: true\n")
+    assert result == "added"
+    loaded = yaml.safe_load(cfg.read_text())
+    assert loaded["extends"] == ["shared/base.yml", FRAG], "order or contents wrong"
+    assert loaded["pre-commit"] == {"parallel": True}, "unrelated key disturbed"
+
+
+def test_wire_appends_to_flow_list(tmp_path: Path) -> None:
+    cfg, result = _wire(tmp_path, "extends: [shared/base.yml]\ncolors: false\n")
+    assert result == "added"
+    assert yaml.safe_load(cfg.read_text())["extends"] == ["shared/base.yml", FRAG]
+
+
+def test_wire_is_idempotent(tmp_path: Path) -> None:
+    cfg, first = _wire(tmp_path, "pre-commit:\n  commands:\n    lint:\n      run: x\n")
+    assert first == "added"
+    after_first = cfg.read_text()
+    assert ps.ensure_lefthook_extends(cfg) == "present"
+    assert cfg.read_text() == after_first, "second run rewrote the file"
+
+
+def test_wire_refuses_non_yaml_configs(tmp_path: Path) -> None:
+    for name in ("lefthook.toml", "lefthook.json"):
+        cfg, result = _wire(tmp_path, "[pre-commit]\n", name=name)
+        assert result == "unsupported", f"{name} must not be line-edited"
+        assert cfg.read_text() == "[pre-commit]\n", f"{name} was modified"
+
+
+def test_wire_refuses_scalar_extends(tmp_path: Path) -> None:
+    body = "extends: shared/base.yml\n"
+    cfg, result = _wire(tmp_path, body)
+    assert result == "unsupported", "a shape we cannot edit safely must be refused"
+    assert cfg.read_text() == body
+
+
+def test_wire_changes_nothing_but_the_extends_entry(tmp_path: Path) -> None:
+    """The scope boundary: a stale hand-pasted EDPA block stays untouched.
+
+    Removing it would be a cosmetic edit to someone else's file — and it is
+    harmless, since the fragment wins the name collision with identical run:
+    lines. Every original line must survive, in order, with only the extends
+    entry added.
+    """
+    body = (
+        "# my project hooks\n"
+        "pre-commit:\n"
+        "  commands:\n"
+        "    my-lint:\n"
+        "      run: make lint\n"
+        "post-commit:\n"
+        "  commands:\n"
+        "    edpa-evidence:\n"          # the stale hand-pasted EDPA command
+        "      run: sh .edpa/engine/scripts/hooks/post-commit-evidence\n"
+    )
+    cfg, result = _wire(tmp_path, body)
+    assert result == "added"
+    after = cfg.read_text().splitlines()
+    original = body.splitlines()
+    # Blank lines are ignored: the inserted block carries its own separator,
+    # which is formatting on EDPA's own addition, not a change to user content.
+    added = [ln for ln in after if ln.strip() and ln not in original]
+    assert added == ["extends:", f"  - {FRAG}"], f"EDPA changed more than extends: {added}"
+    # Every original line survives, in its original relative order.
+    kept = [ln for ln in after if ln.strip() and ln in original]
+    assert kept == [ln for ln in original if ln.strip()], "original lines reordered or dropped"
+
+
+def test_wire_preserves_comments(tmp_path: Path) -> None:
+    body = "# keep me\nextends:\n  - base.yml\n# trailing note\n"
+    cfg, _ = _wire(tmp_path, body)
+    after = cfg.read_text()
+    assert "# keep me" in after and "# trailing note" in after
+    # The entry lands inside the block, not after the trailing comment.
+    assert yaml.safe_load(after)["extends"] == ["base.yml", FRAG]
+
+
+def test_check_hooks_never_writes_to_lefthook_config(tmp_path: Path) -> None:
+    """--check-hooks is a read-only doctor; it must not wire anything."""
+    _git_hooks(tmp_path)
+    body = "pre-commit:\n  commands:\n    lint:\n      run: x\n"
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text(body)
+    ps.install_hooks(tmp_path, check_only=True)
+    assert cfg.read_text() == body, "read-only doctor edited the user's config"
+
+
+def test_with_hooks_wires_extends(tmp_path: Path) -> None:
+    _git_hooks(tmp_path)
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text("pre-commit:\n  commands:\n    lint:\n      run: x\n")
+    ps.install_hooks(tmp_path, refresh=True)
+    assert yaml.safe_load(cfg.read_text())["extends"] == [FRAG]
+
+
 # ─── Lefthook coexistence ──────────────────────────────────────────────────────
 
 
-def test_lefthook_detected_prints_snippet_and_skips_git_hooks(
+def test_lefthook_detected_wires_extends_and_skips_git_hooks(
     tmp_path: Path, capsys
 ) -> None:
+    """Under lefthook EDPA wires extends: itself (S-255) rather than printing a
+    snippet and hoping — and still never writes into .git/hooks/."""
     hooks = _git_hooks(tmp_path)
-    (tmp_path / "lefthook.yml").write_text("# user config\n")
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text("# user config\n")
     assert ps.install_hooks(tmp_path, refresh=True) is True
-    # Nothing written into .git/hooks/ — lefthook owns it.
     for name in HOOK_NAMES:
         assert not (hooks / name).exists(), f"{name} leaked into .git/hooks"
     out = capsys.readouterr().out
     assert "lefthook detected" in out
-    assert "use_stdin: true" in out  # the critical pre-push correctness flag
+    assert yaml.safe_load(cfg.read_text())["extends"] == [FRAG]
+    assert "# user config" in cfg.read_text(), "user's own content dropped"
+    # The paste-in fallback is for configs EDPA cannot edit — not this one.
+    assert ps.LEFTHOOK_SNIPPET not in out
+
+
+def test_unsupported_config_falls_back_to_printed_snippet(
+    tmp_path: Path, capsys
+) -> None:
+    """A .toml config cannot be line-edited, so the manual path is still shown —
+    including use_stdin: true, the pre-push correctness flag."""
+    _git_hooks(tmp_path)
+    (tmp_path / "lefthook.toml").write_text("[pre-commit]\n")
+    ps.install_hooks(tmp_path, refresh=True)
+    out = capsys.readouterr().out
+    assert "could not add the extends: line" in out
+    assert "use_stdin: true" in out
 
 
 @pytest.mark.parametrize(

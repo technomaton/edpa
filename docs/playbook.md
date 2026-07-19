@@ -101,7 +101,7 @@ curl -fsSL https://edpa.technomaton.com/install.sh | sh
 python3 .edpa/engine/scripts/project_setup.py --with-ci --with-hooks --with-rules
 ```
 
-> `--with-hooks` je lefthook-aware (pri pritomnem `lefthook.yml` vypise paste-ready snippet misto zapisu do `.git/hooks/`); stav hooku overis pres `--check-hooks`.
+> `--with-hooks` je lefthook-aware (pri pritomnem `lefthook.yml` zapise jediny radek `extends: .edpa/engine/lefthook-edpa.yml` misto zapisu do `.git/hooks/`); stav hooku overis pres `--check-hooks`.
 
 Vysledna struktura:
 
@@ -448,7 +448,7 @@ Povolene prefixy: `S` (Story), `F` (Feature), `E` (Epic), `T` (Task), `D` (Defec
 | post-commit | Zaznamenava `commit_author` evidence |
 | pre-push | Kontrola ID kolizi vuci remote |
 
-Registrace je idempotentni a sebe-obnovujici: EDPA znacka sve hooky sentinelem `EDPA-MANAGED-HOOK`, opakovany `--with-hooks` (nebo `--refresh-hooks`) je osvezi a cizi (ne-EDPA) hook v dane pozici **nikdy nepreplacne** -- vypise hlasku + radek k rucnimu zaretezeni (`sh .edpa/engine/scripts/hooks/<hook> "$@"`). Pokud je v repu **lefthook** (`lefthook.yml`), `.git/hooks/` vlastni lefthook, takze EDPA tam nezapisuje a misto toho vypise hotovy snippet do `lefthook.yml`; pote spust `lefthook install`. Stav hooku overis read-only pres `--check-hooks` (kazdy hook jako active / missing / foreign, pripadne flag lefthook).
+Registrace je idempotentni a sebe-obnovujici: EDPA znacka sve hooky sentinelem `EDPA-MANAGED-HOOK`, opakovany `--with-hooks` (nebo `--refresh-hooks`) je osvezi a cizi (ne-EDPA) hook v dane pozici **nikdy nepreplacne** -- vypise hlasku + radek k rucnimu zaretezeni (`sh .edpa/engine/scripts/hooks/<hook> "$@"`). Pokud je v repu **lefthook** (`lefthook.yml`), `.git/hooks/` vlastni lefthook, takze EDPA tam nezapisuje a misto toho zadratuje do `lefthook.yml` jediny radek `extends: .edpa/engine/lefthook-edpa.yml`; pote spust `lefthook install`. Tenhle radek je **jedina** vec, kterou EDPA v cizim lefthook configu kdy zmeni -- nic neodstranuje, nepreskladava ani nepreformatovava, a stary rucne vlozeny EDPA blok zamerne nechava byt (je neskodny: fragment vyhrava kolizi jmen a ma identicke `run:` radky). Repa, ktera jeste bezi na rucnim pastu, se na `extends:` prevedou automaticky pri nejblizsim `/plugin update` -- diky tomu k nim opravy hooku vubec dorazi, protoze vlozeny blok je zmrazena kopie, kdezto fragment se re-vendoruje kazdou session. `lefthook.toml`/`.json` nelze bezpecne editovat po radcich, takze tam se dal vypisuje cely snippet. Stav hooku overis read-only pres `--check-hooks` (kazdy hook jako active / missing / foreign, pripadne flag lefthook).
 
 **Doporuceno** -- misto lepeni celeho bloku pridej do `lefthook.yml` jediny radek na vendorovany fragment, pak `lefthook install`; zmeny hooku se pak propaguji samy pri `/plugin update` (bez re-paste, EDPA invaliduje lefthook checksum):
 

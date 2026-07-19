@@ -200,6 +200,14 @@ _has_lefthook() {
   return 1
 }
 if _has_lefthook; then
+  # Migrate onto `extends:` — the default registration path (S-255). A pasted
+  # block is a frozen copy that never sees a hook fix again; the fragment is
+  # re-vendored every session, so this is what makes /plugin update actually
+  # deliver. Writes ONE extends: entry and nothing else — a stale pasted block
+  # is left alone on purpose (the fragment wins the name collision and its run:
+  # lines are identical, so the merged config is unchanged). Idempotent, so this
+  # is a no-op on every later session.
+  python3 "$TARGET/scripts/project_setup.py" --lefthook-wire --root "$PROJECT" 1>&2 || true
   # If the repo wires EDPA via `extends:` to the vendored fragment, lefthook's
   # sync only watches the MAIN config's mtime — the fragment just changed under
   # it, so drop lefthook's checksum (a git-internal file, never the user's

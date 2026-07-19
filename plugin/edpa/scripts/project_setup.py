@@ -18,9 +18,10 @@ What it does:
      can read PR signals materialized from PR events.
   6. Optionally install git hooks (``--with-hooks``) — pre-commit + pre-push
      ID safety, commit-msg ticket-attached, post-commit local-evidence. Detects
-     lefthook (prints a paste-ready snippet instead of clobbering .git/hooks/),
-     warns on foreign hooks, and is idempotent. ``--refresh-hooks`` re-registers
-     only; ``--check-hooks`` is a read-only doctor.
+     lefthook (wires ``extends:`` to the vendored fragment instead of clobbering
+     .git/hooks/), warns on foreign hooks, and is idempotent.
+     ``--refresh-hooks`` re-registers only; ``--check-hooks`` is a read-only
+     doctor; ``--lefthook-wire`` ensures only the ``extends:`` line.
 
 What it does NOT do (V2.0 hard cut from V1):
   - No ``gh project`` calls
@@ -416,14 +417,96 @@ def _lefthook_extends_paths(text: str) -> list[str]:
     return paths
 
 
+def ensure_lefthook_extends(cfg_path: Path) -> str:
+    """Wire the vendored fragment into a user's lefthook config, idempotently.
+
+    ``extends:`` is EDPA's default registration path (S-255): one line, and hook
+    changes then ride along with ``/plugin update`` instead of needing a
+    re-paste. EDPA writes that line itself rather than printing it and hoping.
+
+    **This is the only edit EDPA ever makes to a lefthook config.** One
+    ``extends:`` entry pointing at the vendored fragment — nothing added,
+    removed, reordered or reformatted beyond it. In particular a stale
+    hand-pasted EDPA block is left exactly where it is: on a command-name
+    collision the fragment wins and its ``run:`` lines are byte-identical to the
+    old snippet's, so the merged config is unchanged either way (verified
+    against lefthook 1.7.22 and 2.1.10). Removing it would be a cosmetic edit to
+    someone else's file, so we don't.
+
+    Comments and formatting survive — this is a line scanner, not a YAML
+    round-trip, because reserialising a user's config would reflow it.
+
+    Returns one of ``present`` (already wired, no write), ``added``,
+    ``unsupported`` (a config shape we refuse to guess at) or ``failed``.
+    """
+    # .toml/.json express extends: with entirely different syntax; a line
+    # scanner tuned for YAML would corrupt them. Those users get instructions.
+    if cfg_path.suffix not in (".yml", ".yaml"):
+        return "unsupported"
+    try:
+        text = cfg_path.read_text(encoding="utf-8")
+    except OSError:
+        return "failed"
+    if LEFTHOOK_FRAGMENT_NAME in text:
+        return "present"
+
+    lines = text.splitlines()
+    entry = f"  - {LEFTHOOK_FRAGMENT_REL}"
+    updated: list[str] | None = None
+
+    for i, line in enumerate(lines):
+        if not re.match(r"^extends\s*:", line):
+            continue
+        rest = line.split(":", 1)[1].strip()
+        if rest.startswith("["):
+            # Flow style: extends: [a.yml] → extends: [a.yml, <fragment>]
+            close = line.rfind("]")
+            if close == -1:
+                return "unsupported"  # flow list spanning lines — don't guess
+            head = line[:close].rstrip()
+            sep = "" if head.endswith("[") else ", "
+            updated = list(lines)
+            updated[i] = f"{head}{sep}{LEFTHOOK_FRAGMENT_REL}{line[close:]}"
+        elif rest and not rest.startswith("#"):
+            return "unsupported"  # extends: single-scalar — don't guess
+        else:
+            # Block style: append after the block's last indented entry, so a
+            # trailing comment or blank line below it stays below it.
+            last, j = i, i + 1
+            while j < len(lines):
+                if not lines[j].strip():
+                    j += 1
+                    continue
+                if lines[j][:1] not in (" ", "\t"):
+                    break
+                last, j = j, j + 1
+            updated = list(lines)
+            updated.insert(last + 1, entry)
+        break
+
+    if updated is None:
+        # No extends: key at all — introduce one at the top of the file.
+        updated = ["extends:", entry, ""] + lines
+
+    body = "\n".join(updated)
+    if text.endswith("\n") or not text:
+        body += "\n"
+    try:
+        cfg_path.write_text(body, encoding="utf-8")
+    except OSError:
+        return "failed"
+    return "added"
+
+
 def lefthook_hook_status(cfg_path: Path) -> tuple[list[str], list[str]]:
     """Which EDPA hooks are wired into a lefthook config, and which are missing.
 
-    EDPA cannot register into lefthook itself (it owns .git/hooks/), so it hands
-    the user a paste-ready snippet (or the recommended one-line ``extends:`` to
-    the vendored fragment). A *partial* paste — only some of the four ``run:``
-    lines copied in — silently drops the guard hooks, and until now nothing
-    detected it. Each EDPA hook's vendored script basename (``pre-commit-id-safety``
+    EDPA cannot write .git/hooks/ under lefthook (lefthook owns it), so it wires
+    a one-line ``extends:`` to the vendored fragment instead — and for a config
+    shape it cannot safely edit (.toml/.json), falls back to handing the user a
+    paste-ready snippet. A *partial* paste — only some of the four ``run:``
+    lines copied in — silently drops the guard hooks, and nothing detected it
+    before D-77. Each EDPA hook's vendored script basename (``pre-commit-id-safety``
     …) is unique and appears verbatim in its ``run:`` line, so a plain substring
     scan over the raw config text tells wired from missing — no YAML parser,
     dependency-free, format-agnostic (.yml/.yaml/.toml/.json, survives reorder
@@ -525,6 +608,16 @@ def install_hooks(root: Path, *, refresh: bool = False,
     if lefthook_cfg:
         warn(f"lefthook detected ({lefthook_cfg.name}) — it owns .git/hooks/, "
              f"so EDPA registers via lefthook, not by copying hooks.")
+        # --check-hooks is read-only by contract; only writing paths wire.
+        wired = "skipped" if check_only else ensure_lefthook_extends(lefthook_cfg)
+        if wired == "added":
+            ok(f"Wired `extends: {LEFTHOOK_FRAGMENT_REL}` into "
+               f"{lefthook_cfg.name} — the one line EDPA writes to your "
+               f"lefthook config, and the only one it will ever touch.")
+            info("   Run `lefthook install` to pick it up.")
+        elif wired == "failed":
+            warn(f"Could not write to {lefthook_cfg.name} — add the extends: "
+                 f"line by hand (shown below).")
         registered, missing = lefthook_hook_status(lefthook_cfg)
         total = len(_HOOK_SPECS)
         if not missing:
@@ -544,9 +637,11 @@ def install_hooks(root: Path, *, refresh: bool = False,
         else:
             info(f"No EDPA hooks registered in {lefthook_cfg.name} yet "
                  f"(0 of {total}).")
-        if not check_only:
-            info("EDPA does not edit your lefthook config. Recommended — add one "
-                 "line referencing the vendored fragment, then `lefthook install`:")
+        if not check_only and wired in ("unsupported", "failed"):
+            # Only when EDPA could not do it itself: .toml/.json configs, a
+            # config shape too ambiguous to edit safely, or an unwritable file.
+            info(f"EDPA could not add the extends: line to {lefthook_cfg.name} "
+                 f"itself — add it by hand, then run `lefthook install`:")
             print()
             print("extends:")
             print(f"  - {LEFTHOOK_FRAGMENT_REL}")
@@ -651,6 +746,36 @@ def lefthook_audit(root: Path) -> int:
     return 0
 
 
+def lefthook_wire(root: Path) -> int:
+    """Migrate a lefthook repo onto ``extends:`` (called by update_engine.sh).
+
+    ``extends:`` is the default registration path (S-255), so a repo still on a
+    hand-pasted block — or on nothing at all — is moved onto it after a
+    ``/plugin update``. That is what makes hook fixes actually arrive: a pasted
+    block is a frozen copy, the fragment is re-vendored every session.
+
+    Writes exactly one ``extends:`` entry and nothing else; a stale pasted block
+    is deliberately left in place (harmless — the fragment wins the name
+    collision with identical ``run:`` lines). Announces the edit on stderr,
+    because it is a write to a file the user owns. Always returns 0: a session
+    start must never be blocked by this.
+    """
+    cfg = detect_lefthook(root)
+    if cfg is None:
+        return 0
+    result = ensure_lefthook_extends(cfg)
+    if result == "added":
+        print(f"EDPA: wired `extends: {LEFTHOOK_FRAGMENT_REL}` into {cfg.name} "
+              f"— hook updates now arrive automatically.", file=sys.stderr)
+        print("EDPA:    this is the only line EDPA writes to your lefthook "
+              "config; nothing else was changed.", file=sys.stderr)
+    elif result in ("unsupported", "failed"):
+        print(f"EDPA: could not add `extends: {LEFTHOOK_FRAGMENT_REL}` to "
+              f"{cfg.name} — add it by hand so hook updates propagate.",
+              file=sys.stderr)
+    return 0
+
+
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 
@@ -691,6 +816,12 @@ def main() -> int:
              "warns on stderr. Always exits 0 (never blocks).",
     )
     parser.add_argument(
+        "--lefthook-wire", action="store_true",
+        help="Ensure the lefthook config extends the vendored EDPA fragment "
+             "(the default registration path). Writes that one line and "
+             "nothing else; idempotent. Always exits 0 (never blocks).",
+    )
+    parser.add_argument(
         "--root", type=Path, default=None,
         help="Project root (default: walk up from CWD to .git/)",
     )
@@ -702,6 +833,11 @@ def main() -> int:
     # always exit 0 — see lefthook_audit.
     if args.lefthook_audit:
         return lefthook_audit(root)
+
+    # Migrate onto extends: (update_engine.sh). Runs before the audit so a repo
+    # that was only partially pasted reads as fully wired straight away.
+    if args.lefthook_wire:
+        return lefthook_wire(root)
 
     # Hook-only fast paths. They skip vendor/seed so they are cheap and safe to
     # call on every session start (update_engine.sh self-heal) or on demand

@@ -6,7 +6,7 @@ description: >
   (scripts + schemas + templates) into `.edpa/engine/`, creates
   `.edpa/config/{edpa.yaml,people.yaml}`, seeds id_counters.yaml, and
   optionally copies the PR-signal CI workflow + registers git hooks
-  (lefthook-aware; prints a snippet instead of clobbering managed hooks).
+  (lefthook-aware; wires one `extends:` line instead of clobbering managed hooks).
   No GitHub Project provisioning (V1 path removed in 2.0.0).
 license: MIT
 compatibility: Python 3.10+, MCP edpa server
@@ -70,10 +70,18 @@ Resulting layout:
     after running setup.
   - **Registration is robust + lefthook-aware:**
     - Under **lefthook** (`lefthook.yml` present, which owns `.git/hooks/`),
-      EDPA does **not** write `.git/hooks/`. Recommended: add one line —
-      `extends: [.edpa/engine/lefthook-edpa.yml]` — then `lefthook install`;
-      it tracks plugin updates with no re-paste. A full paste-in snippet (with
-      `use_stdin: true` on pre-push, or the push hangs) is the fallback.
+      EDPA does **not** write `.git/hooks/`. It instead wires one line into
+      your lefthook config — `extends: [.edpa/engine/lefthook-edpa.yml]` — and
+      that entry is the **only** thing it ever changes there: nothing removed,
+      reordered or reformatted, and a stale hand-pasted EDPA block is left in
+      place on purpose (the fragment wins the name collision, with identical
+      `run:` lines). Run `lefthook install` afterwards. Because the fragment is
+      re-vendored every session, hook fixes then arrive with `/plugin update`
+      instead of needing a re-paste — repos still on a pasted block are
+      migrated onto `extends:` automatically at the next update.
+      A `lefthook.toml`/`.json` cannot be line-edited safely, so those get the
+      full paste-in snippet printed instead (with `use_stdin: true` on
+      pre-push, or the push hangs).
     - A **foreign** hook already occupying a slot is never clobbered — EDPA
       skips it and prints the exact line to chain itself in by hand.
     - **Idempotent + self-refreshing:** re-running `--with-hooks` (or
