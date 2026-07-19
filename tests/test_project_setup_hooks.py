@@ -159,3 +159,192 @@ def test_lefthook_snippet_is_valid_yaml() -> None:
     # commit-msg passes the message file as the first positional arg.
     commit_msg_cmd = next(iter(cfg["commit-msg"]["commands"].values()))
     assert "{1}" in commit_msg_cmd["run"]
+
+
+# ─── Lefthook content-aware detection (partial-paste blind spot) ───────────────
+
+_FULL_LEFTHOOK = """\
+# my project hooks
+pre-commit:
+  commands:
+    lint:
+      run: npm run lint
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety
+commit-msg:
+  commands:
+    edpa-ticket-attached:
+      run: sh .edpa/engine/scripts/hooks/commit-msg-ticket-attached {1}
+post-commit:
+  commands:
+    edpa-evidence:
+      run: sh .edpa/engine/scripts/hooks/post-commit-evidence
+pre-push:
+  commands:
+    edpa-id-safety:
+      run: sh .edpa/engine/scripts/hooks/pre-push-id-safety {1} {2}
+      use_stdin: true
+"""
+
+# Only the reporting hook pasted — the exact real-world bug: guards dropped.
+_PARTIAL_LEFTHOOK = """\
+# my hooks
+post-commit:
+  commands:
+    edpa-evidence:
+      run: sh .edpa/engine/scripts/hooks/post-commit-evidence
+"""
+
+
+def test_lefthook_hook_status_all_registered(tmp_path: Path) -> None:
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text(_FULL_LEFTHOOK)
+    registered, missing = ps.lefthook_hook_status(cfg)
+    assert set(registered) == set(HOOK_NAMES)
+    assert missing == []
+
+
+def test_lefthook_hook_status_partial(tmp_path: Path) -> None:
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text(_PARTIAL_LEFTHOOK)
+    registered, missing = ps.lefthook_hook_status(cfg)
+    assert registered == ["post-commit"]
+    assert set(missing) == {"pre-commit", "pre-push", "commit-msg"}
+
+
+def test_lefthook_hook_status_survives_reorder_and_noise(tmp_path: Path) -> None:
+    # Hooks out of snippet order, interleaved with unrelated commands + comments.
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text(
+        "pre-push:\n  commands:\n    x:\n"
+        "      run: sh .edpa/engine/scripts/hooks/pre-push-id-safety {1} {2}\n"
+        "      use_stdin: true\n"
+        "commit-msg:\n  commands:\n    y:\n"
+        "      run: sh .edpa/engine/scripts/hooks/commit-msg-ticket-attached {1}\n"
+        "# a comment line\n"
+        "pre-commit:\n  commands:\n    z:\n"
+        "      run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety\n"
+        "post-commit:\n  commands:\n    w:\n"
+        "      run: sh .edpa/engine/scripts/hooks/post-commit-evidence\n"
+        "test:\n  commands:\n    unit:\n      run: pytest\n"
+    )
+    registered, missing = ps.lefthook_hook_status(cfg)
+    assert set(registered) == set(HOOK_NAMES)
+    assert missing == []
+
+
+def test_install_hooks_lefthook_partial_warns_unguarded(
+    tmp_path: Path, capsys
+) -> None:
+    hooks = _git_hooks(tmp_path)
+    (tmp_path / "lefthook.yml").write_text(_PARTIAL_LEFTHOOK)
+    assert ps.install_hooks(tmp_path, refresh=True) is True
+    out = capsys.readouterr().out
+    assert "UNGUARDED" in out
+    for hook in ("pre-commit", "pre-push", "commit-msg"):
+        assert hook in out, f"missing hook {hook} not named in warning"
+    assert "registered: post-commit" in out
+    # Still nothing written into .git/hooks/ — lefthook owns it.
+    for name in HOOK_NAMES:
+        assert not (hooks / name).exists()
+
+
+def test_install_hooks_lefthook_all_registered_is_quiet(
+    tmp_path: Path, capsys
+) -> None:
+    hooks = _git_hooks(tmp_path)
+    (tmp_path / "lefthook.yml").write_text(_FULL_LEFTHOOK)
+    assert ps.install_hooks(tmp_path, refresh=True) is True
+    out = capsys.readouterr().out
+    assert "All 4 EDPA hooks registered" in out
+    assert "UNGUARDED" not in out
+    # 4/4 wired → no reason to dump the paste snippet.
+    assert "use_stdin" not in out
+    for name in HOOK_NAMES:
+        assert not (hooks / name).exists()
+
+
+# ─── --lefthook-audit (SessionStart doctor: stderr-only, non-blocking) ─────────
+
+
+def test_lefthook_audit_partial_is_loud(tmp_path: Path, capsys) -> None:
+    (tmp_path / "lefthook.yml").write_text(_PARTIAL_LEFTHOOK)
+    assert ps.lefthook_audit(tmp_path) == 0
+    err = capsys.readouterr().err
+    assert "UNGUARDED" in err
+    for hook in ("pre-commit", "pre-push", "commit-msg"):
+        assert hook in err
+
+
+def test_lefthook_audit_all_registered_is_silent(tmp_path: Path, capsys) -> None:
+    (tmp_path / "lefthook.yml").write_text(_FULL_LEFTHOOK)
+    assert ps.lefthook_audit(tmp_path) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out == ""
+
+
+def test_lefthook_audit_zero_registered_is_silent(tmp_path: Path, capsys) -> None:
+    (tmp_path / "lefthook.yml").write_text("# user config only\n")
+    assert ps.lefthook_audit(tmp_path) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out == ""
+
+
+def test_lefthook_audit_no_lefthook_is_silent(tmp_path: Path, capsys) -> None:
+    assert ps.lefthook_audit(tmp_path) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out == ""
+
+
+# ─── Extends-aware detection (the vendored fragment lives outside lefthook.yml) ─
+
+
+def _write_fragment(root: Path) -> Path:
+    frag = root / ".edpa" / "engine" / "lefthook-edpa.yml"
+    frag.parent.mkdir(parents=True, exist_ok=True)
+    frag.write_text(_FULL_LEFTHOOK)  # carries the four run: basenames
+    return frag
+
+
+def test_extends_paths_parses_block_and_inline() -> None:
+    block = "extends:\n  - .edpa/engine/lefthook-edpa.yml\n  - other.yml\n"
+    assert ps._lefthook_extends_paths(block) == [
+        ".edpa/engine/lefthook-edpa.yml", "other.yml"]
+    inline = "extends: [.edpa/engine/lefthook-edpa.yml, other.yml]\n"
+    assert ps._lefthook_extends_paths(inline) == [
+        ".edpa/engine/lefthook-edpa.yml", "other.yml"]
+    assert ps._lefthook_extends_paths("pre-commit:\n  commands: {}\n") == []
+
+
+def test_lefthook_hook_status_follows_extends(tmp_path: Path) -> None:
+    # Main config holds ZERO run: lines — all four live in the extended fragment.
+    _write_fragment(tmp_path)
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text("extends:\n  - .edpa/engine/lefthook-edpa.yml\n")
+    registered, missing = ps.lefthook_hook_status(cfg)
+    assert set(registered) == set(HOOK_NAMES), "extends fragment misread as missing"
+    assert missing == []
+
+
+def test_lefthook_audit_extends_is_silent(tmp_path: Path, capsys) -> None:
+    # extends → 4/4 → SessionStart audit must stay quiet, not false-alarm.
+    _write_fragment(tmp_path)
+    (tmp_path / "lefthook.yml").write_text(
+        "extends: [.edpa/engine/lefthook-edpa.yml]\n")
+    assert ps.lefthook_audit(tmp_path) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out == ""
+
+
+def test_lefthook_extends_missing_fragment_does_not_crash(tmp_path: Path) -> None:
+    # A dangling extends (fragment not vendored yet) is best-effort: no run:
+    # lines found anywhere → treated as not-opted-in, never raises.
+    cfg = tmp_path / "lefthook.yml"
+    cfg.write_text("extends:\n  - .edpa/engine/lefthook-edpa.yml\n")
+    registered, missing = ps.lefthook_hook_status(cfg)
+    assert registered == []
+    assert set(missing) == set(HOOK_NAMES)

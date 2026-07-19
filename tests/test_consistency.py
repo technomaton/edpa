@@ -623,3 +623,38 @@ def test_command_docs_have_frontmatter_and_mcp_allowlists():
     assert not problems, (
         "command-doc allowlist drift:\n  " + "\n  ".join(problems)
     )
+
+
+# ---------------------------------------------------------------------------
+# 17. Lefthook `extends:` fragment — single source of truth, vendored in sync
+# ---------------------------------------------------------------------------
+
+def test_lefthook_fragment_matches_snippet_and_vendored():
+    """The lefthook `extends:` fragment must carry the same four `run:` lines as
+    LEFTHOOK_SNIPPET (one source of truth — no drift between the one-line extends
+    path and the paste-in fallback) and match its vendored copy at
+    .edpa/engine/lefthook-edpa.yml (the engine root is outside the dir set
+    test_vendored_engine_content_in_sync compares, so guard it here)."""
+    sys.path.insert(0, str(ROOT / "plugin" / "edpa" / "scripts"))
+    import project_setup as ps
+
+    frag_src = ROOT / "plugin" / "edpa" / "lefthook-edpa.yml"
+    assert frag_src.exists(), "plugin/edpa/lefthook-edpa.yml missing"
+
+    def run_cmds(text):
+        return sorted(
+            line.split("run:", 1)[1].strip()
+            for line in text.splitlines() if "run:" in line
+        )
+
+    assert run_cmds(frag_src.read_text(encoding="utf-8")) == run_cmds(ps.LEFTHOOK_SNIPPET), (
+        "lefthook fragment `run:` lines drifted from LEFTHOOK_SNIPPET — "
+        "keep plugin/edpa/lefthook-edpa.yml and LEFTHOOK_SNIPPET in lockstep"
+    )
+
+    vendored = ROOT / ".edpa" / "engine" / "lefthook-edpa.yml"
+    if vendored.exists():
+        assert vendored.read_text(encoding="utf-8") == frag_src.read_text(encoding="utf-8"), (
+            ".edpa/engine/lefthook-edpa.yml drifted from plugin source — re-vendor "
+            "(python3 plugin/edpa/scripts/project_setup.py)"
+        )

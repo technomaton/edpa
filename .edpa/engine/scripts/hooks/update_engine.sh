@@ -78,6 +78,32 @@ if [ "$PLUGIN_VERSION" = "$LOCAL_VERSION" ]; then
     fi
   }
   _warn_legacy_yaml
+
+  # Every-session partial-paste guard (D-77). The rich python audit further down
+  # only runs on a version change (cold path), but a partial lefthook paste
+  # happens at setup and must surface promptly — every session, not just after a
+  # `/plugin update`. Cheap shell tripwire: count EDPA hook basenames wired into
+  # the lefthook config (following the extends fragment, if referenced) and spawn
+  # python ONLY on a partial wiring (1..3 of 4) for the full UNGUARDED message.
+  # 0/4 (not opted in) and 4/4 (correct) stay silent and python-free. Basenames
+  # mirror _HOOK_SPECS in project_setup.py.
+  for _lf in lefthook.yml lefthook.yaml .lefthook.yml .lefthook.yaml lefthook.toml lefthook.json; do
+    [ -f "$PROJECT/$_lf" ] || continue
+    _corpus=$(cat "$PROJECT/$_lf" 2>/dev/null)
+    case "$_corpus" in
+      *lefthook-edpa.yml*)
+        _corpus="$_corpus
+$(cat "$PROJECT/.edpa/engine/lefthook-edpa.yml" 2>/dev/null)" ;;
+    esac
+    _wired=0
+    for _b in pre-commit-id-safety commit-msg-ticket-attached post-commit-evidence pre-push-id-safety; do
+      case "$_corpus" in *"$_b"*) _wired=$((_wired + 1)) ;; esac
+    done
+    if [ "$_wired" -gt 0 ] && [ "$_wired" -lt 4 ]; then
+      python3 "$TARGET/scripts/project_setup.py" --lefthook-audit --root "$PROJECT" 1>&2 || true
+    fi
+    break
+  done
   exit 0
 fi
 
@@ -144,6 +170,14 @@ VENDOR rules "$PLUGIN_ROOT"
 echo "$PLUGIN_VERSION" > "$TARGET/VERSION"
 chmod +x "$TARGET/scripts/hooks/"* 2>/dev/null || true
 
+# Single-file lefthook fragment for `extends:` — vendored to the engine root so
+# a one-line extends in the user's lefthook.yml wires in all four hooks and
+# tracks plugin updates (no re-paste). VENDOR only handles subdirs, so copy it
+# explicitly.
+if [ -f "$PLUGIN_SRC/lefthook-edpa.yml" ]; then
+  cp "$PLUGIN_SRC/lefthook-edpa.yml" "$TARGET/lefthook-edpa.yml"
+fi
+
 # Self-heal git hooks after an engine update. A version bump can leave
 # .git/hooks/ holding a stale snapshot, or another tool (e.g. lefthook) may
 # have clobbered EDPA's hooks — which silently stops contribution evidence
@@ -157,8 +191,22 @@ _has_lefthook() {
   return 1
 }
 if _has_lefthook; then
-  echo "EDPA: lefthook detected — verify EDPA hooks are registered with:" >&2
-  echo "       python3 $TARGET/scripts/project_setup.py --check-hooks" >&2
+  # If the repo wires EDPA via `extends:` to the vendored fragment, lefthook's
+  # sync only watches the MAIN config's mtime — the fragment just changed under
+  # it, so drop lefthook's checksum (a git-internal file, never the user's
+  # config) to force a re-sync on the next git op. Only when the fragment is
+  # actually referenced, so inline-paste users aren't nudged into a needless
+  # reinstall.
+  for _lf in lefthook.yml lefthook.yaml .lefthook.yml .lefthook.yaml lefthook.toml lefthook.json; do
+    if [ -f "$PROJECT/$_lf" ] && grep -q "lefthook-edpa.yml" "$PROJECT/$_lf" 2>/dev/null; then
+      rm -f "$PROJECT/.git/info/lefthook.checksum"
+      break
+    fi
+  done
+  # Content-aware audit: silent when 0/4 (repo never opted in) or 4/4 (all
+  # wired), loud + specific only on a partial paste (guards silently missing).
+  # Non-blocking (|| true) — advisory only, must never break a session start.
+  python3 "$TARGET/scripts/project_setup.py" --lefthook-audit --root "$PROJECT" 1>&2 || true
 elif grep -q "EDPA-MANAGED-HOOK" "$PROJECT"/.git/hooks/* 2>/dev/null; then
   echo "EDPA: re-registering git hooks after update..." >&2
   python3 "$TARGET/scripts/project_setup.py" --refresh-hooks --root "$PROJECT" 1>&2 || true

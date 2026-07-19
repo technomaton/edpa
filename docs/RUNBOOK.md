@@ -130,8 +130,17 @@ deliberately careful:
   dispatcher shims into `.git/hooks/` (and can set `core.hooksPath`), so a plain
   copy would be ignored or clobbered — this is the usual cause of "contribution
   stopped working after an update". EDPA detects `lefthook.yml` and, instead of
-  writing `.git/hooks/`, prints a paste-ready block. Add it to your
-  `lefthook.yml`, then run `lefthook install`:
+  writing `.git/hooks/`, EDPA registers via lefthook. **Recommended** — add one
+  line pointing at the vendored fragment, then run `lefthook install`; it tracks
+  plugin updates automatically (no re-paste):
+
+  ```yaml
+  extends:
+    - .edpa/engine/lefthook-edpa.yml
+  ```
+
+  Or paste the full block as a fallback (no auto-propagation), then
+  `lefthook install`:
 
   ```yaml
   pre-commit:
@@ -154,8 +163,11 @@ deliberately careful:
   ```
 
 - **After a plugin update**, the SessionStart auto-update re-registers EDPA hooks
-  automatically when the project already uses them (and, under lefthook, reminds
-  you to verify). No manual step needed for the plain `.git/hooks/` case.
+  automatically when the project already uses them. With the `extends:` fragment,
+  hook changes propagate on their own — EDPA invalidates lefthook's checksum so it
+  re-syncs on the next commit; under a full paste, SessionStart instead audits and
+  warns loudly if a partial paste left guards missing. No manual step for the plain
+  `.git/hooks/` case.
 - **Verify any time** (read-only doctor — no changes):
 
   ```bash

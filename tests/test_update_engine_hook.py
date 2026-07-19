@@ -235,15 +235,115 @@ def test_self_heal_skipped_when_no_edpa_hooks(tmp_path):
         assert not (hooks / name).exists(), f"{name} forced onto opt-out repo"
 
 
-def test_self_heal_lefthook_prints_check_reminder(tmp_path):
-    """Under lefthook the hook does not edit .git/hooks/ — it points the user
-    at the doctor instead (EDPA never edits the lefthook config)."""
+def test_self_heal_lefthook_silent_when_not_opted_in(tmp_path):
+    """Under lefthook with no EDPA hooks pasted (0/4), the audit stays silent —
+    the repo never opted in, so don't nag. .git/hooks/ is never touched."""
     _seed_engine(tmp_path, version="1.0.0")
     hooks = _git_hooks(tmp_path)
     (tmp_path / "lefthook.yml").write_text("# user config\n")
     result = _run(tmp_path)
     assert result.returncode == 0, result.stderr
-    assert "lefthook detected" in result.stderr
-    assert "--check-hooks" in result.stderr
+    assert "UNGUARDED" not in result.stderr
     for name in ("pre-commit", "pre-push", "commit-msg", "post-commit"):
         assert not (hooks / name).exists(), f"{name} written under lefthook"
+
+
+def test_self_heal_lefthook_warns_on_partial_paste(tmp_path):
+    """A partial lefthook paste (only the evidence hook wired, guards missing)
+    is the silent blind spot — SessionStart must now flag it loudly on stderr,
+    while still never editing .git/hooks/ (lefthook owns it)."""
+    _seed_engine(tmp_path, version="1.0.0")
+    hooks = _git_hooks(tmp_path)
+    (tmp_path / "lefthook.yml").write_text(
+        "post-commit:\n  commands:\n    edpa-evidence:\n"
+        "      run: sh .edpa/engine/scripts/hooks/post-commit-evidence\n"
+    )
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "UNGUARDED" in result.stderr
+    assert "commit-msg" in result.stderr  # a named missing guard
+    for name in ("pre-commit", "pre-push", "commit-msg", "post-commit"):
+        assert not (hooks / name).exists(), f"{name} written under lefthook"
+
+
+# ─── Every-session partial-paste guard on the WARM path (D-77) ───────────────
+#
+# The cold-path audit only fires on a version change, but a partial lefthook
+# paste happens at setup and must surface every session. update_engine.sh runs a
+# cheap shell tripwire on the warm path that spawns the python audit ONLY when
+# the wiring is partial (1..3 of 4). The warm path does not vendor, so the audit
+# script the tripwire calls must be seeded (in reality it's the copy a prior
+# cold path vendored).
+
+
+def _seed_project_setup(project: Path) -> None:
+    # project_setup.py imports sibling modules (id_counter, …) at load, so vendor
+    # the whole real scripts/ tree — exactly what a prior cold path leaves behind
+    # on the warm path.
+    dst = project / ".edpa" / "engine" / "scripts"
+    shutil.rmtree(dst, ignore_errors=True)
+    shutil.copytree(REPO / "plugin/edpa/scripts", dst)
+
+
+def test_warm_path_warns_on_partial_lefthook_paste(tmp_path):
+    """Warm start (versions match) + partial paste → still warns loudly. This is
+    the every-session guarantee the cold-path-only audit could not give."""
+    _seed_engine(tmp_path, version=_current_plugin_version())
+    _seed_project_setup(tmp_path)
+    (tmp_path / "lefthook.yml").write_text(
+        "post-commit:\n  commands:\n    edpa-evidence:\n"
+        "      run: sh .edpa/engine/scripts/hooks/post-commit-evidence\n"
+    )
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "updating engine" not in result.stderr  # proves this is the warm path
+    assert "UNGUARDED" in result.stderr
+    assert "commit-msg" in result.stderr
+
+
+def test_warm_path_silent_when_lefthook_fully_wired(tmp_path):
+    """Warm start + all four hooks wired → no nag (and the tripwire never spawns
+    python)."""
+    _seed_engine(tmp_path, version=_current_plugin_version())
+    _seed_project_setup(tmp_path)
+    (tmp_path / "lefthook.yml").write_text(
+        "pre-commit:\n  commands:\n    edpa-id-safety:\n"
+        "      run: sh .edpa/engine/scripts/hooks/pre-commit-id-safety\n"
+        "commit-msg:\n  commands:\n    edpa-ticket-attached:\n"
+        "      run: sh .edpa/engine/scripts/hooks/commit-msg-ticket-attached {1}\n"
+        "post-commit:\n  commands:\n    edpa-evidence:\n"
+        "      run: sh .edpa/engine/scripts/hooks/post-commit-evidence\n"
+        "pre-push:\n  commands:\n    edpa-id-safety:\n"
+        "      run: sh .edpa/engine/scripts/hooks/pre-push-id-safety {1} {2}\n"
+        "      use_stdin: true\n"
+    )
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "updating engine" not in result.stderr
+    assert "UNGUARDED" not in result.stderr
+
+
+def test_warm_path_silent_when_lefthook_not_opted_in(tmp_path):
+    """Warm start + a lefthook repo with no EDPA hooks (0/4) → silent, python-free."""
+    _seed_engine(tmp_path, version=_current_plugin_version())
+    _seed_project_setup(tmp_path)
+    (tmp_path / "lefthook.yml").write_text("# user config\n")
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "UNGUARDED" not in result.stderr
+
+
+def test_warm_path_silent_with_extends_fragment(tmp_path):
+    """Warm start + extends-based wiring → 4/4 via the fragment, silent. The
+    tripwire must follow the referenced fragment, not false-alarm on the thin
+    main config."""
+    _seed_engine(tmp_path, version=_current_plugin_version())
+    _seed_project_setup(tmp_path)
+    shutil.copy(REPO / "plugin/edpa/lefthook-edpa.yml",
+                tmp_path / ".edpa/engine/lefthook-edpa.yml")
+    (tmp_path / "lefthook.yml").write_text(
+        "extends:\n  - .edpa/engine/lefthook-edpa.yml\n"
+    )
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "UNGUARDED" not in result.stderr
