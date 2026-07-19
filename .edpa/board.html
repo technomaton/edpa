@@ -24,6 +24,7 @@
   --type-feature:#0891b2;--type-feature-bg:rgba(8,145,178,0.08);
   --type-story:#ea580c;--type-story-bg:rgba(234,88,12,0.08);
   --type-defect:#dc2626;--type-defect-bg:rgba(220,38,38,0.08);
+  --type-risk:#d97706;--type-risk-bg:rgba(217,119,6,0.08);
 }
 /* -- Dark theme ----------------------------------------------------- */
 .dark{
@@ -39,6 +40,7 @@
   --type-feature:#22d3ee;--type-feature-bg:rgba(34,211,238,0.12);
   --type-story:#f97316;--type-story-bg:rgba(249,115,22,0.12);
   --type-defect:#f87171;--type-defect-bg:rgba(248,113,113,0.12);
+  --type-risk:#fbbf24;--type-risk-bg:rgba(251,191,36,0.12);
 }
 body{
   font-family:'DM Sans',system-ui,sans-serif;
@@ -57,6 +59,16 @@ body{
   font-weight:700;color:var(--ac2);flex-shrink:0;
 }
 .header__meta{font-size:0.8rem;color:var(--t2);}
+/* -- Iteration chip (S-253) ----------------------------------------- */
+.iter-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:'JetBrains Mono',monospace;font-size:0.72rem;
+  background:var(--s1);color:var(--t2);border:1px solid var(--bd);
+  border-radius:8px;padding:5px 10px;box-shadow:var(--shadow);
+  white-space:nowrap;
+}
+.iter-chip__pi{color:var(--ac2);font-weight:700;}
+.iter-chip__dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .filters{
   display:flex;flex-wrap:wrap;align-items:center;gap:8px;
   margin-left:auto;
@@ -133,6 +145,7 @@ body{
 .card[data-type="Feature"]{border-left-color:var(--type-feature);background:var(--type-feature-bg);}
 .card[data-type="Story"]{border-left-color:var(--type-story);background:var(--type-story-bg);}
 .card[data-type="Defect"]{border-left-color:var(--type-defect);background:var(--type-defect-bg);}
+.card[data-type="Risk"]{border-left-color:var(--type-risk);background:var(--type-risk-bg);}
 .card:hover{
   border-color:var(--ac);
   box-shadow:var(--shadow-hover);
@@ -144,6 +157,7 @@ body{
 .card[data-type="Feature"]:hover{border-left-color:var(--type-feature);}
 .card[data-type="Story"]:hover{border-left-color:var(--type-story);}
 .card[data-type="Defect"]:hover{border-left-color:var(--type-defect);}
+.card[data-type="Risk"]:hover{border-left-color:var(--type-risk);}
 .card--done{opacity:0.55;}
 .card--done:hover{opacity:0.85;}
 .card.hidden{display:none;}
@@ -188,6 +202,43 @@ body{
   font-family:'JetBrains Mono',monospace;font-size:0.6rem;
   color:var(--t2);
 }
+/* -- Risks (ROAM) --------------------------------------------------- */
+.risk-panel{
+  margin-top:16px;
+  background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);
+  padding:12px;box-shadow:var(--shadow);
+}
+.risk-panel__head{
+  display:flex;align-items:center;gap:8px;
+  padding-bottom:12px;margin-bottom:8px;border-bottom:1px solid var(--bd);
+}
+.risk-panel__title{
+  font-family:'JetBrains Mono',monospace;font-size:0.8rem;
+  font-weight:700;text-transform:uppercase;letter-spacing:0.05em;
+  color:var(--type-risk);
+}
+.risk-panel__count{
+  font-family:'JetBrains Mono',monospace;font-size:0.7rem;
+  background:var(--s3);color:var(--t2);padding:2px 8px;
+  border-radius:10px;margin-left:auto;
+}
+.risk-panel__list{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;
+}
+.risk-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.risk-roam,.risk-sev{
+  font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:700;
+  padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:0.03em;
+}
+.roam--resolved{background:rgba(5,150,105,0.12);color:var(--gn);}
+.roam--owned{background:rgba(99,102,241,0.12);color:var(--ac);}
+.roam--mitigated{background:rgba(8,145,178,0.12);color:var(--cy);}
+.roam--accepted{background:var(--s3);color:var(--t2);}
+.roam--none{background:var(--s3);color:var(--t3);}
+.risk-sev{background:var(--s3);color:var(--t2);}
+.risk-sev--high{background:rgba(220,38,38,0.12);color:var(--rd);}
+.risk-sev--medium{background:rgba(217,119,6,0.12);color:var(--yl);}
+.risk-sev--low{background:rgba(5,150,105,0.12);color:var(--gn);}
 /* -- Footer --------------------------------------------------------- */
 .footer{
   margin-top:24px;padding-top:12px;border-top:1px solid var(--bd);
@@ -208,31 +259,34 @@ body{
 
 <div class="header">
   <span class="header__title">EDPA Board</span>
-  <span class="header__meta">Medical Platform &amp; Datovy e-shop &middot; 2026-04-01 15:56</span>
+  <span class="header__meta">Medical Platform &amp; Datovy e-shop &middot; 2026-07-08 22:55</span>
+  <div class="iter-chip" id="iterChip"></div>
   <div class="filters">
     <select id="fIteration" onchange="applyFilters()"><option value="">All iterations</option>
-<option value="PI-2026-1">PI-2026-1</option>
 <option value="PI-2026-1.1">PI-2026-1.1</option>
 <option value="PI-2026-1.2">PI-2026-1.2</option>
 <option value="PI-2026-1.3">PI-2026-1.3</option>
 <option value="PI-2026-1.4">PI-2026-1.4</option>
-<option value="PI-2026-1.5">PI-2026-1.5</option>
+<option value="PI-2026-2.1">PI-2026-2.1</option>
+<option value="PI-2026-2.2">PI-2026-2.2</option>
 </select>
     <select id="fType" onchange="applyFilters()"><option value="">All types</option>
+<option value="Defect">Defect</option>
 <option value="Epic">Epic</option>
 <option value="Feature">Feature</option>
 <option value="Initiative">Initiative</option>
+<option value="Risk">Risk</option>
 <option value="Story">Story</option>
 </select>
     <input id="fSearch" type="text" placeholder="Search..." oninput="applyFilters()">
-    <button class="chip chip--assignee" data-filter-assignee="d1" title="Sr Dev MC">SD</button>
-<button class="chip chip--assignee" data-filter-assignee="d2" title="DB Spec MC">DS</button>
-<button class="chip chip--assignee" data-filter-assignee="do" title="DevOps MC">DM</button>
-<button class="chip chip--assignee" data-filter-assignee="matousek" title="Matousek">MA</button>
-<button class="chip chip--assignee" data-filter-assignee="pm" title="PM Partner">PP</button>
-<button class="chip chip--assignee" data-filter-assignee="tuma" title="O. Tuma">OT</button>
-<button class="chip chip--assignee" data-filter-assignee="turyna" title="Turyna">TU</button>
-<button class="chip chip--assignee" data-filter-assignee="urbanek" title="J. Urbanek">JU</button>
+    <button class="chip chip--assignee" data-filter-assignee="d1"><div class="chip__avatar" title="Sr Dev MC">SD</div></button>
+<button class="chip chip--assignee" data-filter-assignee="d2"><div class="chip__avatar" title="DB Spec MC">DS</div></button>
+<button class="chip chip--assignee" data-filter-assignee="do"><div class="chip__avatar" title="DevOps MC">DM</div></button>
+<button class="chip chip--assignee" data-filter-assignee="matousek"><div class="chip__avatar" title="Matousek">MA</div></button>
+<button class="chip chip--assignee" data-filter-assignee="pm"><div class="chip__avatar" title="PM Partner">PP</div></button>
+<button class="chip chip--assignee" data-filter-assignee="tuma"><div class="chip__avatar" title="O. Tuma">OT</div></button>
+<button class="chip chip--assignee" data-filter-assignee="turyna"><div class="chip__avatar" title="Turyna">TU</div></button>
+<button class="chip chip--assignee" data-filter-assignee="urbanek"><img class="chip__avatar chip__avatar--gh" src="https://github.com/jurby.png?size=24" alt="@jurby" title="J. Urbanek (@jurby)" width="24" height="24"></button>
 
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark/light">&#9790;</button>
   </div>
@@ -242,52 +296,11 @@ body{
   <div class="column__head">
     <span class="column__dot dot--planned"></span>
     <span class="column__title">Planned</span>
-    <span class="column__count">2</span>
-  </div>
-  <div class="column__list"><article class="card"
-        data-assignee="turyna"
-        data-iteration="PI-2026-1.5"
-        data-type="Story"
-        data-id="S-225">
-  <div class="card__head">
-    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-225</span>
-    <span class="card__js" title="Job Size">5</span>
-  </div>
-  <h3 class="card__title">Anon edge cases</h3>
-  <span class="card__parent">F-102 Anonymizacni engine</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 5">5</span></div>
-  <div class="card__foot">
-    <div class="card__avatar" title="Turyna">TU</div>
-    <span class="card__iter">PI-2026-1.5</span>
-  </div>
-</article>
-<article class="card"
-        data-assignee="do"
-        data-iteration="PI-2026-1.5"
-        data-type="Story"
-        data-id="S-226">
-  <div class="card__head">
-    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-226</span>
-    <span class="card__js" title="Job Size">3</span>
-  </div>
-  <h3 class="card__title">Monitoring setup</h3>
-  <span class="card__parent">F-120 FHIR bridge</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR: 3">3</span></div>
-  <div class="card__foot">
-    <div class="card__avatar" title="DevOps MC">DM</div>
-    <span class="card__iter">PI-2026-1.5</span>
-  </div>
-</article></div>
-</div>
-<div class="column">
-  <div class="column__head">
-    <span class="column__dot dot--progress"></span>
-    <span class="column__title">In Progress</span>
-    <span class="column__count">10</span>
+    <span class="column__count">19</span>
   </div>
   <div class="column__list"><article class="card"
         data-assignee="d1"
-        data-iteration=""
+        data-iteration="PI-2026-2.2"
         data-type="Feature"
         data-id="F-111">
   <div class="card__head">
@@ -296,15 +309,15 @@ body{
   </div>
   <h3 class="card__title">Objednavkovy system</h3>
   <span class="card__parent">E-11 Datový e-shop API</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 13">13</span><span class="wsjf-dot wsjf-rr" title="RR: 5">5</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 13">13</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 5">5</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Sr Dev MC">SD</div>
-    
+    <span class="card__iter">PI-2026-2.2</span>
   </div>
 </article>
 <article class="card"
         data-assignee="pm"
-        data-iteration=""
+        data-iteration="PI-2026-1.1"
         data-type="Epic"
         data-id="E-11">
   <div class="card__head">
@@ -313,15 +326,15 @@ body{
   </div>
   <h3 class="card__title">Datový e-shop API</h3>
   <span class="card__parent">I-1 Medical Platform &amp; Datovy e-shop</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 8">8</span><span class="wsjf-dot wsjf-tc" title="TC: 13">13</span><span class="wsjf-dot wsjf-rr" title="RR: 5">5</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 8">8</span><span class="wsjf-dot wsjf-tc" title="TC: 13">13</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 5">5</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="PM Partner">PP</div>
-    
+    <span class="card__iter">PI-2026-1.1</span>
   </div>
 </article>
 <article class="card"
         data-assignee="tuma"
-        data-iteration=""
+        data-iteration="PI-2026-1.1"
         data-type="Feature"
         data-id="F-120">
   <div class="card__head">
@@ -330,15 +343,15 @@ body{
   </div>
   <h3 class="card__title">FHIR bridge</h3>
   <span class="card__parent">E-12 OMOP CDM integrace</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 13">13</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 13">13</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="O. Tuma">OT</div>
-    
+    <span class="card__iter">PI-2026-1.1</span>
   </div>
 </article>
 <article class="card"
         data-assignee="urbanek"
-        data-iteration=""
+        data-iteration="PI-2026-1.1"
         data-type="Feature"
         data-id="F-102">
   <div class="card__head">
@@ -347,15 +360,15 @@ body{
   </div>
   <h3 class="card__title">Anonymizacni engine</h3>
   <span class="card__parent">E-10 Anonymizační modul</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 13">13</span><span class="wsjf-dot wsjf-tc" title="TC: 13">13</span><span class="wsjf-dot wsjf-rr" title="RR: 8">8</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 13">13</span><span class="wsjf-dot wsjf-tc" title="TC: 13">13</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 8">8</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="J. Urbanek">JU</div>
-    
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
+    <span class="card__iter">PI-2026-1.1</span>
   </div>
 </article>
 <article class="card"
         data-assignee="matousek"
-        data-iteration=""
+        data-iteration="PI-2026-2.2"
         data-type="Feature"
         data-id="F-110">
   <div class="card__head">
@@ -364,15 +377,15 @@ body{
   </div>
   <h3 class="card__title">Katalog datasetu</h3>
   <span class="card__parent">E-11 Datový e-shop API</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 8">8</span><span class="wsjf-dot wsjf-tc" title="TC: 8">8</span><span class="wsjf-dot wsjf-rr" title="RR: 3">3</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 8">8</span><span class="wsjf-dot wsjf-tc" title="TC: 8">8</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 3">3</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Matousek">MA</div>
-    
+    <span class="card__iter">PI-2026-2.2</span>
   </div>
 </article>
 <article class="card"
         data-assignee="urbanek"
-        data-iteration=""
+        data-iteration="PI-2026-2.1"
         data-type="Epic"
         data-id="E-10">
   <div class="card__head">
@@ -381,10 +394,10 @@ body{
   </div>
   <h3 class="card__title">Anonymizační modul</h3>
   <span class="card__parent">I-1 Medical Platform &amp; Datovy e-shop</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 13">13</span><span class="wsjf-dot wsjf-tc" title="TC: 8">8</span><span class="wsjf-dot wsjf-rr" title="RR: 8">8</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 13">13</span><span class="wsjf-dot wsjf-tc" title="TC: 8">8</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 8">8</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="J. Urbanek">JU</div>
-    
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
+    <span class="card__iter">PI-2026-2.1</span>
   </div>
 </article>
 <article class="card"
@@ -394,13 +407,115 @@ body{
         data-id="I-1">
   <div class="card__head">
     <span class="card__id" style="background:var(--type-initiative-bg);color:var(--type-initiative)">I-1</span>
-    <span class="card__js" title="Job Size">21</span>
+    <span class="card__js" title="Job Size">20</span>
   </div>
   <h3 class="card__title">Medical Platform &amp; Datovy e-shop</h3>
   
   
   <div class="card__foot">
     <div class="card__avatar" title="PM Partner">PP</div>
+    
+  </div>
+</article>
+<article class="card"
+        data-assignee=""
+        data-iteration=""
+        data-type="Initiative"
+        data-id="I-2">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-initiative-bg);color:var(--type-initiative)">I-2</span>
+    
+  </div>
+  <h3 class="card__title">EDPA Platform Development (dogfood)</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card"
+        data-assignee=""
+        data-iteration=""
+        data-type="Epic"
+        data-id="E-13">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-epic-bg);color:var(--type-epic)">E-13</span>
+    
+  </div>
+  <h3 class="card__title">Engine correctness, validation &amp; calibration</h3>
+  <span class="card__parent">I-2 EDPA Platform Development (dogfood)</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card"
+        data-assignee=""
+        data-iteration=""
+        data-type="Epic"
+        data-id="E-14">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-epic-bg);color:var(--type-epic)">E-14</span>
+    
+  </div>
+  <h3 class="card__title">Delivery analytics, reporting &amp; exports</h3>
+  <span class="card__parent">I-2 EDPA Platform Development (dogfood)</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card"
+        data-assignee=""
+        data-iteration=""
+        data-type="Epic"
+        data-id="E-15">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-epic-bg);color:var(--type-epic)">E-15</span>
+    
+  </div>
+  <h3 class="card__title">Developer experience, governance &amp; infrastructure</h3>
+  <span class="card__parent">I-2 EDPA Platform Development (dogfood)</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card"
+        data-assignee=""
+        data-iteration=""
+        data-type="Feature"
+        data-id="F-125">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-feature-bg);color:var(--type-feature)">F-125</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">Drop dead assignee + pr_author evidence signals (GH-issue-sourced, never fired local-first)</h3>
+  <span class="card__parent">E-13 Engine correctness, validation &amp; calibration</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card"
+        data-assignee=""
+        data-iteration=""
+        data-type="Feature"
+        data-id="F-126">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-feature-bg);color:var(--type-feature)">F-126</span>
+    
+  </div>
+  <h3 class="card__title">Audit remediation batch 2026-07 — fixes from 50-agent repo audit</h3>
+  <span class="card__parent">E-15 Developer experience, governance &amp; infrastructure</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
     
   </div>
 </article>
@@ -415,7 +530,7 @@ body{
   </div>
   <h3 class="card__title">Data validace modul</h3>
   <span class="card__parent">F-102 Anonymizacni engine</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 5">5</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 5">5</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Turyna">TU</div>
     <span class="card__iter">PI-2026-1.4</span>
@@ -432,7 +547,7 @@ body{
   </div>
   <h3 class="card__title">E2E integration testy</h3>
   <span class="card__parent">F-101 Data Upload API</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR: 2">2</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 2">2</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Matousek">MA</div>
     <span class="card__iter">PI-2026-1.4</span>
@@ -449,22 +564,81 @@ body{
   </div>
   <h3 class="card__title">Auth modul</h3>
   <span class="card__parent">F-111 Objednavkovy system</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 5">5</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 5">5</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Sr Dev MC">SD</div>
     <span class="card__iter">PI-2026-1.4</span>
+  </div>
+</article>
+<article class="card"
+        data-assignee="turyna"
+        data-iteration="PI-2026-1.4"
+        data-type="Story"
+        data-id="S-225">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-225</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">Anon edge cases</h3>
+  <span class="card__parent">F-102 Anonymizacni engine</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 5">5</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="Turyna">TU</div>
+    <span class="card__iter">PI-2026-1.4</span>
+  </div>
+</article>
+<article class="card"
+        data-assignee="do"
+        data-iteration="PI-2026-1.4"
+        data-type="Story"
+        data-id="S-226">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-226</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Monitoring setup</h3>
+  <span class="card__parent">F-120 FHIR bridge</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 3">3</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="DevOps MC">DM</div>
+    <span class="card__iter">PI-2026-1.4</span>
+  </div>
+</article>
+<article class="card"
+        data-assignee="urbanek"
+        data-iteration=""
+        data-type="Story"
+        data-id="S-253">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-253</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Board: reactive header chip showing active iteration&#x27;s PI + date range</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
+    
   </div>
 </article></div>
 </div>
 <div class="column">
   <div class="column__head">
+    <span class="column__dot dot--progress"></span>
+    <span class="column__title">In Progress</span>
+    <span class="column__count">0</span>
+  </div>
+  <div class="column__list"></div>
+</div>
+<div class="column">
+  <div class="column__head">
     <span class="column__dot dot--done"></span>
     <span class="column__title">Done</span>
-    <span class="column__count">25</span>
+    <span class="column__count">131</span>
   </div>
   <div class="column__list"><article class="card card--done"
         data-assignee="tuma"
-        data-iteration=""
+        data-iteration="PI-2026-2.1"
         data-type="Epic"
         data-id="E-12">
   <div class="card__head">
@@ -473,15 +647,15 @@ body{
   </div>
   <h3 class="card__title">OMOP CDM integrace</h3>
   <span class="card__parent">I-1 Medical Platform &amp; Datovy e-shop</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 13">13</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 13">13</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="O. Tuma">OT</div>
-    
+    <span class="card__iter">PI-2026-2.1</span>
   </div>
 </article>
 <article class="card card--done"
         data-assignee="tuma"
-        data-iteration="PI-2026-1"
+        data-iteration="PI-2026-2.2"
         data-type="Feature"
         data-id="F-101">
   <div class="card__head">
@@ -490,15 +664,15 @@ body{
   </div>
   <h3 class="card__title">Data Upload API</h3>
   <span class="card__parent">E-10 Anonymizační modul</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 8">8</span><span class="wsjf-dot wsjf-rr" title="RR: 3">3</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 8">8</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 3">3</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="O. Tuma">OT</div>
-    <span class="card__iter">PI-2026-1</span>
+    <span class="card__iter">PI-2026-2.2</span>
   </div>
 </article>
 <article class="card card--done"
         data-assignee="urbanek"
-        data-iteration="PI-2026-1"
+        data-iteration="PI-2026-2.1"
         data-type="Feature"
         data-id="F-100">
   <div class="card__head">
@@ -507,15 +681,83 @@ body{
   </div>
   <h3 class="card__title">OMOP CDM Parser</h3>
   <span class="card__parent">E-10 Anonymizační modul</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 8">8</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 5">5</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 8">8</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 5">5</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="J. Urbanek">JU</div>
-    <span class="card__iter">PI-2026-1</span>
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
+    <span class="card__iter">PI-2026-2.1</span>
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Feature"
+        data-id="F-121">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-feature-bg);color:var(--type-feature)">F-121</span>
+    
+  </div>
+  <h3 class="card__title">Correctness &amp; calibration batch 2026-06</h3>
+  <span class="card__parent">E-13 Engine correctness, validation &amp; calibration</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Feature"
+        data-id="F-122">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-feature-bg);color:var(--type-feature)">F-122</span>
+    
+  </div>
+  <h3 class="card__title">PI analytics &amp; BI batch 2026-06</h3>
+  <span class="card__parent">E-14 Delivery analytics, reporting &amp; exports</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Feature"
+        data-id="F-123">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-feature-bg);color:var(--type-feature)">F-123</span>
+    
+  </div>
+  <h3 class="card__title">Write-tools UX &amp; governance batch 2026-06</h3>
+  <span class="card__parent">E-15 Developer experience, governance &amp; infrastructure</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Feature"
+        data-id="F-124">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-feature-bg);color:var(--type-feature)">F-124</span>
+    
+  </div>
+  <h3 class="card__title">Consolidation batch 2026-06-11 — dead code, doc rot, release guard, reconcile</h3>
+  <span class="card__parent">E-15 Developer experience, governance &amp; infrastructure</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
   </div>
 </article>
 <article class="card card--done"
         data-assignee="turyna"
-        data-iteration="PI-2026-1.1"
+        data-iteration="PI-2026-1.2"
         data-type="Story"
         data-id="S-200">
   <div class="card__head">
@@ -524,10 +766,10 @@ body{
   </div>
   <h3 class="card__title">OMOP parser impl.</h3>
   <span class="card__parent">F-100 OMOP CDM Parser</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 8">8</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 3">3</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 8">8</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 3">3</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Turyna">TU</div>
-    <span class="card__iter">PI-2026-1.1</span>
+    <span class="card__iter">PI-2026-1.2</span>
   </div>
 </article>
 <article class="card card--done"
@@ -541,7 +783,7 @@ body{
   </div>
   <h3 class="card__title">Unit testy OMOP</h3>
   <span class="card__parent">F-100 OMOP CDM Parser</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR: 2">2</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 2">2</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Turyna">TU</div>
     <span class="card__iter">PI-2026-1.1</span>
@@ -558,7 +800,7 @@ body{
   </div>
   <h3 class="card__title">OMOP validace schemat</h3>
   <span class="card__parent">F-100 OMOP CDM Parser</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR: 2">2</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 2">2</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="O. Tuma">OT</div>
     <span class="card__iter">PI-2026-1.1</span>
@@ -575,7 +817,7 @@ body{
   </div>
   <h3 class="card__title">Upload endpoint</h3>
   <span class="card__parent">F-101 Data Upload API</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 2">2</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 2">2</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="O. Tuma">OT</div>
     <span class="card__iter">PI-2026-1.1</span>
@@ -592,7 +834,7 @@ body{
   </div>
   <h3 class="card__title">Upload UI komponenta</h3>
   <span class="card__parent">F-101 Data Upload API</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR: 1">1</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 1">1</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Matousek">MA</div>
     <span class="card__iter">PI-2026-1.1</span>
@@ -609,7 +851,7 @@ body{
   </div>
   <h3 class="card__title">Upload testy</h3>
   <span class="card__parent">F-101 Data Upload API</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 2">2</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR: 1">1</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 2">2</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 1">1</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Sr Dev MC">SD</div>
     <span class="card__iter">PI-2026-1.2</span>
@@ -626,9 +868,9 @@ body{
   </div>
   <h3 class="card__title">Anon pipeline MVP</h3>
   <span class="card__parent">F-102 Anonymizacni engine</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 8">8</span><span class="wsjf-dot wsjf-tc" title="TC: 8">8</span><span class="wsjf-dot wsjf-rr" title="RR: 5">5</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 8">8</span><span class="wsjf-dot wsjf-tc" title="TC: 8">8</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 5">5</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="J. Urbanek">JU</div>
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
     <span class="card__iter">PI-2026-1.2</span>
   </div>
 </article>
@@ -643,7 +885,7 @@ body{
   </div>
   <h3 class="card__title">K-anonymity algoritmus</h3>
   <span class="card__parent">F-102 Anonymizacni engine</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 3">3</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 3">3</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Turyna">TU</div>
     <span class="card__iter">PI-2026-1.2</span>
@@ -660,7 +902,7 @@ body{
   </div>
   <h3 class="card__title">Anonymizace testy</h3>
   <span class="card__parent">F-102 Anonymizacni engine</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR: 2">2</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 2">2</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Sr Dev MC">SD</div>
     <span class="card__iter">PI-2026-1.2</span>
@@ -677,7 +919,7 @@ body{
   </div>
   <h3 class="card__title">Katalog UI</h3>
   <span class="card__parent">F-110 Katalog datasetu</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 2">2</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 2">2</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Matousek">MA</div>
     <span class="card__iter">PI-2026-1.2</span>
@@ -694,7 +936,7 @@ body{
   </div>
   <h3 class="card__title">Katalog API</h3>
   <span class="card__parent">F-110 Katalog datasetu</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 3">3</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 3">3</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="DB Spec MC">DS</div>
     <span class="card__iter">PI-2026-1.2</span>
@@ -711,14 +953,14 @@ body{
   </div>
   <h3 class="card__title">Katalog search</h3>
   <span class="card__parent">F-110 Katalog datasetu</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR: 1">1</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 1">1</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="Matousek">MA</div>
     <span class="card__iter">PI-2026-1.3</span>
   </div>
 </article>
 <article class="card card--done"
-        data-assignee="d1"
+        data-assignee="tuma"
         data-iteration="PI-2026-1.3"
         data-type="Story"
         data-id="S-212">
@@ -728,14 +970,14 @@ body{
   </div>
   <h3 class="card__title">Objednavka workflow</h3>
   <span class="card__parent">F-111 Objednavkovy system</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 8">8</span><span class="wsjf-dot wsjf-rr" title="RR: 3">3</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 8">8</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 3">3</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="Sr Dev MC">SD</div>
+    <div class="card__avatar" title="O. Tuma">OT</div>
     <span class="card__iter">PI-2026-1.3</span>
   </div>
 </article>
 <article class="card card--done"
-        data-assignee="d2"
+        data-assignee="matousek"
         data-iteration="PI-2026-1.3"
         data-type="Story"
         data-id="S-213">
@@ -745,9 +987,9 @@ body{
   </div>
   <h3 class="card__title">Objednavka notifikace</h3>
   <span class="card__parent">F-111 Objednavkovy system</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR: 2">2</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 2">2</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="DB Spec MC">DS</div>
+    <div class="card__avatar" title="Matousek">MA</div>
     <span class="card__iter">PI-2026-1.3</span>
   </div>
 </article>
@@ -762,14 +1004,14 @@ body{
   </div>
   <h3 class="card__title">FHIR parser</h3>
   <span class="card__parent">F-120 FHIR bridge</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR: 5">5</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 5">5</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="O. Tuma">OT</div>
     <span class="card__iter">PI-2026-1.3</span>
   </div>
 </article>
 <article class="card card--done"
-        data-assignee="do"
+        data-assignee="turyna"
         data-iteration="PI-2026-1.3"
         data-type="Story"
         data-id="S-215">
@@ -779,14 +1021,14 @@ body{
   </div>
   <h3 class="card__title">FHIR mapping</h3>
   <span class="card__parent">F-120 FHIR bridge</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 8">8</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 8">8</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="DevOps MC">DM</div>
+    <div class="card__avatar" title="Turyna">TU</div>
     <span class="card__iter">PI-2026-1.3</span>
   </div>
 </article>
 <article class="card card--done"
-        data-assignee="tuma"
+        data-assignee="urbanek"
         data-iteration="PI-2026-1.3"
         data-type="Story"
         data-id="S-216">
@@ -796,15 +1038,15 @@ body{
   </div>
   <h3 class="card__title">CI/CD pipeline</h3>
   <span class="card__parent">F-101 Data Upload API</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR: 3">3</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 5">5</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 3">3</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="O. Tuma">OT</div>
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
     <span class="card__iter">PI-2026-1.3</span>
   </div>
 </article>
 <article class="card card--done"
         data-assignee="tuma"
-        data-iteration="PI-2026-1.3"
+        data-iteration="PI-2026-1.2"
         data-type="Story"
         data-id="S-217">
   <div class="card__head">
@@ -813,10 +1055,10 @@ body{
   </div>
   <h3 class="card__title">Security scan setup</h3>
   <span class="card__parent">F-120 FHIR bridge</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR: 5">5</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 5">5</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="O. Tuma">OT</div>
-    <span class="card__iter">PI-2026-1.3</span>
+    <span class="card__iter">PI-2026-1.2</span>
   </div>
 </article>
 <article class="card card--done"
@@ -830,14 +1072,14 @@ body{
   </div>
   <h3 class="card__title">API dokumentace</h3>
   <span class="card__parent">F-100 OMOP CDM Parser</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 2">2</span><span class="wsjf-dot wsjf-tc" title="TC: 1">1</span><span class="wsjf-dot wsjf-rr" title="RR: 1">1</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 2">2</span><span class="wsjf-dot wsjf-tc" title="TC: 1">1</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 1">1</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="J. Urbanek">JU</div>
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
     <span class="card__iter">PI-2026-1.4</span>
   </div>
 </article>
 <article class="card card--done"
-        data-assignee="urbanek"
+        data-assignee="tuma"
         data-iteration="PI-2026-1.4"
         data-type="Story"
         data-id="S-219">
@@ -847,14 +1089,14 @@ body{
   </div>
   <h3 class="card__title">Architektura review</h3>
   <span class="card__parent">F-102 Anonymizacni engine</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR: 3">3</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 3">3</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="J. Urbanek">JU</div>
+    <div class="card__avatar" title="O. Tuma">OT</div>
     <span class="card__iter">PI-2026-1.4</span>
   </div>
 </article>
 <article class="card card--done"
-        data-assignee="d1"
+        data-assignee="turyna"
         data-iteration="PI-2026-1.4"
         data-type="Story"
         data-id="S-220">
@@ -864,9 +1106,9 @@ body{
   </div>
   <h3 class="card__title">Performance testy</h3>
   <span class="card__parent">F-111 Objednavkovy system</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR: 3">3</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 5">5</span><span class="wsjf-dot wsjf-tc" title="TC: 3">3</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 3">3</span></div>
   <div class="card__foot">
-    <div class="card__avatar" title="Sr Dev MC">SD</div>
+    <div class="card__avatar" title="Turyna">TU</div>
     <span class="card__iter">PI-2026-1.4</span>
   </div>
 </article>
@@ -881,19 +1123,1802 @@ body{
   </div>
   <h3 class="card__title">DB migrace scripts</h3>
   <span class="card__parent">F-110 Katalog datasetu</span>
-  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR: 2">2</span></div>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 3">3</span><span class="wsjf-dot wsjf-tc" title="TC: 2">2</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 2">2</span></div>
   <div class="card__foot">
     <div class="card__avatar" title="DB Spec MC">DS</div>
     <span class="card__iter">PI-2026-1.4</span>
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-227">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-227</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">PI confidence &amp; predictability trending (pi-metrics.json accumulator)</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-228">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-228</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">Tests for calibrate_signals.py (NaN weights, local minima, constraint violations)</h3>
+  <span class="card__parent">F-121 Correctness &amp; calibration batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-229">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-229</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">Real-data calibration feedback loop (--real-data flag + corrections YAML)</h3>
+  <span class="card__parent">F-121 Correctness &amp; calibration batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-230">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-230</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">CW governance: --dry-run + --commit + heuristics bounds validation + RUNBOOK</h3>
+  <span class="card__parent">F-121 Correctness &amp; calibration batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-231">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-231</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">insights: anomaly detection (overload, stalled stories, critical-path blockers)</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-232">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-232</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">E1: feature-level capacity rollup on program board (progress bar + Σ JS)</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-233">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-233</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">E3: client-side filter &amp; search on PI board (team/status/text)</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-234">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-234</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">D3: property-based tests for engine core invariants (hypothesis)</h3>
+  <span class="card__parent">F-121 Correctness &amp; calibration batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-235">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-235</span>
+    <span class="card__js" title="Job Size">8</span>
+  </div>
+  <h3 class="card__title">F4 — AI-agent contribution attribution as first-class contributor type</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-236">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-236</span>
+    <span class="card__js" title="Job Size">13</span>
+  </div>
+  <h3 class="card__title">F5 — Interactive BI dashboard: multi-filter, Gantt, WSJF bubble chart, velocity sparklines</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-237">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-237</span>
+    <span class="card__js" title="Job Size">8</span>
+  </div>
+  <h3 class="card__title">F3 — Payroll/invoicing export: CSV + JSON from engine derived hours + hourly_rate</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-238">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-238</span>
+    <span class="card__js" title="Job Size">8</span>
+  </div>
+  <h3 class="card__title">D4: skill-driven E2E harness via claude -p — outcome assertions over setup/add/close-iteration</h3>
+  <span class="card__parent">F-123 Write-tools UX &amp; governance batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-239">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-239</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Release version-drift guard — extend bump_version.py + consistency test + checklist integration</h3>
+  <span class="card__parent">F-124 Consolidation batch 2026-06-11 — dead code, doc rot, release guard, reconcile</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-240">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-240</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">CI: coverage reporting + nightly skill-E2E workflow</h3>
+  <span class="card__parent">F-124 Consolidation batch 2026-06-11 — dead code, doc rot, release guard, reconcile</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-241">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-241</span>
+    <span class="card__js" title="Job Size">8</span>
+  </div>
+  <h3 class="card__title">/edpa:reconcile — git evidence vs backlog status reconciliation (script + MCP tool + command)</h3>
+  <span class="card__parent">F-124 Consolidation batch 2026-06-11 — dead code, doc rot, release guard, reconcile</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-242">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-242</span>
+    <span class="card__js" title="Job Size">8</span>
+  </div>
+  <h3 class="card__title">mcp_server dispatch table + shared YAML loader + engine logging</h3>
+  <span class="card__parent">F-124 Consolidation batch 2026-06-11 — dead code, doc rot, release guard, reconcile</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-243">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-243</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">CI guards: vendored-engine content drift test, web build job, release tag validation, py3.10 matrix</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-244">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-244</span>
+    <span class="card__js" title="Job Size">1</span>
+  </div>
+  <h3 class="card__title">OSS hygiene: SECURITY.md, issue templates, untrack .coverage</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-245">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-245</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">Test infra: tests/conftest.py, tool-only pyproject.toml, CONTRIBUTING dev setup</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-246">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-246</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">CI-suite tests for board.py and reports.py (973 LOC user-facing, zero unit coverage)</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-247">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-247</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Web SEO fundamentals: canonical/og/twitter, hreflang, sitemap, robots.txt + dropdown keyboard a11y</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-248">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-248</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">CZ/EN dedup phase 1: extract setup wizard generator to web/src/lib, version from version.ts, drop stamp targets</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-249">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-249</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">CI polish: ruff errors-only job, coverage floor, secrets-gated deploy-web, fix update-template.yml, tools README</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-250">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-250</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">EN translation of journey.astro (cz-only) → web/src/pages/en/journey.astro</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-251">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-251</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">EN translation of tutorial.astro (cz-only) → web/src/pages/en/tutorial.astro</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Story"
+        data-id="S-252">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-story-bg);color:var(--type-story)">S-252</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Re-enable EN nav for journey/tutorial + emit hreflang cs/en/x-default for dual-locale routes</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-1">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-1</span>
+    
+  </div>
+  <h3 class="card__title">Git hooks not registered after update / under lefthook — contribution evidence stops firing</h3>
+  <span class="card__parent">F-123 Write-tools UX &amp; governance batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-10">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-10</span>
+    
+  </div>
+  <h3 class="card__title">write-tools: /edpa:link-dep and /edpa:roam commands</h3>
+  <span class="card__parent">F-123 Write-tools UX &amp; governance batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-11">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-11</span>
+    
+  </div>
+  <h3 class="card__title">plugin/README.md: fix phantom edpa_sync_people + add Write-tools section</h3>
+  <span class="card__parent">F-123 Write-tools UX &amp; governance batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-12">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-12</span>
+    
+  </div>
+  <h3 class="card__title">F1: forecast.py + edpa_forecast_pi MCP tool + /edpa:forecast command</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-13">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-13</span>
+    
+  </div>
+  <h3 class="card__title">F3: payroll_export.py + /edpa:export command (billable hours CSV)</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-14">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-14</span>
+    
+  </div>
+  <h3 class="card__title">D1: .github/workflows/test.yml — pytest CI on push/PR</h3>
+  <span class="card__parent">F-123 Write-tools UX &amp; governance batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-15">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-15</span>
+    
+  </div>
+  <h3 class="card__title">C1: explain.py + engine --explain &lt;person&gt; — allocation narrative markdown</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-16">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-16</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">/edpa:explain broken vs real engine output — reads derived_reports/items, engine writes people[]</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-17">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-17</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">Backlog status drift — 26 shipped items stuck in Funnel, parented under demo features; PI-2026-1 stale active</h3>
+  <span class="card__parent">F-124 Consolidation batch 2026-06-11 — dead code, doc rot, release guard, reconcile</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-18">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-18</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">Dead/broken V1 CI workflows — .github/ references nonexistent paths, plugin ships 11 V1 workflow templates</h3>
+  <span class="card__parent">F-124 Consolidation batch 2026-06-11 — dead code, doc rot, release guard, reconcile</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-19">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-19</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Docs rot — TODO.md claims v1.3.0-beta, SETUP.md describes removed V1 flow, version drift across living docs</h3>
+  <span class="card__parent">F-124 Consolidation batch 2026-06-11 — dead code, doc rot, release guard, reconcile</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-2">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-2</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">read_resource nevaliduje iteration-id (path traversal guard chybí)</h3>
+  <span class="card__parent">F-121 Correctness &amp; calibration batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-20">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-20</span>
+    <span class="card__js" title="Job Size">1</span>
+  </div>
+  <h3 class="card__title">skill-E2E is local-only validation — remove nightly GitHub workflow (owner decision)</h3>
+  <span class="card__parent">F-124 Consolidation batch 2026-06-11 — dead code, doc rot, release guard, reconcile</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee="urbanek"
+        data-iteration="PI-2026-2.2"
+        data-type="Defect"
+        data-id="D-21">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-21</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">pi_planning/reconcile/transitions crash on Windows cp1252 console (UnicodeEncodeError on glyph print) — add _console guard</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
+    <span class="card__iter">PI-2026-2.2</span>
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-22">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-22</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">PI Calendar collapses all PIs onto current year — multi-year PI sets render 2027 iterations on the 2026 grid</h3>
+  <span class="card__parent">F-122 PI analytics &amp; BI batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee="urbanek"
+        data-iteration="PI-2026-2.2"
+        data-type="Defect"
+        data-id="D-23">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-23</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Engine subprocess git reads crash on Windows cp1252 — subprocess text=True without encoding=&#x27;utf-8&#x27;</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
+    <span class="card__iter">PI-2026-2.2</span>
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-24">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-24</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">PI rollup (pi_close.py) has no command/MCP front-end — add /edpa:close-pi + edpa_pi_close</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-25">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-25</span>
+    
+  </div>
+  <h3 class="card__title">engine accepts a PI as --iteration and silently under-counts the report (drops .N Story/Defect/Task work)</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-26">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-26</span>
+    <span class="card__js" title="Job Size">13</span>
+  </div>
+  <h3 class="card__title">evidence: as single source of signals; report must equal materialized snapshot (yaml_edit/transitions leak in-memory)</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-27">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-27</span>
+    <span class="card__js" title="Job Size">1</span>
+  </div>
+  <h3 class="card__title">.mcp.json points at vendored consumer path (.claude/edpa) → edpa MCP fails with -32000 in source repo</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-28">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-28</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">materialize writes cross-iteration yaml_edit at full weight; Story/Defect hours distorted on recompute</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-29">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-29</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">post-commit hook credits commit_author cross-iteration at full weight on foreign-iteration items (D-28 follow-up)</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-3">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-3</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Task/Event/Risk neviditelné v backlog CLI + PREFIX_TO_DIR nekonzistence (T→stories)</h3>
+  <span class="card__parent">F-121 Correctness &amp; calibration batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-30">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-30</span>
+    <span class="card__js" title="Job Size">1</span>
+  </div>
+  <h3 class="card__title">transitions.py iteration-window helpers mishandle timezones (naive-datetime crash + offset clobber)</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-31">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-31</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">bump_version.py omits web/package-lock.json embedded version; lockfile drifts from package.json each release and consistency test misses it</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-32">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-32</span>
+    <span class="card__js" title="Job Size">1</span>
+  </div>
+  <h3 class="card__title">pi_close.aggregate_engine_results reads wrong edpa_results.json keys (allocations/person/derived_hours vs people/id/total_derived) -&gt; zero PI-rollup hours</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-33">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-33</span>
+    <span class="card__js" title="Job Size">1</span>
+  </div>
+  <h3 class="card__title">GH-side PR-thread signals (pr_reviewer/issue_comment) bypass the D-29 out-of-iteration gate -&gt; cross-iteration leak persists in sync_pr_contributions</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-34">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-34</span>
+    <span class="card__js" title="Job Size">1</span>
+  </div>
+  <h3 class="card__title">local_evidence drops /contribute weights &gt;10 (build_signals [0,10] clamp) — diverges from detect_contributors, silently loses manual attributions</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-35">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-35</span>
+    <span class="card__js" title="Job Size">1</span>
+  </div>
+  <h3 class="card__title">commit_author emits stale 2.78 not the calibrated 4.00 — local_evidence/sync_pr read a non-existent &#x27;signal_weights&#x27; key instead of &#x27;signals&#x27;</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-36">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-36</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">Re-tune yaml_edit weights (peg to commit_author=4.00) + drop dead contributors_rebalance + add bulk_item_threshold + bound yaml_edit_weights in validate_syntax</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-37">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-37</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">edpa-branch-check gates branch names that nothing reads; replace with PR ID-collision gate (dogfood + distribute)</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-38">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-38</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">commit_author/agent_contribution credit every item ID merely mentioned in a commit message, not just the worked-on item</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-39">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-39</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">install.sh: broken curl-fallback extraction, missing assets vendoring, dead --with-server probe, missing mcp dep</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-4">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-4</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">validate_syntax: chybí Event schema + roam_status enum se nevaliduje</h3>
+  <span class="card__parent">F-121 Correctness &amp; calibration batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-40">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-40</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">README front door teaches removed V1 architecture (paths, sync section, command table, directory tree)</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-41">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-41</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Evidence integrity: auto-commit sweeps staged index; backlog add writes legacy as: field; dead exit code</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-42">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-42</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Engine guards: frontmatter type-coercion crashes; dead V1 code; preflight shell=True; non-atomic save_md</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-43">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-43</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">Plugin hooks tax every repo: gate to EDPA projects; silent pip --break-system-packages without consent/caps</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-44">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-44</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">EDPA_TOKEN documented but wired nowhere — restore secrets fallback + warning in contribution-sync</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-45">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-45</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">engine/reports skills hand-compute instead of invoking scripts; setup skill quotes stale weights</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-46">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-46</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">MCP surface drift: backlog type enum, T- routing, traversal guard, pi-planning argv, allowed-tools, plugin README</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-47">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-47</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">Web EN: dead journey/tutorial nav + language switcher; dead /docs/flow-metrics card; orphaned docs hub</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-48">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-48</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Docs rot batch: methodology contradiction, quick-start, timesheet naming, TODO/mcp.md counts, evidence merge guide, harness READMEs</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-49">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-49</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">update_engine.sh downgrades vendored engine when installed plugin is older than project VERSION</h3>
+  
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-5">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-5</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">sys.path import helper - odstranit leak v MCP session (try/finally pop)</h3>
+  <span class="card__parent">F-121 Correctness &amp; calibration batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-50">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-50</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">Python 3.10: datetime.fromisoformat rejects Z-suffixed timestamps across engine (transitions, evidence, reconcile)</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-51">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-51</span>
+    <span class="card__js" title="Job Size">1</span>
+  </div>
+  <h3 class="card__title">Purge legacy as: role fields from contributors[] across 38 backlog items (validator hard-errors on edit)</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-52">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-52</span>
+    <span class="card__js" title="Job Size">5</span>
+  </div>
+  <h3 class="card__title">Engine core hardening: consolidate type-dir mapping (7+ drifted copies, Risk KeyError) + coarse write lock for item read-modify-write</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-53">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-53</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Rewrite v1.11-stamped evidence/audit doc family to V2 signal architecture</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-54">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-54</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Web EN content drift: port homepage wave section + evaluation filter, refresh stale copy, canvas aria labels</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-55">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-55</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">Audit follow-ups: resolve_person email guard, methodology weight table, release checklist, bump targets, close-iteration claim, command allowlist test, writer locks</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-56">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-56</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">payroll_export.py and insights.py read derived_reports but engine CLI writes people — stock payroll returns 0 rows</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-57">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-57</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">forecast.py reads iteration-YAML delivery blocks that no close tool writes — velocity history is always [0,0,0]</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-58">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-58</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">pi_close.py reports total_capacity_hours=0 despite people.yaml capacity registry</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-59">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-59</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">pi_close.py features_completed is always empty — iteration-prefix filter never matches features</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-6">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-6</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">docs drift: verze 2.1.6→2.5.1, mrtvé --mode flagy, methodology V1 SoT</h3>
+  <span class="card__parent">F-121 Correctness &amp; calibration batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-60">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-60</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">iteration close backfills planned_sp=delivered making PI predictability metric vacuous</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-61">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-61</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">no item-creation path writes created_at — edpa_flow_metrics structurally empty on local-first repos</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-62">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-62</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">engine story-activity path credits signals that D-28/D-29 gating neutralized (weight-0 out_of_iteration)</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-63">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-63</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">commit_author evidence outside the item&#x27;s iteration window keeps full weight 4.0 — 12.3% of E2E signals skewed cw</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-64">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-64</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">commit-msg ticket gate regex matches PI-id substrings — ticketless commit passes by mentioning PI-2026-1</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-65">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-65</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">edpa_item_create accepts statuses invalid for the item type&#x27;s workflow — validate rejects what create allowed</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-66">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-66</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">detect_contributors --all-items close commit sprays attribution across all touched items; docs claim auto-commit that does not exist</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-67">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-67</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">Defect status changes emit no state_transition evidence — defects invisible to flow/time-in-state analytics</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-68">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-68</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Results-schema readers: reports/explain/board/pi_close read only &#x27;people&#x27; — reuse _results_compat for legacy &#x27;derived_reports&#x27; shape (inverse of D-56); fix board --level help default</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-69">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-69</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">Create/validate consistency + iteration activation: Event/Risk status validation at create, align parentless Defect/Event/Risk between create and validate, new edpa_iteration_activate handler + command</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-7">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-7</span>
+    
+  </div>
+  <h3 class="card__title">write-tools: /edpa:change-state command wrapping edpa_item_transition</h3>
+  <span class="card__parent">F-123 Write-tools UX &amp; governance batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-70">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-70</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">sync_pr out-of-window gating: mirror D-63 windowing to GH-side _gate_out_of_iteration so out-of-window PR-derived signals lose full weight</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-71">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-71</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">objectives CLI: add argparse main to objectives.py (objective_set/remove, confidence_vote) so it works without the MCP server</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-72">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-72</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">backlog.py validate hierarchy checker errors &#x27;missing parent reference&#x27; on parentless Defect/Event/Risk — align with documented top-level behavior (the D-69 remainder)</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-73">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-73</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">engine story-activity synthetic item copies all-time contributors[] shares instead of iteration-scoped credit (D-62 adjacency)</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-74">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-74</span>
+    <span class="card__js" title="Job Size">2</span>
+  </div>
+  <h3 class="card__title">yaml_edit_signals awards list-growth/volume weight for contributors[]/evidence[] growth on bookkeeping commits (chore evidence/contributors)</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-75">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-75</span>
+    <span class="card__js" title="Job Size">3</span>
+  </div>
+  <h3 class="card__title">board.py has no representation for Risks; forecast nested-status vs top-level status asymmetry (D-57 note)</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-76">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-76</span>
+    <span class="card__js" title="Job Size">1</span>
+  </div>
+  <h3 class="card__title">mcp_server ITEM_ID_RE syntactically accepts bare &#x27;PI-2026&#x27; as item id — harden to reject PI-shaped ids explicitly</h3>
+  <span class="card__parent">F-126 Audit remediation batch 2026-07 — fixes from 50-agent repo audit</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-8">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-8</span>
+    
+  </div>
+  <h3 class="card__title">write-tools: /edpa:update command wrapping edpa_item_update</h3>
+  <span class="card__parent">F-123 Write-tools UX &amp; governance batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
+  </div>
+</article>
+<article class="card card--done"
+        data-assignee=""
+        data-iteration=""
+        data-type="Defect"
+        data-id="D-9">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-defect-bg);color:var(--type-defect)">D-9</span>
+    
+  </div>
+  <h3 class="card__title">write-tools: /edpa:objectives command (objective_set/remove + confidence_vote)</h3>
+  <span class="card__parent">F-123 Write-tools UX &amp; governance batch 2026-06</span>
+  <div class="card__wsjf"><span class="wsjf-dot wsjf-bv" title="BV: 0">0</span><span class="wsjf-dot wsjf-tc" title="TC: 0">0</span><span class="wsjf-dot wsjf-rr" title="RR&OE: 0">0</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="?">?</div>
+    
   </div>
 </article></div>
 </div>
 </div>
 
+<div class="risk-panel">
+  <div class="risk-panel__head">
+    <span class="risk-panel__title">Risks (ROAM)</span>
+    <span class="risk-panel__count">3</span>
+  </div>
+  <div class="risk-panel__list"><article class="card"
+        data-assignee="urbanek"
+        data-iteration=""
+        data-type="Risk"
+        data-id="R-1">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-risk-bg);color:var(--type-risk)">R-1</span>
+  </div>
+  <h3 class="card__title">OMOP schema changes may break parser</h3>
+  <div class="risk-badges"><span class="risk-roam roam--owned">Owned</span><span class="risk-sev risk-sev--high">high</span></div>
+  <div class="card__foot">
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
+  </div>
+</article>
+<article class="card"
+        data-assignee="pm"
+        data-iteration=""
+        data-type="Risk"
+        data-id="R-3">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-risk-bg);color:var(--type-risk)">R-3</span>
+  </div>
+  <h3 class="card__title">Team capacity drop during summer holidays</h3>
+  <div class="risk-badges"><span class="risk-roam roam--accepted">Accepted</span><span class="risk-sev risk-sev--high">high</span></div>
+  <div class="card__foot">
+    <div class="card__avatar" title="PM Partner">PP</div>
+  </div>
+</article>
+<article class="card"
+        data-assignee="urbanek"
+        data-iteration=""
+        data-type="Risk"
+        data-id="R-2">
+  <div class="card__head">
+    <span class="card__id" style="background:var(--type-risk-bg);color:var(--type-risk)">R-2</span>
+  </div>
+  <h3 class="card__title">Third-party API rate limits may block data sync</h3>
+  <div class="risk-badges"><span class="risk-roam roam--mitigated">Mitigated</span><span class="risk-sev risk-sev--medium">medium</span></div>
+  <div class="card__foot">
+    <img class="card__avatar card__avatar--gh" src="https://github.com/jurby.png?size=40" alt="@jurby" title="J. Urbanek (@jurby)" width="40" height="40">
+  </div>
+</article></div>
+</div>
+
 <div class="footer">
-  <span>37 items</span>
+  <span>150 items</span>
   <span>&middot;</span>
-  <span>Generated 2026-04-01 15:56 by EDPA</span>
+  <span>Generated 2026-07-08 22:55 by EDPA</span>
 </div>
 
 <script>
@@ -908,6 +2933,43 @@ function toggleTheme() {
 if (localStorage.getItem('edpa-board-theme') === 'dark') {
   document.body.classList.add('dark');
   document.getElementById('themeToggle').innerHTML = '&#9788;';
+}
+
+// Iteration chip (S-253): fill the header chip from the ITERATIONS map,
+// defaulting to the active iteration and re-syncing whenever the iteration
+// dropdown changes (wired via applyFilters + an initial call below).
+const ITERATIONS = {"PI-2026-1.1": {"end": "2026-04-10", "num": 1, "pi": "PI-2026-1", "start": "2026-04-06", "status": "closed"}, "PI-2026-1.2": {"end": "2026-04-17", "num": 2, "pi": "PI-2026-1", "start": "2026-04-13", "status": "closed"}, "PI-2026-1.3": {"end": "2026-04-24", "num": 3, "pi": "PI-2026-1", "start": "2026-04-20", "status": "closed"}, "PI-2026-1.4": {"end": "2026-05-01", "num": 4, "pi": "PI-2026-1", "start": "2026-04-27", "status": "active"}, "PI-2026-1.5": {"end": "2026-05-08", "num": 5, "pi": "PI-2026-1", "start": "2026-05-04", "status": "planned"}, "PI-2026-2.1": {"end": "2026-05-15", "num": 1, "pi": "PI-2026-2", "start": "2026-05-11", "status": "closed"}, "PI-2026-2.2": {"end": "2026-05-22", "num": 2, "pi": "PI-2026-2", "start": "2026-05-18", "status": "active"}, "PI-2026-2.3": {"end": "2026-05-29", "num": 3, "pi": "PI-2026-2", "start": "2026-05-25", "status": "planned"}, "PI-2026-2.4": {"end": "2026-06-05", "num": 4, "pi": "PI-2026-2", "start": "2026-06-01", "status": "planned"}, "PI-2026-2.5": {"end": "2026-06-12", "num": 5, "pi": "PI-2026-2", "start": "2026-06-08", "status": "planned"}};
+const DEFAULT_ITER = "PI-2026-2.2";
+const ITER_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function iterFmtDate(iso, withYear) {
+  const p = (iso || '').split('-');
+  if (p.length !== 3) return iso || '';
+  const day = parseInt(p[2], 10);
+  const mon = ITER_MONTHS[parseInt(p[1], 10) - 1] || '';
+  if (isNaN(day) || !mon) return iso || '';
+  return withYear ? (day + ' ' + mon + ' ' + p[0]) : (day + ' ' + mon);
+}
+function iterFmtRange(start, end) {
+  if (!start && !end) return '';
+  if (!start) return iterFmtDate(end, true);
+  if (!end) return iterFmtDate(start, true);
+  const sameYear = start.slice(0, 4) === end.slice(0, 4);
+  return iterFmtDate(start, !sameYear) + ' \u2013 ' + iterFmtDate(end, true);
+}
+function updateIterChip() {
+  const chip = document.getElementById('iterChip');
+  if (!chip) return;
+  const sel = document.getElementById('fIteration');
+  const id = (sel && sel.value) ? sel.value : DEFAULT_ITER;
+  const it = ITERATIONS[id];
+  if (!it) { chip.style.display = 'none'; return; }
+  chip.style.display = '';
+  const dot = it.status === 'active'
+    ? '<span class="iter-chip__dot dot--progress"></span>' : '';
+  const iter = (it.num != null) ? (' &middot; Iter ' + it.num) : '';
+  const range = iterFmtRange(it.start, it.end);
+  const dates = range ? (' &middot; ' + range) : '';
+  chip.innerHTML = dot + '<span class="iter-chip__pi">' + (it.pi || id) + '</span>' + iter + dates;
 }
 
 const chips = document.querySelectorAll('.chip--assignee');
@@ -944,7 +3006,12 @@ function applyFilters() {
     const visible = col.querySelectorAll('.card:not(.hidden)').length;
     col.querySelector('.column__count').textContent = visible;
   });
+
+  updateIterChip();
 }
+
+// Initial paint (also handles a --iteration pre-selected dropdown).
+updateIterChip();
 </script>
 </body>
 </html>
