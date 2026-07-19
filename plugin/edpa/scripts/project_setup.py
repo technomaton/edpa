@@ -367,6 +367,31 @@ def detect_lefthook(root: Path) -> Path | None:
     return None
 
 
+def lefthook_hook_status(cfg_path: Path) -> tuple[list[str], list[str]]:
+    """Which EDPA hooks are wired into a lefthook config, and which are missing.
+
+    EDPA cannot register into lefthook itself (it owns .git/hooks/), so it hands
+    the user a paste-ready snippet. A *partial* paste — only some of the four
+    ``run:`` lines copied in — silently drops the guard hooks, and until now
+    nothing detected it. Each EDPA hook's vendored script basename
+    (``pre-commit-id-safety`` …) is unique and appears verbatim in its ``run:``
+    line, so a plain substring scan over the raw config text is enough to tell
+    wired from missing — no YAML parser, dependency-free, and format-agnostic
+    (works for .yml/.yaml/.toml/.json, survives reordering and comments).
+
+    Returns ``(registered, missing)`` as git-hook names, in _HOOK_SPECS order.
+    """
+    try:
+        text = cfg_path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        text = ""
+    registered: list[str] = []
+    missing: list[str] = []
+    for hook, src_name, _ in _HOOK_SPECS:
+        (registered if src_name in text else missing).append(hook)
+    return registered, missing
+
+
 def _hook_src_dir(root: Path) -> Path:
     """Hook sources — plugin layout when running from source, else vendored."""
     src_dir = HERE / "hooks"
@@ -412,6 +437,25 @@ def install_hooks(root: Path, *, refresh: bool = False,
     if lefthook_cfg:
         warn(f"lefthook detected ({lefthook_cfg.name}) — it owns .git/hooks/, "
              f"so EDPA registers via lefthook, not by copying hooks.")
+        registered, missing = lefthook_hook_status(lefthook_cfg)
+        total = len(_HOOK_SPECS)
+        if not missing:
+            ok(f"All {total} EDPA hooks registered in {lefthook_cfg.name}: "
+               f"{', '.join(registered)}")
+            return True
+        if registered:
+            # Partial paste — the silent blind spot: the repo opted in (some
+            # EDPA hooks are wired) yet guards are missing. Say so, loudly.
+            warn(f"WARNING: {len(missing)} of {total} EDPA hooks NOT registered "
+                 f"in {lefthook_cfg.name} — commits are UNGUARDED:")
+            for hook in missing:
+                warn(f"   - {hook}: {_HOOK_PURPOSE[hook]}")
+            info(f"   registered: {', '.join(registered)}")
+            info(f"   Fix: merge the FULL block below into {lefthook_cfg.name} "
+                 f"(not just part), then run `lefthook install`.")
+        else:
+            info(f"No EDPA hooks registered in {lefthook_cfg.name} yet "
+                 f"(0 of {total}).")
         if not check_only:
             info("EDPA does not edit your lefthook config. Add this block, "
                  "then run `lefthook install`:")
@@ -469,6 +513,32 @@ def install_hooks(root: Path, *, refresh: bool = False,
     return True
 
 
+def lefthook_audit(root: Path) -> int:
+    """SessionStart doctor for lefthook repos (called by update_engine.sh).
+
+    Silent when 0 of N EDPA hooks are registered (the repo never opted in) or
+    all N are (correctly wired). Loud, on stderr, ONLY for a partial paste
+    (1..N-1 registered) — the state where a repo opted in but guards are
+    silently missing. Always returns 0: advisory, must never block a session.
+    """
+    cfg = detect_lefthook(root)
+    if cfg is None:
+        return 0
+    registered, missing = lefthook_hook_status(cfg)
+    if not registered or not missing:
+        return 0  # 0/N (not opted in) or N/N (all wired) — stay quiet
+    total = len(_HOOK_SPECS)
+    print(f"EDPA: WARNING: {len(missing)} of {total} EDPA hooks NOT registered "
+          f"in {cfg.name} — commits are UNGUARDED.", file=sys.stderr)
+    for hook in missing:
+        print(f"EDPA:    - {hook}: {_HOOK_PURPOSE[hook]}", file=sys.stderr)
+    print(f"EDPA:    registered: {', '.join(registered)}", file=sys.stderr)
+    print("EDPA:    Fix: merge the full EDPA block into your lefthook config, "
+          "then `lefthook install`. Details: python3 "
+          ".edpa/engine/scripts/project_setup.py --check-hooks", file=sys.stderr)
+    return 0
+
+
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 
@@ -503,12 +573,23 @@ def main() -> int:
              "without changing anything — the hooks doctor.",
     )
     parser.add_argument(
+        "--lefthook-audit", action="store_true",
+        help="SessionStart doctor for lefthook repos: silent unless a partial "
+             "paste left some EDPA hooks registered and others missing, then "
+             "warns on stderr. Always exits 0 (never blocks).",
+    )
+    parser.add_argument(
         "--root", type=Path, default=None,
         help="Project root (default: walk up from CWD to .git/)",
     )
     args = parser.parse_args()
 
     root = args.root.resolve() if args.root else find_repo_root(Path.cwd())
+
+    # Silent SessionStart audit (update_engine.sh). No header, stderr-only,
+    # always exit 0 — see lefthook_audit.
+    if args.lefthook_audit:
+        return lefthook_audit(root)
 
     # Hook-only fast paths. They skip vendor/seed so they are cheap and safe to
     # call on every session start (update_engine.sh self-heal) or on demand

@@ -235,15 +235,32 @@ def test_self_heal_skipped_when_no_edpa_hooks(tmp_path):
         assert not (hooks / name).exists(), f"{name} forced onto opt-out repo"
 
 
-def test_self_heal_lefthook_prints_check_reminder(tmp_path):
-    """Under lefthook the hook does not edit .git/hooks/ — it points the user
-    at the doctor instead (EDPA never edits the lefthook config)."""
+def test_self_heal_lefthook_silent_when_not_opted_in(tmp_path):
+    """Under lefthook with no EDPA hooks pasted (0/4), the audit stays silent —
+    the repo never opted in, so don't nag. .git/hooks/ is never touched."""
     _seed_engine(tmp_path, version="1.0.0")
     hooks = _git_hooks(tmp_path)
     (tmp_path / "lefthook.yml").write_text("# user config\n")
     result = _run(tmp_path)
     assert result.returncode == 0, result.stderr
-    assert "lefthook detected" in result.stderr
-    assert "--check-hooks" in result.stderr
+    assert "UNGUARDED" not in result.stderr
+    for name in ("pre-commit", "pre-push", "commit-msg", "post-commit"):
+        assert not (hooks / name).exists(), f"{name} written under lefthook"
+
+
+def test_self_heal_lefthook_warns_on_partial_paste(tmp_path):
+    """A partial lefthook paste (only the evidence hook wired, guards missing)
+    is the silent blind spot — SessionStart must now flag it loudly on stderr,
+    while still never editing .git/hooks/ (lefthook owns it)."""
+    _seed_engine(tmp_path, version="1.0.0")
+    hooks = _git_hooks(tmp_path)
+    (tmp_path / "lefthook.yml").write_text(
+        "post-commit:\n  commands:\n    edpa-evidence:\n"
+        "      run: sh .edpa/engine/scripts/hooks/post-commit-evidence\n"
+    )
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "UNGUARDED" in result.stderr
+    assert "commit-msg" in result.stderr  # a named missing guard
     for name in ("pre-commit", "pre-push", "commit-msg", "post-commit"):
         assert not (hooks / name).exists(), f"{name} written under lefthook"

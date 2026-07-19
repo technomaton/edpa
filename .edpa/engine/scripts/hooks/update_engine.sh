@@ -157,8 +157,10 @@ _has_lefthook() {
   return 1
 }
 if _has_lefthook; then
-  echo "EDPA: lefthook detected — verify EDPA hooks are registered with:" >&2
-  echo "       python3 $TARGET/scripts/project_setup.py --check-hooks" >&2
+  # Content-aware audit: silent when 0/4 (repo never opted in) or 4/4 (all
+  # wired), loud + specific only on a partial paste (guards silently missing).
+  # Non-blocking (|| true) — advisory only, must never break a session start.
+  python3 "$TARGET/scripts/project_setup.py" --lefthook-audit --root "$PROJECT" 1>&2 || true
 elif grep -q "EDPA-MANAGED-HOOK" "$PROJECT"/.git/hooks/* 2>/dev/null; then
   echo "EDPA: re-registering git hooks after update..." >&2
   python3 "$TARGET/scripts/project_setup.py" --refresh-hooks --root "$PROJECT" 1>&2 || true
