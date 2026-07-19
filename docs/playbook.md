@@ -4,8 +4,8 @@ Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allo
 
 EDPA V2 je **local-first**: zdrojem pravdy je `.edpa/backlog/**/*.md` (YAML frontmatter), git je audit trail. GitHub je **volitelny** -- zadny GitHub Project, zadne org Issue Types, zadny obousmerny sync.
 
-**Verze:** EDPA 2.19.0
-**Posledni aktualizace:** 2026-07-19
+**Verze:** EDPA 2.20.0
+**Posledni aktualizace:** 2026-07-20
 
 ---
 
@@ -78,7 +78,7 @@ V terminalu s Claude Code nainstalovanym:
 /edpa:setup --with-ci --with-hooks --with-rules
 ```
 
-Claude Code (skill `/edpa:setup`) provede kroky 1.1-1.4 automaticky -- vendoruje engine do `.edpa/engine/`, naseje konfiguraci a `id_counters.yaml`, a volitelne nainstaluje git hooky, PR-signal CI workflow a `.claude/rules/`. Idempotentni -- opakovane spusteni nic nerozbije. `--with-hooks` je lefthook-aware (pri pritomnem `lefthook.yml` vypise snippet misto zapisu do `.git/hooks/`); stav overis pres `--check-hooks`.
+Claude Code (skill `/edpa:setup`) provede kroky 1.1-1.4 automaticky -- vendoruje engine do `.edpa/engine/`, naseje konfiguraci a `id_counters.yaml`, a volitelne nainstaluje git hooky, PR-signal CI workflow a `.claude/rules/`. Idempotentni -- opakovane spusteni nic nerozbije. `--with-hooks` je lefthook-aware (pri pritomnem `lefthook.yml` zapise jediny radek `extends: .edpa/engine/lefthook-edpa.yml` misto zapisu do `.git/hooks/`); stav overis pres `--check-hooks`.
 
 ### Cesta B: Manualni CLI
 
@@ -207,7 +207,7 @@ project:
 
 governance:
   # Auto-razitkovano na verzi pluginu instalatorem.
-  methodology: "EDPA 2.19.0"
+  methodology: "EDPA 2.20.0"
   # Jedina vypocetni cesta od v1.14 (zadny simple/full/gates mode selector,
   # zadny audit_mode -- snapshoty vzdy nesou plny signals[] audit trail).
 

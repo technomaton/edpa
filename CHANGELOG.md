@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 2.20.0 — 2026-07-20
+
+Lefthook `extends:` becomes the default registration path — EDPA wires it
+itself — plus the hook self-heal deadlock that stopped `/plugin update` from
+delivering hook fixes at all.
 
 ### Fixed
 

@@ -95,7 +95,7 @@ engine + `.edpa/` tree.
 **Expected output (last steps):**
 
 ```
-  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (49 scripts, VERSION 2.19.0)
+  [1] Vendor engine    ✓ Vendored engine → .edpa/engine/ (49 scripts, VERSION 2.20.0)
   [2] Directory tree   ✓ Directory tree at .edpa/
   [3] Config templates ✓ Seeded people.yaml, edpa.yaml, cw_heuristics.yaml
   [4] ID counter       ✓ id_counters.yaml seeded
@@ -110,7 +110,7 @@ EDPA setup complete.
   hand-edit; the SessionStart hook re-syncs it on plugin update).
 - `.edpa/config/{edpa.yaml,people.yaml,cw_heuristics.yaml,id_counters.yaml}`.
 - `.edpa/{backlog,iterations,reports,snapshots}/` tree.
-- (flags) `.git/hooks/*` (or a lefthook snippet),
+- (flags) `.git/hooks/*` (or one `extends:` line in your lefthook config),
   `.github/workflows/edpa-contribution-sync.yml`, `.claude/rules/`.
 
 **Git hooks — registration, lefthook, verification:**
@@ -132,17 +132,24 @@ deliberately careful:
   dispatcher shims into `.git/hooks/` (and can set `core.hooksPath`), so a plain
   copy would be ignored or clobbered — this is the usual cause of "contribution
   stopped working after an update". EDPA detects `lefthook.yml` and, instead of
-  writing `.git/hooks/`, EDPA registers via lefthook. **Recommended** — add one
-  line pointing at the vendored fragment, then run `lefthook install`; it tracks
-  plugin updates automatically (no re-paste):
+  writing `.git/hooks/`, registers via lefthook — it **writes this one line into
+  your lefthook config itself**, then you run `lefthook install`:
 
   ```yaml
   extends:
     - .edpa/engine/lefthook-edpa.yml
   ```
 
-  Or paste the full block as a fallback (no auto-propagation), then
-  `lefthook install`:
+  That entry is the **only** thing EDPA ever changes in a lefthook config —
+  nothing removed, reordered or reformatted, and a stale hand-pasted EDPA block
+  is left in place on purpose (harmless: the fragment wins the command-name
+  collision and its `run:` lines are identical). Because the fragment is
+  re-vendored every session, hook fixes then arrive with `/plugin update`
+  instead of needing a re-paste, and a repo still on a pasted block is migrated
+  onto `extends:` automatically at the next update.
+
+  A `lefthook.toml`/`.json` cannot be line-edited safely, so those get the full
+  block printed to paste by hand (no auto-propagation), then `lefthook install`:
 
   ```yaml
   pre-commit:
