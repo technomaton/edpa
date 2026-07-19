@@ -223,6 +223,35 @@ def test_self_heal_reregisters_when_edpa_hooks_present(tmp_path):
     assert SENTINEL in (hooks / "pre-commit").read_text()
 
 
+def test_self_heal_adopts_pre_sentinel_hooks(tmp_path):
+    """A hook predating the sentinel still signals opt-in (D-78).
+
+    Gating self-heal on EDPA-MANAGED-HOOK alone deadlocked exactly the repos
+    that needed it: no sentinel → self-heal never fires → hook never re-stamped
+    → still no sentinel, forever. Probing the body (.edpa/engine/scripts/, which
+    every hook generation carries) breaks the cycle. End-to-end: the gate opens,
+    project_setup adopts the legacy hook, and it comes out re-stamped.
+    """
+    _seed_engine(tmp_path, version="1.0.0")
+    hooks = _git_hooks(tmp_path)
+    src = REPO / "plugin/edpa/scripts/hooks/pre-commit-id-safety"
+    legacy = "\n".join(
+        ln for ln in src.read_text(encoding="utf-8").splitlines()
+        if SENTINEL not in ln
+    ) + "\n"
+    assert SENTINEL not in legacy, "fixture must not carry the sentinel"
+    (hooks / "pre-commit").write_text(legacy)
+
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "re-registering git hooks" in result.stderr, (
+        "self-heal gate stayed shut on a pre-sentinel hook"
+    )
+    assert SENTINEL in (hooks / "pre-commit").read_text(), (
+        "legacy hook reached self-heal but was not adopted"
+    )
+
+
 def test_self_heal_skipped_when_no_edpa_hooks(tmp_path):
     """A repo that never opted into hooks must not get them forced on update."""
     _seed_engine(tmp_path, version="1.0.0")

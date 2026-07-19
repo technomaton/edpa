@@ -184,6 +184,15 @@ fi
 # from firing. Re-register ONLY when the project already opted into hooks
 # (an EDPA-owned hook is present, or lefthook is in use), so a version bump
 # never forces hooks on a repo that deliberately skipped them.
+#
+# The opt-in probe matches on the hook BODY, not just the sentinel (D-78).
+# Gating on EDPA-MANAGED-HOOK alone deadlocked exactly the repos that needed
+# healing: a pre-sentinel hook carries no sentinel, so self-heal never fired, so
+# the hook never got re-stamped, so it never gained a sentinel. Every EDPA hook
+# of every generation invokes a script under .edpa/engine/scripts/, so that path
+# is the durable opt-in signal. It also matches a hook the user chained EDPA
+# into by hand — opt-in too, and --refresh-hooks leaves foreign files untouched,
+# so the broader probe costs nothing.
 _has_lefthook() {
   for _lf in lefthook.yml lefthook.yaml .lefthook.yml .lefthook.yaml lefthook.toml lefthook.json; do
     [ -f "$PROJECT/$_lf" ] && return 0
@@ -207,7 +216,7 @@ if _has_lefthook; then
   # wired), loud + specific only on a partial paste (guards silently missing).
   # Non-blocking (|| true) — advisory only, must never break a session start.
   python3 "$TARGET/scripts/project_setup.py" --lefthook-audit --root "$PROJECT" 1>&2 || true
-elif grep -q "EDPA-MANAGED-HOOK" "$PROJECT"/.git/hooks/* 2>/dev/null; then
+elif grep -qE "EDPA-MANAGED-HOOK|\.edpa/engine/scripts/" "$PROJECT"/.git/hooks/* 2>/dev/null; then
   echo "EDPA: re-registering git hooks after update..." >&2
   python3 "$TARGET/scripts/project_setup.py" --refresh-hooks --root "$PROJECT" 1>&2 || true
 fi

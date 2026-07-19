@@ -4,6 +4,15 @@
 
 ### Fixed
 
+- **Engine self-heal never fired on the repos that needed it (D-78).**
+  `update_engine.sh` gated its post-update `--refresh-hooks` call on
+  `grep EDPA-MANAGED-HOOK .git/hooks/*` — the exact sentinel a pre-sentinel hook
+  lacks. That deadlocked: no sentinel → self-heal skipped → hook never
+  re-stamped → still no sentinel, every session forever, so hook fixes shipped
+  via `/plugin update` silently never reached the repo. The opt-in probe now
+  matches the hook body (`.edpa/engine/scripts/`, carried by every EDPA hook
+  generation) as well as the sentinel. A hand-chained hook matches too, which is
+  also opt-in; `--refresh-hooks` leaves foreign files untouched either way.
 - **Pre-sentinel git hooks were classified as foreign forever (D-78).**
   `install_hooks` decided ownership purely on the `EDPA-MANAGED-HOOK` sentinel,
   so hooks installed before that sentinel landed — same executable body, older
