@@ -1,5 +1,38 @@
 # Changelog
 
+## 2.21.0 — 2026-07-20
+
+The commit-msg escape hatch now works in repos that enforce Conventional
+Commits — which is to say, in the repos EDPA's own work rules describe.
+
+### Fixed
+
+- **Escape prefixes were not valid Conventional Commits (D-79).** EDPA's work
+  rules mandate CC, yet every escape it accepted (`no-ticket:`, `WIP:`,
+  `[no-ticket]`) fails a conventional-commit gate. In a repo running one, a
+  non-trivial ticket-less change had **no** message that passed both gates:
+
+  | Subject | EDPA | CC gate |
+  |---|---|---|
+  | `no-ticket: fix typo` | pass | reject |
+  | `chore(no-ticket): fix typo` | reject | pass |
+  | `chore: fix typo` | reject | pass |
+
+  The dead end selects for the worst option available — `git commit
+  --no-verify`, which skips *every* hook including pre-commit ID safety and
+  leaves no trace in the message. The bypass-CC shape was deliberate ("to make
+  opt-outs visible in `git log --oneline`") but defeats itself in exactly the
+  repos that follow EDPA's own guidance.
+
+  `chore(no-ticket):` and `chore(wip):` are now accepted. They satisfy a CC gate
+  while keeping the escape visible and greppable in `git log --oneline` — what
+  the bare forms were for in the first place. The bare forms remain accepted for
+  back-compat, documented as usable only where no CC gate runs. Bare `chore:` is
+  deliberately **not** an escape: valid CC, but it says nothing about intent.
+
+  Docs present the scoped form as preferred: work rules (plugin + repo copy),
+  setup SKILL, playbook CZ, web playbook CZ + EN, hook purpose string.
+
 ## 2.20.0 — 2026-07-20
 
 Lefthook `extends:` becomes the default registration path — EDPA wires it
