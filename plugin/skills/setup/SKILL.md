@@ -57,7 +57,7 @@ Resulting layout:
   - **pre-commit**: ID-safety validator (filename≡frontmatter id,
     counter monotonicity, HEAD collisions) — Layer 5 of collision defense
   - **commit-msg**: require EDPA item reference in commit subject/body
-    (or `no-ticket:` escape) — catches "did work, forgot to attribute"
+    (or `chore(no-ticket):` escape) — catches "did work, forgot to attribute"
   - **post-commit**: `local_evidence.py` emits commit_author and
     `/contribute` signals into the referenced item's `evidence[]`
   - **pre-push**: upstream ID collision check (`validate_ids.py

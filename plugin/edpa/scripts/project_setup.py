@@ -322,7 +322,7 @@ _HOOK_SPECS: tuple[tuple[str, str, str], ...] = (
     ("pre-push", "pre-push-id-safety",
      "ID safety: no ID collisions with the remote tip"),
     ("commit-msg", "commit-msg-ticket-attached",
-     "require an EDPA item ref (or a 'no-ticket:' escape)"),
+     "require an EDPA item ref (or a 'chore(no-ticket):' escape)"),
     ("post-commit", "post-commit-evidence",
      "emit commit_author evidence into the item's evidence[]"),
 )

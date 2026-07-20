@@ -363,7 +363,7 @@ git checkout -b chore/T-050-ci-pipeline</code></pre>
         </thead>
         <tbody>
           <tr><td>pre-commit</td><td>ID safety — reference check</td></tr>
-          <tr><td>commit-msg</td><td>Requires an item reference or <code>no-ticket:</code></td></tr>
+          <tr><td>commit-msg</td><td>Requires an item reference or <code>chore(no-ticket):</code></td></tr>
           <tr><td>post-commit</td><td>Materializes <code>commit_author</code>, <code>yaml_edit</code> and <code>state_transition</code> into <code>evidence[]</code> (<code>local_evidence.py</code>)</td></tr>
           <tr><td>pre-push</td><td>Checks for ID collisions</td></tr>
         </tbody>
@@ -943,7 +943,7 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
     <p><strong>Fix:</strong></p>
     <ul>
       <li>Add an item reference to the message: <code>feat(S-200): ...</code></li>
-      <li>Or, for commits without a ticket, use the <code>no-ticket:</code> prefix</li>
+      <li>Or, for commits without a ticket, use the <code>chore(no-ticket):</code> prefix</li>
     </ul>
 
     <h3>Python — missing dependencies</h3>

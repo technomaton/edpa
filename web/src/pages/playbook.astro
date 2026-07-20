@@ -365,7 +365,7 @@ git checkout -b chore/T-050-ci-pipeline</code></pre>
         </thead>
         <tbody>
           <tr><td>pre-commit</td><td>ID safety — kontrola referencí</td></tr>
-          <tr><td>commit-msg</td><td>Vyžaduje referenci itemu nebo <code>no-ticket:</code></td></tr>
+          <tr><td>commit-msg</td><td>Vyžaduje referenci itemu nebo <code>chore(no-ticket):</code></td></tr>
           <tr><td>post-commit</td><td>Materializuje <code>commit_author</code>, <code>yaml_edit</code> a <code>state_transition</code> do <code>evidence[]</code> (<code>local_evidence.py</code>)</td></tr>
           <tr><td>pre-push</td><td>Kontrola ID kolizí</td></tr>
         </tbody>
@@ -939,7 +939,7 @@ Required format: &#123;type&#125;/&#123;item-id&#125;-&#123;description&#125;</c
     <p><strong>Řešení:</strong></p>
     <ul>
       <li>Přidat referenci itemu do zprávy: <code>feat(S-200): ...</code></li>
-      <li>Nebo pro commity bez ticketu použít prefix <code>no-ticket:</code></li>
+      <li>Nebo pro commity bez ticketu použít prefix <code>chore(no-ticket):</code></li>
     </ul>
 
     <h3>Python — chybějící závislosti</h3>

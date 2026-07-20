@@ -6,6 +6,7 @@ tmp git repo (so we exercise the _staged_paths git call).
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -52,6 +53,34 @@ def test_no_ticket_prefix_passes() -> None:
         msg = f"{prefix} just iterating"
         passes, _ = cta.check_message(msg, ["src/x.py"])
         assert passes, f"expected pass with prefix {prefix!r}"
+
+
+def test_cc_scoped_escape_prefixes_pass() -> None:
+    """D-79: the bare escapes are not valid Conventional Commits, so a repo
+    running a CC gate rejected every one of them — leaving a ticket-less
+    non-trivial change with no message that passed both gates, and --no-verify
+    (which skips ID safety too, silently) as the only way through."""
+    for prefix in ("chore(no-ticket):", "chore(wip):"):
+        msg = f"{prefix} tidy a comment"
+        passes, _ = cta.check_message(msg, ["src/x.py"])
+        assert passes, f"expected pass with CC-scoped escape {prefix!r}"
+
+
+def test_cc_scoped_escapes_are_valid_conventional_commits() -> None:
+    """The whole point: these must satisfy a conventional-commit gate too."""
+    cc = re.compile(
+        r"^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)"
+        r"(\([a-z0-9._-]+\))?!?: .+"
+    )
+    for prefix in ("chore(no-ticket):", "chore(wip):"):
+        assert cc.match(f"{prefix} tidy a comment"), f"{prefix!r} is not valid CC"
+
+
+def test_bare_chore_without_scope_still_blocked() -> None:
+    """`chore: x` is valid CC but says nothing about intent — it must not
+    become an accidental escape hatch."""
+    passes, _ = cta.check_message("chore: fix typo", ["src/x.py"])
+    assert not passes, "bare `chore:` must not pass as an escape"
 
 
 def test_auto_prefixes_pass() -> None:

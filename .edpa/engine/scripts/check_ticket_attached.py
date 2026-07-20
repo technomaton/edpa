@@ -16,8 +16,11 @@ Pass conditions (any one is enough):
      works. PI ids (``PI-2026`` / ``PI-2026-1``) are *not* item IDs and
      don't count (D-64).
   2. Subject starts with an explicit escape hatch:
+       ``chore(no-ticket):`` / ``chore(wip):``   ← preferred (valid CC)
        ``no-ticket:`` / ``[no-ticket]`` / ``WIP:`` / ``wip:``
      (The escape stays in the commit msg as audit trail in git log.)
+     Prefer the ``chore(...)`` forms: the bare ones are not valid Conventional
+     Commits, so a repo with a conventional-commit gate rejects them (D-79).
   3. Subject starts with an auto-generated prefix:
        ``chore(evidence):``    (local_evidence follow-up)
        ``chore(ci-materialization):``  (sync_pr_contributions follow-up)
@@ -33,7 +36,7 @@ Pass conditions (any one is enough):
 
 Fail otherwise. The user can:
   - rewrite the message with the ticket in the CC scope (``git commit --amend``)
-  - opt out explicitly with the ``no-ticket:`` prefix
+  - opt out explicitly with the ``chore(no-ticket):`` prefix
   - or, if truly orphan work, create a ticket first via /edpa:add
 
 Usage (typically called by .git/hooks/commit-msg, not by humans):
@@ -61,7 +64,19 @@ from pathlib import Path
 # any token that continues with '-digits' (PI-2026-1, CVE-2026-1234, …).
 _ITEM_REF_RE = re.compile(r"\b(?!PI-)[A-Z]{1,3}-\d{1,9}\b(?!-\d)")
 
+# Escapes come in two shapes for one reason (D-79): the bare forms are not
+# valid Conventional Commits, so a repo running a conventional-commit gate —
+# which EDPA's own work rules prescribe — rejects every one of them. That left
+# a non-trivial ticket-less change with no message passing both gates, and the
+# only way out was `git commit --no-verify`, which skips *every* hook including
+# pre-commit ID safety and leaves no trace in the message. The CC-scoped
+# variants satisfy a CC gate while keeping the escape visible and greppable in
+# `git log --oneline`, which is what the bare forms were for in the first place.
 _ESCAPE_PREFIXES = (
+    # CC-valid — preferred, and the only forms that work under a CC gate.
+    "chore(no-ticket):",
+    "chore(wip):",
+    # Bare forms — kept for back-compat; usable only where no CC gate runs.
     "no-ticket:",
     "[no-ticket]",
     "WIP:", "wip:",

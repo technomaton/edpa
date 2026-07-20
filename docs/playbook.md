@@ -444,7 +444,7 @@ Povolene prefixy: `S` (Story), `F` (Feature), `E` (Epic), `T` (Task), `D` (Defec
 | Hook | Co dela |
 |------|---------|
 | pre-commit | ID safety -- kontrola referenci |
-| commit-msg | Vyzaduje referenci itemu nebo `no-ticket:` |
+| commit-msg | Vyzaduje referenci itemu nebo `chore(no-ticket):` |
 | post-commit | Zaznamenava `commit_author` evidence |
 | pre-push | Kontrola ID kolizi vuci remote |
 
@@ -1091,7 +1091,7 @@ commit-msg: no item reference found
 
 **Reseni:**
 - Pridat referenci itemu do zpravy: `feat(S-200): ...`
-- Nebo pro commity bez ticketu pouzit prefix `no-ticket:`
+- Nebo pro commity bez ticketu pouzit prefix `chore(no-ticket):`
 
 ### Python -- chybejici zavislosti
 

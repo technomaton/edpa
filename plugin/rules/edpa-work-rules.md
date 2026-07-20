@@ -69,21 +69,26 @@ ID-collision detection (`edpa-collision-check.yml`).
    Note the assigned ID from the output, then commit referencing it.
 
 4. **If the work is genuinely out-of-scope** (typo fix in a comment,
-   doc reformat, build config bump), use the `no-ticket:` escape
+   doc reformat, build config bump), use the `chore(no-ticket):` escape
    prefix — the commit-msg hook accepts it and the reason stays in the
    commit log as audit trail:
    ```
-   git commit -m "no-ticket: fix typo in README"
+   git commit -m "chore(no-ticket): fix typo in README"
    ```
-   (Escape prefixes intentionally bypass CC scope to make opt-outs
-   visible in `git log --oneline`.)
+   The scope makes the opt-out visible in `git log --oneline` while
+   staying a valid Conventional Commit. Bare `no-ticket:` / `WIP:` are
+   still accepted for back-compat, but **only** in repos with no
+   conventional-commit gate — under such a gate they are rejected, and
+   the dead end pushes people to `--no-verify`, which skips every hook
+   including ID safety and leaves no trace in the message (D-79).
 
 ## What gets blocked (and why)
 
 The `commit-msg-ticket-attached` hook fails commits that:
 - modify non-operational code paths AND
 - have no EDPA item ID anywhere in the subject/body AND
-- don't use an escape prefix (`no-ticket:`, `WIP:`, `[no-ticket]`) AND
+- don't use an escape prefix (`chore(no-ticket):`, `chore(wip):`, or the
+  bare `no-ticket:` / `WIP:` / `[no-ticket]`) AND
 - don't use an auto-prefix (`chore(evidence):`, `chore(ci-materialization):`, `chore(contributors):`, `Merge`, `Revert`, `Initial commit`, `fixup!`, `squash!`)
 
 The CC scope (`feat(S-42):`) is the canonical way to satisfy the
@@ -128,8 +133,8 @@ local evidence pipeline (`commit_author` → `evidence[]` → `contributors[]`
 
 | Scenario | Action |
 |---|---|
-| Truly trivial change, no ticket worth opening | `no-ticket:` prefix |
-| In-progress series, will squash later | `WIP:` prefix |
+| Truly trivial change, no ticket worth opening | `chore(no-ticket):` prefix |
+| In-progress series, will squash later | `chore(wip):` prefix |
 | Hot fix, ticket coming retroactively | `git commit --no-verify` + open ticket immediately after |
 | Bulk migration, automation | Set `EDPA_NO_TICKET_CHECK=1` for the session |
 
