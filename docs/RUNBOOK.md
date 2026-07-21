@@ -296,9 +296,11 @@ event kinds together, all read from materialized `evidence[]`:
   credit per item stays ≤ 1.0 × JS. Contributors follow the D-82
   attribution chain — in-window evidence shares (`window`) → all-time
   contributors[] (`passthrough`) → transition author (`author`), recorded
-  per event in the gate_events audit. Validated against
-  `edpa-simulation-gates` harness (avg MAD 7.8%, stable to ±20% CW
-  perturbation). **Requires the transitions to be materialized** — the
+  per event in the gate_events audit. Re-validated against
+  `edpa-simulation-gates` on v2.22 (avg MAD 7.7%, worst-iter 30.5%,
+  MC spread 0.76 pp over 100 runs at ±20% perturbation —
+  `reports/RESULTS-v2.22.md`; v1 pre-fix baseline: 7.8% / 47.4%).
+  **Requires the transitions to be materialized** — the
   post-commit hook and `--materialize` write them.
 - **YAML-edit signals** — every commit on a backlog YAML in the
   iteration window contributes structural signals (create, block_add,
@@ -566,10 +568,14 @@ See [`docs/dev-collisions.md`](dev-collisions.md) for decision tree, common coll
    post-commit hook (or `--materialize`) records them as `state_transition`
    signals; a status change is only captured if it was committed with a message
    `transitions.py` recognises.
-2. **Static-contributor model**: engine uses one contributor list per parent
-   item for *every* gate of that item. Highly specialised roles that touch
-   only some gates (e.g. Architect at LBC only) get over-attributed at the
-   other gates. Per-iteration MAD outliers up to ~47 % observed in
-   `edpa-simulation-gates`. In practice teams contribute across most gates,
-   so this is rarely a problem; address by recalibrating heuristics or
-   removing such contributors from items where they are truly absent.
+2. **Per-iteration share granularity at gates (D-82)**: gate attribution
+   aggregates all of a parent's in-window evidence into one share vector
+   applied to *every* gate of that item in the iteration — a specialist who
+   touches only some gates (e.g. Architect at LBC only) is still
+   over-attributed at the others within that iteration, though far less than
+   under the pre-D-82 static-contributor model. Worst-iteration MAD ~31 %
+   observed in `edpa-simulation-gates` (was ~47 % pre-D-82), localized to
+   iterations where a person has few active items. In practice teams
+   contribute across most gates, so this is rarely a problem; per-gate
+   attribution would close the residual but is deliberately out of scope
+   (iteration granularity is the D-82 design).
