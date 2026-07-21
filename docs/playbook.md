@@ -4,8 +4,8 @@ Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allo
 
 EDPA V2 je **local-first**: zdrojem pravdy je `.edpa/backlog/**/*.md` (YAML frontmatter), git je audit trail. GitHub je **volitelny** -- zadny GitHub Project, zadne org Issue Types, zadny obousmerny sync.
 
-**Verze:** EDPA 2.21.0
-**Posledni aktualizace:** 2026-07-20
+**Verze:** EDPA 2.22.0
+**Posledni aktualizace:** 2026-07-21
 
 ---
 
@@ -207,7 +207,7 @@ project:
 
 governance:
   # Auto-razitkovano na verzi pluginu instalatorem.
-  methodology: "EDPA 2.21.0"
+  methodology: "EDPA 2.22.0"
   # Jedina vypocetni cesta od v1.14 (zadny simple/full/gates mode selector,
   # zadny audit_mode -- snapshoty vzdy nesou plny signals[] audit trail).
 
@@ -245,7 +245,7 @@ EDPA V2 je **evidence-driven**: `cw[osoba, item] = contribution_score / Σ contr
 | `pr_reviewer` | 2.17 | Odeslany PR review (mimo self) |
 | `issue_comment` | 1.46 | Komentar na issue/PR (mimo boty) |
 
-Rolove vahy prispevatelu (`--contributor PERSON:ROLE:CW`) -- owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; `evidence_threshold` 1.0. `cw_heuristics.yaml` navic obsahuje `gate_weights` pro Feature/Epic/Initiative -- status transition na rodici rozdeluje jeho Job Size napric lifecyclem (souc = 1.0 per typ).
+Rolove vahy prispevatelu (`--contributor PERSON:ROLE:CW`) -- owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; `evidence_threshold` 1.0. `cw_heuristics.yaml` navic obsahuje `gate_weights` pro Feature/Epic/Initiative -- status transition na rodici rozdeluje jeho Job Size napric lifecyclem (souc = 1.0 per typ). Gate kredit je **per-lifecycle budget** (v2.22): kazda ladder hrana kredituje max jednou -- re-crossing po QA bounci ani backward pohyb nic nedostane, forward jump secte preskocene hrany (soucet <= 1.0 x JS per item). Atribuce gate eventu preferuje evidenci z dane iterace: `window` > `passthrough` (all-time contributors[]) > `author` (cw=1.0); zvolena cesta je zaznamenana v auditu (pole `attribution`).
 
 ### 1.5 Nakonfigurovat iterace (iterations/)
 
@@ -1015,7 +1015,7 @@ Od v1.14 jedina vypocetni cesta (zadny simple/full/gates mode). Pro kazdou osobu
 3. Pro kazdou osobu: `ratio_i = score_i / sum(scores)`
 4. Odvozene hodiny: `hours_i = ratio_i x capacity`
 
-Invariant: `sum(DerivedHours) = capacity` (presne, ne priblizne). Feature/Epic/Initiative status transitions navic rozdeluji rodicovsky Job Size pres `gate_weights`.
+Invariant: `sum(DerivedHours) = capacity` (presne, ne priblizne). Feature/Epic/Initiative status transitions navic rozdeluji rodicovsky Job Size pres `gate_weights` -- jako per-lifecycle budget (hrana max 1x, backward/re-crossing 0, forward jump = preskocene hrany) s atribuci `window` > `passthrough` > `author`.
 
 ---
 
@@ -1171,6 +1171,6 @@ PR-thread signaly (`pr_reviewer`, `issue_comment`) se do `evidence[]` dostanou j
 | **yaml_edit** | Strukturalni signal z editu backlog YAMLu; nese `delta` (blocks/list-items/scalars/lines) + `raw_weight`/`discount`. Backfill/migrace a commity nad `bulk_item_threshold` (5) itemu maji discount x0.1. |
 | **MAD** | Mean Absolute Deviation -- prumerna absolutni odchylka (metrika kalibrace) |
 | **Evidence** | `evidence[]` na itemu -- **jediny zapisovany zdroj signalu** (D-26); `contributors[]`/`cw` jsou odvozene (`aggregate_signals`, preskakuje vahu 0). Zapisuje post-commit hook / `--materialize`; engine je **cisty ctenar**. |
-| **Gate** | Status transition na Feature/Epic/Initiative; rozdeluje rodicovsky JS pres `gate_weights` |
+| **Gate** | Status transition na Feature/Epic/Initiative; rozdeluje rodicovsky JS pres `gate_weights` -- per-lifecycle budget (hrana max 1x, soucet <= 1.0 x JS), atribuce `window` > `passthrough` > `author` |
 | **EDPA_NO_LOCAL_EVIDENCE** | Env vlajka -- vypina **jen** automaticky post-commit hook; `local_evidence.py --materialize` ji ignoruje (explicitni catch-up). |
 | **Ground truth** | Potvrzena realita od tymu (pro kalibraci) |

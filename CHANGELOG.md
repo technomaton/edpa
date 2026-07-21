@@ -1,5 +1,62 @@
 # Changelog
 
+## 2.22.0 — 2026-07-21
+
+Three credit-allocation fixes that change how derived hours distribute
+across items and people — the per-item Σcw = 1.0 and Σ hours = capacity
+invariants are untouched. Closed iteration snapshots are not rewritten
+retroactively, but re-running an old iteration now yields corrected
+numbers. Note: the Monte Carlo validation figures in docs (MAD 7.8 %)
+were measured against the old model and are due for re-validation.
+
+### Fixed
+
+- **Net-negative contribution scores silently voided an item's entire
+  credit (D-80).** A contributor whose signals netted negative
+  (`yaml_edit:revert` from grooming cleanup on someone else's item)
+  deflated the per-item cw denominator, pushing the legitimate
+  contributors above cw 1.0 — which `engine.extract_contributors`
+  hard-drops as out of range, silently voiding **all** credit on the
+  item with no WARN anywhere. `aggregate_signals` now clamps per-person
+  net scores at 0 before normalization; the raw negative score stays in
+  `contribution_score` for audit and the clamp warns on stderr.
+  All-negative items return None (existing warn-and-skip path). A revert
+  from the same person still reduces their own score — the clamp only
+  kicks in at the net-negative boundary, not per signal.
+  `extract_contributors` also warns when dropping out-of-range cw
+  (covers files written before the clamp and hand-written frontmatter).
+- **QA bounces double-credited gate edges — gate credit is now a
+  per-lifecycle budget (D-81).** A bounce re-crossing
+  Implementing→Validating credited 0.50 × js on **every** crossing
+  (1.64 × js total for one bounce); a reopen hit the equal-split
+  fallback (~0.143 — more than Releasing→Done); a forward jump got an
+  arbitrary 1/N instead of the bypassed edges it compressed; item
+  creation (Init→Funnel) silently earned a phantom ~0.143.
+  `load_gate_events` now replays each item's gate-edge budget over its
+  full materialized transition history: each ladder edge credits at most
+  once (first crossing), backward moves and re-crossings earn nothing,
+  forward jumps sum the bypassed edges, and off-ladder transitions earn
+  nothing with a WARN (the equal-split fallback is removed). Total gate
+  credit per item is bounded at 1.0 × js, matching the `gate_weights`
+  config contract.
+- **Gate events inherited all-time contributors — attribution now
+  prefers in-window evidence (D-82).** Gate events took the parent's
+  **all-time** `contributors[]` as their first attribution step, so a
+  contributor from an earlier iteration kept scoring at gates in
+  iterations they never worked the item — the per-iteration proportional
+  normalization then spread their capacity over ghost shares.
+  Attribution is now a chain, recorded per event in the gate_events
+  audit (`attribution` field): **(1) window** — shares recomputed from
+  the parent's in-window credit-bearing evidence (same math as D-73's
+  `_activity_contributors`; agent_contribution and neutralized signals
+  excluded), **(2) passthrough** — all-time `contributors[]` when no
+  in-window signals exist, **(3) author** — the transition author at
+  cw=1.0 (v1.17.1 fallback preserved).
+
+  Docs updated: methodology.md (gate budget + attribution chain),
+  RUNBOOK.md, `cw_heuristics.yaml.tmpl` (plugin + vendored copy),
+  playbook CZ + web playbook CZ/EN.
+
 ## 2.21.0 — 2026-07-20
 
 The commit-msg escape hatch now works in repos that enforce Conventional

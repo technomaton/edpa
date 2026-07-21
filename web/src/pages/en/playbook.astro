@@ -218,7 +218,7 @@ naming:
       </table>
     </div>
 
-    <p>Contributor role weights (<code>--contributor PERSON:ROLE:CW</code>) — owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0. <code>cw_heuristics.yaml</code> additionally carries <code>gate_weights</code> for Feature/Epic/Initiative — a status transition on the parent distributes its Job Size across the lifecycle (sum = 1.0 per type).</p>
+    <p>Contributor role weights (<code>--contributor PERSON:ROLE:CW</code>) — owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0. <code>cw_heuristics.yaml</code> additionally carries <code>gate_weights</code> for Feature/Epic/Initiative — a status transition on the parent distributes its Job Size across the lifecycle (sum = 1.0 per type). Gate credit is a <strong>per-lifecycle budget</strong> (v2.22): each ladder edge credits at most once — a re-crossing after a QA bounce or a backward move earns nothing, a forward jump sums the bypassed edges (Σ ≤ 1.0 × JS per item). Gate-event attribution prefers in-iteration evidence: <code>window</code> → <code>passthrough</code> (all-time contributors) → <code>author</code> (cw=1.0); the chosen path is recorded in the audit.</p>
 
     <h3>1.5 Configure iterations (iterations/)</h3>
     <p>PI and iterations live in <code>.edpa/iterations/</code> as separate files:</p>
@@ -882,7 +882,7 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
       <li>Per person: <code>ratio_i = score_i / Σ scores</code></li>
       <li>Derived hours: <code>hours_i = ratio_i × capacity</code></li>
     </ol>
-    <div class="note"><strong>Invariant:</strong> <code>Σ DerivedHours = capacity</code> per person (exactly, not approximately). Feature/Epic/Initiative status transitions additionally distribute the parent's Job Size via <code>gate_weights</code>.</div>
+    <div class="note"><strong>Invariant:</strong> <code>Σ DerivedHours = capacity</code> per person (exactly, not approximately). Feature/Epic/Initiative status transitions additionally distribute the parent's Job Size via <code>gate_weights</code> — as a per-lifecycle budget (edge at most once, Σ ≤ 1.0 × JS) with attribution <code>window</code> → <code>passthrough</code> → <code>author</code>.</div>
   </section>
 
   <!-- Troubleshooting -->
@@ -1009,7 +1009,7 @@ cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml</code></pre>
           <tr><td><strong>Signal</strong></td><td>Proof of contribution from git/PR (commit_author, pr_reviewer, issue_comment) with a weight</td></tr>
           <tr><td><strong>MAD</strong></td><td>Mean Absolute Deviation (calibration metric)</td></tr>
           <tr><td><strong>Evidence</strong></td><td><code>evidence[]</code> on an item — aggregated signals; <code>detect_contributors.py</code> computes <code>contributors[]</code> from them</td></tr>
-          <tr><td><strong>Gate</strong></td><td>Status transition on a Feature/Epic/Initiative; distributes the parent JS via <code>gate_weights</code></td></tr>
+          <tr><td><strong>Gate</strong></td><td>Status transition on a Feature/Epic/Initiative; distributes the parent JS via <code>gate_weights</code> — per-lifecycle budget (edge at most once, Σ ≤ 1.0 × JS), attribution <code>window</code> → <code>passthrough</code> → <code>author</code></td></tr>
           <tr><td><strong>Ground truth</strong></td><td>Team-confirmed reality (used for calibration)</td></tr>
         </tbody>
       </table>
