@@ -217,6 +217,62 @@ def test_aggregate_zero_signals_returns_none():
     assert dc.aggregate_signals([], {}) is None
 
 
+def test_aggregate_negative_score_person_clamped_to_zero(capsys):
+    """A person whose signals net NEGATIVE (e.g. only a yaml_edit:revert
+    from grooming cleanup on somebody else's item) clamps to cw 0.
+
+    Pre-fix the negative score deflated the denominator, pushing the
+    legitimate contributor above cw 1.0 — and the engine hard-drops
+    out-of-range cw (extract_contributors requires 0 <= cw <= 1), so the
+    real owner silently lost ALL credit on the item.
+    """
+    sigs = [
+        {"type": "commit_author", "ref": "commit/aaa", "login": "alice",
+         "weight": 4.0, "detected_at": "t"},
+        {"type": "yaml_edit", "ref": "commit/bbb/S-1.md", "login": "bob",
+         "weight": -0.5, "tags": ["revert(-1)"], "detected_at": "t"},
+    ]
+    result = dc.aggregate_signals(sigs, {"alice": "alice", "bob": "bob"})
+    assert result is not None
+    by_person = {c["person"]: c for c in result}
+    assert by_person["alice"]["cw"] == 1.0
+    assert by_person["bob"]["cw"] == 0.0
+    # Raw (negative) score is kept for the audit trail; only the cw share
+    # is clamped.
+    assert by_person["bob"]["contribution_score"] == -0.5
+    assert sum(c["cw"] for c in result) == pytest.approx(1.0)
+    assert "clamped to 0" in capsys.readouterr().err
+
+
+def test_aggregate_all_negative_returns_none():
+    """Every contributor net-negative → nothing creditable → warn-and-skip
+    path (None); a negative total must never leak into cw math."""
+    sigs = [
+        {"type": "yaml_edit", "ref": "commit/bbb/S-1.md", "login": "bob",
+         "weight": -0.5, "tags": ["revert(-1)"], "detected_at": "t"},
+    ]
+    assert dc.aggregate_signals(sigs, {"bob": "bob"}) is None
+
+
+def test_aggregate_revert_reduces_own_score():
+    """A revert signal from the SAME person reduces their own net score —
+    clamping kicks in only at the per-person net-negative boundary, not
+    per signal."""
+    sigs = [
+        {"type": "commit_author", "ref": "commit/aaa", "login": "alice",
+         "weight": 4.0, "detected_at": "t"},
+        {"type": "yaml_edit", "ref": "commit/aab/S-1.md", "login": "alice",
+         "weight": -0.5, "tags": ["revert(-1)"], "detected_at": "t"},
+        {"type": "commit_author", "ref": "commit/bbb", "login": "bob",
+         "weight": 4.0, "detected_at": "t"},
+    ]
+    result = dc.aggregate_signals(sigs, {"alice": "alice", "bob": "bob"})
+    by_person = {c["person"]: c for c in result}
+    assert by_person["alice"]["contribution_score"] == 3.5
+    assert by_person["alice"]["cw"] == pytest.approx(3.5 / 7.5, abs=0.001)
+    assert by_person["bob"]["cw"] == pytest.approx(4.0 / 7.5, abs=0.001)
+
+
 def test_aggregate_resolves_login_via_people_map():
     """GitHub login should be mapped to canonical person id."""
     sigs = [

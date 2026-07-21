@@ -20,8 +20,16 @@ optional excerpt (for manual:*), detected_at timestamp.
 
 Aggregation:
   contribution_score[P, item] = Σ signal_weights for person P on item
-  cw[P, item]                 = score[P, item] / Σ_persons score[*, item]
+  cw[P, item]                 = clamp(score[P, item], 0) / Σ_persons clamp(score[*, item], 0)
   → Σ_persons cw[*, item] = 1.0    (per-item invariant)
+
+  Net-negative person scores (revert-only activity, e.g. grooming cleanup
+  via yaml_edit:revert) clamp to 0 for the cw computation: a negative
+  share has no meaning in per-item normalization, and letting it through
+  both inflates the other contributors above cw 1.0 (which the engine
+  hard-drops as out of range — silently voiding their credit) and breaks
+  the Σ cw = 1.0 invariant the snapshot audit relies on. The raw score
+  stays in contribution_score for the audit trail.
 
 Modes:
   1. CI mode (env-driven, used by edpa-contributor-detect.yml):
@@ -507,7 +515,6 @@ def aggregate_signals(signals: list[dict],
 
     # Resolve every signal's login → person_id, normalising case.
     by_person: dict[str, list[dict]] = defaultdict(list)
-    total_score = 0.0
     unknown: set[str] = set()
     for sig in signals:
         # Zero-weight signals (e.g. state_transition) are analytics-only
@@ -524,7 +531,6 @@ def aggregate_signals(signals: list[dict],
         # `login` field, add resolved person id later in contributor entry.
         clean = {k: v for k, v in sig.items() if k != "login"}
         by_person[person_id].append(clean)
-        total_score += sig["weight"]
     # Surface tokens that resolved to neither a known github handle nor a
     # person id — these are credited as-is and the engine awards 0h, so a
     # silent typo would otherwise vanish without a trace.
@@ -534,19 +540,40 @@ def aggregate_signals(signals: list[dict],
               f"unless it is a real person id; typo or external contributor?).",
               file=sys.stderr)
 
-    if total_score <= 0:
-        return None
-
-    # Sort persons by contribution_score desc for deterministic YAML order.
-    contributors: list[dict] = []
+    # Per-person net scores. Negative-weight signals (yaml_edit:revert)
+    # reduce the score of the person who made them — anti-work semantics.
+    # A person whose signals net NEGATIVE overall is clamped to 0 for the
+    # cw share: without the clamp their negative score deflates the
+    # denominator, pushing the other contributors above cw 1.0 — and the
+    # engine hard-drops out-of-range cw (extract_contributors requires
+    # 0 <= cw <= 1), silently voiding the legitimate contributor's credit
+    # on the item. Clamping keeps every cw inside [0, 1] and Σ cw = 1.0.
     person_scores = [
         (pid, sum(s["weight"] for s in sigs), sigs)
         for pid, sigs in by_person.items()
     ]
+    clamped: dict[str, float] = {}
+    clamped_total = 0.0
+    for pid, raw, _sigs in person_scores:
+        if raw < 0:
+            print(
+                f"WARNING: {pid}: net contribution score {raw:.2f} is "
+                f"negative (revert-only activity?) — clamped to 0 for the "
+                f"cw share; raw score kept in contribution_score for audit.",
+                file=sys.stderr,
+            )
+        clamped[pid] = max(0.0, raw)
+        clamped_total += clamped[pid]
+
+    if clamped_total <= 0:
+        return None
+
+    # Sort persons by contribution_score desc for deterministic YAML order.
+    contributors: list[dict] = []
     person_scores.sort(key=lambda x: (-x[1], x[0]))
 
     for pid, score, sigs in person_scores:
-        cw = score / total_score
+        cw = clamped[pid] / clamped_total
         # Sort signals deterministic by (type, ref) so two detect runs on
         # identical GH state produce byte-identical YAML.
         sigs_sorted = sorted(sigs, key=lambda s: (s["type"], s["ref"]))

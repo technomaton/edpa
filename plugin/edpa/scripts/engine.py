@@ -98,6 +98,17 @@ def extract_contributors(item):
         except (TypeError, ValueError):
             continue
         if not 0 <= cw_val <= 1:
+            # Out-of-range cw used to be dropped SILENTLY — the person lost
+            # all credit on the item with no trace (reachable via net-
+            # negative revert math before the aggregate_signals clamp, or
+            # via hand-written frontmatter). Keep the drop (a share outside
+            # [0,1] is incoherent) but surface it loudly.
+            print(
+                f"WARN: {item.get('id', '?')}: contributors[] entry for "
+                f"{person!r} has cw={cw_val} outside [0,1] — entry skipped. "
+                f"Re-run detect_contributors to recompute.",
+                file=sys.stderr,
+            )
             continue
         out.append({
             "person": person,
