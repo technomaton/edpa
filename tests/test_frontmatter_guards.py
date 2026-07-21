@@ -173,3 +173,135 @@ def test_gate_event_skips_non_numeric_parent_js(edpa_root: Path, capsys) -> None
     )
     assert events == []
     assert "js must be numeric" in capsys.readouterr().err
+
+
+# ─── D-82: gate-event attribution chain (window → passthrough → author) ─────
+
+
+FEATURE_MD_WINDOWED = (
+    "---\n"
+    "id: F-1\ntype: Feature\ntitle: T\nparent: E-1\n"
+    "js: 8\nstatus: Implementing\niteration: PI-2026-1\n"
+    "contributors:\n  - person: alice\n    cw: 1\n"
+    "evidence:\n"
+    "  - type: state_transition\n"
+    "    from_status: Funnel\n"
+    "    to_status: Implementing\n"
+    "    at: \"2026-04-07T10:00:00+00:00\"\n"
+    "    person: alice\n"
+    "    ref: commit/abc1234\n"
+    "  - type: yaml_edit\n"
+    "    person: bob\n"
+    "    weight: 2.0\n"
+    "    ref: commit/def5678/F-1.md\n"
+    "    at: \"2026-04-07T11:00:00+00:00\"\n"
+    "  - type: yaml_edit\n"
+    "    person: carol\n"
+    "    weight: 1.0\n"
+    "    ref: commit/def9999/F-1.md\n"
+    "    at: \"2026-04-08T11:00:00+00:00\"\n"
+    "---\n"
+)
+
+FEATURE_MD_NO_CONTRIBUTORS = (
+    "---\n"
+    "id: F-1\ntype: Feature\ntitle: T\nparent: E-1\n"
+    "js: 8\nstatus: Implementing\niteration: PI-2026-1\n"
+    "evidence:\n"
+    "  - type: state_transition\n"
+    "    from_status: Funnel\n"
+    "    to_status: Implementing\n"
+    "    at: \"2026-04-07T10:00:00+00:00\"\n"
+    "    person: alice\n"
+    "    ref: commit/abc1234\n"
+    "---\n"
+)
+
+FEATURE_MD_ONLY_EXCLUDED_SIGNALS = (
+    "---\n"
+    "id: F-1\ntype: Feature\ntitle: T\nparent: E-1\n"
+    "js: 8\nstatus: Implementing\niteration: PI-2026-1\n"
+    "contributors:\n  - person: alice\n    cw: 1\n"
+    "evidence:\n"
+    "  - type: state_transition\n"
+    "    from_status: Funnel\n"
+    "    to_status: Implementing\n"
+    "    at: \"2026-04-07T10:00:00+00:00\"\n"
+    "    person: alice\n"
+    "    ref: commit/abc1234\n"
+    "  - type: yaml_edit\n"
+    "    person: bob\n"
+    "    weight: 2.0\n"
+    "    ref: commit/old0000/F-1.md\n"
+    "    at: \"2026-03-01T11:00:00+00:00\"\n"
+    "  - type: agent_contribution\n"
+    "    person: _claude\n"
+    "    agent: claude-test\n"
+    "    weight: 1.0\n"
+    "    ref: commit/abc1234/agent/claude-test\n"
+    "    at: \"2026-04-07T10:30:00+00:00\"\n"
+    "---\n"
+)
+
+
+def _plant_feature(edpa_root: Path, content: str) -> None:
+    (edpa_root / "iterations" / "PI-2026-1.1.yaml").write_text(
+        ITER_YAML, encoding="utf-8")
+    (edpa_root / "backlog" / "features" / "F-1.md").write_text(
+        content, encoding="utf-8")
+
+
+def test_gate_event_prefers_in_window_shares(edpa_root: Path) -> None:
+    """D-82 chain step 1: gate contributors are recomputed from the parent's
+    IN-WINDOW evidence (bob 2.0 / carol 1.0), NOT copied from the all-time
+    contributors[] (alice) — pre-D-82 alice kept scoring at gates in
+    iterations she never touched the item (cross-iteration ghost credit)."""
+    _plant_feature(edpa_root, FEATURE_MD_WINDOWED)
+    events, audit = engine.load_gate_events(
+        edpa_root, "PI-2026-1.1", GATE_HEUR,
+        people=[{"id": "alice"}, {"id": "bob"}, {"id": "carol"}],
+    )
+    assert len(events) == 1
+    by_person = {c["person"]: c for c in events[0]["contributors"]}
+    assert set(by_person) == {"bob", "carol"}
+    assert by_person["bob"]["cw"] == pytest.approx(2 / 3, abs=0.001)
+    assert by_person["carol"]["cw"] == pytest.approx(1 / 3, abs=0.001)
+    assert audit[0]["attribution"] == "window"
+
+
+def test_gate_event_passthrough_attribution_without_window_signals(
+        edpa_root: Path) -> None:
+    """D-82 chain step 2: no in-window credit signals → the all-time
+    contributors[] passthrough (pre-D-82 behavior) applies."""
+    _plant_feature(edpa_root, FEATURE_MD.format(js="8"))
+    events, audit = engine.load_gate_events(
+        edpa_root, "PI-2026-1.1", GATE_HEUR, people=PEOPLE,
+    )
+    assert [c["person"] for c in events[0]["contributors"]] == ["alice"]
+    assert audit[0]["attribution"] == "passthrough"
+
+
+def test_gate_event_author_attribution_when_no_contributors(
+        edpa_root: Path) -> None:
+    """D-82 chain step 3 (v1.17.1): no in-window signals AND no
+    contributors[] → the transition author is credited at cw=1.0."""
+    _plant_feature(edpa_root, FEATURE_MD_NO_CONTRIBUTORS)
+    events, audit = engine.load_gate_events(
+        edpa_root, "PI-2026-1.1", GATE_HEUR, people=PEOPLE,
+    )
+    assert [c["person"] for c in events[0]["contributors"]] == ["alice"]
+    assert events[0]["contributors"][0]["cw"] == 1.0
+    assert audit[0]["attribution"] == "author"
+
+
+def test_gate_event_window_ignores_out_of_window_and_agent_signals(
+        edpa_root: Path) -> None:
+    """D-82 reader exclusions: out-of-window edits don't count, and
+    agent_contribution (_claude — not a people.yaml member) never dilutes
+    human shares. Both excluded here → passthrough to alice."""
+    _plant_feature(edpa_root, FEATURE_MD_ONLY_EXCLUDED_SIGNALS)
+    events, audit = engine.load_gate_events(
+        edpa_root, "PI-2026-1.1", GATE_HEUR, people=PEOPLE,
+    )
+    assert [c["person"] for c in events[0]["contributors"]] == ["alice"]
+    assert audit[0]["attribution"] == "passthrough"

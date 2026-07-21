@@ -253,12 +253,20 @@ the person's capacity across whichever items they touched:
    `level == "Story"` filter.)
 2. **Parent gate transitions** — Feature/Epic/Initiative status
    transitions become synthetic events with effective JS =
-   `parent.JS × gate_weights[type][transition]`. D-26: the engine reads
+   `parent.JS × (credited gate weight)`. D-26: the engine reads
    these from the materialized `state_transition` signals in `evidence[]`
    (written by the post-commit hook / `/edpa:materialize`) — it no longer
-   scans git. Parent contributors inherit cw from the parent's
-   contributors[]; when the parent has none, the transition's recorded
-   author is credited at cw=1.0.
+   scans git. **D-81 (gate budget):** the `gate_weights` table is a
+   per-lifecycle budget (edges sum to 1.0 × parent.JS), replayed over the
+   item's full transition history — each ladder edge credits at most once
+   (re-crossings after a QA bounce earn nothing), backward moves earn
+   nothing, and a forward jump credits the sum of the bypassed edges.
+   **D-82 (attribution chain):** each gate event's contributors come from
+   (a) shares recomputed from the parent's *in-window* evidence
+   (`attribution: window`), else (b) the parent's all-time contributors[]
+   (`passthrough`), else (c) the transition's recorded author at cw=1.0
+   (`author`). The chosen path is recorded per event in
+   `edpa_results.json` gate_events audit.
 3. **YAML-edit signals** — every commit on a backlog YAML contributes
    structural signals (create / block_add / list_grow / scalar_change /
    lines_volume / revert). D-26: these are materialized into `evidence[]`

@@ -731,6 +731,45 @@ def _yaml_edit_from_evidence(edpa_root, start=None, end=None):
     return out
 
 
+def _gate_credit_signals_from_evidence(edpa_root, start=None, end=None):
+    """Read windowed, credit-bearing signals from parent items' evidence[]
+    for gate-event attribution (D-82).
+
+    Like _yaml_edit_from_evidence but across every signal type that
+    represents attributable work on the parent (yaml_edit, commit_author,
+    manual:*). Excluded:
+      - zero-weight signals (state_transition is analytics-only by design)
+      - out_of_iteration-tagged signals (D-62 neutralized: audit-visible,
+        non-crediting)
+      - agent_contribution (person is _claude — not a people.yaml member;
+        its share would evaporate in run_edpa and dilute the real shares)
+
+    Returns {item_id: [signal, ...]} for Feature/Epic/Initiative items.
+    """
+    edpa_root = Path(edpa_root)
+    out: dict[str, list] = {}
+    for sub in GATE_TYPE_DIRS.values():
+        dir_path = edpa_root / "backlog" / sub
+        if not dir_path.is_dir():
+            continue
+        for f in sorted(dir_path.glob("*.md")):
+            data = load_yaml(f) or {}
+            item_id = data.get("id")
+            if not item_id:
+                continue
+            for s in _read_evidence(data):
+                if not s.get("weight"):
+                    continue
+                if s.get("type") == "agent_contribution":
+                    continue
+                if "out_of_iteration" in (s.get("tags") or []):
+                    continue
+                if not _in_window(s.get("at"), start, end):
+                    continue
+                out.setdefault(item_id, []).append(s)
+    return out
+
+
 def _activity_contributors(sigs):
     """D-73: contributor shares for a story-activity event, scoped to the
     signals actually in THIS iteration's window.
@@ -956,11 +995,20 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
     iteration is never re-credited here. Per item this bounds total gate
     credit at 1.0 × parent.js, as the config contract states.
 
-    v1.17.1 fix (Finding #1): when the parent has no contributors[] (typical
-    for IP-iter strategic items seeded with title+js but no team yet), fall
-    back to crediting the transition's commit author (`changed_by`) at cw=1.0.
-    Without this fallback, IP iterations with real strategic work derive 0h
-    because gate events inherit empty contributor lists.
+    D-82: contributor attribution follows a chain, recorded per event in
+    the audit's ``attribution`` field:
+
+      1. ``window`` — shares recomputed from the parent's IN-WINDOW
+         credit-bearing evidence (yaml_edit / commit_author / manual),
+         the same math as _activity_contributors (D-73). Credits whoever
+         worked the parent in THIS iteration, not whoever touched it
+         across all time (cross-iteration ghost credit).
+      2. ``passthrough`` — the parent's all-time contributors[], when no
+         in-window credit signals exist.
+      3. ``author`` — the transition's commit author (`changed_by`) at
+         cw=1.0, when the parent has no contributors[] either (v1.17.1
+         Finding #1: IP-iter strategic items seeded with title+js but no
+         team yet would otherwise derive 0h).
 
     Stories are NOT emitted here — they continue to flow through
     load_backlog_items() with the Done filter.
@@ -997,6 +1045,8 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
     gate_weights = (heuristics or {}).get("gate_weights", {}) or {}
     ladders = {t: _build_gate_ladder(w) for t, w in gate_weights.items()}
     spent: dict[str, dict] = {}  # item_id -> {"edges": set[int], "keys": set[str]}
+    # D-82: windowed credit-bearing parent evidence for the attribution chain.
+    windowed_credit = _gate_credit_signals_from_evidence(edpa_root, start, end)
 
     events = []
     audit = []
@@ -1106,7 +1156,19 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
         effective_js = round(parent_js * weight, 6)
         synth_id = f"{t['item_id']}@{t['from_status'] or 'init'}->{t['to_status']}"
 
-        contribs = _passthrough_contributors(parent)
+        # D-82 attribution chain — credit whoever worked the parent in THIS
+        # iteration first (shares recomputed from its in-window evidence,
+        # the same math as _activity_contributors / D-73), then the all-time
+        # contributors[] passthrough, then the transition author (v1.17.1).
+        # Pre-D-82 the passthrough ran first, so a contributor from an
+        # earlier iteration kept scoring at gates long after they stopped
+        # working the item (cross-iteration misattribution).
+        contribs = _activity_contributors(
+            windowed_credit.get(t["item_id"]) or [])
+        attribution = "window"
+        if not contribs:
+            contribs = _passthrough_contributors(parent)
+            attribution = "passthrough"
         if not contribs:
             # v1.17.1 fallback: parent has no contributors[] yet → credit the
             # transition's git author. Resolves email/login via people.yaml.
@@ -1117,6 +1179,7 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
             if not resolved and "@" in changed_by:
                 resolved = resolver.get(changed_by.split("@", 1)[0])
             if resolved:
+                attribution = "author"
                 contribs = [{
                     "person": resolved,
                     "cw": 1.0,
@@ -1130,6 +1193,8 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
                         "detected_at": t.get("changed_at"),
                     }],
                 }]
+            else:
+                attribution = None
 
         events.append({
             "id": synth_id,
@@ -1147,6 +1212,11 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
             "changed_at": t["changed_at"],
             "changed_by": t["changed_by"],
             "commit_hash": t["commit_hash"],
+            # D-82: which attribution path produced the contributors —
+            # "window" (in-iteration evidence shares), "passthrough"
+            # (all-time contributors[]), "author" (transition author), or
+            # None when nobody could be credited.
+            "attribution": attribution,
         })
 
     return events, audit

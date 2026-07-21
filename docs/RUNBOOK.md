@@ -289,10 +289,17 @@ event kinds together, all read from materialized `evidence[]`:
   changes are materialized as `state_transition` signals (weight 0 —
   analytics + delivery lead-time, never scored directly); the engine
   reconstructs gate events from them with
-  `effective_js = parent.JS × gate_weights[type][transition]`.
-  Validated against `edpa-simulation-gates` harness (avg MAD 7.8%,
-  stable to ±20% CW perturbation). **Requires the transitions to be
-  materialized** — the post-commit hook and `--materialize` write them.
+  `effective_js = parent.JS × (credited gate weight)`. Gate credit is a
+  **per-lifecycle budget** (D-81): each ladder edge credits at most once
+  across the item's whole history (QA bounces / reopens earn no second
+  credit; a forward jump credits the bypassed edges' sum), so total gate
+  credit per item stays ≤ 1.0 × JS. Contributors follow the D-82
+  attribution chain — in-window evidence shares (`window`) → all-time
+  contributors[] (`passthrough`) → transition author (`author`), recorded
+  per event in the gate_events audit. Validated against
+  `edpa-simulation-gates` harness (avg MAD 7.8%, stable to ±20% CW
+  perturbation). **Requires the transitions to be materialized** — the
+  post-commit hook and `--materialize` write them.
 - **YAML-edit signals** — every commit on a backlog YAML in the
   iteration window contributes structural signals (create, block_add,
   list_grow, scalar_change, lines_volume, revert). D-26: materialized
