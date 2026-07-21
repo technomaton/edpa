@@ -48,8 +48,12 @@ signals:
 # Weights split the parent's Job Size across its lifecycle, so prep
 # work (LBC, decomposition, validation) is credited as it happens —
 # not only at terminal Done. Weights MUST sum to 1.0 per item type.
-# The gate event inherits the parent's contributors[] verbatim
-# (per-item shares are unchanged by the gate split).
+# D-81: the table is a per-lifecycle BUDGET — each edge credits at most
+# once per item (QA bounces / reopens earn no second credit; a forward
+# jump credits the bypassed edges' sum), so total gate credit per item
+# stays <= 1.0 x JS. D-82: gate contributors follow the attribution
+# chain — in-window evidence shares, else the parent's contributors[],
+# else the transition author.
 #
 # Stories stay Done-only and flow through the regular backlog scan;
 # they are never emitted as gate events.

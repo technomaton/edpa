@@ -219,7 +219,7 @@ naming:
       </table>
     </div>
 
-    <p>Rolové váhy přispěvatelů (<code>--contributor PERSON:ROLE:CW</code>) — owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0. <code>cw_heuristics.yaml</code> navíc obsahuje <code>gate_weights</code> pro Feature/Epic/Initiative — status transition na rodiči rozděluje jeho Job Size napříč lifecyclem (součet = 1.0 per typ).</p>
+    <p>Rolové váhy přispěvatelů (<code>--contributor PERSON:ROLE:CW</code>) — owner 1.0 / key 0.6 / reviewer 0.25 / consulted 0.15; <code>evidence_threshold</code> 1.0. <code>cw_heuristics.yaml</code> navíc obsahuje <code>gate_weights</code> pro Feature/Epic/Initiative — status transition na rodiči rozděluje jeho Job Size napříč lifecyclem (součet = 1.0 per typ). Gate kredit je <strong>per-lifecycle budget</strong> (v2.22): každá ladder hrana kredituje max jednou — re-crossing po QA bounci ani backward pohyb nic nedostane, forward jump sečte přeskočené hrany (Σ ≤ 1.0 × JS per item). Atribuce gate eventů preferuje evidenci z dané iterace: <code>window</code> → <code>passthrough</code> (all-time contributors) → <code>author</code> (cw=1.0); zvolená cesta je zaznamenaná v auditu.</p>
 
     <p>Kalibrace přes <code>/edpa:calibrate</code> — Monte Carlo random sampling + coordinate descent přes 3D prostor signálových vah proti syntetickému korpusu. Detail viz sekce <a href="#architektura">Architektura</a>.</p>
 
@@ -878,7 +878,7 @@ python3 .edpa/engine/scripts/reports.py PI-2026-1.1</code></pre>
       <li>Pro každou osobu: <code>ratio_i = score_i / sum(scores)</code></li>
       <li>Odvozené hodiny: <code>hours_i = ratio_i × capacity</code></li>
     </ol>
-    <div class="note"><strong>Invariant:</strong> <code>sum(DerivedHours) = capacity</code> (přesně, ne přibližně). Feature/Epic/Initiative status transitions navíc rozdělují rodičovský Job Size přes <code>gate_weights</code>.</div>
+    <div class="note"><strong>Invariant:</strong> <code>sum(DerivedHours) = capacity</code> (přesně, ne přibližně). Feature/Epic/Initiative status transitions navíc rozdělují rodičovský Job Size přes <code>gate_weights</code> — jako per-lifecycle budget (hrana max 1×, Σ ≤ 1.0 × JS) s atribucí <code>window</code> → <code>passthrough</code> → <code>author</code>.</div>
   </section>
 
   <!-- Troubleshooting -->
@@ -1004,7 +1004,7 @@ cp .edpa/engine/templates/edpa.yaml.tmpl .edpa/config/edpa.yaml</code></pre>
           <tr><td><strong>Signal</strong></td><td>Doklad příspěvku z gitu/PR (commit_author, pr_reviewer, issue_comment) s váhou</td></tr>
           <tr><td><strong>MAD</strong></td><td>Mean Absolute Deviation — průměrná absolutní odchylka (metrika kalibrace)</td></tr>
           <tr><td><strong>Evidence</strong></td><td><code>evidence[]</code> na itemu — agregované signály; <code>detect_contributors.py</code> z nich počítá <code>contributors[]</code></td></tr>
-          <tr><td><strong>Gate</strong></td><td>Status transition na Feature/Epic/Initiative; rozděluje rodičovský JS přes <code>gate_weights</code></td></tr>
+          <tr><td><strong>Gate</strong></td><td>Status transition na Feature/Epic/Initiative; rozděluje rodičovský JS přes <code>gate_weights</code> — per-lifecycle budget (hrana max 1×, Σ ≤ 1.0 × JS), atribuce <code>window</code> → <code>passthrough</code> → <code>author</code></td></tr>
           <tr><td><strong>Ground truth</strong></td><td>Potvrzená realita od týmu (pro kalibraci)</td></tr>
         </tbody>
       </table>

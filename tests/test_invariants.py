@@ -299,6 +299,27 @@ def test_extract_contributors_skips_invalid_entries():
     assert extracted[0]["person"] == "alice"
 
 
+def test_extract_contributors_warns_on_out_of_range_cw(capsys):
+    """Out-of-range cw is still dropped (a share outside [0,1] is
+    incoherent) but never silently — pre-fix this path voided a person's
+    credit with no trace (net-negative revert math could push the legit
+    contributor above cw 1.0; also reachable via hand-written frontmatter)."""
+    item = {
+        "id": "S-9",
+        "contributors": [
+            {"person": "alice", "cw": 1.14},   # out of range — dropped + WARN
+            {"person": "carol", "cw": -0.14},  # out of range — dropped + WARN
+            {"person": "bob", "cw": 0.6},      # ok
+        ],
+    }
+    extracted = extract_contributors(item)
+    assert [c["person"] for c in extracted] == ["bob"]
+    err = capsys.readouterr().err
+    assert "S-9" in err
+    assert "alice" in err and "carol" in err
+    assert "outside [0,1]" in err
+
+
 def test_extract_contributors_tolerates_legacy_as_field():
     """v1.11 engine ignores `as:` for backward read compatibility with
     fixtures from v1.10-era tests. validate_syntax.py rejects `as:`

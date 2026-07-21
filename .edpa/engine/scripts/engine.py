@@ -98,6 +98,17 @@ def extract_contributors(item):
         except (TypeError, ValueError):
             continue
         if not 0 <= cw_val <= 1:
+            # Out-of-range cw used to be dropped SILENTLY — the person lost
+            # all credit on the item with no trace (reachable via net-
+            # negative revert math before the aggregate_signals clamp, or
+            # via hand-written frontmatter). Keep the drop (a share outside
+            # [0,1] is incoherent) but surface it loudly.
+            print(
+                f"WARN: {item.get('id', '?')}: contributors[] entry for "
+                f"{person!r} has cw={cw_val} outside [0,1] — entry skipped. "
+                f"Re-run detect_contributors to recompute.",
+                file=sys.stderr,
+            )
             continue
         out.append({
             "person": person,
@@ -720,6 +731,45 @@ def _yaml_edit_from_evidence(edpa_root, start=None, end=None):
     return out
 
 
+def _gate_credit_signals_from_evidence(edpa_root, start=None, end=None):
+    """Read windowed, credit-bearing signals from parent items' evidence[]
+    for gate-event attribution (D-82).
+
+    Like _yaml_edit_from_evidence but across every signal type that
+    represents attributable work on the parent (yaml_edit, commit_author,
+    manual:*). Excluded:
+      - zero-weight signals (state_transition is analytics-only by design)
+      - out_of_iteration-tagged signals (D-62 neutralized: audit-visible,
+        non-crediting)
+      - agent_contribution (person is _claude — not a people.yaml member;
+        its share would evaporate in run_edpa and dilute the real shares)
+
+    Returns {item_id: [signal, ...]} for Feature/Epic/Initiative items.
+    """
+    edpa_root = Path(edpa_root)
+    out: dict[str, list] = {}
+    for sub in GATE_TYPE_DIRS.values():
+        dir_path = edpa_root / "backlog" / sub
+        if not dir_path.is_dir():
+            continue
+        for f in sorted(dir_path.glob("*.md")):
+            data = load_yaml(f) or {}
+            item_id = data.get("id")
+            if not item_id:
+                continue
+            for s in _read_evidence(data):
+                if not s.get("weight"):
+                    continue
+                if s.get("type") == "agent_contribution":
+                    continue
+                if "out_of_iteration" in (s.get("tags") or []):
+                    continue
+                if not _in_window(s.get("at"), start, end):
+                    continue
+                out.setdefault(item_id, []).append(s)
+    return out
+
+
 def _activity_contributors(sigs):
     """D-73: contributor shares for a story-activity event, scoped to the
     signals actually in THIS iteration's window.
@@ -876,20 +926,89 @@ def load_story_activity_events(edpa_root, iteration_id, heuristics,
     return events, audit
 
 
+def _build_gate_ladder(weights):
+    """Parse an ordered ``gate_weights`` table into a status ladder.
+
+    Returns ``(ladder, edge_weights, standalone)``:
+      - ``ladder[i] -> ladder[i+1]`` carries weight ``edge_weights[i]``
+      - ``standalone`` maps ``"A→B" -> weight`` for table entries that did
+        not fit the walked chain (credited independently, deduped per item)
+
+    The table is authored ladder-ordered (Funnel→…→Done); the walk starts
+    at the first pair and follows each ``to`` into the next ``from``.
+    """
+    pairs = []
+    for key, w in (weights or {}).items():
+        a, sep, b = str(key).partition("→")
+        if not sep:
+            a, sep, b = str(key).partition("->")
+        if not sep:
+            continue
+        pairs.append((a.strip(), b.strip(), float(w)))
+    if not pairs:
+        return [], [], {}
+    ladder = [pairs[0][0], pairs[0][1]]
+    edge_weights = [pairs[0][2]]
+    used = {0}
+    progressed = True
+    while progressed:
+        progressed = False
+        for i, (a, _b, _w) in enumerate(pairs):
+            if i not in used and a == ladder[-1]:
+                ladder.append(pairs[i][1])
+                edge_weights.append(pairs[i][2])
+                used.add(i)
+                progressed = True
+    standalone = {
+        f"{a}→{b}": w for i, (a, b, w) in enumerate(pairs) if i not in used
+    }
+    return ladder, edge_weights, standalone
+
+
 def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
     """Convert status transitions into scoring 'events' for mode=gates.
 
-    For Feature/Epic/Initiative parents, every status transition that occurred
-    within iteration_id's date window becomes an item-shaped event with
-    job_size = parent.js * gate_weights[type][transition]. Each event reuses
+    For Feature/Epic/Initiative parents, status transitions within
+    iteration_id's date window become item-shaped events with
+    job_size = parent.js × (credited gate weight). Each event reuses
     its parent's contributor list as evidence, so run_edpa() scores it with
     the same math as a Done item.
 
-    v1.17.1 fix (Finding #1): when the parent has no contributors[] (typical
-    for IP-iter strategic items seeded with title+js but no team yet), fall
-    back to crediting the transition's commit author (`changed_by`) at cw=1.0.
-    Without this fallback, IP iterations with real strategic work derive 0h
-    because gate events inherit empty contributor lists.
+    D-81: gate credit is a BUDGET, not per-transition cash. The
+    gate_weights table splits parent.js across the status ladder (weights
+    sum to 1.0 by config contract — test_template_gate_weights_sum_to_one):
+
+      * each ladder edge is credited AT MOST ONCE per item, the first time
+        any recorded transition crosses it — a QA bounce that re-crosses
+        Implementing→Validating earns no second 0.50 × js;
+      * backward moves (reopens, e.g. Validating→Implementing) earn
+        nothing — the rework they represent is credited through the
+        Story / commit_author / yaml_edit channels;
+      * a forward JUMP over skipped statuses credits the sum of the
+        bypassed edges (the work happened, compressed);
+      * transitions whose statuses don't resolve on the ladder earn
+        nothing (WARN) — the pre-D-81 equal-split fallback credited an
+        arbitrary 1/N of parent.js, which could out-weight real gates.
+
+    The budget replays over ALL materialized transitions chronologically
+    (not just this iteration's window), so an edge credited in an earlier
+    iteration is never re-credited here. Per item this bounds total gate
+    credit at 1.0 × parent.js, as the config contract states.
+
+    D-82: contributor attribution follows a chain, recorded per event in
+    the audit's ``attribution`` field:
+
+      1. ``window`` — shares recomputed from the parent's IN-WINDOW
+         credit-bearing evidence (yaml_edit / commit_author / manual),
+         the same math as _activity_contributors (D-73). Credits whoever
+         worked the parent in THIS iteration, not whoever touched it
+         across all time (cross-iteration ghost credit).
+      2. ``passthrough`` — the parent's all-time contributors[], when no
+         in-window credit signals exist.
+      3. ``author`` — the transition's commit author (`changed_by`) at
+         cw=1.0, when the parent has no contributors[] either (v1.17.1
+         Finding #1: IP-iter strategic items seeded with title+js but no
+         team yet would otherwise derive 0h).
 
     Stories are NOT emitted here — they continue to flow through
     load_backlog_items() with the Done filter.
@@ -918,12 +1037,20 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
     # D-26: read materialized state_transition signals from evidence[] — the
     # engine is a pure reader and no longer scans git (detect_transitions). The
     # post-commit hook / `--materialize` persist transitions; we read the snapshot.
-    transitions = _transitions_from_evidence(edpa_root, start, end)
+    # D-81: UNWINDOWED read — the full chronological history is needed to
+    # replay each item's gate-edge budget (edges credited in earlier
+    # iterations must stay spent); in-window filtering happens per transition
+    # below via _in_window.
+    all_transitions = _transitions_from_evidence(edpa_root)
     gate_weights = (heuristics or {}).get("gate_weights", {}) or {}
+    ladders = {t: _build_gate_ladder(w) for t, w in gate_weights.items()}
+    spent: dict[str, dict] = {}  # item_id -> {"edges": set[int], "keys": set[str]}
+    # D-82: windowed credit-bearing parent evidence for the attribution chain.
+    windowed_credit = _gate_credit_signals_from_evidence(edpa_root, start, end)
 
     events = []
     audit = []
-    for t in transitions:
+    for t in all_transitions:
         item_type = t["item_type"]
         # Stories are surfaced by transitions.py for audit/debug visibility,
         # but engine gates mode credits stories only at status=Done (handled
@@ -931,17 +1058,80 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
         # don't double-count.
         if item_type == "Story":
             continue
-        weights = gate_weights.get(item_type, {}) or {}
-        gate_key = f"{t['from_status']}→{t['to_status']}"
-        weight = weights.get(gate_key)
-        if weight is None and weights:
-            weight = round(1.0 / len(weights), 4)
-            print(
-                f"WARN: no gate_weight for {item_type} '{gate_key}', "
-                f"using equal-split fallback {weight}",
-                file=sys.stderr,
-            )
-        if not weight or weight <= 0:
+        if item_type not in ladders:
+            continue
+        ladder, edge_weights, standalone = ladders[item_type]
+        if not ladder:
+            continue
+        pos = {s: i for i, s in enumerate(ladder)}
+        frm, to = t.get("from_status"), t.get("to_status")
+        if not frm:
+            # Creation (init → first status): analytics-only. The authoring
+            # work is already credited by the item's yaml_edit:create signal.
+            continue
+        gate_key = f"{frm}→{to}"
+        item_spent = spent.setdefault(t["item_id"], {"edges": set(), "keys": set()})
+        in_window = _in_window(t.get("changed_at"), start, end)
+
+        # Classify the transition against the ladder.
+        crossed: list[int] = []   # ladder edge indices this transition crosses
+        stand_key = None          # standalone (off-chain) edge key
+        backward = False
+        if frm in pos and to in pos:
+            if pos[to] > pos[frm]:
+                crossed = list(range(pos[frm], pos[to]))
+            else:
+                backward = True     # reopen / self-move: no lifecycle progress
+        elif gate_key in standalone:
+            stand_key = gate_key
+
+        if backward or (not crossed and stand_key is None):
+            if in_window:
+                if backward:
+                    print(
+                        f"note: {t['item_id']} '{gate_key}' moves backward on "
+                        f"the {item_type} ladder - no gate credit "
+                        f"(reopen; rework credited via Story/commit/yaml_edit)",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"WARN: {t['item_id']}: no gate_weight for {item_type} "
+                        f"'{gate_key}' and it does not resolve on the status "
+                        f"ladder - no credit. Add an explicit edge to "
+                        f"gate_weights to credit it.",
+                        file=sys.stderr,
+                    )
+            continue
+
+        # Spend budget (always, even out-of-window — replay) and compute the
+        # freshly credited weight (in-window, unspent edges only).
+        weight = 0.0
+        if crossed:
+            fresh = [i for i in crossed if i not in item_spent["edges"]]
+            item_spent["edges"].update(crossed)
+            if in_window:
+                if fresh:
+                    weight = round(sum(edge_weights[i] for i in fresh), 6)
+                else:
+                    print(
+                        f"note: {t['item_id']} '{gate_key}' already credited by "
+                        f"an earlier crossing - no double credit",
+                        file=sys.stderr,
+                    )
+        else:
+            fresh_key = stand_key not in item_spent["keys"]
+            item_spent["keys"].add(stand_key)
+            if in_window:
+                if fresh_key:
+                    weight = standalone[stand_key]
+                else:
+                    print(
+                        f"note: {t['item_id']} '{gate_key}' already credited by "
+                        f"an earlier crossing - no double credit",
+                        file=sys.stderr,
+                    )
+        if not in_window or weight <= 0:
             continue
 
         sub = GATE_TYPE_DIRS.get(item_type)
@@ -966,7 +1156,19 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
         effective_js = round(parent_js * weight, 6)
         synth_id = f"{t['item_id']}@{t['from_status'] or 'init'}->{t['to_status']}"
 
-        contribs = _passthrough_contributors(parent)
+        # D-82 attribution chain — credit whoever worked the parent in THIS
+        # iteration first (shares recomputed from its in-window evidence,
+        # the same math as _activity_contributors / D-73), then the all-time
+        # contributors[] passthrough, then the transition author (v1.17.1).
+        # Pre-D-82 the passthrough ran first, so a contributor from an
+        # earlier iteration kept scoring at gates long after they stopped
+        # working the item (cross-iteration misattribution).
+        contribs = _activity_contributors(
+            windowed_credit.get(t["item_id"]) or [])
+        attribution = "window"
+        if not contribs:
+            contribs = _passthrough_contributors(parent)
+            attribution = "passthrough"
         if not contribs:
             # v1.17.1 fallback: parent has no contributors[] yet → credit the
             # transition's git author. Resolves email/login via people.yaml.
@@ -977,6 +1179,7 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
             if not resolved and "@" in changed_by:
                 resolved = resolver.get(changed_by.split("@", 1)[0])
             if resolved:
+                attribution = "author"
                 contribs = [{
                     "person": resolved,
                     "cw": 1.0,
@@ -990,6 +1193,8 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
                         "detected_at": t.get("changed_at"),
                     }],
                 }]
+            else:
+                attribution = None
 
         events.append({
             "id": synth_id,
@@ -1007,6 +1212,11 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
             "changed_at": t["changed_at"],
             "changed_by": t["changed_by"],
             "commit_hash": t["commit_hash"],
+            # D-82: which attribution path produced the contributors —
+            # "window" (in-iteration evidence shares), "passthrough"
+            # (all-time contributors[]), "author" (transition author), or
+            # None when nobody could be credited.
+            "attribution": attribution,
         })
 
     return events, audit

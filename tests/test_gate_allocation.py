@@ -300,7 +300,9 @@ def test_template_gate_weights_sum_to_one():
 # engine integration (v1.14: single-mode — gates is the only path)
 # ---------------------------------------------------------------------------
 
-def _run_engine(repo, edpa, iteration="PI-2026-1.1"):
+def _run_engine_full(repo, edpa, iteration="PI-2026-1.1"):
+    """Materialize evidence + run the engine; return (results, process) so
+    tests can also assert on stderr (WARN / note lines)."""
     # D-26: the engine is a pure reader of evidence[]. Materialize git
     # transitions into evidence[] first (exactly as close-iteration would),
     # so the engine has state_transition signals to build gate events from.
@@ -323,7 +325,12 @@ def _run_engine(repo, edpa, iteration="PI-2026-1.1"):
         cwd=repo, capture_output=True, text=True, encoding="utf-8",
     )
     assert r.returncode == 0, r.stderr
-    return json.loads(out.read_text())
+    return json.loads(out.read_text()), r
+
+
+def _run_engine(repo, edpa, iteration="PI-2026-1.1"):
+    result, _proc = _run_engine_full(repo, edpa, iteration)
+    return result
 
 
 def test_engine_produces_gate_events(tmp_path):
@@ -378,6 +385,10 @@ def test_no_transitions_degenerates_to_done_credit(tmp_path):
 
 
 def test_status_revert_does_not_subtract(tmp_path):
+    """A backward move earns nothing and never SUBTRACTS: the first crossing
+    keeps its credit. The re-crossing after the revert earns no second credit
+    (D-81 edge budget) — pre-D-81 both forward crossings were credited (2 ×
+    0.10), inflating the item's gate total beyond the ladder budget."""
     repo, edpa = _make_repo(tmp_path)
     _change_status(repo, edpa, "backlog/features/F-1.md", "Analyzing",
                    "2026-04-08T12:00:00")
@@ -388,8 +399,72 @@ def test_status_revert_does_not_subtract(tmp_path):
     result = _run_engine(repo, edpa)
     forward = [e for e in result["gate_events"]
                if e["parent_id"] == "F-1" and e["transition"] == "Funnel→Analyzing"]
-    assert len(forward) == 2  # both forward transitions credited
+    assert len(forward) == 1  # first crossing credited; re-crossing deduped
+    assert forward[0]["weight"] == pytest.approx(0.10)
     assert result["all_invariants_passed"]
+
+
+def test_gate_bounce_credits_each_edge_once(tmp_path):
+    """D-81 core scenario: QA bounce. Validating→Implementing earns nothing
+    (backward), the re-crossed Implementing→Validating earns nothing (edge
+    already spent). Total gate credit stays within the ladder budget
+    (0.10+0.05+0.05+0.50 = 0.70 of 1.0) instead of reaching 1.34."""
+    repo, edpa = _make_repo(tmp_path)
+    f = "backlog/features/F-1.md"
+    _change_status(repo, edpa, f, "Analyzing", "2026-04-07T12:00:00")
+    _change_status(repo, edpa, f, "Backlog", "2026-04-08T12:00:00")
+    _change_status(repo, edpa, f, "Implementing", "2026-04-09T12:00:00")
+    _change_status(repo, edpa, f, "Validating", "2026-04-10T12:00:00")
+    _change_status(repo, edpa, f, "Implementing", "2026-04-11T12:00:00")  # QA reject
+    _change_status(repo, edpa, f, "Validating", "2026-04-12T12:00:00")    # re-submit
+    result, proc = _run_engine_full(repo, edpa)
+    ev = [e for e in result["gate_events"] if e["parent_id"] == "F-1"]
+    total_w = sum(e["weight"] for e in ev)
+    assert total_w == pytest.approx(0.10 + 0.05 + 0.05 + 0.50)
+    impl_val = [e for e in ev if e["transition"] == "Implementing→Validating"]
+    assert len(impl_val) == 1
+    assert "moves backward" in proc.stderr
+    assert "already credited" in proc.stderr
+
+
+def test_forward_jump_sums_bypassed_edges(tmp_path):
+    """D-81: Funnel→Backlog in one step credits the bypassed edges
+    (0.10 + 0.05) — the work happened, compressed. Pre-D-81 the jump hit
+    the equal-split fallback with an arbitrary 1/7 ≈ 0.143."""
+    repo, edpa = _make_repo(tmp_path)
+    _change_status(repo, edpa, "backlog/features/F-1.md", "Backlog",
+                   "2026-04-08T12:00:00")
+    result = _run_engine(repo, edpa)
+    ev = [e for e in result["gate_events"] if e["parent_id"] == "F-1"]
+    assert len(ev) == 1
+    assert ev[0]["transition"] == "Funnel→Backlog"
+    assert ev[0]["weight"] == pytest.approx(0.15)
+
+
+def test_gate_budget_replays_across_iterations(tmp_path):
+    """D-81: an edge credited in iteration 1 stays spent in iteration 2 —
+    a bounce + re-crossing in a LATER iteration earns nothing. The budget
+    replays over the full materialized history, not just the window."""
+    repo, edpa = _make_repo(tmp_path)
+    (edpa / "iterations" / "PI-2026-1.2.yaml").write_text(
+        "iteration:\n"
+        "  id: PI-2026-1.2\n  pi: PI-2026-1\n  status: closed\n"
+        "  start_date: 2026-04-20\n  end_date: 2026-05-01\n  weeks: 2\n"
+    )
+    f = "backlog/features/F-1.md"
+    # iter 1: Funnel→Analyzing→Backlog — credited in iteration 1
+    _change_status(repo, edpa, f, "Analyzing", "2026-04-08T12:00:00")
+    _change_status(repo, edpa, f, "Backlog", "2026-04-10T12:00:00")
+    r1 = _run_engine(repo, edpa, "PI-2026-1.1")
+    w1 = sum(e["weight"] for e in r1["gate_events"] if e["parent_id"] == "F-1")
+    assert w1 == pytest.approx(0.15)
+
+    # iter 2: bounce back and re-cross — no NEW credit
+    _change_status(repo, edpa, f, "Analyzing", "2026-04-22T12:00:00")
+    _change_status(repo, edpa, f, "Backlog", "2026-04-24T12:00:00")
+    r2 = _run_engine(repo, edpa, "PI-2026-1.2")
+    credited = [e for e in r2["gate_events"] if e["parent_id"] == "F-1"]
+    assert credited == []
 
 
 def test_demo_runs_without_mode_arg(tmp_path):
@@ -402,12 +477,15 @@ def test_demo_runs_without_mode_arg(tmp_path):
     assert r.returncode == 0, r.stderr
 
 
-def test_unknown_gate_uses_equal_split_fallback(tmp_path):
+def test_unknown_gate_earns_no_credit_and_warns(tmp_path):
+    """D-81: a transition that does not resolve on the status ladder earns
+    NOTHING (WARN) — the pre-D-81 equal-split fallback credited an arbitrary
+    1/N of parent.js (≈0.143 for Features — more than Releasing→Done)."""
     repo, edpa = _make_repo(tmp_path)
     _change_status(repo, edpa, "backlog/features/F-1.md", "WeirdStatus",
                    "2026-04-08T12:00:00")
-    result = _run_engine(repo, edpa)
+    result, proc = _run_engine_full(repo, edpa)
     weird = [e for e in result["gate_events"]
              if e["parent_id"] == "F-1" and "WeirdStatus" in e["transition"]]
-    assert len(weird) == 1
-    assert 0 < weird[0]["weight"] < 1
+    assert weird == []
+    assert "no gate_weight" in proc.stderr
