@@ -887,14 +887,74 @@ def load_story_activity_events(edpa_root, iteration_id, heuristics,
     return events, audit
 
 
+def _build_gate_ladder(weights):
+    """Parse an ordered ``gate_weights`` table into a status ladder.
+
+    Returns ``(ladder, edge_weights, standalone)``:
+      - ``ladder[i] -> ladder[i+1]`` carries weight ``edge_weights[i]``
+      - ``standalone`` maps ``"A→B" -> weight`` for table entries that did
+        not fit the walked chain (credited independently, deduped per item)
+
+    The table is authored ladder-ordered (Funnel→…→Done); the walk starts
+    at the first pair and follows each ``to`` into the next ``from``.
+    """
+    pairs = []
+    for key, w in (weights or {}).items():
+        a, sep, b = str(key).partition("→")
+        if not sep:
+            a, sep, b = str(key).partition("->")
+        if not sep:
+            continue
+        pairs.append((a.strip(), b.strip(), float(w)))
+    if not pairs:
+        return [], [], {}
+    ladder = [pairs[0][0], pairs[0][1]]
+    edge_weights = [pairs[0][2]]
+    used = {0}
+    progressed = True
+    while progressed:
+        progressed = False
+        for i, (a, _b, _w) in enumerate(pairs):
+            if i not in used and a == ladder[-1]:
+                ladder.append(pairs[i][1])
+                edge_weights.append(pairs[i][2])
+                used.add(i)
+                progressed = True
+    standalone = {
+        f"{a}→{b}": w for i, (a, b, w) in enumerate(pairs) if i not in used
+    }
+    return ladder, edge_weights, standalone
+
+
 def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
     """Convert status transitions into scoring 'events' for mode=gates.
 
-    For Feature/Epic/Initiative parents, every status transition that occurred
-    within iteration_id's date window becomes an item-shaped event with
-    job_size = parent.js * gate_weights[type][transition]. Each event reuses
+    For Feature/Epic/Initiative parents, status transitions within
+    iteration_id's date window become item-shaped events with
+    job_size = parent.js × (credited gate weight). Each event reuses
     its parent's contributor list as evidence, so run_edpa() scores it with
     the same math as a Done item.
+
+    D-81: gate credit is a BUDGET, not per-transition cash. The
+    gate_weights table splits parent.js across the status ladder (weights
+    sum to 1.0 by config contract — test_template_gate_weights_sum_to_one):
+
+      * each ladder edge is credited AT MOST ONCE per item, the first time
+        any recorded transition crosses it — a QA bounce that re-crosses
+        Implementing→Validating earns no second 0.50 × js;
+      * backward moves (reopens, e.g. Validating→Implementing) earn
+        nothing — the rework they represent is credited through the
+        Story / commit_author / yaml_edit channels;
+      * a forward JUMP over skipped statuses credits the sum of the
+        bypassed edges (the work happened, compressed);
+      * transitions whose statuses don't resolve on the ladder earn
+        nothing (WARN) — the pre-D-81 equal-split fallback credited an
+        arbitrary 1/N of parent.js, which could out-weight real gates.
+
+    The budget replays over ALL materialized transitions chronologically
+    (not just this iteration's window), so an edge credited in an earlier
+    iteration is never re-credited here. Per item this bounds total gate
+    credit at 1.0 × parent.js, as the config contract states.
 
     v1.17.1 fix (Finding #1): when the parent has no contributors[] (typical
     for IP-iter strategic items seeded with title+js but no team yet), fall
@@ -929,12 +989,18 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
     # D-26: read materialized state_transition signals from evidence[] — the
     # engine is a pure reader and no longer scans git (detect_transitions). The
     # post-commit hook / `--materialize` persist transitions; we read the snapshot.
-    transitions = _transitions_from_evidence(edpa_root, start, end)
+    # D-81: UNWINDOWED read — the full chronological history is needed to
+    # replay each item's gate-edge budget (edges credited in earlier
+    # iterations must stay spent); in-window filtering happens per transition
+    # below via _in_window.
+    all_transitions = _transitions_from_evidence(edpa_root)
     gate_weights = (heuristics or {}).get("gate_weights", {}) or {}
+    ladders = {t: _build_gate_ladder(w) for t, w in gate_weights.items()}
+    spent: dict[str, dict] = {}  # item_id -> {"edges": set[int], "keys": set[str]}
 
     events = []
     audit = []
-    for t in transitions:
+    for t in all_transitions:
         item_type = t["item_type"]
         # Stories are surfaced by transitions.py for audit/debug visibility,
         # but engine gates mode credits stories only at status=Done (handled
@@ -942,17 +1008,80 @@ def load_gate_events(edpa_root, iteration_id, heuristics, people=None):
         # don't double-count.
         if item_type == "Story":
             continue
-        weights = gate_weights.get(item_type, {}) or {}
-        gate_key = f"{t['from_status']}→{t['to_status']}"
-        weight = weights.get(gate_key)
-        if weight is None and weights:
-            weight = round(1.0 / len(weights), 4)
-            print(
-                f"WARN: no gate_weight for {item_type} '{gate_key}', "
-                f"using equal-split fallback {weight}",
-                file=sys.stderr,
-            )
-        if not weight or weight <= 0:
+        if item_type not in ladders:
+            continue
+        ladder, edge_weights, standalone = ladders[item_type]
+        if not ladder:
+            continue
+        pos = {s: i for i, s in enumerate(ladder)}
+        frm, to = t.get("from_status"), t.get("to_status")
+        if not frm:
+            # Creation (init → first status): analytics-only. The authoring
+            # work is already credited by the item's yaml_edit:create signal.
+            continue
+        gate_key = f"{frm}→{to}"
+        item_spent = spent.setdefault(t["item_id"], {"edges": set(), "keys": set()})
+        in_window = _in_window(t.get("changed_at"), start, end)
+
+        # Classify the transition against the ladder.
+        crossed: list[int] = []   # ladder edge indices this transition crosses
+        stand_key = None          # standalone (off-chain) edge key
+        backward = False
+        if frm in pos and to in pos:
+            if pos[to] > pos[frm]:
+                crossed = list(range(pos[frm], pos[to]))
+            else:
+                backward = True     # reopen / self-move: no lifecycle progress
+        elif gate_key in standalone:
+            stand_key = gate_key
+
+        if backward or (not crossed and stand_key is None):
+            if in_window:
+                if backward:
+                    print(
+                        f"note: {t['item_id']} '{gate_key}' moves backward on "
+                        f"the {item_type} ladder - no gate credit "
+                        f"(reopen; rework credited via Story/commit/yaml_edit)",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"WARN: {t['item_id']}: no gate_weight for {item_type} "
+                        f"'{gate_key}' and it does not resolve on the status "
+                        f"ladder - no credit. Add an explicit edge to "
+                        f"gate_weights to credit it.",
+                        file=sys.stderr,
+                    )
+            continue
+
+        # Spend budget (always, even out-of-window — replay) and compute the
+        # freshly credited weight (in-window, unspent edges only).
+        weight = 0.0
+        if crossed:
+            fresh = [i for i in crossed if i not in item_spent["edges"]]
+            item_spent["edges"].update(crossed)
+            if in_window:
+                if fresh:
+                    weight = round(sum(edge_weights[i] for i in fresh), 6)
+                else:
+                    print(
+                        f"note: {t['item_id']} '{gate_key}' already credited by "
+                        f"an earlier crossing - no double credit",
+                        file=sys.stderr,
+                    )
+        else:
+            fresh_key = stand_key not in item_spent["keys"]
+            item_spent["keys"].add(stand_key)
+            if in_window:
+                if fresh_key:
+                    weight = standalone[stand_key]
+                else:
+                    print(
+                        f"note: {t['item_id']} '{gate_key}' already credited by "
+                        f"an earlier crossing - no double credit",
+                        file=sys.stderr,
+                    )
+        if not in_window or weight <= 0:
             continue
 
         sub = GATE_TYPE_DIRS.get(item_type)
