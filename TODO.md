@@ -38,22 +38,7 @@ hypothetical demand.
 Irrelevant for stdio (single client). If MCP is ever exposed over HTTP/SSE,
 add a per-client request budget before exposure, not after.
 
-### `tests/test_mcp_server.py` — resource-listing tests
+### (moved to backlog 2026-07-22)
 
-`list_resources` enumerates `edpa://config`, `edpa://people`, and one entry
-per closed iteration's `edpa_results.json`. Only `read_resource` is tested
-today; add tests that `list_resources` returns the right URIs on a fresh
-fixture and picks up a newly closed iteration.
-
-### Document `EDPA_ROOT` env var in install.sh output
-
-The printed "Next steps" after install doesn't mention `EDPA_ROOT`. Useful
-when hacking on the EDPA repo itself (MCP client should read the demo
-`.edpa/`) or when a project keeps `.edpa/` in a non-standard location.
-
-### install.sh root ↔ web/public sync automation
-
-`tests/test_install_sh_hygiene.py` guards byte-equality between
-`./install.sh` and `web/public/install.sh`, so drift fails CI — but the sync
-itself is manual. Candidate: a build step in `web/` that copies the root file
-into `public/` on every deploy (symlinks need Vercel verification).
+`list_resources` tests → S-259, `EDPA_ROOT` in install.sh output → S-260,
+install.sh ↔ web/public sync automation → S-261.
