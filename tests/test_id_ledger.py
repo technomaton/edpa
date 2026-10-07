@@ -132,6 +132,21 @@ def test_lost_acknowledgement_does_not_burn_a_second_number(
     assert take(alice) == 12
 
 
+def test_push_that_times_out_after_landing_is_still_ours(
+        ledger_ready: World, alice: Path, monkeypatch) -> None:
+    """Same, but the transport gives up with an exception (git timeout)."""
+    real_push = ledger._push
+
+    def timing_out_push(repo, remote, ref, new, expect):
+        real_push(repo, remote, ref, new, expect)
+        raise ledger.LedgerUnavailable("git push did not finish within 20s")
+
+    monkeypatch.setattr(ledger, "_push", timing_out_push)
+    res = ledger.reserve(alice, "Story", "S")
+    assert res.numbers == [11] and res.attempts == 1
+    assert ledger_ready.counters()["counters"]["Story"] == 11
+
+
 def test_identical_commit_is_not_a_second_win(
         ledger_ready: World, alice: Path) -> None:
     """Two worktrees of one person can build the same commit; git answers

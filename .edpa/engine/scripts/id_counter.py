@@ -884,15 +884,19 @@ def init_remote(root: Path | str, *, headroom: int = 20, fetch: bool = True,
     namespaces: tuple[str, ...] = ("refs/heads", "refs/remotes")
     fetched = False
     if fetch:
-        r = subprocess.run(
-            ["git", "fetch", "--quiet", "--no-tags", remote,
-             f"+refs/heads/*:{scan_ns}/*"], cwd=str(root), capture_output=True,
-            text=True, encoding="utf-8", stdin=subprocess.DEVNULL, check=False)
-        if r.returncode != 0:
+        try:
+            r = subprocess.run(
+                ["git", "fetch", "--quiet", "--no-tags", remote,
+                 f"+refs/heads/*:{scan_ns}/*"], cwd=str(root),
+                capture_output=True, text=True, encoding="utf-8",
+                stdin=subprocess.DEVNULL, check=False, timeout=600)
+            failure = None if r.returncode == 0 else (r.stderr or "").strip()
+        except subprocess.TimeoutExpired:
+            failure = "git fetch did not finish within 10 minutes"
+        if failure is not None:
             raise IdCounterError(
                 f"cannot fetch the branches of {remote!r} — the floor would be "
-                f"a guess. Fix the connection or pass --no-fetch.\n"
-                f"{(r.stderr or '').strip()}")
+                f"a guess. Fix the connection or pass --no-fetch.\n{failure}")
         fetched = True
         namespaces += (scan_ns,)
     try:

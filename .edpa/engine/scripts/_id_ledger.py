@@ -323,7 +323,8 @@ def _observe(repo: Path | str, remote: str, ref: str,
         if r.returncode == 0:
             sha = _rev(repo, tmp)
             if sha is None:
-                raise _Transient(f"fetched {ref} but cannot resolve it")
+                raise LedgerUnavailable(
+                    f"fetched {ref} from {remote!r} but cannot resolve it")
             return sha
     finally:
         _git(repo, "update-ref", "-d", tmp, check=False)
@@ -481,13 +482,19 @@ def _transact(repo: Path | str, remote: str, ref: str, mutate, *,
             observed = _observe(repo, remote, ref)
             continue
 
-        flag, output = _push(repo, remote, ref, new, observed)
+        try:
+            flag, output = _push(repo, remote, ref, new, observed)
+        except LedgerUnavailable as e:      # timed out — it may have landed
+            flag, output = "", str(e)
         if flag not in (" ", "*"):
             # Lost race, refusal, or an ambiguous outcome (a timeout after
             # the server applied it) — ask the remote which one it was.
             latest = _observe(repo, remote, ref)
-            ours = latest is not None and (
-                latest == new or _is_ancestor(repo, new, latest))
+            try:
+                ours = latest is not None and (
+                    latest == new or _is_ancestor(repo, new, latest))
+            except _Transient:
+                ours = False                # cannot tell: reserve afresh
             if not ours:
                 if latest != observed:
                     observed = latest                      # lost the race
