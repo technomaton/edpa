@@ -240,6 +240,7 @@ _STATE_LOCK_NAME = "id.lock"          # guards the high-water mark file
 _HWM_NAME = "id_hwm.yaml"             # same layout as id_counters.yaml
 _TURNSTILE_NAME = "id-net.lock"       # advisory, held across the network
 _TURNSTILE_WAIT_SEC = 45
+_POOL_NAME = "id_pool.yaml"           # numbers reserved ahead for offline use
 
 AUTHORITY_ENV = "EDPA_ID_AUTHORITY"
 DEFAULT_LEDGER_REMOTE = "origin"
@@ -466,6 +467,52 @@ def _bump_hwm(state: Path, item_type: str, value: int) -> None:
         _write_counter_atomic(path, item_type, value)
 
 
+# ─── Pre-reserved numbers (offline use) ─────────────────────────────────────
+# Reserve-then-use can never diverge from the ledger; use-then-reserve is
+# exactly how V1's --local fallback produced two ID series. So the only
+# offline path is a block reserved while online and consumed later.
+
+def _read_pool(state: Path) -> dict[str, list[int]]:
+    try:
+        data = yaml.safe_load((state / _POOL_NAME).read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
+    pool = data.get("pool") if isinstance(data, dict) else None
+    if not isinstance(pool, dict):
+        return {}
+    return {str(k): sorted(int(n) for n in v if isinstance(n, int))
+            for k, v in pool.items() if isinstance(v, list)}
+
+
+def _write_pool(state: Path, pool: dict[str, list[int]]) -> None:
+    path = state / _POOL_NAME
+    fd, tmp_path = tempfile.mkstemp(suffix=".yaml", prefix=".id_pool_",
+                                    dir=str(state))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            yaml.safe_dump({"pool": {k: v for k, v in sorted(pool.items()) if v}},
+                           f, sort_keys=True, default_flow_style=False)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _pool_take(state: Path, item_type: str) -> int | None:
+    with _state_lock(state):
+        pool = _read_pool(state)
+        numbers = pool.get(item_type) or []
+        if not numbers:
+            return None
+        number = numbers.pop(0)
+        pool[item_type] = numbers
+        _write_pool(state, pool)
+        return number
+
+
 # ─── Allocation authority ───────────────────────────────────────────────────
 
 @dataclass(frozen=True)
@@ -603,7 +650,9 @@ def _remote_failure(ledger, exc: Exception, auth: Authority) -> IdCounterError:
     elif isinstance(exc, ledger.LedgerUnavailable):
         text = (f"cannot reach the ID ledger ({where}). A ticket ID is only "
                 f"reserved online — no ID was assigned and nothing was "
-                f"written. Check the connection / git credentials and retry."
+                f"written. Check the connection / git credentials and retry "
+                f"(to work offline, reserve a block beforehand: "
+                f"id_counter.py reserve --type <Type> --count N)."
                 f"\n{exc}")
     elif isinstance(exc, ledger.LedgerRejected):
         text = (f"the remote does not let this environment update the ID "
@@ -641,6 +690,17 @@ def _next_id_remote(item_type: str, root: Path, auth: Authority,
                 title=meta.get("title"), parent=meta.get("parent"),
                 branch=branch or None, created_at=meta.get("created_at"),
             )
+    except ledger.LedgerUnavailable as e:
+        number = _pool_take(state, item_type)
+        if number is None:
+            raise _remote_failure(ledger, e, auth) from e
+        left = len(_read_pool(state).get(item_type) or [])
+        print(f"id_counter: remote unreachable — using pre-reserved "
+              f"{prefix}-{number} ({left} left for {item_type})", file=sys.stderr)
+        with _state_lock(state):
+            _bump_hwm(state, item_type, number)
+        _mirror_legacy(root, item_type, number)
+        return f"{prefix}-{number}"
     except ledger.LedgerError as e:
         raise _remote_failure(ledger, e, auth) from e
     number = res.numbers[0]
@@ -711,3 +771,417 @@ def seed_counters_from_fs(root: Path | str) -> dict[str, int]:
         raise IdCounterError(
             f"Could not acquire {lock_path} within {_LOCK_TIMEOUT_SEC}s"
         ) from e
+
+
+# ─── CLI ────────────────────────────────────────────────────────────────────
+
+def _find_project_root(start: Path) -> Path | None:
+    p = start.resolve()
+    for candidate in (p, *p.parents):
+        if (candidate / ".edpa").is_dir():
+            return candidate
+    return None
+
+
+def _require_ledger():
+    ledger = _ledger()
+    if ledger is None:
+        raise IdCounterError(
+            "_id_ledger.py is missing from this engine — update the EDPA "
+            "plugin / re-vendor the engine")
+    return ledger
+
+
+def reserve_block(item_type: str, root: Path | str, count: int) -> list[str]:
+    """Reserve ``count`` IDs now and keep them in this clone's pool; they
+    are handed out by ``next_id`` only when the remote is unreachable."""
+    if item_type not in TYPE_PREFIX:
+        raise ValueError(f"Unknown item type: {item_type}")
+    root = Path(root)
+    auth = resolve_authority(root)
+    if auth.mode != "remote":
+        raise IdCounterError(
+            "a block can only be pre-reserved under the remote ID authority "
+            "(the local counter needs no network to begin with)")
+    ledger = _require_ledger()
+    state = _state_dir(root)
+    if state is None:
+        raise IdCounterError("remote ID authority needs a git repository")
+    prefix = TYPE_PREFIX[item_type]
+    floor = max(
+        _scan_fs_max(root / ".edpa" / "backlog" / TYPE_DIRS[item_type], item_type),
+        _safe_counter(root / _COUNTER_REL, item_type),
+        _safe_counter(_hwm_path(state), item_type),
+    )
+    try:
+        with _turnstile(state):
+            res = ledger.reserve(root, item_type, prefix, floor=floor,
+                                 count=count, remote=auth.remote, ref=auth.ref)
+    except ledger.LedgerError as e:
+        raise _remote_failure(ledger, e, auth) from e
+    with _state_lock(state):
+        pool = _read_pool(state)
+        pool[item_type] = sorted(set(pool.get(item_type, [])) | set(res.numbers))
+        _write_pool(state, pool)
+        _bump_hwm(state, item_type, res.numbers[-1])
+    return [f"{prefix}-{n}" for n in res.numbers]
+
+
+def init_remote(root: Path | str, *, headroom: int = 20, fetch: bool = True,
+                remote: str | None = None, ref: str | None = None) -> dict:
+    """Plan the bootstrap of the ID ledger: per-type floors this clone can
+    prove, plus headroom. Returns the plan; ``apply_init_remote`` writes it.
+
+    The floor is the highest number that may exist without a reservation
+    record. It has to cover every pre-ledger item anywhere — so all remote
+    branches are fetched into a private namespace first (a single-branch
+    or shallow clone sees them too) — and ``headroom`` more, for sessions
+    that keep minting from an outdated allocator during the cut-over.
+    """
+    root = Path(root)
+    auth = resolve_authority(root)
+    remote = remote or auth.remote
+    ref = ref or auth.ref
+    ledger = _require_ledger()
+    ledger.check_names(remote, ref)
+    if _git_layout(root) is None:
+        raise IdCounterError("init-remote needs a git repository")
+    if _git_out(root, "remote", "get-url", remote) is None:
+        raise IdCounterError(f"git remote {remote!r} is not configured")
+
+    scan_ns = "refs/edpa/scan"
+    namespaces: tuple[str, ...] = ("refs/heads", "refs/remotes")
+    fetched = False
+    if fetch:
+        r = subprocess.run(
+            ["git", "fetch", "--quiet", "--no-tags", remote,
+             f"+refs/heads/*:{scan_ns}/*"], cwd=str(root), capture_output=True,
+            text=True, encoding="utf-8", stdin=subprocess.DEVNULL, check=False)
+        if r.returncode != 0:
+            raise IdCounterError(
+                f"cannot fetch the branches of {remote!r} — the floor would be "
+                f"a guess. Fix the connection or pass --no-fetch.\n"
+                f"{(r.stderr or '').strip()}")
+        fetched = True
+        namespaces += (scan_ns,)
+    try:
+        seen = scan_known_max(root, namespaces)
+    finally:
+        for name in (_git_out(root, "for-each-ref", "--format=%(refname)",
+                              scan_ns) or "").split():
+            _git_out(root, "update-ref", "-d", name)
+    floors = {t: (v + headroom if v > 0 else 0) for t, v in seen.items()}
+    return {"remote": remote, "ref": ref, "seen": seen, "floors": floors,
+            "headroom": headroom, "fetched": fetched}
+
+
+def apply_init_remote(root: Path | str, plan: dict) -> None:
+    """Create the ledger from ``plan``, or lift an existing one to it
+    (idempotent: a ledger already at or above the plan is left as is)."""
+    ledger = _require_ledger()
+    try:
+        ledger.raise_floors(
+            Path(root), plan["floors"], create=True,
+            remote=plan["remote"], ref=plan["ref"],
+            subject=f"init: seed ID ledger (headroom {plan['headroom']})")
+    except ledger.LedgerError as e:
+        raise IdCounterError(f"could not create the ID ledger: {e}") from e
+
+
+def write_opt_in(root: Path | str, plan: dict) -> list[Path]:
+    """Prepare the opt-in commit in the working tree: the ``ids:`` block in
+    edpa.yaml and the tracked counter fenced at the floors. Not committed —
+    the change goes through the project's normal review."""
+    root = Path(root)
+    changed: list[Path] = []
+    cfg = root / ".edpa" / "config" / "edpa.yaml"
+    text = cfg.read_text(encoding="utf-8") if cfg.exists() else ""
+    if not _ids_config(root):
+        block = ("\n# ID authority (ADR-014): ticket IDs are reserved on the "
+                 "shared git remote\n# (compare-and-swap on a ref) so they are "
+                 "unique across worktrees, branches\n# and developers. See "
+                 "docs/dev-collisions.md.\nids:\n  authority: remote\n")
+        if plan["remote"] != DEFAULT_LEDGER_REMOTE:
+            block += f"  remote: {plan['remote']}\n"
+        if plan["ref"] != DEFAULT_LEDGER_REF:
+            block += f"  ref: {plan['ref']}\n"
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        cfg.write_text(text.rstrip("\n") + "\n" + block if text else block.lstrip("\n"),
+                       encoding="utf-8")
+        changed.append(cfg)
+    counter = root / _COUNTER_REL
+    if counter.exists():
+        # Fence, do not delete: worktrees whose vendored hook predates the
+        # ledger still read this file, and an outdated allocator minting
+        # from it lands above the floor, where the new hooks stop it.
+        fenced = {t: max(plan["floors"].get(t, 0), _safe_counter(counter, t))
+                  for t in TYPE_DIRS}
+        before = counter.read_text(encoding="utf-8")
+        _write_map_atomic(counter, fenced)
+        if counter.read_text(encoding="utf-8") != before:
+            changed.append(counter)
+    return changed
+
+
+def _status(root: Path, refresh: bool) -> dict:
+    auth = resolve_authority(root)
+    ledger = _ledger()
+    state = _state_dir(root)
+    ledger_state, ledger_error = None, None
+    if ledger is not None and state is not None:
+        try:
+            if refresh:
+                ledger.refresh(root, remote=auth.remote, ref=auth.ref)
+                auth = resolve_authority(root)   # may just have been discovered
+            cached = ledger.cached_state(root)
+            if cached is not None:
+                ledger_state = {"counters": cached[0], "floors": cached[1]}
+        except ledger.LedgerError as e:
+            ledger_error = str(e)
+    info: dict = {
+        "authority": auth.mode, "source": auth.source,
+        "remote": auth.remote, "ref": auth.ref,
+        "ledger": ledger_state, "ledger_error": ledger_error,
+        "local": {}, "pool": _read_pool(state) if state else {},
+    }
+    for t, d in TYPE_DIRS.items():
+        info["local"][t] = {
+            "files": _scan_fs_max(root / ".edpa" / "backlog" / d, t),
+            "tracked": _safe_counter(root / _COUNTER_REL, t),
+            "clone": _safe_counter(_hwm_path(state), t) if state else 0,
+        }
+    return info
+
+
+def _print_status(info: dict) -> None:
+    how = {"env": f"${AUTHORITY_ENV}", "config": "ids.authority in edpa.yaml",
+           "discovered": "this clone has seen an ID ledger",
+           "default": "no ledger known"}[info["source"]]
+    print(f"ID authority: {info['authority']}  ({how})")
+    if info["authority"] == "remote" or info["ledger"]:
+        print(f"Ledger:       {info['ref']} on {info['remote']}"
+              + ("" if info["ledger"] else "  — not seen by this clone yet"))
+    if info["ledger_error"]:
+        print(f"              ! {info['ledger_error']}")
+    led = info["ledger"] or {"counters": {}, "floors": {}}
+    print()
+    print(f"  {'type':<11}{'ledger':>8}{'floor':>8}{'files':>8}"
+          f"{'tracked':>9}{'clone':>8}  pre-reserved")
+    def cell(v) -> str:
+        return str(v) if v else "-"
+
+    for t, prefix in TYPE_PREFIX.items():
+        loc = info["local"][t]
+        pool = ", ".join(f"{prefix}-{n}" for n in info["pool"].get(t, []))
+        print(f"  {t:<11}{cell(led['counters'].get(t)):>8}"
+              f"{cell(led['floors'].get(t)):>8}{cell(loc['files']):>8}"
+              f"{cell(loc['tracked']):>9}{cell(loc['clone']):>8}  {pool}")
+    print()
+    print("  ledger   highest number reserved on the remote (cached copy)")
+    print("  floor    numbers up to here may exist without a reservation record")
+    print("  files    highest item file in this checkout")
+    print("  tracked  .edpa/config/id_counters.yaml in this checkout")
+    print("  clone    high-water mark shared by this clone's worktrees")
+
+
+def _doctor(root: Path, *, raise_floors: bool) -> int:
+    auth = resolve_authority(root)
+    ledger = _require_ledger()
+    problems = 0
+    print(f"ID authority: {auth.mode} ({auth.source})")
+    try:
+        known = ledger.refresh(root, remote=auth.remote, ref=auth.ref)
+    except ledger.LedgerError as e:
+        print(f"✗ cannot reach the ledger: {e}")
+        return 1
+    if not known:
+        print(f"· no ID ledger at {auth.ref} on {auth.remote} "
+              f"(run: id_counter.py init-remote)")
+        return 0 if auth.mode == "local" else 1
+    counters, floors = ledger.cached_state(root)
+    print(f"✓ ledger reachable: {auth.ref} on {auth.remote}")
+
+    local = _checkout_max(root)
+    above = {t: v for t, v in local.items() if v > counters.get(t, 0)}
+    unreserved: list[str] = []
+    for t, d in TYPE_DIRS.items():
+        prefix = TYPE_PREFIX[t]
+        for f in sorted((root / ".edpa" / "backlog" / d).glob(f"{prefix}-*.md")):
+            num = f.stem.rsplit("-", 1)[-1]
+            if num.isdigit() and int(num) > floors.get(t, 0) \
+                    and ledger.find_record(root, f.stem) is None:
+                unreserved.append(f.stem)
+    if unreserved:
+        problems += 1
+        print(f"✗ {len(unreserved)} item(s) above the floor without a "
+              f"reservation: {', '.join(unreserved[:12])}"
+              + (" …" if len(unreserved) > 12 else ""))
+    else:
+        print("✓ every item above the floor has a reservation record")
+    if above:
+        problems += 1
+        print("✗ this checkout holds numbers above the ledger: "
+              + ", ".join(f"{TYPE_PREFIX[t]}-{v} (ledger {counters.get(t, 0)})"
+                          for t, v in above.items()))
+    if raise_floors and (above or unreserved):
+        wanted = {t: v for t, v in local.items() if v > floors.get(t, 0)}
+        try:
+            ledger.raise_floors(root, wanted, remote=auth.remote, ref=auth.ref,
+                                subject="floors: adopt local items (doctor --raise)")
+        except ledger.LedgerError as e:
+            print(f"✗ could not raise the floors: {e}")
+            return 1
+        print("→ floors raised to: "
+              + ", ".join(f"{TYPE_PREFIX[t]}-{v}" for t, v in wanted.items()))
+        return 0
+    if problems:
+        print("\nIf those items are real pre-ledger work, adopt them: "
+              "id_counter.py doctor --raise")
+    return 1 if problems else 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    import json
+
+    try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
+        import _console  # noqa: F401
+    except ImportError:
+        pass
+
+    parser = argparse.ArgumentParser(
+        prog="id_counter",
+        description="EDPA ID allocator — status, remote ledger bootstrap, "
+                    "scripted allocation.")
+    parser.add_argument("--root", help="project root (default: nearest "
+                        "directory with .edpa/, walking up from cwd)")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("status", help="who allocates IDs here, and the "
+                       "counters each layer holds")
+    p.add_argument("--refresh", action="store_true",
+                   help="read the remote ledger first (network)")
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("next", help="allocate one ID and print it")
+    p.add_argument("--type", required=True, choices=sorted(TYPE_PREFIX))
+    p.add_argument("--title")
+    p.add_argument("--parent")
+    p.add_argument("--created-at", dest="created_at")
+
+    p = sub.add_parser("reserve", help="pre-reserve a block of IDs for "
+                       "offline use (remote authority)")
+    p.add_argument("--type", required=True, choices=sorted(TYPE_PREFIX))
+    p.add_argument("--count", type=int, required=True)
+
+    p = sub.add_parser("init-remote", help="create the ID ledger on the "
+                       "shared remote (once per repository)")
+    p.add_argument("--headroom", type=int, default=20,
+                   help="numbers left free above the highest known ID for "
+                        "sessions still on an outdated allocator (default 20)")
+    p.add_argument("--remote")
+    p.add_argument("--ref")
+    p.add_argument("--no-fetch", action="store_true",
+                   help="do not fetch the remote's branches before scanning")
+    p.add_argument("--apply", action="store_true",
+                   help="skip the confirmation prompt")
+    p.add_argument("--write-config", action="store_true",
+                   help="also prepare the opt-in change in the working tree "
+                        "(ids.authority in edpa.yaml + fenced id_counters.yaml)")
+
+    p = sub.add_parser("doctor", help="check this checkout against the ledger")
+    p.add_argument("--raise", dest="raise_floors", action="store_true",
+                   help="adopt this checkout's unreserved items as pre-ledger "
+                        "(raises the ledger floors)")
+    p.add_argument("--rebuild", action="store_true",
+                   help="local authority: re-seed id_counters.yaml from the "
+                        "item files (never lowers a counter)")
+    p.add_argument("--forget", action="store_true",
+                   help="drop this clone's cached copy of the ledger")
+
+    args = parser.parse_args(argv)
+    root = Path(args.root).resolve() if args.root else _find_project_root(Path.cwd())
+    if root is None or not (root / ".edpa").is_dir():
+        print("ERROR: no .edpa/ directory found (run from the project, or "
+              "pass --root)", file=sys.stderr)
+        return 2
+
+    try:
+        if args.command == "status":
+            info = _status(root, args.refresh)
+            if args.json:
+                print(json.dumps(info, indent=2, sort_keys=True))
+            else:
+                _print_status(info)
+            return 0
+
+        if args.command == "next":
+            print(next_id(args.type, root, meta={
+                "title": args.title, "parent": args.parent,
+                "created_at": args.created_at}))
+            return 0
+
+        if args.command == "reserve":
+            if args.count < 1:
+                print("ERROR: --count must be >= 1", file=sys.stderr)
+                return 2
+            ids = reserve_block(args.type, root, args.count)
+            print(f"Reserved {ids[0]}..{ids[-1]} — kept for offline use in "
+                  f"this clone.")
+            return 0
+
+        if args.command == "init-remote":
+            plan = init_remote(root, headroom=max(args.headroom, 0),
+                               fetch=not args.no_fetch,
+                               remote=args.remote, ref=args.ref)
+            print(f"ID ledger: {plan['ref']} on {plan['remote']}")
+            print("Highest ID found across worktrees and branches"
+                  + ("" if plan["fetched"] else " (remote branches NOT fetched)")
+                  + f", + headroom {plan['headroom']}:\n")
+            for t, prefix in TYPE_PREFIX.items():
+                if plan["seen"][t]:
+                    print(f"  {t:<11} {prefix}-{plan['seen'][t]:<6} → floor "
+                          f"{prefix}-{plan['floors'][t]:<6} first new ID "
+                          f"{prefix}-{plan['floors'][t] + 1}")
+            print()
+            if not args.apply:
+                try:
+                    answer = input("Create the ledger? [y/N]: ").strip().lower()
+                except EOFError:
+                    answer = ""
+                if answer != "y":
+                    print("Aborted — nothing was written.")
+                    return 1
+            apply_init_remote(root, plan)
+            print("Ledger ready. Every session of this clone now reserves IDs "
+                  "there.")
+            if args.write_config:
+                for path in write_opt_in(root, plan):
+                    print(f"  prepared: {path.relative_to(root)}")
+                print("Commit that change through your normal review — it "
+                      "switches everyone else.")
+            else:
+                print("Next: opt the project in (one reviewed commit): "
+                      "re-run with --write-config, or set `ids.authority: "
+                      "remote` in .edpa/config/edpa.yaml.")
+            return 0
+
+        if args.command == "doctor":
+            if args.forget:
+                _require_ledger().forget(root)
+                print("Dropped the cached ledger copy of this clone.")
+                return 0
+            if args.rebuild:
+                counters = seed_counters_from_fs(root)
+                print("id_counters.yaml: " + ", ".join(
+                    f"{k}={v}" for k, v in sorted(counters.items()) if v))
+                return 0
+            return _doctor(root, raise_floors=args.raise_floors)
+    except IdCounterError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
