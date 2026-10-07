@@ -294,7 +294,8 @@ def _commit(repo: Path | str, parents: list[str], counters: dict[str, int],
     raise _Transient(f"cannot create the ledger commit: {r.stderr.strip()}")
 
 
-def _observe(repo: Path | str, remote: str, ref: str) -> str | None:
+def _observe(repo: Path | str, remote: str, ref: str,
+             timeout: float | None = None) -> str | None:
     """Fetch the remote ledger tip and return its sha, or ``None`` when the
     ref does not exist on the remote.
 
@@ -307,11 +308,12 @@ def _observe(repo: Path | str, remote: str, ref: str) -> str | None:
     Raises :class:`LedgerUnavailable` when the remote cannot be reached.
     """
     tmp = f"{_OBSERVED_NS}/{uuid.uuid4().hex}"
+    timeout = timeout or _NET_TIMEOUT_SEC
 
     def fetch() -> _Result:
         return _git(repo, "fetch", "--quiet", "--no-tags",
                     "--no-recurse-submodules", *_fetch_extra, remote,
-                    f"+{ref}:{tmp}", timeout=_NET_TIMEOUT_SEC, check=False)
+                    f"+{ref}:{tmp}", timeout=timeout, check=False)
 
     try:
         r = fetch()
@@ -329,7 +331,7 @@ def _observe(repo: Path | str, remote: str, ref: str) -> str | None:
     # ls-remote tells them apart by exit code (2 = no matching ref), so no
     # human-readable message has to be parsed.
     probe = _git(repo, "ls-remote", "--exit-code", remote, ref,
-                 timeout=_NET_TIMEOUT_SEC, check=False)
+                 timeout=timeout, check=False)
     if probe.returncode == 2:
         return None
     detail = (probe.stderr if probe.returncode != 0 else r.stderr).strip()
@@ -601,11 +603,14 @@ def raise_floors(repo: Path | str, floors: dict[str, int], *,
 
 
 def refresh(repo: Path | str, *, remote: str = DEFAULT_REMOTE,
-            ref: str = DEFAULT_REF) -> bool:
+            ref: str = DEFAULT_REF, timeout: float | None = None) -> bool:
     """Read the remote ledger and advance the local cache. Never writes to
-    the remote. Returns whether this clone now knows a ledger."""
+    the remote. Returns whether this clone now knows a ledger.
+
+    ``timeout`` shortens the per-call network wait for callers on an
+    interactive path (git hooks)."""
     check_names(remote, ref)
-    observed = _observe(repo, remote, ref)
+    observed = _observe(repo, remote, ref, timeout)
     if observed is None:
         return _rev(repo, CACHE_REF) is not None
     # Remote behind or diverged: _advance_cache keeps the cache — the next

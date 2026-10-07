@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "plugin" / "edpa" / "scripts"
@@ -21,6 +22,9 @@ if str(SCRIPTS) not in sys.path:
 
 import _id_ledger as ledger  # noqa: E402
 from _id_ledger import DEFAULT_REF  # noqa: E402
+from id_counter import TYPE_DIRS  # noqa: E402
+
+COUNTER = Path(".edpa/config/id_counters.yaml")
 
 
 def git(cwd: Path, *args: str, check: bool = True) -> str:
@@ -29,6 +33,38 @@ def git(cwd: Path, *args: str, check: bool = True) -> str:
     if check and r.returncode != 0:
         raise AssertionError(f"git {' '.join(args)} failed: {r.stderr}")
     return r.stdout.strip()
+
+
+def project(root: Path, *, authority: str | None = None,
+            counters: dict | None = None, extra_ids: dict | None = None) -> Path:
+    """Lay an (untracked) ``.edpa/`` skeleton into a checkout."""
+    (root / ".edpa" / "config").mkdir(parents=True, exist_ok=True)
+    for d in TYPE_DIRS.values():
+        (root / ".edpa" / "backlog" / d).mkdir(parents=True, exist_ok=True)
+    if authority or extra_ids:
+        ids = {**({"authority": authority} if authority else {}),
+               **(extra_ids or {})}
+        (root / ".edpa" / "config" / "edpa.yaml").write_text(
+            yaml.safe_dump({"ids": ids}), encoding="utf-8")
+    if counters is not None:
+        (root / COUNTER).write_text(
+            yaml.safe_dump({"counters": counters}), encoding="utf-8")
+    return root
+
+
+def item(root: Path, item_id: str, dirname: str = "stories", *,
+         title: str | None = None, created_at: str | None = None) -> Path:
+    """Write a minimal backlog item file by hand (i.e. NOT via the
+    allocator — that is the point in several tests)."""
+    front: dict = {"id": item_id}
+    if title:
+        front["title"] = title
+    if created_at:
+        front["created_at"] = created_at
+    path = root / ".edpa" / "backlog" / dirname / f"{item_id}.md"
+    path.write_text("---\n" + yaml.safe_dump(front, sort_keys=False) + "---\n",
+                    encoding="utf-8")
+    return path
 
 
 class World:

@@ -1,21 +1,30 @@
 #!/usr/bin/env python3
-"""Local-first ID safety validator — pre-commit and pre-push modes.
+"""ID safety validator — pre-commit and pre-push modes.
 
-V2 defense-in-depth Layers 5 (pre-commit) + 6 (pre-push) from
-``docs/v2/plan.md``. Runs as a git hook to catch ID collisions before
-they reach upstream.
+Runs as a git hook to catch ID problems before they reach upstream.
 
 Modes:
-    --staged    Validate staged ``.edpa/backlog/`` files against working
-                tree state. Checks filename ≡ frontmatter id, no
-                duplicate IDs within staged set, counter file monotonic
-                with new items, no new ID already exists in HEAD.
+    --staged    Validate staged ``.edpa/backlog/`` files. Always: filename
+                ≡ frontmatter id, no duplicate IDs within the staged set,
+                no new ID already at HEAD under another path. Then, by ID
+                authority (``id_counter.resolve_authority``):
 
-    --pre-push  Validate commits about to be pushed against the remote
-                tip. Reads ``git pre-push`` stdin protocol (one line per
-                local→remote ref pair). Fetches the remote ref, diffs
-                local commits, and checks that no new backlog file ID
-                exists upstream.
+                local   the tracked counter grew with the new items;
+                remote  every new item is backed by a reservation in the
+                        ID ledger (ADR-014): its number is either at or
+                        below the ledger's floor (it predates the ledger)
+                        or the ledger holds a record for it whose
+                        ``created_at`` matches the item's.
+
+    --pre-push  Validate commits about to be pushed against the remote's
+                integration branch. Reads the ``git pre-push`` stdin
+                protocol (one line per local→remote ref pair). Blocks when
+                an item added by the push already exists upstream *as a
+                different item* — including the common case where both
+                sit at the same path (two Stories that both got S-5).
+                Under the remote authority it also verifies reservations,
+                which is what catches items committed with --no-verify or
+                minted by an outdated allocator.
 
 Exit codes:
     0   all checks pass (or no relevant files)
@@ -29,6 +38,7 @@ try:  # best-effort UTF-8 stdio on legacy Windows consoles (cp1250)
 except ImportError:
     pass
 import argparse
+import datetime as _dt
 import re
 import subprocess
 import sys
@@ -39,6 +49,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 try:
+    import id_counter as _id_counter  # noqa: E402
     from id_counter import TYPE_DIRS, TYPE_PREFIX  # noqa: E402
 finally:
     sys.path.pop(0)
@@ -50,6 +61,10 @@ PREFIX_TO_TYPE = {v: k for k, v in TYPE_PREFIX.items()}
 
 _BACKLOG_PATH_RE = re.compile(r"^\.edpa/backlog/([^/]+)/([A-Z]{1,3}-\d{1,9})\.md$")
 _ID_FROM_FRONTMATTER_RE = re.compile(r"^id:\s*([A-Z]{1,3}-\d{1,9})\s*$", re.MULTILINE)
+
+# Hooks sit on an interactive path — do not wait the allocator's full
+# network timeout to find out the remote is unreachable.
+_HOOK_NET_TIMEOUT_SEC = 8
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +146,39 @@ def _extract_id_from_frontmatter(content: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _frontmatter(content: str | None) -> dict:
+    if not content or not content.startswith("---"):
+        return {}
+    end = content.find("\n---", 4)
+    if end < 0:
+        return {}
+    try:
+        data = yaml.safe_load(content[4:end]) or {}
+    except yaml.YAMLError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _created_at(content: str | None) -> str | None:
+    """The item's ``created_at`` as the string the allocator recorded.
+
+    The write layer stores it quoted; a hand-edited unquoted value parses
+    as a timestamp and is normalised back to the same shape.
+    """
+    value = _frontmatter(content).get("created_at")
+    if isinstance(value, _dt.datetime):
+        if value.tzinfo is not None:
+            value = value.astimezone(_dt.timezone.utc).replace(tzinfo=None)
+        return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if value is None:
+        return None
+    return str(value).strip() or None
+
+
+def _title(content: str | None) -> str:
+    return str(_frontmatter(content).get("title") or "").strip()
+
+
 def _parse_counter(content: str) -> dict[str, int]:
     """Parse id_counters.yaml content into {type: counter_value}."""
     try:
@@ -139,6 +187,164 @@ def _parse_counter(content: str) -> dict[str, int]:
         return {}
     counters = data.get("counters") or {}
     return {k: int(v) for k, v in counters.items() if isinstance(v, (int, float))}
+
+
+# ---------------------------------------------------------------------------
+# Identity + reservations (ADR-014) — shared with renumber_collisions.py
+# ---------------------------------------------------------------------------
+
+def authority(repo_root: Path):
+    """The project's ID authority, or ``None`` when it cannot be resolved
+    (then the caller keeps the legacy, local rules)."""
+    try:
+        return _id_counter.resolve_authority(repo_root)
+    except Exception:  # noqa: BLE001 — a hook must not die on a bad config
+        return None
+
+
+def integration_target(repo_root: Path, remote: str) -> str | None:
+    """The remote branch new work lands on: ``<remote>/HEAD``, else
+    ``<remote>/main``, else ``<remote>/master``."""
+    head_ref = _git(["symbolic-ref", f"refs/remotes/{remote}/HEAD"], cwd=repo_root)
+    if head_ref and head_ref.strip():
+        return head_ref.strip()
+    for name in ("main", "master"):
+        ref = f"refs/remotes/{remote}/{name}"
+        if _git(["rev-parse", "--verify", "--quiet", ref], cwd=repo_root):
+            return ref
+    return None
+
+
+def same_item(repo_root: Path, target_ref: str, path: str,
+              local_ref: str, local_content: str | None = None) -> bool:
+    """Is ``path`` on ``local_ref`` the same item as ``path`` on the target?
+
+    The same ID at the same path is the ordinary shape of both "my item,
+    already merged (e.g. squashed)" and "someone else's item that got my
+    number". ``created_at`` tells them apart; for items older than that
+    stamp, lineage does: the version that entered the target must be one
+    this branch has had.
+    """
+    theirs = _read_committed_file(repo_root, target_ref, path)
+    if theirs is None:
+        return True
+    if local_content is None:
+        local_content = _read_committed_file(repo_root, local_ref, path)
+    mine_at, theirs_at = _created_at(local_content), _created_at(theirs)
+    if mine_at and theirs_at:
+        return mine_at == theirs_at
+
+    added = _git(["log", "--diff-filter=A", "--format=%H", "-1", target_ref,
+                  "--", path], cwd=repo_root)
+    if not added or not added.strip():
+        return False
+    entered = _git(["rev-parse", f"{added.strip()}:{path}"], cwd=repo_root)
+    if not entered:
+        return False
+    history = _git(["log", "--format=%H", "-100", local_ref, "--", path],
+                   cwd=repo_root)
+    for sha in (history or "").split():
+        blob = _git(["rev-parse", f"{sha}:{path}"], cwd=repo_root)
+        if blob and blob.strip() == entered.strip():
+            return True
+    return False
+
+
+def reservation_problems(repo_root: Path, auth,
+                         new_items: list[tuple[str, str, str, str | None]],
+                         ) -> tuple[list[str], list[str]]:
+    """Check new items against the ID ledger. Returns ``(errors, warnings)``.
+
+    ``new_items`` is ``[(path, item_id, item_type, content)]``.
+
+    * a ledger record exists → the item's ``created_at`` must match it
+      (records of pre-reserved blocks carry none and accept any item);
+    * no record, number ≤ the type's floor → the item predates the ledger;
+    * no record above the floor → not reserved: blocked.
+
+    The local cache is consulted first; one refresh is attempted when a
+    record is missing (the cache may simply be stale). If the ledger
+    cannot be consulted at all the item is reported as a warning — the
+    push-time check is the one that must be online.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    ledger = _id_counter._ledger()
+    if ledger is None or not new_items:
+        return errors, warnings
+
+    tried = {"refresh": False, "ok": False}
+
+    def refresh() -> bool:
+        if not tried["refresh"]:
+            tried["refresh"] = True
+            try:
+                tried["ok"] = bool(ledger.refresh(
+                    repo_root, remote=auth.remote, ref=auth.ref,
+                    timeout=_HOOK_NET_TIMEOUT_SEC))
+            except ledger.LedgerError:
+                tried["ok"] = False
+        return tried["ok"]
+
+    def state():
+        try:
+            return ledger.cached_state(repo_root)
+        except ledger.LedgerError:
+            return None
+
+    known = state()
+    if known is None and refresh():
+        known = state()
+    if known is None:
+        warnings.append(
+            f"ID ledger ({auth.ref} on {auth.remote}) is not available — "
+            f"reservations of {len(new_items)} new item(s) not verified")
+        return errors, warnings
+    _counters, floors = known
+
+    for path, item_id, item_type, content in new_items:
+        number = int(item_id.rsplit("-", 1)[1])
+        record = ledger.find_record(repo_root, item_id)
+        if record is None and number > floors.get(item_type, 0):
+            if not tried["refresh"] and refresh():
+                _counters, floors = state() or known
+                record = ledger.find_record(repo_root, item_id)
+        if record is not None:
+            want, have = record.get("created_at"), _created_at(content)
+            if want and have != want:
+                what = f' "{record["title"]}"' if record.get("title") else ""
+                errors.append(
+                    f"{path}: {item_id} is reserved in the ID ledger for a "
+                    f"different item{what} (by {record.get('by') or '?'}, "
+                    f"{record.get('at') or '?'}). This file was not created "
+                    f"by the allocator — create the item with /edpa:add."
+                )
+            continue
+        floor = floors.get(item_type, 0)
+        if number <= floor:
+            continue                      # predates the ledger
+        if tried["refresh"] and not tried["ok"]:
+            warnings.append(
+                f"{path}: cannot reach the ID ledger to verify the "
+                f"reservation of {item_id}")
+            continue
+        errors.append(
+            f"{path}: {item_id} has no reservation in the ID ledger "
+            f"(numbers up to {TYPE_PREFIX[item_type]}-{floor} predate it). "
+            f"IDs come from /edpa:add (backlog.py add); if an outdated EDPA "
+            f"plugin minted this one, update the plugin and re-create the "
+            f"item."
+        )
+    return errors, warnings
+
+
+def _history_edit_in_progress(repo_root: Path) -> bool:
+    """Merge / cherry-pick / revert in flight: the staged additions are
+    other people's commits being replayed, not new allocations here."""
+    return any(
+        _git(["rev-parse", "--verify", "--quiet", name], cwd=repo_root)
+        for name in ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -168,11 +374,14 @@ def cmd_staged(args: argparse.Namespace) -> int:
         return 0  # nothing to check
 
     errors: list[str] = []
+    warnings: list[str] = []
 
     # Check 1: filename ≡ frontmatter id, per file
     seen_ids: dict[str, str] = {}
+    contents: dict[str, str | None] = {}
     for path, _dir, item_id, _type in backlog_staged:
         content = _read_staged_file(repo_root, path)
+        contents[path] = content
         if content is None:
             errors.append(f"{path}: cannot read staged content")
             continue
@@ -196,8 +405,6 @@ def cmd_staged(args: argparse.Namespace) -> int:
     for path, _dir, item_id, _type in backlog_staged:
         if path in head_paths:
             continue  # modification, not addition
-        if path in head_paths:
-            continue
         # collision if a different file with same ID exists at HEAD
         for hp in head_paths:
             parsed = _parse_backlog_path(hp)
@@ -206,8 +413,18 @@ def cmd_staged(args: argparse.Namespace) -> int:
                     f"{path}: ID {item_id} already exists at HEAD as {hp}"
                 )
 
-    # Check 3: counter file monotonic with new items
-    if counter_staged or backlog_staged:
+    # Check 3: every new item was really allocated
+    auth = authority(repo_root)
+    if auth is not None and auth.mode == "remote":
+        new_items = [(path, item_id, item_type, contents.get(path))
+                     for path, _dir, item_id, item_type in backlog_staged
+                     if path not in head_paths]
+        if new_items and not _history_edit_in_progress(repo_root):
+            errs, warns = reservation_problems(repo_root, auth, new_items)
+            errors.extend(errs)
+            warnings.extend(warns)
+    elif counter_staged or backlog_staged:
+        # Local authority: the tracked counter is the allocator's record.
         old_content = _read_committed_file(repo_root, "HEAD", _COUNTER_PATH) or ""
         new_content = (
             _read_staged_file(repo_root, _COUNTER_PATH) or old_content
@@ -231,6 +448,8 @@ def cmd_staged(args: argparse.Namespace) -> int:
                     f"Run id_counter.next_id to allocate properly."
                 )
 
+    for w in warnings:
+        print(f"warning: {w}", file=sys.stderr)
     if errors:
         print("✗ ID safety check failed (pre-commit):", file=sys.stderr)
         for e in errors:
@@ -265,24 +484,39 @@ def cmd_pre_push(args: argparse.Namespace) -> int:
         )
         return 0
 
+    # Compare added IDs against the integration target (remote default
+    # branch tip), NOT against the pushed branch's own remote tip or the
+    # merge-base — both are older than main and miss items merged since.
+    target_ref = integration_target(repo_root, remote)
+    if target_ref is None:
+        print(
+            f"warning: cannot tell which branch of {remote} work lands on "
+            f"(run `git remote set-head {remote} --auto`); pre-push ID "
+            f"check skipped.",
+            file=sys.stderr,
+        )
+        return 0
+    up_files = _list_tree(repo_root, target_ref, ".edpa/backlog")
+    up_set = set(up_files)
+
     errors: list[str] = []
+    new_items: list[tuple[str, str, str, str | None]] = []
+    seen: set[str] = set()
     for raw in sys.stdin:
         parts = raw.strip().split()
         if len(parts) != 4:
             continue
-        local_ref, local_sha, remote_ref, remote_sha = parts
-        if local_sha == _ZERO_SHA:
+        _local_ref, local_sha, _remote_ref, remote_sha = parts
+        if local_sha == _ZERO_SHA or set(local_sha) == {"0"}:
             continue  # branch deletion, not relevant
 
-        # Determine the comparison base for "what's added on this push":
-        # remote tip of this branch if it exists, otherwise the merge-base
-        # with the default branch on remote.
-        if remote_sha != _ZERO_SHA:
+        # What this push adds: relative to the remote tip of this branch if
+        # it exists, otherwise to where the branch left the target.
+        base: str | None = None
+        if set(remote_sha) != {"0"}:
             base = remote_sha
         else:
-            mb_out = _git(
-                ["merge-base", local_sha, f"{remote}/HEAD"], cwd=repo_root,
-            )
+            mb_out = _git(["merge-base", local_sha, target_ref], cwd=repo_root)
             base = mb_out.strip() if mb_out else None
         if not base:
             continue  # first push of a brand-new branch with no shared history
@@ -291,23 +525,15 @@ def cmd_pre_push(args: argparse.Namespace) -> int:
             ["diff", "--name-only", "--diff-filter=A", base, local_sha],
             cwd=repo_root,
         )
-
-        # Compare added IDs against the integration target (remote default
-        # branch tip), NOT against `base` — `base` is the merge-base which is
-        # typically older than the current main HEAD, missing items merged
-        # since the branch forked.
-        # Resolve the integration target ref: refs/remotes/<remote>/HEAD →
-        # typically refs/remotes/origin/main. Falls back to remote/main.
-        head_ref = _git(["symbolic-ref", f"refs/remotes/{remote}/HEAD"], cwd=repo_root)
-        target_ref = head_ref.strip() if head_ref else f"refs/remotes/{remote}/main"
-        up_files = _list_tree(repo_root, target_ref, ".edpa/backlog")
-
         for line in (added or "").splitlines():
             parsed = _parse_backlog_path(line)
-            if not parsed:
+            if not parsed or line in seen:
                 continue
-            _dir, item_id, _type = parsed
-            # Check whether the SAME ID exists upstream under any directory.
+            seen.add(line)
+            _dir, item_id, item_type = parsed
+            content = _read_committed_file(repo_root, local_sha, line)
+
+            # The same ID upstream under another directory (misplaced file).
             for up_path in up_files:
                 up_parsed = _parse_backlog_path(up_path)
                 if up_parsed and up_parsed[1] == item_id and up_path != line:
@@ -316,6 +542,29 @@ def cmd_pre_push(args: argparse.Namespace) -> int:
                         f"{up_path}"
                     )
 
+            if line not in up_set:
+                new_items.append((line, item_id, item_type, content))
+                continue
+            # Same ID at the same path — the ordinary collision (two
+            # Stories that both got S-5), or simply this branch's own item
+            # that already landed.
+            if not same_item(repo_root, target_ref, line, local_sha, content):
+                theirs = _read_committed_file(repo_root, target_ref, line)
+                errors.append(
+                    f"{line}: ID {item_id} already exists on {target_ref} as a "
+                    f"different item\n"
+                    f"      yours:    \"{_title(content)}\"\n"
+                    f"      upstream: \"{_title(theirs)}\""
+                )
+
+    warnings: list[str] = []
+    auth = authority(repo_root)
+    if auth is not None and auth.mode == "remote" and new_items:
+        errs, warnings = reservation_problems(repo_root, auth, new_items)
+        errors.extend(errs)
+
+    for w in warnings:
+        print(f"warning: {w}", file=sys.stderr)
     if errors:
         print("✗ ID collision check failed (pre-push):", file=sys.stderr)
         for e in errors:
@@ -338,7 +587,7 @@ def cmd_pre_push(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="validate_ids",
-        description="EDPA local-first ID safety validator (pre-commit / pre-push).",
+        description="EDPA ID safety validator (pre-commit / pre-push).",
     )
     sub = parser.add_subparsers(dest="mode", required=True)
     sub.add_parser("--staged", help=argparse.SUPPRESS)

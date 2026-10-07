@@ -20,8 +20,8 @@ import pytest
 import yaml
 
 from ledger_world import (  # noqa: F401  (fixtures are used by name)
-    SCRIPTS, World, _isolated_git_config, _templates, alice, bob, git,
-    ledger_ready, world,
+    COUNTER, SCRIPTS, World, _isolated_git_config, _templates, alice, bob,
+    git, item, ledger_ready, project, world,
 )
 
 import _id_ledger as ledger  # noqa: E402
@@ -30,32 +30,6 @@ from id_counter import (  # noqa: E402
     AUTHORITY_ENV, IdCounterError, TYPE_DIRS, next_id, resolve_authority,
     scan_known_max, seed_counters_from_fs,
 )
-
-COUNTER = Path(".edpa/config/id_counters.yaml")
-
-
-def project(root: Path, *, authority: str | None = None,
-            counters: dict | None = None, extra_ids: dict | None = None) -> Path:
-    """Lay an (untracked) ``.edpa/`` skeleton into a checkout."""
-    (root / ".edpa" / "config").mkdir(parents=True, exist_ok=True)
-    for d in TYPE_DIRS.values():
-        (root / ".edpa" / "backlog" / d).mkdir(parents=True, exist_ok=True)
-    if authority or extra_ids:
-        ids = {**({"authority": authority} if authority else {}),
-               **(extra_ids or {})}
-        (root / ".edpa" / "config" / "edpa.yaml").write_text(
-            yaml.safe_dump({"ids": ids}), encoding="utf-8")
-    if counters is not None:
-        (root / COUNTER).write_text(
-            yaml.safe_dump({"counters": counters}), encoding="utf-8")
-    return root
-
-
-def item(root: Path, item_id: str, dirname: str = "stories") -> Path:
-    path = root / ".edpa" / "backlog" / dirname / f"{item_id}.md"
-    path.write_text(f"---\nid: {item_id}\n---\n", encoding="utf-8")
-    return path
-
 
 @pytest.fixture(autouse=True)
 def _no_authority_override(monkeypatch):
