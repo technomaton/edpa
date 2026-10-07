@@ -1105,7 +1105,14 @@ def cmd_add(root, backlog, args):
     print(color(f"  Created (local): {bold(new_id)} {title}",
                 level_color(args.type)))
     print(color(f"  File:    {file_path}", C.MUTED))
-    print(color(f"  Mode:    local (no gh calls; V2 path)", C.MUTED))
+    try:
+        from id_counter import resolve_authority
+        auth = resolve_authority(root)
+        mode = (f"ID reserved in the ledger ({auth.ref} on {auth.remote})"
+                if auth.mode == "remote" else "local counter")
+    except Exception:  # display only — never fail a created item on it
+        mode = "local counter"
+    print(color(f"  Mode:    {mode} (no gh calls; V2 path)", C.MUTED))
     print()
 
 

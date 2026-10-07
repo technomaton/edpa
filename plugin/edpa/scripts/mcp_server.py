@@ -184,6 +184,7 @@ with _sibling_path():
         # (D-52): serializes the write tools against the post-commit
         # evidence emitter and concurrent MCP sessions.
         BacklogLockTimeout as _BacklogLockTimeout,
+        IdCounterError as _IdCounterError,
         backlog_write_lock as _backlog_write_lock,
     )
 # Read-side directory → type map for the edpa_backlog scan. Superset of the
@@ -1377,11 +1378,12 @@ def _load_md_item(file_path: Path) -> dict | None:
         sys.path.pop(0)
 
 
-def _allocate_id(item_type: str, repo_root: Path) -> str:
+def _allocate_id(item_type: str, repo_root: Path,
+                 meta: dict | None = None) -> str:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
         from id_counter import next_id  # noqa: E402
-        return next_id(item_type, repo_root)
+        return next_id(item_type, repo_root, meta=meta)
     finally:
         sys.path.pop(0)
 
@@ -1574,23 +1576,35 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
         )
 
     repo_root = edpa_root.parent
+    # D-61: stamp creation time at the single write layer (ADR-002 —
+    # backlog.py cmd_add routes through here too) so flow metrics have a
+    # start-of-life timestamp. Same helper as the closed_at stamp in
+    # _handle_item_transition. Taken BEFORE allocation: under the remote
+    # ID authority the same value goes into the reservation record, and
+    # the hooks later match a new item against it (ADR-014).
+    created_at = _utc_now_iso()
+    # Allocate OUTSIDE the backlog lock. With the remote authority this is
+    # a network round trip of seconds; inside the 5 s lock it would starve
+    # the post-commit evidence emitter. Uniqueness never depended on the
+    # backlog lock — the allocator has its own (D-52's "one critical
+    # section" only kept a failed write from burning an ID, and a gap in
+    # the sequence is harmless). Everything that can reject the request
+    # is checked above, so only a write failure can burn a number.
+    try:
+        new_id = _allocate_id(item_type, repo_root, {
+            "title": title.strip(), "parent": parent, "created_at": created_at,
+        })
+    except _IdCounterError as exc:
+        return _err(str(exc))
+
     try:
         with _backlog_write_lock(edpa_root):
-            # allocate-ID + write-file as one critical section (D-52): the
-            # id_counter lock is taken strictly inside this one, never the
-            # reverse, so the ordering cannot deadlock.
-            new_id = _allocate_id(item_type, repo_root)
-
             item: dict = {
                 "id": new_id,
                 "type": item_type,
                 "title": title.strip(),
                 "status": status,
-                # D-61: stamp creation time at the single write layer
-                # (ADR-002 — backlog.py cmd_add routes through here too) so
-                # flow metrics have a start-of-life timestamp. Same helper
-                # as the closed_at stamp in _handle_item_transition.
-                "created_at": _utc_now_iso(),
+                "created_at": created_at,
             }
             if parent:
                 item["parent"] = parent

@@ -344,3 +344,87 @@ def test_setup_does_not_resurrect_the_counter_under_remote_authority(
     project(alice, counters={"Story": 30})           # still fenced on main
     project_setup.seed_id_counters(alice)
     assert yaml.safe_load((alice / COUNTER).read_text())["counters"]["Story"] == 30
+
+
+# ---------------------------------------------------------------------------
+# Through the single write layer (mcp_server._handle_item_create)
+# ---------------------------------------------------------------------------
+
+mcp_server = pytest.importorskip("mcp_server")
+
+
+def _create(root: Path, **args) -> dict | str:
+    import json
+    text = mcp_server._handle_item_create(root / ".edpa", args)[0].text
+    return text if text.startswith("ERROR") else json.loads(text)
+
+
+def test_id_is_allocated_outside_the_backlog_write_lock(
+        tmp_path: Path, monkeypatch) -> None:
+    """A remote reservation takes seconds; inside the 5 s backlog lock it
+    would starve the post-commit evidence emitter."""
+    project(tmp_path)
+    real = mcp_server._allocate_id
+    seen = {}
+
+    def spy(item_type, repo_root, meta=None):
+        # The lock is not reentrant: this only succeeds if create is not
+        # holding it while allocating.
+        with id_counter.backlog_write_lock(tmp_path / ".edpa", timeout=0.2):
+            seen["free"] = True
+        return real(item_type, repo_root, meta)
+
+    monkeypatch.setattr(mcp_server, "_allocate_id", spy)
+    assert _create(tmp_path, type="Defect", title="x")["id"] == "D-1"
+    assert seen == {"free": True}
+
+
+def test_created_item_matches_its_reservation_record(
+        ledger_ready: World, alice: Path) -> None:
+    project(alice, authority="remote")
+    created = _create(alice, type="Defect", title="Login button greyed out")
+    assert created["id"] == "D-1"
+    text = (alice / created["path"]).read_text(encoding="utf-8")
+    front = yaml.safe_load(text.split("---")[1])
+    rec = ledger.find_record(alice, "D-1")
+    assert rec["created_at"] == front["created_at"]
+    assert rec["title"] == "Login button greyed out" and rec["type"] == "Defect"
+
+
+def test_allocation_failure_is_an_actionable_error_not_a_crash(
+        world: World, alice: Path) -> None:
+    project(alice, authority="remote")
+    result = _create(alice, type="Defect", title="x")
+    assert isinstance(result, str) and result.startswith("ERROR")
+    assert "init-remote" in result
+    assert not list((alice / ".edpa" / "backlog" / "defects").iterdir())
+
+
+def test_rejected_request_does_not_reserve_a_number(
+        ledger_ready: World, alice: Path) -> None:
+    """Validation runs before allocation, so a bad request burns nothing."""
+    project(alice, authority="remote")
+    before = ledger_ready.tip()
+    result = _create(alice, type="Defect", title="x", status="NoSuchStatus")
+    assert isinstance(result, str) and result.startswith("ERROR")
+    assert ledger_ready.tip() == before
+
+
+def test_backlog_add_commits_the_item_without_touching_the_counter(
+        ledger_ready: World, alice: Path, capsys) -> None:
+    import argparse
+    import backlog
+
+    project(alice, authority="remote", counters={"Defect": 0, "Story": 10})
+    git(alice, "add", ".edpa")
+    git(alice, "commit", "-q", "-m", "chore(no-ticket): edpa skeleton")
+    args = argparse.Namespace(
+        type="Defect", title="Crash on empty export", parent=None, js=None,
+        bv=None, tc=None, rr_oe=None, assignee=None, status="Funnel",
+        iteration=None, contributor=[])
+    backlog.cmd_add(alice, {}, args)
+
+    assert "ID reserved in the ledger" in capsys.readouterr().out
+    changed = git(alice, "show", "--name-only", "--format=%s", "HEAD").splitlines()
+    assert changed[0] == "feat(D-1): Crash on empty export"
+    assert [c for c in changed[1:] if c] == [".edpa/backlog/defects/D-1.md"]
