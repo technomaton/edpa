@@ -413,7 +413,7 @@ server for [Claude Code](https://docs.anthropic.com/en/docs/claude-code):
 | Skill | What it does |
 |---------|-------------|
 | `/edpa:setup` | Provision `.edpa/` governance (engine, config, id_counters, hooks, CI) |
-| `/edpa:add` | Create a backlog item (local-first; ID from id_counters) |
+| `/edpa:add` | Create a backlog item (local-first; ID from the local counter or the shared ID ledger) |
 | `/edpa:engine` | Compute hours from local git evidence + validate invariants |
 | `/edpa:reports` | Per-person timesheets, per-item cost, snapshots, Excel |
 | `/edpa:autocalib` | Auto-calibrate CW heuristics (after 1st PI) |

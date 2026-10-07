@@ -123,6 +123,17 @@ work**, not a chore:
 3. Reference its ID in the commit message.
 4. Don't bypass the hooks with `--no-verify` unless the user
    explicitly authorises it.
+5. Don't invent an item ID or write a backlog file by hand. IDs come
+   from `/edpa:add`; in a project that reserves IDs on its git remote
+   (`id_counter.py status` → `remote`) an item without a reservation is
+   rejected by the hooks. If the allocator reports that it cannot
+   reserve an ID, relay its message — don't work around it.
+
+(EDPA's own tooling does use `--no-verify` in two places: the
+`chore(evidence):` commit, and the push that reserves an ID in the
+ledger — one metadata commit to a tooling ref, which would otherwise
+run your pre-push test suite for every ticket. Neither carries your
+code.)
 
 This guarantees that the next `/edpa:engine` run accounts for AI-driven
 work the same way it accounts for human-driven work — through the

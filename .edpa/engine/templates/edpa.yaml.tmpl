@@ -92,6 +92,25 @@ governance:
 # Default behavior (flag absent or `true`): auto-update on session start.
 # auto_update_engine: false
 
+# ID authority — who hands out item IDs (S-42, F-7, …).
+#
+#   auto    (default) the local counter, until the project has an ID ledger
+#           on its git remote — then that. Nothing to configure for solo work.
+#   remote  IDs are reserved on the shared git remote (compare-and-swap on a
+#           ref), so they are unique across worktrees, branches and
+#           developers the moment they are assigned. Recommended as soon as
+#           more than one person or clone creates items. Switch once with:
+#             python3 .edpa/engine/scripts/id_counter.py init-remote --write-config
+#   local   always the counter in .edpa/config/id_counters.yaml.
+#
+# `remote` / `ref` only matter under the remote authority; set `ref` to a
+# branch (refs/heads/edpa-ids) on a forge that refuses custom ref namespaces.
+# See docs/dev-collisions.md.
+# ids:
+#   authority: auto
+#   remote: origin
+#   ref: refs/edpa/ids
+
 naming:
   pi_pattern: "PI-{year}-{pi_num}"            # e.g., PI-2026-1
   iteration_pattern: "PI-{year}-{pi_num}.{iter_num}"  # e.g., PI-2026-1.3

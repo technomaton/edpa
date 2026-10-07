@@ -60,7 +60,7 @@ plugin/
 │   └── hooks.json                   # SessionStart (install_deps) + PostToolUse (validate_on_save, post_commit)
 ├── skills/                          # 5 skills. Slug = directory name -> /edpa:<dir>
 │   ├── setup/SKILL.md          # → /edpa:setup     — provision .edpa/ governance (engine, config, hooks, CI)
-│   ├── add/SKILL.md            # → /edpa:add       — create a backlog item (local-first, id_counters)
+│   ├── add/SKILL.md            # → /edpa:add       — create a backlog item (ID from the local counter or the shared ledger)
 │   ├── engine/SKILL.md         # → /edpa:engine    — evidence-driven calculation
 │   ├── reports/SKILL.md        # → /edpa:reports   — timesheets, exports, snapshots
 │   └── autocalib/SKILL.md      # → /edpa:autocalib — CW heuristic optimization (Monte Carlo + coord descent)
@@ -127,7 +127,7 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 | Skill / command | Invocation | What it does |
 |---|---|---|
 | `edpa:setup` | `/edpa:setup` | Provision `.edpa/` governance (engine, config, id_counters, hooks, CI) |
-| `edpa:add` | `/edpa:add` | Create a backlog item (local-first; ID from id_counters) |
+| `edpa:add` | `/edpa:add` | Create a backlog item (local-first; ID from the local counter or the shared ID ledger) |
 | `edpa:engine` | `/edpa:engine` | Compute hours from local git evidence + validate invariants |
 | `edpa:reports` | `/edpa:reports` | Per-person timesheets, per-item cost, snapshots, Excel |
 | `edpa:autocalib` | `/edpa:autocalib` | Auto-calibrate CW heuristics (Monte Carlo + coordinate descent) |
@@ -154,14 +154,28 @@ PR-thread signals (`pr_reviewer`, `issue_comment`) arrive only via the optional
 
 ## Multi-developer setup — ID collision handling
 
-When teams have multiple devs creating backlog items in parallel branches, ID collisions are possible (both allocate `S-5` before either's PR merges). EDPA ships **four defense layers** plus a semi-automatic recovery tool:
+When several people (or clones) create backlog items in parallel, two of them can allocate the same ID (`S-5`) before either merges.
+
+**Teams: reserve IDs on the shared remote instead.** With more than one
+person (or more than one clone) creating items, switch the project to the
+*remote ID authority* (ADR-014): every ID is reserved on the git remote the
+moment it is assigned, so two sessions cannot get the same one and no ticket
+has to go through a PR just to claim its number.
+
+```bash
+python3 .edpa/engine/scripts/id_counter.py init-remote --write-config   # once per repository
+git add .edpa/config/edpa.yaml && git commit -m "chore(no-ticket): reserve ticket IDs in the shared ledger"
+python3 .edpa/engine/scripts/id_counter.py status                       # who allocates here, and why
+```
+
+Under the default local ID authority EDPA detects collisions after the fact, with **four defense layers** plus a semi-automatic recovery tool:
 
 | Layer | Where | Trigger | Tool |
 |---|---|---|---|
 | 5 — pre-commit hook | local | `git commit` | `validate_ids.py --staged` (blocks commit on inconsistencies) |
-| 6 — pre-push hook | local | `git push` | `validate_ids.py --pre-push` (blocks push if ID exists upstream) |
+| 6 — pre-push hook | local | `git push` | `validate_ids.py --pre-push` (blocks push if the item exists upstream as a different item; verifies reservations under the remote authority) |
 | 7 — CI workflow | server | PR open/sync | `edpa-collision-check.yml` (comments on PR + fails check) |
-| Recovery | local | after conflict | `renumber_collisions.py --apply` (renames + updates parents + bumps counter) |
+| Recovery | local | after conflict | `renumber_collisions.py --apply` (renames + updates references; new ID from the counter or the ledger) |
 
 Hook registration (`--with-hooks` / `--refresh-hooks`) is idempotent and lefthook-aware: EDPA tags its own hooks with an `EDPA-MANAGED-HOOK` sentinel, never clobbers a foreign hook already in a slot, and — if a `lefthook.yml` is present — wires a single `extends: .edpa/engine/lefthook-edpa.yml` entry into it instead of writing to `.git/hooks/`. That entry is the only thing EDPA ever changes in a lefthook config; repos still on an older hand-pasted block are migrated onto it at the next `/plugin update`, and the stale block is left untouched (harmless — the fragment wins the name collision with identical `run:` lines). Verify any time with the read-only doctor `project_setup.py --check-hooks` (reports each hook as active / missing / foreign, or flags lefthook).
 
@@ -171,9 +185,8 @@ Hook registration (`--with-hooks` / `--refresh-hooks`) is idempotent and lefthoo
 # Local hooks
 python3 .edpa/engine/scripts/project_setup.py --with-hooks
 
-# CI workflow
-cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
-   .github/workflows/edpa-collision-check.yml
+# CI workflows (collision check + contribution sync)
+python3 .edpa/engine/scripts/project_setup.py --with-ci
 ```
 
 Full guide with decision tree, common collision shapes (single / multi / parent-chain / cascading), recovery flow, and troubleshooting: [`docs/dev-collisions.md`](../docs/dev-collisions.md).
@@ -255,5 +268,5 @@ Note: Skills carry the text content (instructions), but Claude Code is the only 
 
 .github/workflows/                    # CI — 2 EDPA workflows (edpa- prefixed)
 ├── edpa-contribution-sync.yml        # PR review/comment signals — installed by install.sh --with-ci
-└── edpa-collision-check.yml          # backlog ID-collision gate — manual copy from templates/github-workflows/
+└── edpa-collision-check.yml          # backlog ID-collision gate — installed by --with-ci
 ```

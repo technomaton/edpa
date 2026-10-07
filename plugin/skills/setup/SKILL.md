@@ -34,7 +34,7 @@ Resulting layout:
 │   ├── config/
 │   │   ├── edpa.yaml                 ← project.name + governance metadata
 │   │   ├── people.yaml               ← team registry
-│   │   └── id_counters.yaml          ← local-first ID allocator state
+│   │   └── id_counters.yaml          ← ID counter (local ID authority)
 │   ├── backlog/                      ← per-item .md files
 │   │   ├── initiatives/  epics/  features/  stories/  defects/  events/  risks/
 │   ├── iterations/                   ← per-iteration .yaml
@@ -54,20 +54,21 @@ Resulting layout:
   GitHub Actions into `evidence[]`. Local commit_author signals
   flow regardless via `--with-hooks`.
 - `--with-hooks` — install the full git-hook stack into `.git/hooks/`:
-  - **pre-commit**: ID-safety validator (filename≡frontmatter id,
-    counter monotonicity, HEAD collisions) — Layer 5 of collision defense
+  - **pre-commit**: ID-safety validator (filename≡frontmatter id, HEAD
+    collisions, and that every new item was really allocated — counter
+    monotonicity under the local ID authority, a ledger reservation under
+    the remote one) — Layer 5 of collision defense
   - **commit-msg**: require EDPA item reference in commit subject/body
     (or `chore(no-ticket):` escape) — catches "did work, forgot to attribute"
   - **post-commit**: `local_evidence.py` emits commit_author and
     `/contribute` signals into the referenced item's `evidence[]`
   - **pre-push**: upstream ID collision check (`validate_ids.py
-    --pre-push`) — Layer 6 of collision defense; blocks push when local
-    ID already exists on `origin/main`. Recover via `renumber_collisions.py
-    --apply`. Full guide: [`docs/dev-collisions.md`](../../../docs/dev-collisions.md).
-  - **NOTE**: Layer 7 (CI workflow `edpa-collision-check.yml`) is a
-    separate manual step — copy from
-    `.edpa/engine/templates/github-workflows/` to `.github/workflows/`
-    after running setup.
+    --pre-push`) — Layer 6 of collision defense; blocks push when an item
+    you add already exists on `origin/main` as a different item. Recover via
+    `renumber_collisions.py --apply`. Full guide:
+    [`docs/dev-collisions.md`](../../../docs/dev-collisions.md).
+  - Layer 7 (CI workflow `edpa-collision-check.yml`) is installed by
+    `--with-ci`, together with the contribution-sync workflow.
   - **Registration is robust + lefthook-aware:**
     - Under **lefthook** (`lefthook.yml` present, which owns `.git/hooks/`),
       EDPA does **not** write `.git/hooks/`. It instead wires one line into
@@ -126,7 +127,25 @@ python3 .edpa/engine/scripts/backlog.py add \
   --type Initiative --title "Project Apollo"
 ```
 
-### 4. (Optional) Enable PR signal materialization later
+### 4. (Teams) Reserve IDs on the shared remote
+
+With more than one person — or more than one clone — creating items,
+switch the project to the remote ID authority once, so IDs are unique
+across worktrees, branches and developers the moment they are assigned
+(ADR-014). Needs a git remote everyone pushes to; no `gh`, no forge API.
+
+```bash
+python3 .edpa/engine/scripts/id_counter.py init-remote --write-config
+git add .edpa/config/edpa.yaml
+git commit -m "chore(no-ticket): reserve ticket IDs in the shared ledger"
+```
+
+`init-remote` shows its plan and asks before it writes to the remote —
+run it yourself only when the user asked for the switch. Details and the
+cut-over checklist: [`docs/dev-collisions.md`](../../../docs/dev-collisions.md).
+Solo projects without a shared remote stay on the local counter.
+
+### 5. (Optional) Enable PR signal materialization later
 
 If you skipped `--with-ci` initially:
 

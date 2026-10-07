@@ -1,5 +1,69 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Remote ID authority — ticket IDs unique across worktrees, branches and
+  developers (F-130, ADR-014).** The allocator's lock and counter lived
+  inside one working tree, so two worktrees, two clones or two people
+  minted the same number and only found out at merge time; teams worked
+  around it by pushing every new ticket through its own PR to "claim" the
+  ID. A project can now reserve IDs on the git remote it already pushes
+  to: the *ID ledger* is a chain of commits on one ref (`refs/edpa/ids`),
+  and a reservation is a push the server accepts only while the ref still
+  points where the client saw it. Exactly one concurrent pusher wins; the
+  rest retry with the next number. No forge API, no `gh` — ADR-001 stands.
+  ~2 s per ticket. Opt in once per repository:
+  `id_counter.py init-remote --write-config`, then commit the one-line
+  `ids.authority: remote`. Every clone switches as soon as it fetches that
+  commit, including worktrees cut before it.
+  - New `_id_ledger.py` (pure git plumbing; heals a rewound, deleted or
+    force-pushed ledger from any clone's cache) and `id_counter.py` CLI:
+    `status`, `init-remote`, `next`, `reserve`, `doctor`.
+  - Fails closed: no reservation, no ID. The only offline path is a block
+    reserved ahead (`id_counter.py reserve`).
+  - `id_counters.yaml` is no longer rewritten under the remote authority —
+    it was touched by every new ticket and conflicted on every parallel
+    ticket branch.
+  - Hooks verify the reservation (a ledger record whose `created_at`
+    matches the item's, or a number at or below the ledger's floor), so an
+    item that was hand-written or minted by an outdated plugin is stopped
+    at commit / push.
+  - Hermetic end-to-end scenario of the cut-over:
+    `tests/e2e_collision/scenario_b_ledger.sh`.
+
+### Changed
+
+- **Worktrees of one clone share one ID sequence, also under the local
+  authority (S-263).** The lock and a high-water mark moved to the git
+  common dir. Solo projects need no configuration and no network.
+- **`edpa_item_create` allocates the ID before taking the backlog write
+  lock (S-265)** and stamps `created_at` first. An allocation failure is
+  returned as an actionable tool error instead of "internal error".
+- **PI planning server allocates through `id_counter.py next` (S-267).**
+  Its own `nextId` was a second, uncoordinated allocator (bare directory
+  scan, no lock, no counter bump).
+
+### Fixed
+
+- **The pre-push ID check never caught the standard collision (S-266).**
+  It fired only when the same ID existed upstream under a *different*
+  path; two Stories that both got `S-5` share one path. It now compares
+  the items themselves (`created_at`, else content lineage) — which also
+  stops a branch's own squash-merged item from being reported. It no
+  longer skips silently when `origin/HEAD` is unset.
+- **`renumber_collisions.py --apply` renumbered the developer's own item**
+  when its branch had already been squash-merged (S-267). References now
+  follow a rename beyond `parent:` — `depends_on` and iteration item lists.
+- **`project_setup.py` could lower an ID counter (S-263).**
+  `seed_counters_from_fs` overwrote the counter with the filesystem
+  maximum on every run; it now takes the max, so the number of a deleted
+  highest item is not handed out again.
+- **`docs/dev-collisions.md` pointed at `id_counter.py --rebuild`, which
+  did not exist (S-264).** It is `id_counter.py doctor --rebuild`; the
+  guide is rewritten around the two ID authorities.
+
 ## 2.22.0 — 2026-07-21
 
 Three credit-allocation fixes that change how derived hours distribute
