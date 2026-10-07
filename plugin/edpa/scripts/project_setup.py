@@ -51,7 +51,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 try:
-    from id_counter import seed_counters_from_fs, TYPE_DIRS  # noqa: E402
+    from id_counter import (  # noqa: E402
+        IdCounterError, resolve_authority, seed_counters_from_fs, TYPE_DIRS,
+    )
 finally:
     sys.path.pop(0)
 
@@ -240,6 +242,19 @@ def seed_configs(root: Path) -> None:
 
 
 def seed_id_counters(root: Path) -> None:
+    # Under the remote ID authority (ADR-014) the tracked counter is no
+    # longer the allocator's source of truth. An existing file is left for
+    # worktrees whose vendored hooks still read it; a deleted one must not
+    # be resurrected by every re-run of setup.
+    counter_path = root / ".edpa" / "config" / "id_counters.yaml"
+    try:
+        remote = resolve_authority(root).mode == "remote"
+    except IdCounterError:
+        remote = False
+    if remote and not counter_path.exists():
+        info("Remote ID authority — id_counters.yaml not seeded "
+             "(IDs are reserved in the ledger)")
+        return
     counters = seed_counters_from_fs(root)
     nonzero = {k: v for k, v in counters.items() if v}
     ok(f"id_counters.yaml seeded ({len(nonzero)} type(s) with existing items)")
