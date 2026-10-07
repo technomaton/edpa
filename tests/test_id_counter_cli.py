@@ -117,8 +117,11 @@ def test_write_config_prepares_the_opt_in_without_committing(
     text = cfg.read_text(encoding="utf-8")
     assert text.startswith("# my project\nproject:\n  name: Demo   # keep me\n")
     assert yaml.safe_load(text)["ids"] == {"authority": "remote"}
-    # Fenced, not deleted: old vendored hooks still read it.
-    assert yaml.safe_load((alice / COUNTER).read_text())["counters"]["Story"] == 13
+    # The tracked counter is left exactly as it was: branches that created
+    # a ticket before the cut-over carry a bump of it, and rewriting it
+    # here would hand each of them a conflict.
+    assert git(alice, "status", "--porcelain").split() == [
+        "M", ".edpa/config/edpa.yaml"]
     assert git(alice, "rev-parse", "HEAD") == head             # not committed
     assert id_counter.resolve_authority(alice).source == "config"
 

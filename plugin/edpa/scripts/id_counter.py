@@ -539,27 +539,54 @@ def _ledger():
     return _id_ledger
 
 
-def _ids_config(root: Path) -> dict:
-    path = root / ".edpa" / "config" / "edpa.yaml"
+def _ids_block(text: str | None) -> dict:
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except (OSError, yaml.YAMLError):
+        data = yaml.safe_load(text or "") or {}
+    except yaml.YAMLError:
         return {}
     ids = data.get("ids") if isinstance(data, dict) else None
     return ids if isinstance(ids, dict) else {}
+
+
+def _ids_config(root: Path) -> dict:
+    path = root / ".edpa" / "config" / "edpa.yaml"
+    try:
+        return _ids_block(path.read_text(encoding="utf-8"))
+    except OSError:
+        return {}
+
+
+def _target_ids_config(root: Path, remote: str) -> dict:
+    """The ``ids:`` block of edpa.yaml on the remote's integration branch,
+    as of the last fetch (no network). This is how a clone learns that the
+    project opted in before it has merged the opt-in commit anywhere."""
+    layout = _git_layout(root)
+    if layout is None or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", remote):
+        return {}
+    _common, prefix = layout
+    path = (f"{prefix}/" if prefix else "") + ".edpa/config/edpa.yaml"
+    for branch in ("HEAD", "main", "master"):
+        text = _git_out(root, "show", f"refs/remotes/{remote}/{branch}:{path}")
+        if text is not None:
+            return _ids_block(text)
+    return {}
 
 
 def resolve_authority(root: Path | str) -> Authority:
     """Who hands out IDs for the project at ``root``.
 
     1. ``EDPA_ID_AUTHORITY=local|remote`` — explicit override.
-    2. ``ids.authority: local|remote`` in the tracked ``edpa.yaml``.
+    2. ``ids.authority: local|remote`` in the tracked ``edpa.yaml`` of
+       this checkout.
     3. ``auto`` (the default): ``remote`` once this clone has seen an ID
-       ledger, else ``local``.
+       ledger, or once the remote's integration branch opted in (as of
+       the last fetch); else ``local``.
 
-    Step 3 is what makes a cut-over work: a tracked flag exists per
+    Step 3 is what makes a cut-over work. A tracked flag exists per
     branch, and worktrees cut before the opt-in commit do not have it —
-    but they all share the clone's ledger cache, so they switch together.
+    but they share the clone's ledger cache and its remote-tracking refs,
+    so they all switch as soon as one of them reserves an ID or the clone
+    fetches the opt-in commit.
     """
     root = Path(root)
     cfg = _ids_config(root)
@@ -581,6 +608,10 @@ def resolve_authority(root: Path | str) -> Authority:
                 return Authority("remote", remote, ref, "discovered")
         except ledger.LedgerError:
             pass
+        target = _target_ids_config(root, remote)
+        if str(target.get("authority") or "").strip().lower() == "remote":
+            return Authority("remote", str(target.get("remote") or remote),
+                             str(target.get("ref") or ref), "discovered")
     return Authority("local", remote, ref, "default")
 
 
@@ -890,8 +921,15 @@ def apply_init_remote(root: Path | str, plan: dict) -> None:
 
 def write_opt_in(root: Path | str, plan: dict) -> list[Path]:
     """Prepare the opt-in commit in the working tree: the ``ids:`` block in
-    edpa.yaml and the tracked counter fenced at the floors. Not committed —
-    the change goes through the project's normal review."""
+    edpa.yaml. Not committed — it goes through the project's normal review.
+
+    The tracked ``id_counters.yaml`` is deliberately left untouched. Every
+    branch that created a ticket before the cut-over carries a counter
+    bump; rewriting (or deleting) the file here would hand each of them a
+    conflict the moment they meet this commit. Left alone, it keeps
+    merging as it always did until those branches drain, and nothing new
+    writes it any more.
+    """
     root = Path(root)
     changed: list[Path] = []
     cfg = root / ".edpa" / "config" / "edpa.yaml"
@@ -909,17 +947,6 @@ def write_opt_in(root: Path | str, plan: dict) -> list[Path]:
         cfg.write_text(text.rstrip("\n") + "\n" + block if text else block.lstrip("\n"),
                        encoding="utf-8")
         changed.append(cfg)
-    counter = root / _COUNTER_REL
-    if counter.exists():
-        # Fence, do not delete: worktrees whose vendored hook predates the
-        # ledger still read this file, and an outdated allocator minting
-        # from it lands above the floor, where the new hooks stop it.
-        fenced = {t: max(plan["floors"].get(t, 0), _safe_counter(counter, t))
-                  for t in TYPE_DIRS}
-        before = counter.read_text(encoding="utf-8")
-        _write_map_atomic(counter, fenced)
-        if counter.read_text(encoding="utf-8") != before:
-            changed.append(counter)
     return changed
 
 
@@ -955,7 +982,8 @@ def _status(root: Path, refresh: bool) -> dict:
 
 def _print_status(info: dict) -> None:
     how = {"env": f"${AUTHORITY_ENV}", "config": "ids.authority in edpa.yaml",
-           "discovered": "this clone has seen an ID ledger",
+           "discovered": "this clone has seen the project's ID ledger "
+                         "or its opt-in on the integration branch",
            "default": "no ledger known"}[info["source"]]
     print(f"ID authority: {info['authority']}  ({how})")
     if info["authority"] == "remote" or info["ledger"]:
@@ -1087,7 +1115,7 @@ def main(argv: list[str] | None = None) -> int:
                    help="skip the confirmation prompt")
     p.add_argument("--write-config", action="store_true",
                    help="also prepare the opt-in change in the working tree "
-                        "(ids.authority in edpa.yaml + fenced id_counters.yaml)")
+                        "(ids.authority: remote in edpa.yaml)")
 
     p = sub.add_parser("doctor", help="check this checkout against the ledger")
     p.add_argument("--raise", dest="raise_floors", action="store_true",

@@ -402,3 +402,35 @@ def test_backlog_add_commits_the_item_without_touching_the_counter(
     changed = git(alice, "show", "--name-only", "--format=%s", "HEAD").splitlines()
     assert changed[0] == "feat(D-1): Crash on empty export"
     assert [c for c in changed[1:] if c] == [".edpa/backlog/defects/D-1.md"]
+
+
+def test_fetching_the_opt_in_commit_is_enough_to_switch(
+        ledger_ready: World, alice: Path, bob: Path) -> None:
+    """Bob has neither merged the opt-in commit nor ever touched the
+    ledger. Fetching main — which any pull or push does — flips his clone,
+    so his next ticket (and a renumber of an old one) is ledger-backed."""
+    project(alice, authority="remote")
+    git(alice, "add", "-A", ".edpa")
+    git(alice, "commit", "-q", "-m", "chore(no-ticket): opt in")
+    git(alice, "push", "-q", "origin", "HEAD:main")
+
+    git(bob, "checkout", "-q", "-b", "feat/old")
+    project(bob)
+    assert resolve_authority(bob).mode == "local"
+
+    git(bob, "fetch", "-q", "origin")
+    auth = resolve_authority(bob)
+    assert (auth.mode, auth.source) == ("remote", "discovered")
+    assert not (bob / ".edpa/config/edpa.yaml").exists()      # still unmerged
+    assert next_id("Story", bob) == "S-11"
+
+
+def test_opt_in_on_the_target_carries_its_remote_and_ref(
+        world: World, alice: Path, bob: Path) -> None:
+    project(alice, authority="remote", extra_ids={"ref": "refs/heads/edpa-ids"})
+    git(alice, "add", "-A", ".edpa")
+    git(alice, "commit", "-q", "-m", "chore(no-ticket): opt in")
+    git(alice, "push", "-q", "origin", "HEAD:main")
+    project(bob)
+    git(bob, "fetch", "-q", "origin")
+    assert resolve_authority(bob).ref == "refs/heads/edpa-ids"
