@@ -427,11 +427,15 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="edpa_item_create",
             description=(
-                "Create a new backlog item. Allocates the next local ID via "
-                "id_counter (no gh call), validates parent type hierarchy "
+                "Create a new backlog item. Allocates the next ID via "
+                "id_counter (no gh call) — from the local counter, or, in a "
+                "project that reserves IDs on its git remote, by a ~2 s "
+                "reservation there. Validates parent type hierarchy "
                 "(Story→Feature→Epic→Initiative), and writes "
                 ".edpa/backlog/{type}/{ID}.md with frontmatter + body. "
-                "Auto-stamps created_at (UTC) — flow metrics read it."
+                "Auto-stamps created_at (UTC) — flow metrics read it. If the "
+                "ID cannot be reserved the tool returns an error and writes "
+                "nothing: relay it, do not write the item file by hand."
             ),
             inputSchema={
                 "type": "object",
