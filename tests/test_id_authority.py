@@ -62,7 +62,7 @@ def test_processes_in_different_worktrees_get_unique_ids(
             " for _ in range(4)))")
     procs = [subprocess.Popen([sys.executable, "-c", code, str(SCRIPTS), str(t)],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                              text=True) for t in trees]
+                              text=True, encoding="utf-8") for t in trees]
     ids: list[str] = []
     for p in procs:
         out, err = p.communicate(timeout=120)

@@ -167,7 +167,7 @@ def test_concurrent_processes_across_clones_and_worktrees(
     procs = [
         subprocess.Popen([sys.executable, "-c", code, str(SCRIPTS), str(repo)],
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                         text=True)
+                         text=True, encoding="utf-8")
         for repo in (alice, wt, bob, bob)
     ]
     numbers: list[int] = []
