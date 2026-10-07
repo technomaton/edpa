@@ -434,3 +434,29 @@ def test_opt_in_on_the_target_carries_its_remote_and_ref(
     project(bob)
     git(bob, "fetch", "-q", "origin")
     assert resolve_authority(bob).ref == "refs/heads/edpa-ids"
+
+
+def test_item_create_through_the_real_server_over_stdio(
+        ledger_ready: World, alice: Path) -> None:
+    """End to end through the JSON-RPC stdio server: two requests queued
+    back to back are both answered, each with its own reserved ID.
+
+    (That git children do not inherit the server's stdin is pinned at the
+    call site by test_git_never_inherits_stdin — the commands used here
+    happen not to read stdin, so this test alone would not notice.)"""
+    import json
+
+    from test_mcp_integration import MCPClient
+
+    project(alice, authority="remote")
+    with MCPClient(alice / ".edpa") as client:
+        client.initialize()
+        for title in ("First", "Second"):
+            client.send("tools/call", {"name": "edpa_item_create",
+                                       "arguments": {"type": "Defect",
+                                                     "title": title}})
+        answers = [client.recv(timeout=60), client.recv(timeout=60)]
+    assert all(a and "result" in a for a in answers), answers
+    ids = [json.loads(a["result"]["content"][0]["text"])["id"] for a in answers]
+    assert ids == ["D-1", "D-2"]
+    assert ledger.find_record(alice, "D-2")["title"] == "Second"
