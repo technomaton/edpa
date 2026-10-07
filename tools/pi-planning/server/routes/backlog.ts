@@ -38,7 +38,13 @@ export function backlogRoutes(edpaRoot: string): Router {
     const itemType = typeMap[type];
     if (!itemType) return res.status(400).json({ error: `Unknown type: ${type}` });
 
-    const id = nextId(edpaRoot, itemType);
+    let id: string;
+    try {
+      id = nextId(edpaRoot, itemType, typeof req.body?.title === 'string' ? req.body.title : undefined);
+    } catch (e) {
+      // e.g. the ID ledger is unreachable — nothing was written.
+      return res.status(503).json({ error: (e as Error).message });
+    }
     const item = { ...req.body, id, type: itemType };
     saveItem(edpaRoot, item);
     res.status(201).json(item);

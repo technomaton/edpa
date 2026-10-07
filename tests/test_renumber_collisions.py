@@ -618,3 +618,150 @@ def test_three_dev_cascading_collisions(tmp_path: Path) -> None:
     # Summary
     assert summary["renamed"] == 2
     assert summary["counter_bumps"] == {"Story": 5}
+
+
+# ---------------------------------------------------------------------------
+# Identity, wider reference rewrite, and the remote ID authority (ADR-014)
+# ---------------------------------------------------------------------------
+
+from ledger_world import (  # noqa: E402,F401  (fixtures are used by name)
+    COUNTER, World, _isolated_git_config, _templates, alice, bob, git, item,
+    ledger_ready, project, world,
+)
+
+import _id_ledger as ledger  # noqa: E402
+import id_counter  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_authority_override(monkeypatch):
+    monkeypatch.delenv(id_counter.AUTHORITY_ENV, raising=False)
+
+
+def _in(repo: Path, fn, *args, **kw):
+    old = Path.cwd()
+    try:
+        os.chdir(repo)
+        return fn(*args, **kw)
+    finally:
+        os.chdir(old)
+
+
+def _land(repo: Path, message: str) -> None:
+    git(repo, "add", "-A", ".edpa")
+    git(repo, "commit", "-q", "-m", message)
+    git(repo, "push", "-q", "origin", "HEAD:main")
+
+
+def test_own_item_already_on_the_target_is_not_a_collision(
+        world: World, alice: Path, bob: Path) -> None:
+    """After a squash merge the branch still "adds" the item relative to
+    its merge-base; --apply used to renumber the developer's own item."""
+    project(bob)
+    git(bob, "checkout", "-q", "-b", "feat")
+    mine = item(bob, "S-3", title="Reports", created_at="2026-10-08T09:07:00Z")
+    git(bob, "add", "-A", ".edpa")
+    git(bob, "commit", "-q", "-m", "feat(S-3): Reports")
+
+    project(alice)
+    (alice / ".edpa/backlog/stories/S-3.md").write_text(
+        mine.read_text(encoding="utf-8") + "\nedited after the squash\n",
+        encoding="utf-8")
+    _land(alice, "feat(S-3): Reports (#12)")
+
+    assert _in(bob, rc.find_collisions, bob) == []
+
+
+def test_apply_rewrites_depends_on_and_iteration_lists(colliding_repo) -> None:
+    """Only ``parent:`` used to follow the rename."""
+    _remote, local = colliding_repo
+    dep = _write_md(local, ".edpa/backlog/defects/D-2.md", {
+        "id": "D-2", "type": "Defect", "depends_on": ["S-1", "S-3"],
+        "evidence": [{"ref": "commit/abc1234/S-3.md"}],
+    }, body="Follow-up to S-3.\n")
+    iteration = local / ".edpa" / "iterations" / "PI-1.1.yaml"
+    iteration.parent.mkdir(parents=True)
+    iteration.write_text(
+        "planning:\n  stories:\n    - S-2  # kept\n    - S-3  # local story\n",
+        encoding="utf-8")
+    _git(["add", "."], cwd=local)
+    _git(["commit", "-q", "-m", "plan S-3"], cwd=local)
+
+    collisions = _in(local, rc.find_collisions, local)
+    assert [(c["old_id"], c["new_id"]) for c in collisions] == [("S-3", "S-4")]
+    _in(local, rc.apply_collisions, local, collisions)
+
+    text = dep.read_text(encoding="utf-8")
+    assert yaml.safe_load(text.split("---")[1])["depends_on"] == ["S-1", "S-4"]
+    assert "commit/abc1234/S-3.md" in text        # evidence refs are history
+    assert "Follow-up to S-3." in text            # ...and so is prose
+    assert iteration.read_text(encoding="utf-8") == (
+        "planning:\n  stories:\n    - S-2  # kept\n    - S-4  # local story\n")
+
+
+def _bob_collides_with_main(world: World, alice: Path, bob: Path) -> Path:
+    """Main holds S-5; Bob's branch holds another S-5 (minted by an
+    outdated allocator — the only way to collide once a ledger exists)."""
+    project(alice, authority="remote", counters={"Story": 10})
+    item(alice, "S-5", title="Auth", created_at="2026-10-08T09:00:00Z")
+    _land(alice, "feat(S-5): Auth")
+    git(bob, "checkout", "-q", "-b", "feat")
+    project(bob, authority="remote", counters={"Story": 10})
+    mine = item(bob, "S-5", title="Reports", created_at="2026-10-08T09:07:00Z")
+    git(bob, "add", "-A", ".edpa")
+    git(bob, "commit", "-q", "-m", "feat(S-5): Reports")
+    return mine
+
+
+def test_remote_authority_takes_the_replacement_from_the_ledger(
+        ledger_ready: World, alice: Path, bob: Path) -> None:
+    _bob_collides_with_main(ledger_ready, alice, bob)
+    counter_before = (bob / COUNTER).read_bytes()
+
+    collisions = _in(bob, rc.find_collisions, bob)
+    assert [(c["old_id"], c["new_id"]) for c in collisions] == [("S-5", None)]
+    assert ledger_ready.counters()["counters"]["Story"] == 10   # nothing reserved yet
+
+    summary = _in(bob, rc.apply_collisions, bob, collisions)
+    assert (bob / ".edpa/backlog/stories/S-11.md").exists()
+    assert not (bob / ".edpa/backlog/stories/S-5.md").exists()
+    assert summary["counter_bumps"] == {}
+    assert (bob / COUNTER).read_bytes() == counter_before
+    rec = ledger.find_record(bob, "S-11")
+    assert rec["title"] == "Reports"
+    assert rec["created_at"] == "2026-10-08T09:07:00Z"   # hooks will accept it
+
+
+def test_check_never_reserves_and_reports_unreserved_items(
+        ledger_ready: World, alice: Path, bob: Path, monkeypatch, capsys) -> None:
+    """CI mode under the remote authority: the PR check that still means
+    something — a same-path collision makes the PR conflicting, and then
+    pull_request workflows do not run at all."""
+    project(alice, authority="remote")
+    git(alice, "add", "-A", ".edpa")
+    git(alice, "commit", "-q", "-m", "chore(no-ticket): opt in")
+    git(alice, "push", "-q", "origin", "HEAD:main")
+
+    git(bob, "pull", "-q", "origin", "main")
+    git(bob, "checkout", "-q", "-b", "feat")
+    project(bob)
+    item(bob, "S-12", title="minted by hand", created_at="2026-10-08T09:07:00Z")
+    git(bob, "add", "-A", ".edpa")
+    git(bob, "commit", "-q", "-m", "feat(S-12): minted by hand")
+    before = ledger_ready.tip()
+
+    monkeypatch.setattr(sys, "argv", ["renumber_collisions", "--check"])
+    assert _in(bob, rc.main) == 1
+    out = capsys.readouterr().out
+    assert "1 item(s) without an ID reservation" in out
+    assert "S-12 has no reservation in the ID ledger" in out
+    assert ledger_ready.tip() == before
+
+    # The same branch with a properly reserved item passes.
+    (bob / ".edpa/backlog/stories/S-12.md").unlink()
+    new = id_counter.next_id("Story", bob, meta={
+        "title": "reserved", "created_at": "2026-10-08T10:00:00Z"})
+    item(bob, new, title="reserved", created_at="2026-10-08T10:00:00Z")
+    git(bob, "add", "-A", ".edpa")
+    git(bob, "commit", "-q", "-m", f"feat({new}): reserved")
+    assert _in(bob, rc.main) == 0
