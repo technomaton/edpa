@@ -866,8 +866,13 @@ def init_remote(root: Path | str, *, headroom: int = 20, fetch: bool = True,
     The floor is the highest number that may exist without a reservation
     record. It has to cover every pre-ledger item anywhere — so all remote
     branches are fetched into a private namespace first (a single-branch
-    or shallow clone sees them too) — and ``headroom`` more, for sessions
+    or shallow clone sees them too) — and some headroom, for sessions
     that keep minting from an outdated allocator during the cut-over.
+
+    ``headroom`` is the most any type gets; a type receives about a tenth
+    of its current size (at least 1). Stragglers mint in proportion to
+    how busy a type is, and a flat 20 would turn the next Initiative of a
+    three-Initiative project into I-24.
     """
     root = Path(root)
     auth = resolve_authority(root)
@@ -905,7 +910,9 @@ def init_remote(root: Path | str, *, headroom: int = 20, fetch: bool = True,
         for name in (_git_out(root, "for-each-ref", "--format=%(refname)",
                               scan_ns) or "").split():
             _git_out(root, "update-ref", "-d", name)
-    floors = {t: (v + headroom if v > 0 else 0) for t, v in seen.items()}
+    floors = {t: (v + min(headroom, max(1, -(-v // 10))) if v > 0 and headroom > 0
+                  else v)
+              for t, v in seen.items()}
     return {"remote": remote, "ref": ref, "seen": seen, "floors": floors,
             "headroom": headroom, "fetched": fetched}
 
@@ -1109,8 +1116,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("init-remote", help="create the ID ledger on the "
                        "shared remote (once per repository)")
     p.add_argument("--headroom", type=int, default=20,
-                   help="numbers left free above the highest known ID for "
-                        "sessions still on an outdated allocator (default 20)")
+                   help="most numbers left free above a type's highest known "
+                        "ID for sessions still on an outdated allocator; a "
+                        "type gets about a tenth of its size (default 20, "
+                        "0 = none)")
     p.add_argument("--remote")
     p.add_argument("--ref")
     p.add_argument("--no-fetch", action="store_true",
@@ -1169,7 +1178,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ID ledger: {plan['ref']} on {plan['remote']}")
             print("Highest ID found across worktrees and branches"
                   + ("" if plan["fetched"] else " (remote branches NOT fetched)")
-                  + f", + headroom {plan['headroom']}:\n")
+                  + f", + headroom (up to {plan['headroom']} per type):\n")
             for t, prefix in TYPE_PREFIX.items():
                 if plan["seen"][t]:
                     print(f"  {t:<11} {prefix}-{plan['seen'][t]:<6} → floor "

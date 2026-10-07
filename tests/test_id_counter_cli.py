@@ -57,28 +57,45 @@ def _spread_out_project(world: World, alice: Path, bob: Path) -> None:
 def test_init_remote_seeds_from_everything_this_clone_can_reach(
         world: World, alice: Path, bob: Path, capsys) -> None:
     _spread_out_project(world, alice, bob)
-    assert cli(alice, "init-remote", "--headroom", "5", "--apply") == 0
+    assert cli(alice, "init-remote", "--apply") == 0
     out = capsys.readouterr().out
-    assert "S-8" in out and "floor S-13" in out and "first new ID S-14" in out
+    assert "S-8" in out and "floor S-9" in out and "first new ID S-10" in out
 
     state = world.counters()
-    assert state["floors"] == {"Defect": 6, "Story": 13}
-    assert state["counters"] == {"Defect": 6, "Story": 13}
+    assert state["floors"] == {"Defect": 2, "Story": 9}
+    assert state["counters"] == {"Defect": 2, "Story": 9}
     # Types without any item get no headroom: the first Risk is R-1.
     assert "Risk" not in state["floors"]
     # The private scan namespace is cleaned up again.
     assert git(alice, "for-each-ref", "refs/edpa/scan") == ""
     # ...and the whole clone is switched, without any tracked flag yet.
-    assert next_id("Story", alice) == "S-14"
+    assert next_id("Story", alice) == "S-10"
     assert next_id("Risk", alice) == "R-1"
+
+
+def test_headroom_is_proportional_to_the_size_of_a_type(
+        world: World, alice: Path) -> None:
+    """A flat headroom would number the next Initiative of a small project
+    I-24. A type gets about a tenth of its size, capped by --headroom."""
+    project(alice)
+    item(alice, "S-262")
+    item(alice, "D-62", "defects")
+    item(alice, "I-3", "initiatives")
+    plan = id_counter.init_remote(alice, headroom=20, fetch=False)
+    assert plan["floors"] == {
+        "Initiative": 4, "Epic": 0, "Feature": 0, "Story": 282,
+        "Defect": 69, "Event": 0, "Risk": 0}
+    assert id_counter.init_remote(alice, headroom=5, fetch=False)["floors"]["Story"] == 267
+    flat = id_counter.init_remote(alice, headroom=0, fetch=False)["floors"]
+    assert (flat["Story"], flat["Initiative"]) == (262, 3)
 
 
 def test_init_remote_twice_changes_nothing(
         world: World, alice: Path, bob: Path) -> None:
     _spread_out_project(world, alice, bob)
-    assert cli(alice, "init-remote", "--headroom", "5", "--apply") == 0
+    assert cli(alice, "init-remote", "--apply") == 0
     tip = world.tip()
-    assert cli(alice, "init-remote", "--headroom", "5", "--apply") == 0
+    assert cli(alice, "init-remote", "--apply") == 0
     assert world.tip() == tip
 
 
@@ -112,8 +129,7 @@ def test_write_config_prepares_the_opt_in_without_committing(
     git(alice, "commit", "-q", "-m", "seed")
     head = git(alice, "rev-parse", "HEAD")
 
-    assert cli(alice, "init-remote", "--headroom", "10", "--apply",
-               "--write-config") == 0
+    assert cli(alice, "init-remote", "--apply", "--write-config") == 0
     text = cfg.read_text(encoding="utf-8")
     assert text.startswith("# my project\nproject:\n  name: Demo   # keep me\n")
     assert yaml.safe_load(text)["ids"] == {"authority": "remote"}
