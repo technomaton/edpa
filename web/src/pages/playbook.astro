@@ -287,7 +287,7 @@ python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 \
   --title "..." --js 5 --assignee bob --iteration PI-2026-1.1
 python3 .edpa/engine/scripts/backlog.py add --type Epic --parent I-1 \
   --title "..." --js 13 --bv 13 --tc 8 --rr-oe 5</code></pre>
-    <p><code>backlog.py add</code> je v V2 <strong>čistě lokální</strong> (žádné <code>gh</code>): ID se přidělí z <code>id_counters.yaml</code> (<code>S-42</code>, <code>E-15</code>, <code>I-3</code>), hierarchie rodiče se zvaliduje, YAML se zapíše pod <code>.edpa/backlog/</code> a změna se auto-commitne jako <code>feat(&lt;ID&gt;):</code>. PR-odvozené signály přicházejí až později přes volitelný contribution-sync workflow.</p>
+    <p><code>backlog.py add</code> je v V2 <strong>čistě lokální</strong> (žádné <code>gh</code>): ID se přidělí z <code>id_counters.yaml</code>, nebo se u týmů rezervuje na sdíleném git remote (<code>ids.authority: remote</code>) (<code>S-42</code>, <code>E-15</code>, <code>I-3</code>), hierarchie rodiče se zvaliduje, YAML se zapíše pod <code>.edpa/backlog/</code> a změna se auto-commitne jako <code>feat(&lt;ID&gt;):</code>. PR-odvozené signály přicházejí až později přes volitelný contribution-sync workflow.</p>
     <div class="note"><strong>Odstraněno v 2.0.0:</strong> „GH-first" režim <code>add</code> (tvorba GH issue, sub-issue API, přepis title na <code>"&#123;ID&#125;: &#123;title&#125;"</code>). V V2 je <code>add</code> local-only — V1 tvrzení „strictly GH-first" už NEPLATÍ.</div>
 
     <p>Přidělování přispěvatelů lze udělat hned při založení (per-item CW share):</p>

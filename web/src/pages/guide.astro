@@ -143,7 +143,7 @@ PR #42 closed → sync_pr_contributions.py:
     num: 6,
     title: 'Naplnit backlog',
     color: 'var(--or)',
-    desc: 'Items přidávejte přes backlog.py add — ID se alokuje z id_counters.yaml, hierarchie se validuje a soubor .md se zapíše do .edpa/backlog/ a auto-commitne jako feat(<ID>):. Hierarchie: Initiative > Epic > Feature > Story (+ Defect na úrovni Story). WSJF se počítá automaticky.',
+    desc: 'Items přidávejte přes backlog.py add — ID se alokuje z lokálního čítače (id_counters.yaml), nebo se u týmů rezervuje na sdíleném git remote (unikátní napříč worktree i vývojáři); hierarchie se validuje a soubor .md se zapíše do .edpa/backlog/ a auto-commitne jako feat(<ID>):. Hierarchie: Initiative > Epic > Feature > Story (+ Defect na úrovni Story). WSJF se počítá automaticky.',
     claude: `# V Claude Code stačí napsat:
 /edpa:add Story "Implementovat login endpoint" \\
   --parent F-1 --js 5 --bv 8 --tc 5 --rr-oe 3 \\

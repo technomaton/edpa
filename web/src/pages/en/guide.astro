@@ -111,7 +111,7 @@ python3 .edpa/engine/scripts/setup.py --with-ci`,
     num: 5,
     title: 'Populate Backlog',
     color: 'var(--or)',
-    desc: 'Add items via backlog.py add — the ID is allocated from id_counters.yaml, the parent hierarchy is validated, and a .md file is written under .edpa/backlog/ and auto-committed as feat(<ID>):. Hierarchy: Initiative > Epic > Feature > Story. WSJF is calculated automatically.',
+    desc: 'Add items via backlog.py add — the ID comes from the local counter (id_counters.yaml) or, for teams, is reserved on the shared git remote (unique across worktrees and developers); the parent hierarchy is validated, and a .md file is written under .edpa/backlog/ and auto-committed as feat(<ID>):. Hierarchy: Initiative > Epic > Feature > Story. WSJF is calculated automatically.',
     claude: `# In Claude Code, just say:
 /edpa:add Story "Implement login endpoint" \\
   --parent F-1 --js 5 --bv 8 --tc 5 --rr-oe 3 \\

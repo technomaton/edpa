@@ -428,7 +428,13 @@ feature/F-102-anon-engine</div>
   <section id="kolize-id">
     <h2>9b. ID kolize a renumbering (multi-developer setup)</h2>
 
-    <p>EDPA alokuje ID lokálně (žádný centrální koordinátor) — pokud dva vývojáři současně vytvoří backlog item ze stejného počátečního stavu mainu, oba dostanou stejné ID (např. oba <code>S-5</code>). Kolize se projeví až při merge druhého PR.</p>
+    <p><strong>Týmy: rezervace ID na sdíleném git remote (od 2.23.0).</strong> Projekt může přidělování čísel svěřit git remote, na který tým stejně pushuje. Rezervace je push jednoho servisního commitu do refu <code>refs/edpa/ids</code>, který server přijme jen tehdy, když se ref mezitím nezměnil — vyhraje právě jeden, ostatní zkusí další číslo. ID je tak unikátní napříč worktree, větvemi i vývojáři v okamžiku přidělení (~2 s), bez GitHub API a bez <code>gh</code>. Tiket už nemusí přes PR jen proto, aby si „zabral" číslo; hooky pustí jen tiket s rezervací.</p>
+<pre><code>python3 .edpa/engine/scripts/id_counter.py init-remote --write-config   # jednou na repozitář
+git add .edpa/config/edpa.yaml &amp;&amp; git commit -m "chore(no-ticket): reserve ticket IDs in the shared ledger"
+python3 .edpa/engine/scripts/id_counter.py status                       # kdo tady přiděluje ID a proč</code></pre>
+    <p>Postup přechodu na jednu stránku: <a href="https://github.com/technomaton/edpa/blob/main/docs/id-ledger-prechod.md" target="_blank" rel="noopener">id-ledger-prechod.md</a>.</p>
+
+    <p><strong>Bez sdíleného ledgeru (výchozí, lokální režim)</strong> čerpají worktree jednoho klonu z jedné řady, ale dva klony ne — pokud dva vývojáři současně vytvoří backlog item ze stejného počátečního stavu mainu, oba dostanou stejné ID (např. oba <code>S-5</code>). Kolizi zachytí pre-push hook, nejpozději merge druhého PR.</p>
 
     <p><strong>4 vrstvy obrany</strong> detekují kolizi co nejdřív + poloautomatický recovery tool:</p>
 
