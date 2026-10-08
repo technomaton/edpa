@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.23.2 — 2026-10-08
+
+### Changed
+
+- **`id_counter.py init-remote` leaves no headroom by default (S-291).**
+  Numbering continues right after the highest existing ID instead of
+  skipping up to 20 numbers per type. Everyone has to be on a
+  ledger-aware plugin before a project is switched over; a session still
+  on an outdated allocator is stopped by the hooks. `--headroom N` brings
+  the reserve back for projects that cannot arrange that.
+
 ## 2.23.1 — 2026-10-08
 
 ### Added
