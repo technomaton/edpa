@@ -49,3 +49,9 @@ sync:
     Story: Dodáváno v iteraci
     Defect: Defekt v existující funkcionalitě
     Task: Technická práce
+
+# ID authority (ADR-014): ticket IDs are reserved on the shared git remote
+# (compare-and-swap on a ref) so they are unique across worktrees, branches
+# and developers. See docs/dev-collisions.md.
+ids:
+  authority: remote
