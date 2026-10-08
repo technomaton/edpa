@@ -37,12 +37,12 @@ sequenceDiagram
 | 2 | Zkouška v repu EDPA: `init-remote`, commit, pár tiketů ze dvou worktree | maintainer EDPA | žádný |
 | 3 | Release EDPA (bump verze, changelog, web, tag) — bez nové verze se engine v projektech neaktualizuje | maintainer EDPA | žádný, dokud si plugin neaktualizujete |
 | 4 | **Všichni:** `/plugin update`, restart session, pushnout rozpracované větve s tikety | celý tým | ~5 minut |
-| 5 | V projektu: `init-remote --write-config` a PR s jedním řádkem `ids.authority: remote` | maintainer projektu | od teď platí nový režim |
+| 5 | V projektu: `init-remote --headroom 0 --write-config` a PR s jedním řádkem `ids.authority: remote` | maintainer projektu | od teď platí nový režim |
 | 6 | Kontrola: `id_counter.py status` a `id_counter.py doctor` | kdokoli | — |
 
 ```bash
 # krok 5 (jednou na repozitář, z nejúplnějšího klonu)
-python3 .edpa/engine/scripts/id_counter.py init-remote --write-config
+python3 .edpa/engine/scripts/id_counter.py init-remote --headroom 0 --write-config
 git add .edpa/config/edpa.yaml
 git commit -m "chore(no-ticket): reserve ticket IDs in the shared ledger"
 
@@ -60,7 +60,9 @@ python3 .edpa/engine/scripts/id_counter.py doctor
   Všechny worktree jednoho klonu se přepnou najednou.
 - Tiket napsaný ručně nebo vyražený starým pluginem zastaví hook při commitu nebo pushi.
   Tikety zakládejte vždy přes `/edpa:add`.
-- První nová čísla začnou o kousek výš (rezerva pro ty, kdo ještě neaktualizovali).
+- Číslování plynule pokračuje (`--headroom 0`, žádná rezerva ani díry v řadě). Proto musí mít
+  před krokem 5 všichni nový plugin — kdo by ještě razil čísla po staru, toho zastaví hook a
+  tiket si založí znovu.
 - `id_counters.yaml` se přestane přepisovat, takže na něm přestanou vznikat konflikty.
 - Máte ve větvi tiket z doby před přepnutím se stejným číslem jako někdo jiný? Postup je stejný
   jako dřív: `python3 .edpa/engine/scripts/renumber_collisions.py --apply`. Nové číslo už přijde
