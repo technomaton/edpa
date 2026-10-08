@@ -243,16 +243,17 @@ def seed_configs(root: Path) -> None:
 
 def seed_id_counters(root: Path) -> None:
     # Under the remote ID authority (ADR-014) the tracked counter is no
-    # longer the allocator's source of truth. An existing file is left for
-    # worktrees whose vendored hooks still read it; a deleted one must not
-    # be resurrected by every re-run of setup.
+    # longer the allocator's source of truth and nothing writes it: an
+    # existing file is left exactly as it is (re-seeding it on every run
+    # put the conflict-prone file back into diffs — D-94), and a deleted
+    # one is not resurrected.
     counter_path = root / ".edpa" / "config" / "id_counters.yaml"
     try:
         remote = resolve_authority(root).mode == "remote"
     except IdCounterError:
         remote = False
-    if remote and not counter_path.exists():
-        info("Remote ID authority — id_counters.yaml not seeded "
+    if remote:
+        info("Remote ID authority — id_counters.yaml left as is "
              "(IDs are reserved in the ledger)")
         return
     counters = seed_counters_from_fs(root)
