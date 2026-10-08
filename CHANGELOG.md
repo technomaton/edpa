@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 2.23.0 — 2026-10-08
+
+Ticket IDs can now be reserved on the shared git remote, so they are unique
+across worktrees, branches and developers the moment they are assigned.
+Opt-in per repository; projects that do nothing keep the local counter.
+One-page cut-over guide (Czech): `docs/id-ledger-prechod.md`.
 
 ### Added
 
@@ -60,6 +65,11 @@
   `seed_counters_from_fs` overwrote the counter with the filesystem
   maximum on every run; it now takes the max, so the number of a deleted
   highest item is not handed out again.
+- **Fresh installs pulled `mcp` 2.x, on which the MCP server fails at
+  import (D-83).** The root `requirements.txt` and the dependency line
+  `install.sh` prints were uncapped; both now say `mcp<2`, like
+  `plugin/requirements.txt`. (`backlog.py add` routes through the server,
+  so this broke ticket creation, and CI, on any new environment.)
 - **`docs/dev-collisions.md` pointed at `id_counter.py --rebuild`, which
   did not exist (S-264).** It is `id_counter.py doctor --rebuild`; the
   guide is rewritten around the two ID authorities.
