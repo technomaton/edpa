@@ -867,16 +867,21 @@ def reserve_block(item_type: str, root: Path | str, count: int) -> list[str]:
     return [f"{prefix}-{n}" for n in res.numbers]
 
 
-def init_remote(root: Path | str, *, headroom: int = 20, fetch: bool = True,
+def init_remote(root: Path | str, *, headroom: int = 0, fetch: bool = True,
                 remote: str | None = None, ref: str | None = None) -> dict:
     """Plan the bootstrap of the ID ledger: per-type floors this clone can
-    prove, plus headroom. Returns the plan; ``apply_init_remote`` writes it.
+    prove (plus optional headroom). Returns the plan; ``apply_init_remote`` writes it.
 
     The floor is the highest number that may exist without a reservation
     record. It has to cover every pre-ledger item anywhere — so all remote
     branches are fetched into a private namespace first (a single-branch
-    or shallow clone sees them too) — and some headroom, for sessions
-    that keep minting from an outdated allocator during the cut-over.
+    or shallow clone sees them too).
+
+    By default there is no headroom: numbering simply continues, without
+    gaps. That requires everyone to be on a ledger-aware plugin before
+    the cut-over — a session still minting from an outdated allocator
+    gets a number the ledger hands to someone else, and is stopped by the
+    hooks. ``headroom`` > 0 leaves numbers free for such stragglers.
 
     ``headroom`` is the most any type gets; a type receives about a tenth
     of its current size (at least 1). Stragglers mint in proportion to
@@ -1124,11 +1129,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("init-remote", help="create the ID ledger on the "
                        "shared remote (once per repository)")
-    p.add_argument("--headroom", type=int, default=20,
-                   help="most numbers left free above a type's highest known "
-                        "ID for sessions still on an outdated allocator; a "
-                        "type gets about a tenth of its size (default 20, "
-                        "0 = none)")
+    p.add_argument("--headroom", type=int, default=0,
+                   help="leave numbers free above each type's highest known "
+                        "ID for sessions still on an outdated allocator: "
+                        "about a tenth of a type's size, at most this many. "
+                        "Default 0 — numbering continues without gaps")
     p.add_argument("--remote")
     p.add_argument("--ref")
     p.add_argument("--no-fetch", action="store_true",
@@ -1187,7 +1192,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ID ledger: {plan['ref']} on {plan['remote']}")
             print("Highest ID found across worktrees and branches"
                   + ("" if plan["fetched"] else " (remote branches NOT fetched)")
-                  + f", + headroom (up to {plan['headroom']} per type):\n")
+                  + (f", + headroom (up to {plan['headroom']} per type)"
+                     if plan["headroom"] else "") + ":\n")
             for t, prefix in TYPE_PREFIX.items():
                 if plan["seen"][t]:
                     print(f"  {t:<11} {prefix}-{plan['seen'][t]:<6} → floor "

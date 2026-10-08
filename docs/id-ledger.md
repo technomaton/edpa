@@ -51,7 +51,7 @@ The ref points at the newest commit of a chain. Every commit has
     Story: 290
   floors:          # highest number that may exist WITHOUT a reservation
     Defect: 92     # record: items older than the ledger, plus the
-    Story: 289     # headroom left at cut-over
+    Story: 289     # optional headroom left at cut-over
   ```
 
 - a **message** — the audit record of the reservation:
