@@ -10,8 +10,8 @@ Tento dokument je ADR-style log (Architecture Decision Records) pro V2 transici.
 | [ADR-001](#adr-001-disconnect-edpa-from-github-syncidboard) | Disconnect EDPA from GitHub (sync/ID/board) | Accepted |
 | [ADR-002](#adr-002-mcp-server-as-single-api-layer-over-yaml) | MCP server jako jediná API vrstva nad YAML | Accepted |
 | [ADR-003](#adr-003-mcp-only-when-it-makes-sense) | "MCP jen když dává smysl" — direct script pro compute | Accepted |
-| [ADR-004](#adr-004-local-sequential-id-counter) | Lokální sekvenční ID counter (vs. ULID) | Accepted |
-| [ADR-005](#adr-005-local-hook-based-id-safety) | Lokální hook-based ID safety (vs. CI-based) | Accepted |
+| [ADR-004](#adr-004-local-sequential-id-counter) | Lokální sekvenční ID counter (vs. ULID) | Accepted — **amended by ADR-014** |
+| [ADR-005](#adr-005-local-hook-based-id-safety) | Lokální hook-based ID safety (vs. CI-based) | Accepted — **amended by ADR-014** |
 | [ADR-006](#adr-006-pi-planning-tool-as-optional-komplement-v-v20) | PI planning tool jako optional komplement v V2.0 | Accepted |
 | [ADR-007](#adr-007-drop-discussion-threads-in-v20) | Drop discussion threads v V2.0 | Accepted |
 | [ADR-008](#adr-008-hard-cut-release-v-v20) | Hard cut release v V2.0 (vs. deprecation cycle) | Accepted |
@@ -20,6 +20,7 @@ Tento dokument je ADR-style log (Architecture Decision Records) pro V2 transici.
 | [ADR-011](#adr-011-engine-evidence-via-optional-gh) | Engine evidence via optional `gh` s graceful fallback | **Superseded by ADR-012** |
 | [ADR-012](#adr-012-platform-specific-ci-materialization-layer) | Platform-specific CI materialization layer | Accepted |
 | [ADR-013](#adr-013-pr-event-handling--merge-only-default-with-live-opt-in) | PR event handling: merge-only default, live opt-in | Accepted |
+| [ADR-014](#adr-014-remote-coordinated-identity--id-ledger-na-git-refu) | Remote-coordinated identity: ID ledger na git refu | Accepted |
 
 ---
 
@@ -137,7 +138,7 @@ Pravidlo: MCP pro **strukturované jednotky dat** (item, iteration, person). Skr
 
 **Date:** 2026-05-25
 **Decider:** Jaroslav Urbánek
-**Status:** Accepted
+**Status:** Accepted — amended by [ADR-014](#adr-014-remote-coordinated-identity--id-ledger-na-git-refu) (2026-10-08): formát i sekvenční čísla platí dál, ale u projektů se sdíleným remote už čísla nepřiděluje lokální counter
 
 ### Context
 Po [ADR-001](#adr-001) potřebujeme lokální mechanismus pro generování ID (`STO-42`, `EPI-3`, …) bez `gh issue.number`. Volba ovlivňuje, jak budou IDs vypadat a jak řešit kolize.
@@ -185,7 +186,7 @@ Display ID zachová current schema (`STO-78` → `STO-79`). ID safety přes 6-vr
 
 **Date:** 2026-05-25
 **Decider:** Jaroslav Urbánek
-**Status:** Accepted
+**Status:** Accepted — amended by [ADR-014](#adr-014-remote-coordinated-identity--id-ledger-na-git-refu) (2026-10-08): hooky zůstávají, ale z detekce kolizí se stává ověření rezervace; odmítnutý CI check mezitím vznikl (v2.1.5, distribuován od v2.12.1) a ADR-014 to zpětně zaznamenává
 
 ### Context
 Sekvenční counter ([ADR-004](#adr-004)) bez globálního arbitra (GH) může vést ke kolizím: cross-branch race, retry, manual edits, concurrent processes. Potřebujeme defense, ale **bez návratu ke GH coupling** (např. přes GH CI workflow).
@@ -745,6 +746,74 @@ Engine normalizuje na cw. **Funguje out of the box** díky unique `signals[].ref
 **Sweet spot:** squash-on-merge + merge-only mode = clean main + zachovaný audit (přes `git show`).
 
 **Související:** [ADR-001](#adr-001), [ADR-010](#adr-010), [ADR-012](#adr-012-platform-specific-ci-materialization-layer)
+
+---
+
+## ADR-014: Remote-coordinated identity — ID ledger na git refu
+
+**Date:** 2026-10-08
+**Decider:** Jaroslav Urbánek
+**Status:** Accepted
+
+### Context
+
+[ADR-004](#adr-004-lokální-sekvenční-id-counter) vědomě vypustil globálního arbitra ID („bez GH jsou možné kolize") a vsadil na vrstvenou detekci s tím, že „pro tým < 10 devs a < 100 položek/měsíc je to levnější" a že „pokud kolize budou opakovaný problém, V2.x bude muset…". Ta podmínka nastala. Měření na pilotním projektu (2026-10-07, EDPA 2.22.0):
+
+- **28 git worktree nad jedním klonem**, každý s vlastním `.edpa/config/id_counters.yaml` a vlastním zámkem (`<worktree>/.edpa/.id_counter.lock`) — čítač Story se mezi nimi lišil o desítky. Alokátor byl koordinovaný jen uvnitř jednoho working tree.
+- **167 nových tiketů za 30 dní od 5 lidí** (limit z ADR-004: 100/měsíc).
+- **111 z 233 commitů na `main`** přepisovalo `id_counters.yaml` — soubor, na kterém koliduje každá souběžná tiketová větev.
+- **9 z 60 posledních PR měnilo jen `.edpa/`**: tiket se pouštěl přes celé PR (CI medián 8,6 min, otevřeno→sloučeno medián 11 min) jen proto, aby se jeho ID „zarezervovalo" na `main`.
+- Detekce byla slabší, než dokumentace tvrdila: pre-push check hlásil kolizi jen tehdy, když stejné ID leželo upstream pod **jinou cestou** (`up_path != line`) — dvě Stories se stejným číslem mají cestu stejnou, takže standardní kolizi nezachytil nikdy; CI check na konfliktním PR neběží vůbec. Skutečnou pojistkou byl až add/add konflikt gitu.
+- Oprava (`renumber_collisions.py`) je ruční a ztrátová: nepřepíše commit zprávy už napsané se starým ID.
+
+Reálná kolize v tomto repu: 2026-06-21, dvě paralelní session obě přidělily `D-30`.
+
+### Decision
+
+**Obsah zůstává local-first, identitu koordinuje remote.** Arbitrem čísel je git remote, na který tým stejně pushuje — žádné forge API, žádné `gh` (zásada [ADR-001](#adr-001-disconnect-edpa-from-github-syncidboard) platí beze změny).
+
+1. **ID ledger** = řetěz commitů na jednom refu sdíleného remote (výchozí `refs/edpa/ids` na `origin`; název i remote jsou konfigurovatelné, stejný kód funguje s větví). Strom nese `counters.yaml` (`counters` = nejvyšší vydané číslo per typ, `floors` = nejvyšší číslo, které smí existovat **bez** záznamu o rezervaci), zpráva commitu je auditní záznam rezervace (`EDPA-Id/Type/Title/Parent/Branch/Created-At`).
+2. **Rezervace je compare-and-swap**: push, který server přijme jen tehdy, když ref stále ukazuje tam, kde ho klient viděl. Vyhraje právě jeden; ostatní si přečtou nový stav a zkusí další číslo. Výsledek se rozlišuje opětovným přečtením remote, nikdy parsováním textu.
+3. **Režim se určuje pro klon, ne pro větev** (`id_counter.resolve_authority`): `EDPA_ID_AUTHORITY` → `ids.authority` v trackovaném `edpa.yaml` → `auto`. `auto` je `remote`, jakmile klon ledger viděl, nebo jakmile má opt-in integrační větev remote (dle posledního fetche). Worktree vzniklé před opt-in commitem se tak přepnou spolu se zbytkem klonu.
+4. **Fail-closed**: nedostupný ledger = žádné ID, s konkrétní chybovou hláškou. Jediná offline cesta je blok rezervovaný předem (`id_counter.py reserve`) — reserve-then-use se od ledgeru rozejít nemůže.
+5. **Hooky ověřují rezervaci**, ne maximum: číslo ≤ `floor` je „předledgerové"; nad ním musí mít položka záznam se shodným `created_at`. („≤ max v ledgeru" nestačí — ID vyražené zastaralým alokátorem by prošlo, kdykoli někdo drží nesloučenou rezervaci nad ním.)
+6. **Trackovaný `id_counters.yaml` se v režimu `remote` nepřepisuje** (zrcadlí se jen tam, kde starý vendored hook ještě vyžaduje bump). Tím mizí z merge cesty.
+7. **I lokální režim se zlepšuje**: zámek a high-water mark žijí v git common dir, takže worktree jednoho klonu čerpají z jedné řady.
+8. Přepnutí projektu = `id_counter.py init-remote` (seed z maxim přes všechny worktree a větve + headroom) a jeden commit s `ids.authority: remote`.
+
+### Alternatives considered
+
+- **Zpět ke GitHub issue number jako ID** ([rejected]) — běželo to 13 dní (v1.18.6–v1.23) právě kvůli kolizím a [ADR-001](#adr-001-disconnect-edpa-from-github-syncidboard) to zrušil: nepřenositelná identita, `gh auth` pro každého člověka i agentní session, výpadek GH = výpadek EDPA, osiřelá issues při pádu uprostřed pipeline, `--local` fallback → dvě rozbíhající se řady ID. Navíc: řada issues je sdílená s PR a v tomto repu by narazila na existující `F-100…129` / `S-200…261`; „issue se všemi náležitostmi" znamená druhý zdroj pravdy a zpět synchronizaci.
+- **Jednosměrná projekce tiketů do GitHub Issues kvůli viditelnosti** ([deferred]) — legitimní, ale mimo cestu zakládání a nikdy jako zdroj ID.
+- **Jen sdílený lokální stav (bod 7)** ([insufficient]) — řeší worktree jednoho klonu, ne dva lidi; rezervační PR by zůstala.
+- **ULID / hash ID** ([rejected]) — tvar `PREFIX-<int>` je zadrátovaný ve 12 regexech, 66 testovacích souborech a ~580 commit subjectech, které se přepsat nedají.
+- **Statické rozsahy čísel per vývojář** ([rejected]) — neřeší víc worktree/strojů jednoho člověka, vyžaduje přidělování slotů.
+- **Provizorní ID + finální číslo při merge** ([rejected]) — commit scope by nesl provizorní ID; evidence pipeline by potřebovala aliasy všude.
+- **Backlog na vlastní větvi mimo code review** ([deferred]) — odstranil by i konflikty v `evidence[]`, ale je to přestavba celé evidence pipeline.
+- **Merge driver pro counter soubor** ([rejected]) — server-side merge na forge vlastní drivery nespouští.
+- **Optimistický offline fallback s pozdější registrací** ([rejected]) — use-then-reserve je přesně chyba V1 `--local`.
+- **Smazat nebo zmrazit `id_counters.yaml` při přepnutí** ([rejected po zkoušce]) — každá rozpracovaná větev, která před přepnutím založila tiket, nese bump čítače; přepis souboru v opt-in commitu jí dá konflikt. Soubor se nechává být; smazání je pozdější úklid.
+- **Automatické založení ledgeru při první alokaci** ([rejected]) — smazaný ledger, fork nebo mělký klon by ho tiše založily znovu a nízko.
+
+### Consequences
+
+**Pozitivní:**
+- Unikátní ID napříč worktree, větvemi, klony i lidmi v okamžiku přidělení; ~2–3 s místo PR
+- Žádná „rezervační" PR; `id_counters.yaml` přestává být konfliktním bodem
+- Funguje na každém forge, který přijme push do vlastního refu (nebo větve); testovatelné hermeticky proti bare repu
+- Historie refu je auditní log rezervací (`git log refs/edpa/cache/ids`)
+- Přepsaný, smazaný či rozvětvený ledger se sám opraví z cache kteréhokoli klonu (čítače jsou maxima)
+
+**Negativní (vědomě akceptováno):**
+- Založení tiketu v režimu `remote` potřebuje síť (zmírněno předrezervovaným blokem)
+- Vlastní ref na GitHubu nejde chránit pravidly větví — ochranou je samoopravení z cache a kontrola v hoocích
+- Prostředí, které smí pushnout jen svou větev (sandbox agenta, fork, read-only CI), ID nezíská
+- Obsah tiketu vidí ostatní až po sloučení větve; hned je vidět jen rezervace
+- `git log --all` ukáže i řetěz ledgeru
+
+**Ověřeno:** 2×128 souběžných rezervací ze 3 klonů a 8 worktree proti lokálnímu bare repu; 24 ze 2 klonů proti GitHubu (push do `refs/edpa/*` přijat, 2,4 s na rezervaci); zkouška přechodu se skutečnými hooky, dvěma vývojáři, zastaralým worktree a zbylou předledgerovou kolizí (`tests/e2e_collision/scenario_b_ledger.sh`).
+
+**Související:** [ADR-001](#adr-001-disconnect-edpa-from-github-syncidboard), [ADR-004](#adr-004-lokální-sekvenční-id-counter), [ADR-005](#adr-005-lokální-hook-based-id-safety), [`docs/dev-collisions.md`](../dev-collisions.md)
 
 ---
 

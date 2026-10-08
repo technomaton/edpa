@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
@@ -282,19 +283,48 @@ function isoDate(v: unknown): string | undefined {
   return undefined;
 }
 
-export function nextId(edpaRoot: string, type: string): string {
-  const typeDir = TYPE_DIRS[type];
-  const prefix = TYPE_PREFIX[type];
-  if (!typeDir || !prefix) throw new Error(`Unknown type: ${type}`);
+/**
+ * Allocate the next ID through the engine's allocator (id_counter.py) — the
+ * same one /edpa:add uses, so its locks, its counter and, under the remote
+ * ID authority (ADR-014), the ledger reservation all apply.
+ *
+ * This server used to scan the directory itself (max digit run + 1): no
+ * lock, no counter bump, and a number any other session could mint at the
+ * same moment — a second, uncoordinated allocator.
+ */
+export function nextId(edpaRoot: string, type: string, title?: string): string {
+  if (!TYPE_DIRS[type] || !TYPE_PREFIX[type]) throw new Error(`Unknown type: ${type}`);
 
-  const dir = path.join(edpaRoot, '.edpa', 'backlog', typeDir);
-  if (!fs.existsSync(dir)) return `${prefix}-1`;
-
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
-  let maxNum = 0;
-  for (const f of files) {
-    const match = f.match(/\d+/);
-    if (match) maxNum = Math.max(maxNum, parseInt(match[0]));
+  const candidates = [path.join(edpaRoot, '.edpa', 'engine', 'scripts', 'id_counter.py')];
+  if (import.meta.dirname) {
+    // Running from an EDPA source checkout (no vendored engine in the data dir).
+    candidates.push(path.resolve(
+      import.meta.dirname, '..', '..', '..', 'plugin', 'edpa', 'scripts', 'id_counter.py'));
   }
-  return `${prefix}-${maxNum + 1}`;
+  const script = candidates.find(c => fs.existsSync(c));
+  if (!script) {
+    throw new Error(
+      `EDPA engine not found (looked for ${candidates[0]}). Run /edpa:setup — ` +
+      'the planning server does not mint IDs on its own.',
+    );
+  }
+
+  const args = [script, '--root', edpaRoot, 'next', '--type', type];
+  if (title) args.push('--title', title);
+  let out: string;
+  try {
+    out = execFileSync(process.env.EDPA_PYTHON || 'python3', args, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 90_000,
+    });
+  } catch (e) {
+    const err = e as { stderr?: string; message?: string };
+    throw new Error((err.stderr || err.message || 'ID allocation failed').trim());
+  }
+  const id = out.trim().split(/\s+/).pop() ?? '';
+  if (!/^[A-Z]{1,3}-\d+$/.test(id)) {
+    throw new Error(`Unexpected allocator output: ${out.trim()}`);
+  }
+  return id;
 }

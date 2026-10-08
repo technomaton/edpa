@@ -150,7 +150,21 @@ Check the frozen snapshot in `.edpa/snapshots/PI-2026-1.1.json`.
 
 ## Multi-developer setup — ID collision handling
 
-If your team has more than one person creating backlog items in parallel, you'll occasionally hit ID collisions (two devs both allocate `S-5` before either's PR merges). EDPA ships four defense layers and a semi-automatic recovery tool — see [`docs/dev-collisions.md`](dev-collisions.md) for the full guide.
+If more than one person (or more than one clone) creates backlog items in parallel, two of them can allocate the same ID (`S-5`) before either merges. The fix is to let the shared git remote hand the numbers out:
+
+**Teams: reserve IDs on the shared remote instead.** With more than one
+person (or more than one clone) creating items, switch the project to the
+*remote ID authority* (ADR-014): every ID is reserved on the git remote the
+moment it is assigned, so two sessions cannot get the same one and no ticket
+has to go through a PR just to claim its number.
+
+```bash
+python3 .edpa/engine/scripts/id_counter.py init-remote --write-config   # once per repository
+git add .edpa/config/edpa.yaml && git commit -m "chore(no-ticket): reserve ticket IDs in the shared ledger"
+python3 .edpa/engine/scripts/id_counter.py status                       # who allocates here, and why
+```
+
+Until a project does that it runs on the local ID authority, where EDPA detects collisions after the fact. It ships four defense layers and a semi-automatic recovery tool — see [`docs/dev-collisions.md`](dev-collisions.md) for the full guide.
 
 **Setup** (one-time per project):
 
@@ -163,11 +177,9 @@ If your team has more than one person creating backlog items in parallel, you'll
 python3 .edpa/engine/scripts/project_setup.py --with-hooks
 python3 .edpa/engine/scripts/project_setup.py --check-hooks   # verify (read-only)
 
-# 2. Copy CI workflow template
-cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
-   .github/workflows/edpa-collision-check.yml
-git add .github/workflows/edpa-collision-check.yml
-git commit -m "ci: add EDPA collision check"
+# 2. Install the CI workflows (collision check + contribution sync)
+python3 .edpa/engine/scripts/project_setup.py --with-ci
+git add .github/workflows/ && git commit -m "ci: add EDPA workflows"
 ```
 
 **Recovery** (when a PR shows a conflict in `.edpa/backlog/`):
@@ -175,7 +187,7 @@ git commit -m "ci: add EDPA collision check"
 ```bash
 git fetch origin
 python3 .edpa/engine/scripts/renumber_collisions.py --apply
-git add . && git commit -m "renumber: collision with main"
+git add . && git commit -m "chore(S-6): renumber from S-5 — collision with main"
 git merge origin/main   # take MAX for id_counters.yaml conflict
 git push
 ```

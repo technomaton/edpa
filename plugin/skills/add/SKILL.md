@@ -3,9 +3,11 @@ name: add
 user-invocable: true
 description: >
   Create a new backlog item (Initiative / Epic / Feature / Story / Defect /
-  Event / Risk) — V2 local-first. ID allocated from id_counters.yaml,
-  parent hierarchy validated by MCP edpa_item_create, YAML written under
-  .edpa/backlog/, auto-committed. No GitHub calls at create time;
+  Event / Risk) — V2 local-first. ID from the project's ID authority (the
+  local counter, or a reservation on the shared git remote that is unique
+  across worktrees, branches and developers), parent hierarchy validated
+  by MCP edpa_item_create, YAML written under .edpa/backlog/,
+  auto-committed. No GitHub calls at create time;
   PR-derived signals arrive separately via the contribution-sync workflow.
 license: MIT
 compatibility: Python 3.10+, MCP edpa server
@@ -18,8 +20,14 @@ allowed-tools: Read Bash(python3 *) Bash(git *)
 
 V2 local-first add. No `gh` calls.
 
-1. `id_counter.next_id(type)` from `.edpa/config/id_counters.yaml` →
-   next available number, atomic via file lock + `max(counter, fs_scan)`.
+1. `id_counter.next_id(type)` → next available number. Where it comes
+   from depends on the project's ID authority
+   (`id_counter.py status` shows which):
+   - **local** — `max(id_counters.yaml, fs_scan, clone high-water mark) + 1`
+     under a file lock; unique within this clone (all its worktrees).
+   - **remote** (ADR-014) — reserved in the ID ledger on the shared git
+     remote first, so it is unique across worktrees, branches and
+     developers. Takes ~2 s; needs the network.
 2. EDPA ID = `{prefix}-{num}` → `I-3`, `E-15`, `F-8`, `S-42`, `D-7`,
    `EV-2`, `R-1`.
 3. MCP `edpa_item_create` handler validates parent type hierarchy
@@ -33,25 +41,27 @@ asynchronously via the CI workflow at
 `.github/workflows/edpa-contribution-sync.yml` — see
 `/edpa:setup --with-ci` and `docs/v2/decisions.md` ADR-012.
 
-## Parallel ID allocation — collision handling
+## Parallel ID allocation
 
-ID allocation is **local-first** (no central coordinator). If two devs both
-pull `main` when last Story is `S-4` and both run `/edpa:add Story`, both
-will get `S-5` locally — the collision surfaces at PR merge time.
+**Remote ID authority** (team projects — `ids.authority: remote`): the ID
+is reserved on the shared remote before the file is written, so two
+sessions cannot get the same one. There is nothing to merge "just to
+claim the number" — the ticket file travels with the feature branch.
 
-EDPA detects + resolves this via four defense layers:
-- **Pre-commit hook** (`validate_ids.py --staged`) — local staged consistency
-- **Pre-push hook** (`validate_ids.py --pre-push`) — blocks push if local ID
-  already exists on `origin/main`
-- **CI workflow** (`edpa-collision-check.yml`) — comments on PR + fails check
-  when collision detected
-- **Manual recovery** (`renumber_collisions.py --apply`) — renames local
-  file, rewrites `id:` field, updates `parent:` refs in dependent items,
-  bumps `id_counters.yaml`. Then dev: `git add . && git commit && git merge
-  main && git push` (resolve `id_counters.yaml` merge conflict by taking the
-  MAX value).
+If the command fails with an ID-ledger message, **do not work around it**
+by writing the file yourself or picking a number: an item without a
+reservation is rejected by the pre-commit and pre-push hooks. Relay the
+message — it says what to do (`init-remote` once per repository; fix the
+connection; create the ticket from a clone that may push; or use a block
+pre-reserved with `id_counter.py reserve`).
 
-Full guide with decision tree + common shapes:
+**Local ID authority** (solo / no shared remote): worktrees of one clone
+share a sequence, but two clones can still mint the same number. That is
+caught by the pre-push hook (`validate_ids.py --pre-push`, including the
+usual case where both items sit at the same path) and repaired with
+`renumber_collisions.py --apply`.
+
+Full guide — switching a project to the ledger, the checks, recovery:
 [`docs/dev-collisions.md`](../../../docs/dev-collisions.md).
 
 ## Arguments
@@ -103,8 +113,8 @@ python3 .edpa/engine/scripts/backlog.py add \
 ```
 
 The script will:
-- allocate the next ID atomically from `.edpa/config/id_counters.yaml`
-  (auto-created on first use)
+- allocate the next ID through the project's ID authority (local counter,
+  or a reservation in the shared ledger)
 - validate parent existence + type hierarchy via MCP
 - write `.edpa/backlog/<type>/{ID}.md` with frontmatter + empty body
 - auto-commit `feat({ID}): <title>`
@@ -125,8 +135,9 @@ tree if multiple items were added in sequence.
 - **Never write YAML files directly** — always use `backlog.py add` so
   ID allocation, parent validation, and frontmatter shape go through
   one path (MCP `edpa_item_create`).
-- **Never invent IDs.** They come from `id_counter.next_id()` which
-  uses a file lock + fs scan. Manual IDs collide.
+- **Never invent IDs.** They come from `id_counter.next_id()`. Manual
+  IDs collide, and under the remote ID authority the hooks reject any
+  item that has no reservation.
 - **Never skip `--parent`** for Story/Feature/Epic — flat backlogs
   break WSJF calculation and engine allocation.
 - **Don't add `.github/ISSUE_TEMPLATE/` files.** V2 doesn't create

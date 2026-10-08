@@ -231,8 +231,14 @@ for items not yet closed. Both require timestamp fields synced from GitHub
 ### Write tools
 
 The server also exposes local-first **write** tools (V2). They mutate `.edpa/`
-files directly (atomic tmp+rename) and do **not** commit or call the network —
-the calling skill/command owns the commit. Full set: `edpa_item_create`,
+files directly (atomic tmp+rename) and do **not** commit — the calling
+skill/command owns the commit. They do not call the network either, with one
+exception: in a project that reserves IDs on its git remote
+(`ids.authority: remote`, ADR-014), `edpa_item_create` first reserves the new
+ID there — a `git fetch` and a `git push` of one metadata commit to the
+ID-ledger ref, with the user's own git credentials. That takes about two
+seconds, and when the remote cannot be reached the tool returns an error and
+writes nothing. Under the default local authority it stays offline. Full set: `edpa_item_create`,
 `edpa_item_update`, `edpa_item_transition`, `edpa_item_link_parent`,
 `edpa_item_link_dep`, `edpa_item_roam`, `edpa_objective_set`,
 `edpa_objective_remove`, `edpa_confidence_vote`, `edpa_iteration_create`,
@@ -403,15 +409,23 @@ What changed from the v1.0–v1.2 prototype (kept as design rationale):
 
 - **Local-first writes.** Read tools never mutate state. The V2 write tools
   (`edpa_item_*`, `edpa_iteration_*`, `edpa_pi_create`, `edpa_pi_close`, `edpa_people_upsert`)
-  write `.edpa/` files via atomic tmp+rename and do not commit or call the
-  network; the calling skill/command owns the commit.
+  write `.edpa/` files via atomic tmp+rename and do not commit; the calling
+  skill/command owns the commit.
 - **Path traversal blocked.** `item_id` parameter is the only user input that
   reaches the filesystem; the regex guard plus prefix→directory whitelist
   means a request like `{"item_id": "../etc/passwd"}` is rejected at the
   validator and never resolves to a path.
-- **No outbound network.** The server does not call GitHub or any external
-  service. The neighbouring `github` MCP server in `.mcp.json` does, but
-  it's a separate process under user control.
+- **No forge API, and git traffic only to the project's own remote.** The
+  server never calls GitHub or any other service API (the neighbouring
+  `github` MCP server in `.mcp.json` does, but it's a separate process under
+  user control). The one thing it can send anywhere is git: under the remote
+  ID authority (`ids.authority: remote`), `edpa_item_create` fetches the
+  ID-ledger ref from the project's remote and pushes one metadata commit to
+  it — never source code, never a branch — using the git credentials the
+  user already has. The remote name and ref come from the tracked
+  `edpa.yaml` and are checked for shape before they reach git; the git child
+  never inherits the server's stdin. Under the default local authority the
+  server originates no network traffic at all.
 - **Crash containment.** A handler exception is caught, logged, and surfaced
   as a tool error. The session stays open; the client can retry.
 

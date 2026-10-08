@@ -501,23 +501,39 @@ If these pass, the toolchain is ready for a real PI close.
 
 ## ID collision handling
 
-When two developers parallel-allocate the same backlog item ID (both add `S-5` on different branches before either merges), EDPA detects and recovers via four defense layers — full documentation in [`docs/dev-collisions.md`](dev-collisions.md).
+Every item ID comes from the project's **ID authority** — full documentation in [`docs/dev-collisions.md`](dev-collisions.md).
+
+**Teams: reserve IDs on the shared remote instead.** With more than one
+person (or more than one clone) creating items, switch the project to the
+*remote ID authority* (ADR-014): every ID is reserved on the git remote the
+moment it is assigned, so two sessions cannot get the same one and no ticket
+has to go through a PR just to claim its number.
+
+```bash
+python3 .edpa/engine/scripts/id_counter.py init-remote --write-config   # once per repository
+git add .edpa/config/edpa.yaml && git commit -m "chore(no-ticket): reserve ticket IDs in the shared ledger"
+python3 .edpa/engine/scripts/id_counter.py status                       # who allocates here, and why
+```
+
+Creating a ticket then takes ~2 s and needs the network (or a block taken ahead with `id_counter.py reserve`). The hooks reject any new item the ledger does not back.
+
+**Under the local ID authority** (solo work, no shared remote) worktrees of one clone share a sequence, but two clones can still allocate the same ID (both add `S-5` on different branches before either merges). EDPA detects that and recovers:
 
 **Quick reference for operators:**
 
 | Layer | Where | What it does |
 |---|---|---|
-| Pre-commit hook | local | blocks commit on staged-set inconsistencies |
-| Pre-push hook | local | blocks push if local ID exists upstream |
-| CI workflow | server | comments on PR + fails check on collision |
-| Manual recovery | local | `renumber_collisions.py --apply` renames + updates parents + bumps counter |
+| Pre-commit hook | local | blocks commit on staged-set inconsistencies (remote authority: on items without a reservation) |
+| Pre-push hook | local | blocks push if an item you add exists upstream as a different item — also at the same path |
+| CI workflow | server | comments on PR + fails check on collision / unreserved items |
+| Manual recovery | local | `renumber_collisions.py --apply` renames + updates references (+ bumps the counter under the local authority) |
 
 **Standard recovery flow** (when a PR shows a conflict in `.edpa/backlog/` or `id_counters.yaml`):
 
 ```bash
 git fetch origin
 python3 .edpa/engine/scripts/renumber_collisions.py --apply
-git add . && git commit -m "renumber: collision with main"
+git add . && git commit -m "chore(S-6): renumber from S-5 — collision with main"
 git merge origin/main   # resolve id_counters.yaml conflict by taking MAX value
 git push
 ```
@@ -537,11 +553,12 @@ git push
 # 1. Install local hooks (pre-commit + pre-push)
 python3 .edpa/engine/scripts/project_setup.py --with-hooks
 
-# 2. Copy CI workflow template into project's workflows dir
-cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
-   .github/workflows/edpa-collision-check.yml
-git add .github/workflows/edpa-collision-check.yml
-git commit -m "ci: add EDPA collision check"
+# 2. Install the CI workflows (collision check + contribution sync)
+python3 .edpa/engine/scripts/project_setup.py --with-ci
+git add .github/workflows/ && git commit -m "ci: add EDPA workflows"
+
+# 3. Teams: reserve IDs on the shared remote (see above)
+python3 .edpa/engine/scripts/id_counter.py init-remote --write-config
 ```
 
 Verify hooks are installed (read-only doctor — works for `.git/hooks/` and
