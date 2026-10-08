@@ -1,4 +1,4 @@
 pyyaml
 ruamel.yaml
-mcp
+mcp>=1.0,<2
 filelock

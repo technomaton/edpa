@@ -35,8 +35,10 @@ def test_lists_filelock_dependency() -> None:
 def test_standalone_dep_line_includes_mcp() -> None:
     """backlog.py add (step 4 of the printed instructions) routes through
     mcp_server's create handler, which hard-exits without the mcp SDK — the
-    standalone dep line must install it (matches requirements.txt; D-39)."""
-    assert "pip3 install pyyaml ruamel.yaml openpyxl filelock mcp" in INSTALL_SH
+    standalone dep line must install it (matches requirements.txt; D-39).
+    Capped below 2: mcp 2.x dropped the Server.list_tools API the server
+    is written against (D-83)."""
+    assert "pip3 install pyyaml ruamel.yaml openpyxl filelock 'mcp<2'" in INSTALL_SH
 
 
 def test_web_served_install_sh_in_sync() -> None:
