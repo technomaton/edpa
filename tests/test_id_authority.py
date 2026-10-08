@@ -460,3 +460,20 @@ def test_item_create_through_the_real_server_over_stdio(
     ids = [json.loads(a["result"]["content"][0]["text"])["id"] for a in answers]
     assert ids == ["D-1", "D-2"]
     assert ledger.find_record(alice, "D-2")["title"] == "Second"
+
+
+def test_stale_worktree_finds_a_custom_ref_ledger(
+        world: World, alice: Path) -> None:
+    """A worktree without the ids: block must use the ledger the clone
+    already talks to — not look at the default ref, find nothing, and
+    restore a SECOND ledger there from the cache."""
+    ref = "refs/heads/edpa-ids"
+    stale = project(world.worktree(alice, "stale"))
+    project(alice, authority="remote", extra_ids={"ref": ref})
+    ledger.raise_floors(alice, {"Story": 10}, create=True, ref=ref)
+    assert next_id("Story", alice) == "S-11"
+
+    assert resolve_authority(stale).ref == ref
+    assert next_id("Story", stale) == "S-12"
+    assert world.tip() is None                    # nothing at refs/edpa/ids
+    assert world.counters(ref)["counters"]["Story"] == 12

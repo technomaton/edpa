@@ -603,12 +603,21 @@ def resolve_authority(root: Path | str) -> Authority:
             f"ids.authority must be auto, local or remote — got {mode!r}")
     ledger = _ledger()
     if ledger is not None and _git_layout(root) is not None:
+        target = _target_ids_config(root, remote)
         try:
             if ledger.known_locally(root):
-                return Authority("remote", remote, ref, "discovered")
+                # Where the ledger lives: this checkout's config if it says,
+                # else the integration branch's, else where this clone last
+                # reached it — never blindly the default (a custom-ref
+                # project must not grow a second ledger at refs/edpa/ids).
+                seen = ledger.remembered(root) or (remote, ref)
+                return Authority(
+                    "remote",
+                    str(cfg.get("remote") or target.get("remote") or seen[0]),
+                    str(cfg.get("ref") or target.get("ref") or seen[1]),
+                    "discovered")
         except ledger.LedgerError:
             pass
-        target = _target_ids_config(root, remote)
         if str(target.get("authority") or "").strip().lower() == "remote":
             return Authority("remote", str(target.get("remote") or remote),
                              str(target.get("ref") or ref), "discovered")

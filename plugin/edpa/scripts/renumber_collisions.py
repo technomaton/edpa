@@ -284,8 +284,13 @@ def _front(text: str) -> dict:
 def _reserve_replacement(repo_root: Path, collision: dict) -> str:
     """A fresh ledger reservation for a renumbered item, recorded with the
     item's own ``created_at`` so the hooks accept the renamed file."""
-    front = _front(collision["file"].read_text(encoding="utf-8"))
+    text = collision["file"].read_text(encoding="utf-8")
+    front = _front(text)
     created = front.get("created_at")
+    if _validate is not None:
+        # Same normalisation the hooks apply (an unquoted YAML timestamp
+        # parses to a datetime whose str() would never match again).
+        created = _validate._created_at(text)
     return next_id(collision["type"], repo_root, meta={
         "title": front.get("title"),
         "parent": front.get("parent"),

@@ -341,6 +341,38 @@ def _observe(repo: Path | str, remote: str, ref: str,
     )
 
 
+_CFG_REMOTE = "edpa.idLedgerRemote"
+_CFG_REF = "edpa.idLedgerRef"
+
+
+def _remember(repo: Path | str, remote: str, ref: str) -> None:
+    """Record where this clone's ledger lives (git config, shared by all
+    worktrees). Best effort."""
+    for key, value in ((_CFG_REMOTE, remote), (_CFG_REF, ref)):
+        cur = _git(repo, "config", "--local", "--get", key, check=False)
+        if cur.stdout.strip() != value:
+            _git(repo, "config", "--local", key, value, check=False)
+
+
+def remembered(repo: Path | str) -> tuple[str, str] | None:
+    """``(remote, ref)`` of the ledger this clone last talked to, if any.
+
+    A worktree cut before the opt-in commit has no ``ids:`` block; without
+    this it would look for a custom-ref ledger at the default ref — and,
+    finding nothing there, "restore" a second ledger from the cache."""
+    try:
+        remote = _git(repo, "config", "--local", "--get", _CFG_REMOTE,
+                      check=False).stdout.strip()
+        ref = _git(repo, "config", "--local", "--get", _CFG_REF,
+                   check=False).stdout.strip()
+        if remote and ref:
+            check_names(remote, ref)
+            return remote, ref
+    except LedgerError:
+        pass
+    return None
+
+
 _UNKNOWN = object()
 
 
@@ -512,6 +544,7 @@ def _transact(repo: Path | str, remote: str, ref: str, mutate, *,
                 time.sleep(random.uniform(0.1, 0.3))
                 continue
         _advance_cache(repo, new, known=cached)
+        _remember(repo, remote, ref)
         return Reservation(list(numbers), new, attempt, notes)
 
     if last_error is not None:
@@ -623,6 +656,7 @@ def refresh(repo: Path | str, *, remote: str = DEFAULT_REMOTE,
     # Remote behind or diverged: _advance_cache keeps the cache — the next
     # write heals the remote, and the cache knows the newer reservations.
     _advance_cache(repo, observed)
+    _remember(repo, remote, ref)
     return True
 
 
@@ -642,6 +676,8 @@ def forget(repo: Path | str) -> None:
     """Drop this clone's ledger cache (it is re-read from the remote) and
     any observation ref a killed process left behind."""
     _git(repo, "update-ref", "-d", CACHE_REF, check=False)
+    for key in (_CFG_REMOTE, _CFG_REF):
+        _git(repo, "config", "--local", "--unset", key, check=False)
     r = _git(repo, "for-each-ref", "--format=%(refname)", _OBSERVED_NS,
              check=False)
     for name in r.stdout.split():

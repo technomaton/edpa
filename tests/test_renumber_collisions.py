@@ -765,3 +765,20 @@ def test_check_never_reserves_and_reports_unreserved_items(
     git(bob, "add", "-A", ".edpa")
     git(bob, "commit", "-q", "-m", f"feat({new}): reserved")
     assert _in(bob, rc.main) == 0
+
+
+def test_renumbered_item_with_unquoted_created_at_passes_the_hook_check(
+        ledger_ready: World, alice: Path, bob: Path) -> None:
+    import validate_ids
+    mine = _bob_collides_with_main(ledger_ready, alice, bob)
+    mine.write_text(mine.read_text(encoding="utf-8").replace(
+        "'2026-10-08T09:07:00Z'", "2026-10-08T09:07:00Z"), encoding="utf-8")
+    git(bob, "commit", "-q", "-am", "feat(S-5): unquote")
+    collisions = _in(bob, rc.find_collisions, bob)
+    _in(bob, rc.apply_collisions, bob, collisions)
+    new = bob / ".edpa/backlog/stories/S-11.md"
+    errors, _w = validate_ids.reservation_problems(
+        bob, id_counter.resolve_authority(bob),
+        [(".edpa/backlog/stories/S-11.md", "S-11", "Story",
+          new.read_text(encoding="utf-8"))])
+    assert errors == []
