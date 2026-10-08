@@ -27,6 +27,7 @@ import { VERSION } from '../../lib/version';
       <li><a href="#learning-loop" class="toc-link" data-section="learning-loop">Learning loop</a></li>
       <li><a href="#github-implementation" class="toc-link" data-section="github-implementation">GitHub implementation</a></li>
       <li><a href="#id-collisions" class="toc-link" data-section="id-collisions">ID collisions and renumbering</a></li>
+      <li><a href="#id-ledger" class="toc-link" data-section="id-ledger">How ID reservation works</a></li>
       <li><a href="#reports" class="toc-link" data-section="reports">Reports and audit</a></li>
       <li><a href="#assumptions" class="toc-link" data-section="assumptions">Assumptions and risks</a></li>
       <li><a href="#comparison" class="toc-link" data-section="comparison">Comparison</a></li>
@@ -486,6 +487,107 @@ cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
    .github/workflows/</div>
 
     <p>Full guide with decision tree and common collision shapes (single / multi / parent-chain / cascading): <a href="https://github.com/technomaton/edpa/blob/main/docs/dev-collisions.md" target="_blank"><code>docs/dev-collisions.md</code></a>.</p>
+  </section>
+
+  <!-- 9c. ID ledger -->
+  <section id="id-ledger">
+    <h2>9c. How ID reservation works — the ledger on a git ref</h2>
+
+    <p>Numbers are unique when one place hands them out. Previously every working tree had its own counter and knew nothing about the others, so two worktrees, two clones or two people got the same <code>S-285</code>. The ledger makes the git remote the team already pushes to that one place — like a ticket dispenser. No forge API, no <code>gh</code>: only <code>git fetch</code> and <code>git push</code>, so it works on any git server.</p>
+
+    <h3>What it is built on in git</h3>
+    <p>Git has two layers: <strong>objects</strong> (commits, trees, file contents — named by hash, immutable) and <strong>refs</strong> (named pointers to a commit; a ref is a name and one hash). A branch is the ref <code>refs/heads/main</code>, a tag <code>refs/tags/v2.23.0</code>, GitHub keeps <code>refs/pull/94/head</code> for a pull request. <code>refs/edpa/ids</code> is a pointer of the same kind, only outside <code>refs/heads/</code>. Consequences:</p>
+    <ul>
+      <li><code>git clone</code> and <code>git pull</code> do not fetch it on their own (they take branches and tags),</li>
+      <li>it is not listed among branches in the forge UI,</li>
+      <li>branch rules and CI triggers do not apply to it.</li>
+    </ul>
+    <p>Git itself stores data this way (<code>refs/notes/</code>), and so do Gerrit and git-bug.</p>
+
+    <h3>What the ref holds</h3>
+    <p>The ref points at the newest commit of a chain. Every commit has a parent (the previous reservation), a tree with a single file <code>counters.yaml</code>, and a message that is the audit record of the reservation. It is ordinary git history, without any of your code.</p>
+<pre><code>schema: 1
+counters:        # highest number handed out, per type
+  Defect: 93
+  Story: 290
+floors:          # highest number that may exist WITHOUT a reservation record
+  Defect: 92
+  Story: 289</code></pre>
+<pre><code>alloc S-290: Website (CZ/EN): describe the remote ID authority
+
+EDPA-Id: S-290
+EDPA-Type: Story
+EDPA-Parent: F-129
+EDPA-Branch: main
+EDPA-Created-At: 2026-10-08T07:52:11Z
+EDPA-Nonce: 5f0c…</code></pre>
+<pre><code>git fetch origin refs/edpa/ids
+git log FETCH_HEAD --format='%s  [%an, %ar]'
+git show FETCH_HEAD:counters.yaml</code></pre>
+
+    <h3>One reservation, step by step</h3>
+    <ol>
+      <li><strong>Read.</strong> Fetch the tip of <code>refs/edpa/ids</code> into a temporary ref and read <code>Story: 290</code>.</li>
+      <li><strong>Build.</strong> Assemble a commit with <code>Story: 291</code> using plumbing commands — no working tree, no index, your checkout is untouched.</li>
+      <li><strong>Push with a condition:</strong> “accept only if the ref still points at the commit from step 1”.</li>
+      <li><strong>The server decides.</strong> Accepted → <code>S-291</code> is yours. Rejected because the ref moved → somebody was faster; back to step 1 and the next number.</li>
+      <li><strong>Only now</strong> the item file is written and committed on your branch.</li>
+    </ol>
+<pre><code>git hash-object -w --stdin          # counters.yaml → blob
+git mktree                          # tree with that one file
+git commit-tree &lt;tree&gt; -p &lt;tip&gt;     # commit, message = audit record
+
+git push --no-verify --porcelain \
+  --force-with-lease=refs/edpa/ids:&lt;tip&gt; \
+  origin &lt;new commit&gt;:refs/edpa/ids</code></pre>
+
+    <h3>Where atomicity comes from</h3>
+    <p>From the <code>git push</code> protocol. For every ref the client sends a triple:</p>
+<pre><code>&lt;old hash&gt;  &lt;new hash&gt;  refs/edpa/ids</code></pre>
+    <p>The server locks the ref, checks that it currently holds the <em>old hash</em>, and only then writes the new one — a compare-and-swap. The same mechanism makes a plain <code>git push</code> to <code>main</code> fail when someone pushed before you. <code>--force-with-lease=&lt;ref&gt;:&lt;hash&gt;</code> states the expected value explicitly; with an empty value it means “only if the ref does not exist yet”, which is how the ledger is created.</p>
+    <ul>
+      <li><strong>The outcome is never read from error text.</strong> After any push that is not a clean success the client re-reads the remote: the ref contains my commit → reserved (even if the acknowledgement was lost in a timeout); the ref moved without it → lost race, retry; the ref did not move → the server refuses this environment.</li>
+      <li><strong>Nonce.</strong> Two worktrees of one person can build a byte-identical commit; git would answer the second push “up to date” and both would own the number. Every message carries a random <code>EDPA-Nonce</code>, and “up to date” is never treated as success.</li>
+      <li><strong><code>--no-verify</code></strong> on this one push only: projects run tests in <code>pre-push</code>, and this push carries a single metadata commit, never code.</li>
+    </ul>
+
+    <h3>Why a hand-written ticket does not get through</h3>
+    <p>The hooks (<code>validate_ids.py</code>) verify the reservation of every <em>new</em> item. A number at or below the <code>floor</code> needs nothing — the item predates the ledger. Above the <code>floor</code> a record for that ID must exist and its <code>EDPA-Created-At</code> must equal the item's <code>created_at</code>. “Number ≤ highest reserved” would not do: an ID minted by an outdated plugin passes that whenever someone holds an unmerged reservation above it. pre-commit works from the local copy (offline it only warns); pre-push and CI verify online — which also catches <code>--no-verify</code> commits.</p>
+
+    <h3>Branches, worktrees, clones, agents</h3>
+    <ul>
+      <li><strong>Branches:</strong> the number is reserved on the remote, not on a branch. The item file is committed wherever you are; two branches cannot get the same ID.</li>
+      <li><strong>Worktrees of one clone:</strong> share the ledger copy, the lock and the mode (all of it lives in the shared <code>.git</code>). They switch together, including ones cut before the opt-in commit.</li>
+      <li><strong>Other clones and people:</strong> coordinated by the server.</li>
+      <li><strong>Agent sessions:</strong> like a person, provided they may push to the repository. A sandbox restricted to its own branch cannot reserve and says so.</li>
+      <li><strong>Unchanged:</strong> the <em>content</em> of a ticket is visible to other branches only after merge.</li>
+    </ul>
+    <table>
+      <thead><tr><th>Where</th><th>What</th></tr></thead>
+      <tbody>
+        <tr><td><code>refs/edpa/cache/ids</code></td><td>newest ledger state this clone knows; only ever moves forward</td></tr>
+        <tr><td><code>git config edpa.idLedgerRemote / edpa.idLedgerRef</code></td><td>where this clone last reached the ledger</td></tr>
+        <tr><td><code>&lt;git common dir&gt;/edpa/</code></td><td>lock, high-water mark, pool of numbers reserved ahead</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Failure behaviour</h3>
+    <table>
+      <thead><tr><th>Situation</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td>No network</td><td>no ID, nothing written. A number is never guessed — that is how two ID series start. For offline work take numbers ahead: <code>id_counter.py reserve --type Story --count 5</code></td></tr>
+        <tr><td>Ref deleted or rewound on the server</td><td>every clone has the chain cached and the counters are maxima, so the next reservation from a clone that remembers more restores it</td></tr>
+        <tr><td>Ref overwritten with unrelated history</td><td>both histories are merged, per-type maximum</td></tr>
+        <tr><td>Process dies between reservation and file write</td><td>the number is burned; a gap in the sequence is harmless</td></tr>
+        <tr><td>A stray file like <code>S-9999.md</code></td><td>refused (it would lift everyone's sequence); adopt on purpose with <code>id_counter.py doctor --raise</code></td></tr>
+        <tr><td>Lost race</td><td>automatic retry, about 2 s per attempt</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Why one ref, not one per type</h3>
+    <p>A ref per type would save one retry when a Story and a Defect are created in the same second. The gain is small (a retry costs about 2 s; under 16 concurrent processes the average was 1.6 attempts per reservation) and the bottleneck is the network round trip, not the type. The price would be seven reads instead of one, a non-atomic bootstrap, seven audit logs and harder self-healing. The file carries <code>schema: 1</code>, so a later split would not change ticket IDs.</p>
+
+    <p>Measured: GitHub accepted the push to <code>refs/edpa/*</code>, about 2.4 s per reservation; 2×128 concurrent reservations from 3 clones and 8 worktrees without a duplicate. Not verified: forges other than GitHub, Windows. Full technical reference: <a href="https://github.com/technomaton/edpa/blob/main/docs/id-ledger.md" target="_blank" rel="noopener">id-ledger.md</a> · operations: <a href="https://github.com/technomaton/edpa/blob/main/docs/dev-collisions.md" target="_blank" rel="noopener">dev-collisions.md</a> · decision: <a href="https://github.com/technomaton/edpa/blob/main/docs/v2/decisions.md" target="_blank" rel="noopener">ADR-014</a>.</p>
   </section>
 
   <!-- 10. Reports and audit -->

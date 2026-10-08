@@ -79,5 +79,5 @@ python3 .edpa/engine/scripts/id_counter.py doctor
 
 **Návrat zpět:** `ids.authority: local` v `.edpa/config/edpa.yaml`. Vydaná čísla zůstávají platná.
 
-Podrobnosti: [dev-collisions.md](dev-collisions.md) · rozhodnutí:
+Jak to funguje uvnitř gitu: [id-ledger.md](id-ledger.md) · provoz: [dev-collisions.md](dev-collisions.md) · rozhodnutí:
 [ADR-014](v2/decisions.md#adr-014-remote-coordinated-identity--id-ledger-na-git-refu)

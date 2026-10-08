@@ -315,9 +315,10 @@ def test_setup_does_not_resurrect_the_counter_under_remote_authority(
     project_setup.seed_id_counters(alice)
     assert not (alice / COUNTER).exists()
 
-    project(alice, counters={"Story": 30})           # still fenced on main
+    project(alice, counters={"Story": 2})            # an existing, stale file
+    before = (alice / COUNTER).read_bytes()
     project_setup.seed_id_counters(alice)
-    assert yaml.safe_load((alice / COUNTER).read_text())["counters"]["Story"] == 30
+    assert (alice / COUNTER).read_bytes() == before   # not re-seeded to 4
 
 
 # ---------------------------------------------------------------------------

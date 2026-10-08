@@ -27,6 +27,7 @@ import { VERSION } from '../lib/version';
       <li><a href="#ucici-smycka" class="toc-link" data-section="ucici-smycka">Učící smyčka</a></li>
       <li><a href="#github-implementace" class="toc-link" data-section="github-implementace">GitHub implementace</a></li>
       <li><a href="#kolize-id" class="toc-link" data-section="kolize-id">ID kolize a renumbering</a></li>
+      <li><a href="#id-ledger" class="toc-link" data-section="id-ledger">Jak funguje rezervace ID</a></li>
       <li><a href="#vykazy" class="toc-link" data-section="vykazy">Výkazy a audit</a></li>
       <li><a href="#predpoklady" class="toc-link" data-section="predpoklady">Předpoklady a rizika</a></li>
       <li><a href="#srovnani" class="toc-link" data-section="srovnani">Srovnání</a></li>
@@ -486,6 +487,107 @@ cp .edpa/engine/templates/github-workflows/edpa-collision-check.yml \
    .github/workflows/</div>
 
     <p>Plný guide s rozhodovacím stromem a běžnými typy kolizí (single / multi / parent-chain / cascading): <a href="https://github.com/technomaton/edpa/blob/main/docs/dev-collisions.md" target="_blank"><code>docs/dev-collisions.md</code></a>.</p>
+  </section>
+
+  <!-- 9c. ID ledger -->
+  <section id="id-ledger">
+    <h2>9c. Jak funguje rezervace ID — ledger na git refu</h2>
+
+    <p>Čísla jsou unikátní, když je vydává jedno místo. Dříve měl každý pracovní strom vlastní čítač a o ostatních nevěděl, takže dva worktree, dva klony nebo dva lidé dostali stejné <code>S-285</code>. Ledger dělá tím jedním místem git remote, na který tým stejně pushuje — jako automat na pořadové lístky. Žádné API forge, žádné <code>gh</code>: jen <code>git fetch</code> a <code>git push</code>, takže funguje na jakémkoli git serveru.</p>
+
+    <h3>Na čem to v gitu stojí</h3>
+    <p>Git má dvě vrstvy: <strong>objekty</strong> (commity, stromy, obsah souborů — pojmenované hashem a neměnné) a <strong>refy</strong> (pojmenované ukazatele na commit; ref je jméno a jeden hash). Větev je ref <code>refs/heads/main</code>, tag <code>refs/tags/v2.23.0</code>, GitHub si pro PR vede <code>refs/pull/94/head</code>. <code>refs/edpa/ids</code> je ukazatel stejného druhu, jen mimo <code>refs/heads/</code>. Důsledky:</p>
+    <ul>
+      <li><code>git clone</code> a <code>git pull</code> ho samy nestahují (berou větve a tagy),</li>
+      <li>nezobrazí se mezi větvemi v UI forge,</li>
+      <li>nevztahují se na něj pravidla větví ani spouštěče CI.</li>
+    </ul>
+    <p>Stejně ukládá data sám git (<code>refs/notes/</code>), Gerrit nebo git-bug.</p>
+
+    <h3>Co ref obsahuje</h3>
+    <p>Ref ukazuje na poslední commit řetězu. Každý commit má rodiče (předchozí rezervaci), strom s jediným souborem <code>counters.yaml</code> a zprávu, která je auditním záznamem rezervace. Je to obyčejná git historie, jen bez vašeho kódu.</p>
+<pre><code>schema: 1
+counters:        # nejvyšší vydané číslo per typ
+  Defect: 93
+  Story: 290
+floors:          # nejvyšší číslo, které smí existovat BEZ záznamu o rezervaci
+  Defect: 92
+  Story: 289</code></pre>
+<pre><code>alloc S-290: Website (CZ/EN): describe the remote ID authority
+
+EDPA-Id: S-290
+EDPA-Type: Story
+EDPA-Parent: F-129
+EDPA-Branch: main
+EDPA-Created-At: 2026-10-08T07:52:11Z
+EDPA-Nonce: 5f0c…</code></pre>
+<pre><code>git fetch origin refs/edpa/ids
+git log FETCH_HEAD --format='%s  [%an, %ar]'
+git show FETCH_HEAD:counters.yaml</code></pre>
+
+    <h3>Jedna rezervace krok za krokem</h3>
+    <ol>
+      <li><strong>Přečte stav.</strong> Stáhne špičku <code>refs/edpa/ids</code> do dočasného refu a přečte <code>Story: 290</code>.</li>
+      <li><strong>Připraví nový stav.</strong> Nízkoúrovňovými příkazy složí commit se <code>Story: 291</code> — bez pracovního stromu a indexu, váš checkout se nedotkne.</li>
+      <li><strong>Pošle ho s podmínkou</strong> „přijmi jen tehdy, pokud ref stále míří na commit z kroku 1“.</li>
+      <li><strong>Server rozhodne.</strong> Přijato → <code>S-291</code> je vaše. Odmítnuto, protože se ref posunul → někdo byl rychlejší; zpět na krok 1 a další číslo.</li>
+      <li><strong>Teprve teď</strong> se zapíše soubor tiketu a commitne do vaší větve.</li>
+    </ol>
+<pre><code>git hash-object -w --stdin          # counters.yaml → blob
+git mktree                          # strom s tím jedním souborem
+git commit-tree &lt;tree&gt; -p &lt;tip&gt;     # commit, zpráva = auditní záznam
+
+git push --no-verify --porcelain \
+  --force-with-lease=refs/edpa/ids:&lt;tip&gt; \
+  origin &lt;new commit&gt;:refs/edpa/ids</code></pre>
+
+    <h3>Kde vzniká atomičnost</h3>
+    <p>V protokolu <code>git push</code>. Klient pro každý ref posílá trojici:</p>
+<pre><code>&lt;old hash&gt;  &lt;new hash&gt;  refs/edpa/ids</code></pre>
+    <p>Server ref zamkne, ověří, že na něm právě je <em>starý hash</em>, a teprve pak zapíše nový — compare-and-swap. Stejný mechanismus způsobí, že obyčejný <code>git push</code> do <code>main</code> selže, když někdo pushnul před vámi. <code>--force-with-lease=&lt;ref&gt;:&lt;hash&gt;</code> očekávanou hodnotu zadává výslovně; s prázdnou hodnotou znamená „jen pokud ref ještě neexistuje“ — tak se ledger zakládá.</p>
+    <ul>
+      <li><strong>Výsledek se nikdy nečte z textu chyby.</strong> Po každém pushi, který není čistý úspěch, klient znovu přečte remote: ref obsahuje můj commit → rezervováno (i když se potvrzení ztratilo v timeoutu); ref se posunul bez něj → prohraný závod, opakovat; ref se nepohnul → server toto prostředí nepustí.</li>
+      <li><strong>Nonce.</strong> Dva worktree jednoho člověka mohou složit bajtově shodný commit; git by druhý push ohlásil jako „up to date“ a číslo by měli oba. Každá zpráva proto nese náhodné <code>EDPA-Nonce</code> a „up to date“ se nikdy nebere jako úspěch.</li>
+      <li><strong><code>--no-verify</code></strong> jen u tohoto pushe: projekty pouštějí v <code>pre-push</code> testy a tento push nese jediný servisní commit, nikdy kód.</li>
+    </ul>
+
+    <h3>Proč neprojde ručně napsaný tiket</h3>
+    <p>Hooky (<code>validate_ids.py</code>) u každého <em>nového</em> tiketu ověří rezervaci. Číslo na úrovni <code>floor</code> nebo pod ní nic nepotřebuje — tiket je starší než ledger. Nad <code>floor</code> musí existovat záznam pro dané ID a jeho <code>EDPA-Created-At</code> se musí shodovat s <code>created_at</code> v tiketu. Pravidlo „číslo ≤ nejvyšší vydané“ by nestačilo: ID vyražené zastaralým pluginem by prošlo, kdykoli někdo drží nesloučenou rezervaci nad ním. pre-commit pracuje s lokální kopií (offline jen varuje), pre-push a CI ověřují online — to zachytí i commity s <code>--no-verify</code>.</p>
+
+    <h3>Větve, worktree, klony, agenti</h3>
+    <ul>
+      <li><strong>Větve:</strong> číslo se rezervuje na remote, ne ve větvi. Soubor tiketu se commitne tam, kde stojíte; dvě větve nemohou dostat stejné ID.</li>
+      <li><strong>Worktree jednoho klonu:</strong> sdílejí kopii ledgeru, zámek i režim (vše leží ve společném <code>.git</code>). Přepnou se najednou, i ty vzniklé před opt-in commitem.</li>
+      <li><strong>Jiné klony a lidé:</strong> koordinuje server.</li>
+      <li><strong>Agentní session:</strong> jako člověk, pokud smí pushovat do repa. Sandbox omezený na vlastní větev ID nezíská a ohlásí to.</li>
+      <li><strong>Co zůstává:</strong> <em>obsah</em> tiketu vidí ostatní větve až po sloučení.</li>
+    </ul>
+    <table>
+      <thead><tr><th>Kde</th><th>Co</th></tr></thead>
+      <tbody>
+        <tr><td><code>refs/edpa/cache/ids</code></td><td>nejnovější známý stav ledgeru; posouvá se jen dopředu</td></tr>
+        <tr><td><code>git config edpa.idLedgerRemote / edpa.idLedgerRef</code></td><td>kde tento klon ledger naposledy našel</td></tr>
+        <tr><td><code>&lt;git common dir&gt;/edpa/</code></td><td>zámek, high-water mark, zásoba čísel rezervovaných předem</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Chování při selhání</h3>
+    <table>
+      <thead><tr><th>Situace</th><th>Chování</th></tr></thead>
+      <tbody>
+        <tr><td>Nejde síť</td><td>žádné ID, nic se nezapíše. Číslo se nikdy neodhaduje — tak vznikají dvě řady ID. Pro práci offline si vezměte čísla předem: <code>id_counter.py reserve --type Story --count 5</code></td></tr>
+        <tr><td>Ref na serveru smazán nebo vrácen zpět</td><td>každý klon má řetěz v kopii a čítače jsou maxima, takže příští rezervace z klonu, který si pamatuje víc, ho obnoví</td></tr>
+        <tr><td>Ref přepsán nesouvisející historií</td><td>obě historie se sloučí, per typ maximum</td></tr>
+        <tr><td>Proces spadne mezi rezervací a zápisem souboru</td><td>číslo propadne; díra v řadě ničemu nevadí</td></tr>
+        <tr><td>Zatoulaný soubor typu <code>S-9999.md</code></td><td>odmítnuto (zvedl by řadu všem); vědomě převzít lze přes <code>id_counter.py doctor --raise</code></td></tr>
+        <tr><td>Prohraný závod</td><td>automatické opakování, asi 2 s na pokus</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Proč jeden ref, a ne ref pro každý typ</h3>
+    <p>Ref per typ by ušetřil jedno opakování, když ve stejné vteřině vzniká Story a Defect. Zisk je malý (opakování stojí asi 2 s; v zátěži 16 souběžných procesů vyšlo průměrně 1,6 pokusu na rezervaci) a úzké hrdlo je síťové kolo, ne typ. Cena by byla sedm čtení místo jednoho, neatomické založení, sedm auditních řad a složitější samooprava. Soubor nese <code>schema: 1</code>, takže případné pozdější rozdělení čísla tiketů nezmění.</p>
+
+    <p>Změřeno: GitHub přijal push do <code>refs/edpa/*</code>, asi 2,4 s na rezervaci; 2×128 souběžných rezervací ze 3 klonů a 8 worktree bez duplicity. Neověřeno: jiné forge než GitHub, Windows. Plná technická reference: <a href="https://github.com/technomaton/edpa/blob/main/docs/id-ledger.md" target="_blank" rel="noopener">id-ledger.md</a> · přechod projektu: <a href="https://github.com/technomaton/edpa/blob/main/docs/id-ledger-prechod.md" target="_blank" rel="noopener">id-ledger-prechod.md</a> · rozhodnutí: <a href="https://github.com/technomaton/edpa/blob/main/docs/v2/decisions.md" target="_blank" rel="noopener">ADR-014</a>.</p>
   </section>
 
   <!-- 10. Vykazy a audit -->

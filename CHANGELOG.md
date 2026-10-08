@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.23.1 — 2026-10-08
+
+### Added
+
+- **Technical explanation of the ID ledger (S-290).** `docs/id-ledger.md`
+  and a new section 9c on the website methodology page (CZ/EN): what the
+  ledger ref is in git terms, one reservation step by step, where
+  atomicity comes from, the hook check, behaviour across branches and
+  worktrees, failure behaviour, and why one ref rather than one per type.
+
+### Fixed
+
+- **`/edpa:setup` re-seeded the tracked `id_counters.yaml` under the
+  remote ID authority (D-94).** An existing file is now left exactly as
+  it is.
+
 ## 2.23.0 — 2026-10-08
 
 Ticket IDs can now be reserved on the shared git remote, so they are unique

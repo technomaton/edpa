@@ -22,7 +22,8 @@ python3 .edpa/engine/scripts/id_counter.py status     # which one is active, and
 ## Remote ID authority (ADR-014)
 
 > One-page cut-over guide for the team (Czech, with a diagram):
-> [id-ledger-prechod.md](id-ledger-prechod.md).
+> [id-ledger-prechod.md](id-ledger-prechod.md). How it works inside git:
+> [id-ledger.md](id-ledger.md).
 
 ### How it works
 
