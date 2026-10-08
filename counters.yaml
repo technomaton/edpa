@@ -1,0 +1,17 @@
+schema: 1
+counters:
+  Defect: 92
+  Epic: 17
+  Event: 3
+  Feature: 143
+  Initiative: 3
+  Risk: 4
+  Story: 289
+floors:
+  Defect: 92
+  Epic: 17
+  Event: 3
+  Feature: 143
+  Initiative: 3
+  Risk: 4
+  Story: 289
