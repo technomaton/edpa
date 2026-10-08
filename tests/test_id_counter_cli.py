@@ -59,24 +59,27 @@ def test_init_remote_seeds_from_everything_this_clone_can_reach(
     _spread_out_project(world, alice, bob)
     assert cli(alice, "init-remote", "--apply") == 0
     out = capsys.readouterr().out
-    assert "S-8" in out and "floor S-9" in out and "first new ID S-10" in out
+    # No headroom by default: numbering continues without a gap.
+    assert "floor S-8" in out and "first new ID S-9" in out
+    assert "headroom" not in out
 
     state = world.counters()
-    assert state["floors"] == {"Defect": 2, "Story": 9}
-    assert state["counters"] == {"Defect": 2, "Story": 9}
-    # Types without any item get no headroom: the first Risk is R-1.
+    assert state["floors"] == {"Defect": 1, "Story": 8}
+    assert state["counters"] == {"Defect": 1, "Story": 8}
+    # Types without any item start at 1.
     assert "Risk" not in state["floors"]
     # The private scan namespace is cleaned up again.
     assert git(alice, "for-each-ref", "refs/edpa/scan") == ""
     # ...and the whole clone is switched, without any tracked flag yet.
-    assert next_id("Story", alice) == "S-10"
+    assert next_id("Story", alice) == "S-9"
     assert next_id("Risk", alice) == "R-1"
 
 
 def test_headroom_is_proportional_to_the_size_of_a_type(
         world: World, alice: Path) -> None:
-    """A flat headroom would number the next Initiative of a small project
-    I-24. A type gets about a tenth of its size, capped by --headroom."""
+    """Opt-in headroom: a flat one would number the next Initiative of a
+    small project I-24, so a type gets about a tenth of its size, capped
+    by --headroom."""
     project(alice)
     item(alice, "S-262")
     item(alice, "D-62", "defects")

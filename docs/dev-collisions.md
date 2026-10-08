@@ -61,7 +61,7 @@ git log refs/edpa/cache/ids --format='%s  [%an, %ar]' | head    # who reserved w
 # 2. One maintainer, from the fullest clone:
 python3 .edpa/engine/scripts/id_counter.py init-remote --write-config
 #    → fetches every branch, takes the highest ID per type across all
-#      worktrees and branches, adds headroom, shows the plan, asks, then
+#      worktrees and branches, shows the plan, asks, then
 #      creates the ledger and prepares the opt-in in edpa.yaml.
 
 # 3. Commit the one-line opt-in through your normal review:
@@ -74,11 +74,11 @@ in worktrees cut long before the opt-in commit. Every other clone switches as
 soon as it **fetches** the opt-in (`git fetch` / `git pull`; the pre-push hook
 fetches too) — it does not have to merge it first.
 
-- **Headroom** leaves numbers free above the highest known ID for sessions
-  that are still running an outdated plugin during the switch: about a tenth
-  of a type's size, at most `--headroom` (default 20) — with 262 Stories and
-  3 Initiatives the first new ones are S-283 and I-5. `--headroom 0` is fine
-  when nobody else is working.
+- **Numbering simply continues** — the first new Story is the one after the
+  highest existing. That is why step 1 matters: a session still on an outdated
+  plugin mints a number the ledger gives to someone else, and the hooks stop
+  it. If you cannot get everyone updated first, leave room for them with
+  `--headroom N` (about a tenth of a type's size, at most N).
 - **`id_counters.yaml` is left as it is.** Branches that created a ticket
   before the switch carry a bump of it; the file keeps merging as before until
   they are gone, and nothing new writes it. Delete it later if you like.

@@ -87,15 +87,15 @@ expect "the opt-in touches only edpa.yaml" "M .edpa/config/edpa.yaml" "$(git -C 
   && git push -q origin HEAD:main 2>/dev/null )
 
 say "4. AFTER — every path draws from the ledger"
-expect "main checkout, first ID above the floor (2 + 1 headroom)" "S-4" "$(add anna Story "Facets" F-1)"
-expect "worktree WITHOUT the opt-in commit" "S-5" "$(add wt-stale Story "Boosting" F-1)"
+expect "main checkout, numbering continues right after the floor" "S-3" "$(add anna Story "Facets" F-1)"
+expect "worktree WITHOUT the opt-in commit" "S-4" "$(add wt-stale Story "Boosting" F-1)"
 git -C anna worktree add -q ../wt-a -b feat/a
 git -C anna worktree add -q ../wt-b -b feat/b
 ( add wt-a Story "Parallel A" F-1 > "$W/a.id" ) & ( add wt-b Story "Parallel B" F-1 > "$W/b.id" ) & wait
 PA=$(cat "$W/a.id"); PB=$(cat "$W/b.id")
-case "$PA $PB" in "S-6 S-7"|"S-7 S-6") ok "two worktrees at the same instant ($PA, $PB)";; *) bad "parallel creation gave '$PA' and '$PB'";; esac
+case "$PA $PB" in "S-5 S-6"|"S-6 S-5") ok "two worktrees at the same instant ($PA, $PB)";; *) bad "parallel creation gave '$PA' and '$PB'";; esac
 ( cd boris && git fetch -q origin )
-expect "developer who only FETCHED the opt-in" "S-8" "$(add boris Story "Typos" F-1)"
+expect "developer who only FETCHED the opt-in" "S-7" "$(add boris Story "Typos" F-1)"
 for wt in wt-stale wt-a wt-b; do
   expect "$wt: commits touching id_counters.yaml" "0" "$(git -C "$wt" log --format= --name-only main..HEAD | grep -c id_counters.yaml)"
 done
@@ -128,7 +128,7 @@ say "7. the leftover pre-ledger collision is blocked, then repaired from the led
   elif grep -q "S-2 already exists on refs/remotes/origin/main as a different item" "$W/push.err"; then ok "pre-push: S-2 is a different item upstream"
   else bad "pre-push failed for another reason: $(tail -3 "$W/push.err" | tr '\n' ' ')"; fi
   python3 .edpa/engine/scripts/renumber_collisions.py --apply >"$W/renumber.out" 2>&1
-  expect "renumbered to a ledger reservation" "S-1 S-8 S-9" "$(ls .edpa/backlog/stories | sed 's/\.md//' | sort -t- -k2 -n | tr '\n' ' ' | sed 's/ $//')"
+  expect "renumbered to a ledger reservation" "S-1 S-7 S-8" "$(ls .edpa/backlog/stories | sed 's/\.md//' | sort -t- -k2 -n | tr '\n' ' ' | sed 's/ $//')"
   expect "renumber left the tracked counter alone" "0" "$(git status --porcelain | grep -c id_counters.yaml)"
   git add -A .edpa
   git commit -q -m "chore(no-ticket): renumber my colliding story" 2>"$W/commit.err" && ok "renamed item passes pre-commit" \
@@ -138,7 +138,7 @@ say "7. the leftover pre-ledger collision is blocked, then repaired from the led
 
 say "8. result"
 ( cd anna && git pull -q origin main 2>/dev/null
-  expect "stories on main" "S-1 S-2 S-4 S-5 S-6 S-7" "$(ls .edpa/backlog/stories | sed 's/\.md//' | sort -t- -k2 -n | tr '\n' ' ' | sed 's/ $//')" )
+  expect "stories on main" "S-1 S-2 S-3 S-4 S-5 S-6" "$(ls .edpa/backlog/stories | sed 's/\.md//' | sort -t- -k2 -n | tr '\n' ' ' | sed 's/ $//')" )
 allocator anna doctor | sed 's/^/   | /'
 expect "doctor" "0" "$(allocator anna doctor >/dev/null 2>&1; echo $?)"
 allocator anna status --refresh >/dev/null 2>&1
