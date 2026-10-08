@@ -428,7 +428,13 @@ feature/F-102-anon-engine</div>
   <section id="id-collisions">
     <h2>9b. ID collisions and renumbering (multi-developer setup)</h2>
 
-    <p>EDPA allocates IDs locally (no central coordinator) — if two developers concurrently create a backlog item from the same starting state of <code>main</code>, both get the same ID (e.g. both <code>S-5</code>). The collision surfaces at merge time of the second PR.</p>
+    <p><strong>Teams: reserve IDs on the shared git remote (since 2.23.0).</strong> A project can hand ID allocation to the git remote the team already pushes to. A reservation is a push of one metadata commit to the ref <code>refs/edpa/ids</code> that the server accepts only if the ref has not moved in the meantime — exactly one pusher wins, the others try the next number. The ID is therefore unique across worktrees, branches and developers the moment it is assigned (~2 s), with no GitHub API and no <code>gh</code>. A ticket no longer has to go through a PR just to "claim" its number; the hooks only let through a ticket that has a reservation.</p>
+<pre><code>python3 .edpa/engine/scripts/id_counter.py init-remote --write-config   # once per repository
+git add .edpa/config/edpa.yaml &amp;&amp; git commit -m "chore(no-ticket): reserve ticket IDs in the shared ledger"
+python3 .edpa/engine/scripts/id_counter.py status                       # who allocates IDs here, and why</code></pre>
+    <p>Full guide: <a href="https://github.com/technomaton/edpa/blob/main/docs/dev-collisions.md" target="_blank" rel="noopener">dev-collisions.md</a>.</p>
+
+    <p><strong>Without a shared ledger (the default, local mode)</strong> the worktrees of one clone share a sequence, but two clones do not — if two developers concurrently create a backlog item from the same starting state of <code>main</code>, both get the same ID (e.g. both <code>S-5</code>). The pre-push hook catches the collision; at the latest the merge of the second PR does.</p>
 
     <p><strong>Four defense layers</strong> detect the collision as early as possible, plus a semi-automatic recovery tool:</p>
 

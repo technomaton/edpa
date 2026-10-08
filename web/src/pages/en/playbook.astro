@@ -285,7 +285,7 @@ python3 .edpa/engine/scripts/backlog.py add --type Story --parent F-1 \
 python3 .edpa/engine/scripts/backlog.py add --type Epic --parent I-1 \
   --title "..." --js 13 --bv 13 --tc 8 --rr-oe 5</code></pre>
 
-    <p><code>backlog.py add</code> is <strong>purely local</strong> in V2 (no <code>gh</code>): the ID is allocated from <code>id_counters.yaml</code> (<code>S-42</code>, <code>E-15</code>, <code>I-3</code>), the parent hierarchy is validated, the YAML is written under <code>.edpa/backlog/</code>, and the change is auto-committed as <code>feat(&lt;ID&gt;):</code>. PR-derived signals arrive later via the optional contribution-sync workflow.</p>
+    <p><code>backlog.py add</code> is <strong>purely local</strong> in V2 (no <code>gh</code>): the ID is allocated from <code>id_counters.yaml</code> or, for teams, reserved on the shared git remote (<code>ids.authority: remote</code>) (<code>S-42</code>, <code>E-15</code>, <code>I-3</code>), the parent hierarchy is validated, the YAML is written under <code>.edpa/backlog/</code>, and the change is auto-committed as <code>feat(&lt;ID&gt;):</code>. PR-derived signals arrive later via the optional contribution-sync workflow.</p>
     <div class="note"><strong>Removed in 2.0.0:</strong> the "GH-first" mode of <code>add</code> (creating a GH issue, sub-issue API, rewriting the title to <code>"&#123;ID&#125;: &#123;title&#125;"</code>). In V2 <code>add</code> is local-only — the V1 "strictly GH-first" claim NO LONGER holds.</div>
 
     <p>Contributors can be assigned right at creation time (per-item CW share):</p>
