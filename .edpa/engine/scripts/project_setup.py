@@ -45,6 +45,7 @@ import argparse
 import json
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -592,6 +593,26 @@ def _hook_ownership(dst: Path, src: Path) -> str:
     return _OWN_LEGACY if _hook_body(text) == _hook_body(src_text) else _OWN_FOREIGN
 
 
+def _git_hooks_dir(root: Path) -> Path:
+    """The hooks dir git runs for ``root``. In a main checkout that is
+    .git/hooks/; in a linked worktree .git is a file and the shared hooks live
+    in the common git dir, which only ``git rev-parse --git-path`` resolves
+    (D-101). An unresolvable worktree falls back to the nonexistent
+    .git/hooks/, which install_hooks reports as not a git repo."""
+    dot_git = root / ".git"
+    if not dot_git.is_file():
+        return dot_git / "hooks"
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--git-path", "hooks"],
+            capture_output=True, text=True, encoding="utf-8", check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return dot_git / "hooks"
+    hooks = Path(out)
+    return hooks if hooks.is_absolute() else root / hooks
+
+
 def install_hooks(root: Path, *, refresh: bool = False,
                   check_only: bool = False) -> bool:
     """Register EDPA's git hooks robustly.
@@ -615,7 +636,7 @@ def install_hooks(root: Path, *, refresh: bool = False,
     ``check_only`` reports status and writes nothing (the ``--check-hooks``
     doctor). Returns False only when there is no .git/hooks at all.
     """
-    git_hooks = root / ".git" / "hooks"
+    git_hooks = _git_hooks_dir(root)
     if not git_hooks.exists():
         warn("Not a git repo (no .git/hooks) — skipping hooks")
         return False
