@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.24.0 — 2026-10-27
+
+`backlog.py validate` and the backlog schema now accept a Story the way
+create writes it, and they check the assignee and iteration it names. A
+backlog that passed before can fail on the new reference errors, hence the
+minor version.
+
+### Fixed
+
+- **validate rejected Stories that create accepts (D-100).** `backlog add`
+  and `edpa_item_create` write a Story without an assignee or an
+  iteration, yet `validate` reported every Story without an assignee as an
+  error, and the schema — also run by the on-save hook — required an
+  iteration in every status. The assignee is now optional in every status:
+  it is decided when someone takes the work, the creator may not know it,
+  and it earns no credit since 2.8.0. `validate` warns about a missing
+  iteration only once work has started (Implementing to Releasing, and
+  Done); the schema requires it only for a Done Story.
+
+### Added
+
+- **Reference checks for a Story's assignee and iteration (D-100).**
+  `validate` reports an error when a supplied assignee is not a person in
+  `.edpa/config/people.yaml`, or when a supplied iteration has no
+  iteration record (`.edpa/iterations/<id>.yaml` with a matching
+  `iteration.id`). A PI id such as `PI-2026-1` is not an iteration, and
+  work on such a Story earns no credit.
+
 ## 2.23.2 — 2026-10-08
 
 ### Changed
