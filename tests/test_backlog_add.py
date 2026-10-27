@@ -252,13 +252,44 @@ def test_local_contributors_pass_validate_syntax(tmp_path, silence_git):
 
     backlog.cmd_add(root, bl, _args(
         type="Story", title="Login", parent="F-1", js=5,
-        iteration="PI-2026-1.1",  # Story schema requires iteration:
         contributor=["alice:owner:0.7", "alice:reviewer:0.3"],
     ))
 
     md_path = root / ".edpa" / "backlog" / "stories" / "S-1.md"
     errors, _warnings = validate_syntax.validate_file(md_path)
     assert errors == []
+
+
+def test_story_created_without_assignee_or_iteration_validates(tmp_path, silence_git, capsys):
+    """D-100 regression guard: the Story create writes by default — no
+    assignee, no iteration, status Funnel — passes both shipped validators.
+    The assignee is decided only when someone takes the work and the
+    iteration at planning, so neither validator may demand them up front."""
+    import validate_syntax
+    from _md_frontmatter import save_md
+    root = _write_workspace(
+        tmp_path,
+        initiatives=[{"id": "I-1", "type": "Initiative", "title": "Root",
+                      "status": "Funnel"}],
+        features=[{"id": "F-1", "type": "Feature", "title": "Auth",
+                   "status": "Funnel", "parent": "E-1", "js": 3}],
+    )
+    save_md(root / ".edpa" / "backlog" / "epics" / "E-1.md",
+            {"id": "E-1", "type": "Epic", "title": "Access", "status": "Funnel",
+             "parent": "I-1"}, body="")
+
+    backlog.cmd_add(root, backlog.load_backlog(root),
+                    _args(type="Story", title="Login", parent="F-1", js=5))
+
+    md_path = root / ".edpa" / "backlog" / "stories" / "S-1.md"
+    errors, _warnings = validate_syntax.validate_file(md_path)
+    assert errors == []
+    capsys.readouterr()
+    rc = backlog.cmd_validate(backlog.load_backlog(root),
+                              argparse.Namespace(_root=root / ".edpa"))
+    out = capsys.readouterr().out
+    assert "missing" not in out, out
+    assert rc == 0, out
 
 
 def test_local_commits_via_git(tmp_path, silence_git):

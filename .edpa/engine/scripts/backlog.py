@@ -166,6 +166,9 @@ ARROW  = "\u2192"   # ->
 
 PORTFOLIO_STATUSES = ["Funnel", "Reviewing", "Analyzing", "Ready", "Implementing", "Done"]
 DELIVERY_STATUSES = ["Funnel", "Analyzing", "Backlog", "Implementing", "Validating", "Deploying", "Releasing", "Done"]
+# A Story names its iteration once work on it starts (D-100). The statuses
+# before Implementing are unplanned — the state create leaves a new item in.
+STARTED_STATUSES = DELIVERY_STATUSES[DELIVERY_STATUSES.index("Implementing"):]
 
 
 # -- Data Loading (file-per-item) ----------------------------------------------
@@ -762,12 +765,38 @@ def cmd_wsjf(backlog, args):
     print()
 
 
+def _iteration_record_ids(edpa_root) -> set:
+    """Ids of the iteration records under iterations/.
+
+    A record is the file the engine opens for a Story's iteration,
+    ``iterations/<id>.yaml``, holding ``iteration.id: <id>``. A PI file
+    (``pi:`` block) is not an iteration, and neither is an unreadable file;
+    validate_iterations.py reports why it is unreadable.
+    """
+    ids = set()
+    for path in sorted((Path(edpa_root) / "iterations").glob("*.yaml")):
+        try:
+            doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, yaml.YAMLError):
+            continue
+        record = doc.get("iteration") if isinstance(doc, dict) else None
+        if isinstance(record, dict) and record.get("id") == path.stem:
+            ids.add(path.stem)
+    return ids
+
+
 def cmd_validate(backlog, args):
-    """Validate backlog integrity."""
+    """Validate backlog integrity.
+
+    The checks that resolve a Story's assignee and iteration against
+    config/people.yaml and iterations/ need the project's .edpa/ directory in
+    ``args._root``. main() always sets it; without it they are skipped.
+    """
     items = collect_items(backlog)
     stories = [i for i in items if i["level"] == "Story"]
     features = [i for i in items if i["level"] == "Feature"]
     epics = [i for i in items if i["level"] == "Epic"]
+    edpa_root = getattr(args, "_root", None)
 
     errors = []
     warnings = []
@@ -779,10 +808,16 @@ def cmd_validate(backlog, args):
     print(bold(color("  EDPA Backlog Validation", C.HEADER)))
     print()
 
-    # 1. All stories must have assignee
-    for s in stories:
-        if not s.get("assignee"):
-            errors.append(f"{s['id']} ({s.get('title','')}): missing assignee")
+    # 1. A Story's assignee is optional (D-100): create leaves it unset, the
+    #    team decides it only when someone takes the work, and it earns no
+    #    credit — CW comes from evidence since 2.8.0 dropped the assignee
+    #    signal. A supplied assignee must still be a person from people.yaml.
+    if edpa_root is not None:
+        _, people = _load_people(Path(edpa_root))
+        for s in stories:
+            assignee = s.get("assignee")
+            if assignee not in (None, "") and (not isinstance(assignee, str) or assignee not in people):
+                errors.append(f"{s['id']} ({s.get('title','')}): assignee {assignee!r} is not a person id from config/people.yaml")
 
     # 2. All stories must have JS
     for s in stories:
@@ -812,10 +847,20 @@ def cmd_validate(backlog, args):
         elif parent not in all_ids:
             errors.append(f"{item['id']} ({item.get('title','')}): parent '{parent}' does not exist")
 
-    # 5. All stories should have iteration
+    # 5. A Story names its iteration once work on it starts (D-100); before
+    #    that it is unplanned. A snapshot cannot tell a legacy item from a new
+    #    one, so a missing iteration stays a warning. A supplied iteration must
+    #    name an iteration record: the engine credits work per iteration, so a
+    #    dangling id or a PI id (PI-2026-1 for PI-2026-1.3) earns nothing.
     for s in stories:
-        if not s.get("iteration"):
+        if s.get("status") in STARTED_STATUSES and not s.get("iteration"):
             warnings.append(f"{s['id']} ({s.get('title','')}): missing iteration assignment")
+    if edpa_root is not None:
+        iteration_ids = _iteration_record_ids(edpa_root)
+        for s in stories:
+            iteration = s.get("iteration")
+            if iteration not in (None, "") and (not isinstance(iteration, str) or iteration not in iteration_ids):
+                errors.append(f"{s['id']} ({s.get('title','')}): iteration {iteration!r} has no iteration record in iterations/ (a PI id is not one)")
 
     # 6. Check WSJF consistency
     for item in epics + features:
@@ -906,12 +951,13 @@ def cmd_validate(backlog, args):
 
     # Print results
     checks = [
-        ("Story assignees present", not any("missing assignee" in e for e in errors)),
+        ("Story assignees known", not any("is not a person id" in e for e in errors)),
         ("Story JS values present", not any("missing JS" in e for e in errors)),
         ("Story JS <= 8", not any("exceeds recommended" in w for w in warnings)),
         ("Parent references valid", not any("parent" in e.lower() for e in errors)),
         ("Parent type hierarchy", not any("expected" in e.lower() for e in errors)),
         ("Iteration assignments", not any("missing iteration" in w for w in warnings)),
+        ("Iteration references valid", not any("has no iteration record" in e for e in errors)),
         ("WSJF consistency", not any("stored WSJF" in w for w in warnings)),
         ("No duplicate IDs", not any("Duplicate ID" in e for e in errors)),
         ("CW values valid", not any("unusual cw" in w for w in warnings)),

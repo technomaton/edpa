@@ -117,3 +117,29 @@ def test_parentless_spine_types_fail():
         data = {"id": iid, "type": itype, "title": "X", "status": "Backlog", **extra}
         errors, _ = validate_backlog_schema(_path(type_dir, f"{iid}.md"), data)
         assert any("parent" in e for e in errors), (itype, errors)
+
+
+# ---------------------------------------------------------------------------
+# D-100: create leaves a Story's iteration unset, so the schema requires it
+# only once the Story is Done — its delivery iteration.
+# ---------------------------------------------------------------------------
+
+def _story(**fields):
+    return {"id": "S-1", "type": "Story", "title": "X", "parent": "F-1", "js": 3, **fields}
+
+
+@pytest.mark.parametrize("status", ["Funnel", "Analyzing", "Backlog"])
+def test_unplanned_story_without_iteration_passes(status):
+    errors, _ = validate_backlog_schema(_path("stories", "S-1"), _story(status=status))
+    assert not errors, errors
+
+
+def test_done_story_without_iteration_fails():
+    errors, _ = validate_backlog_schema(_path("stories", "S-1"), _story(status="Done"))
+    assert any("missing required field 'iteration'" in e for e in errors), errors
+
+
+def test_done_story_with_iteration_passes():
+    errors, _ = validate_backlog_schema(
+        _path("stories", "S-1"), _story(status="Done", iteration="PI-2026-1.1"))
+    assert not errors, errors
