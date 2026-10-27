@@ -98,8 +98,10 @@ ITEM_SCHEMA = {
     },
     "Story": {
         "dir": "stories",
-        "required": {"id", "type", "title", "parent", "status", "js", "iteration"},
-        "optional": {"owner", "assignee", "contributors",
+        # `iteration` is required only once the Story is Done (D-100) —
+        # see the iteration check in validate_backlog_schema.
+        "required": {"id", "type", "title", "parent", "status", "js"},
+        "optional": {"owner", "assignee", "contributors", "iteration",
                      "bv", "tc", "rr_oe", "wsjf", "depends_on",
                      "created_at", "closed_at", "updated_at"},
         "statuses": DELIVERY_STATUSES | LEGACY_STATUSES,
@@ -509,11 +511,16 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
         except (TypeError, ValueError):
             errors.append(f"{path}: js must be numeric (got {js!r})")
 
-    # Iteration tag sanity for Stories
+    # Iteration tag sanity for Stories. Create (`backlog add`,
+    # edpa_item_create) leaves the iteration unset, so only a Done Story must
+    # name one — its delivery iteration (D-100). Requiring it from the start
+    # of work would need the same rule on create and transition first.
     if expected_type == "Story":
         iteration = data.get("iteration", "")
         if iteration and not isinstance(iteration, str):
             errors.append(f"{path}: iteration must be a string (got {type(iteration).__name__})")
+        elif iteration in (None, "") and data.get("status") == "Done":
+            errors.append(f"{path}: missing required field 'iteration' (required once a Story is Done)")
 
     # Contributors schema (v1.11+). Each entry carries:
     #   - person   (required, person id from people.yaml)

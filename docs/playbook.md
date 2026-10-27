@@ -421,8 +421,8 @@ python3 .edpa/engine/scripts/backlog.py wsjf --level feature
 python3 .edpa/engine/scripts/backlog.py tree --iteration PI-2026-1.1
 ```
 
-3. **Prirazeni assignees** -- kazda story musi mit assignee
-4. **Aktualizace backlogu** -- `iteration: PI-2026-1.1` na vybranych stories
+3. **Prirazeni assignees** -- assignee doplnte, az je jasne, kdo story resi; `backlog.py validate` ho nevyzaduje, vyplneny ale musi byt v `people.yaml`
+4. **Aktualizace backlogu** -- `iteration: PI-2026-1.1` na vybranych stories; od zahajeni prace ji `validate` ocekava
 
 ### 2.2 Denni prace
 
