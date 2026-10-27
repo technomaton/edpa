@@ -436,3 +436,61 @@ def test_warm_path_silent_with_extends_fragment(tmp_path):
     result = _run(tmp_path)
     assert result.returncode == 0, result.stderr
     assert "UNGUARDED" not in result.stderr
+
+
+# ─── Linked git worktree (D-101) ────────────────────────────────────────────
+# In a linked worktree `.git` is a file that points at the common git dir,
+# where the shared hooks and lefthook's checksum live. The hook addressed
+# "$PROJECT/.git/..." directly: `rm` failed with "Not a directory", `set -e`
+# aborted the update, and the self-heal probe never saw the shared hooks.
+
+
+def _git(cwd: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", "-c", "user.name=EDPA Test", "-c", "user.email=test@example.com", *args],
+        cwd=str(cwd), check=True, capture_output=True, text=True, encoding="utf-8",
+    )
+
+
+def _linked_worktree(tmp_path: Path) -> tuple[Path, Path]:
+    """A repo with one commit plus a linked worktree; returns (main, linked)."""
+    main = tmp_path / "main"
+    main.mkdir()
+    _git(main, "init", "-q")
+    (main / "README").write_text("x\n", encoding="utf-8")
+    _git(main, "add", "README")
+    _git(main, "commit", "-q", "-m", "init")
+    linked = tmp_path / "linked"
+    _git(main, "worktree", "add", "-q", "-b", "linked", str(linked))
+    return main, linked
+
+
+def test_linked_worktree_update_completes_and_drops_shared_checksum(tmp_path):
+    main, linked = _linked_worktree(tmp_path)
+    _seed_engine(linked, version="1.0.0")
+    (linked / "lefthook.yml").write_text(
+        "extends:\n  - .edpa/engine/lefthook-edpa.yml\n", encoding="utf-8"
+    )
+    checksum = main / ".git" / "info" / "lefthook.checksum"
+    checksum.parent.mkdir(exist_ok=True)
+    checksum.write_text("stale\n", encoding="utf-8")
+
+    result = _run(linked)
+    assert result.returncode == 0, result.stderr
+    assert "Not a directory" not in result.stderr
+    assert "engine updated" in result.stderr, "the update stopped before its end"
+    assert not checksum.exists(), "lefthook's checksum in the common git dir survived"
+
+
+def test_linked_worktree_self_heal_refreshes_shared_hooks(tmp_path):
+    main, linked = _linked_worktree(tmp_path)
+    _seed_engine(linked, version="1.0.0")
+    hooks = main / ".git" / "hooks"
+    (hooks / "post-commit").write_text(f"#!/bin/sh\n# {SENTINEL}\nexit 0\n")
+
+    result = _run(linked)
+    assert result.returncode == 0, result.stderr
+    assert "re-registering git hooks" in result.stderr
+    assert SENTINEL in (hooks / "pre-commit").read_text(), (
+        "the missing hook was not installed into the shared hooks dir"
+    )

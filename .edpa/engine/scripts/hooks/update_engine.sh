@@ -193,6 +193,22 @@ fi
 # is the durable opt-in signal. It also matches a hook the user chained EDPA
 # into by hand — opt-in too, and --refresh-hooks leaves foreign files untouched,
 # so the broader probe costs nothing.
+#
+# _git_path names a file in the project's git dir. In a main checkout that is
+# .git/; in a linked worktree .git is a file, and the shared hooks and
+# lefthook's checksum live in the common git dir, which only
+# `git rev-parse --git-path` resolves (D-101). It fails when neither applies.
+_git_path() {
+  if [ -d "$PROJECT/.git" ]; then
+    echo "$PROJECT/.git/$1"
+    return 0
+  fi
+  _gp=$(git -C "$PROJECT" rev-parse --git-path "$1" 2>/dev/null) || return 1
+  case "$_gp" in
+    /*) echo "$_gp" ;;
+    *) echo "$PROJECT/$_gp" ;;
+  esac
+}
 _has_lefthook() {
   for _lf in lefthook.yml lefthook.yaml .lefthook.yml .lefthook.yaml lefthook.toml lefthook.json; do
     [ -f "$PROJECT/$_lf" ] && return 0
@@ -216,7 +232,7 @@ if _has_lefthook; then
   # reinstall.
   for _lf in lefthook.yml lefthook.yaml .lefthook.yml .lefthook.yaml lefthook.toml lefthook.json; do
     if [ -f "$PROJECT/$_lf" ] && grep -q "lefthook-edpa.yml" "$PROJECT/$_lf" 2>/dev/null; then
-      rm -f "$PROJECT/.git/info/lefthook.checksum"
+      _checksum=$(_git_path info/lefthook.checksum) && rm -f "$_checksum" || true
       break
     fi
   done
@@ -224,7 +240,7 @@ if _has_lefthook; then
   # wired), loud + specific only on a partial paste (guards silently missing).
   # Non-blocking (|| true) — advisory only, must never break a session start.
   python3 "$TARGET/scripts/project_setup.py" --lefthook-audit --root "$PROJECT" 1>&2 || true
-elif grep -qE "EDPA-MANAGED-HOOK|\.edpa/engine/scripts/" "$PROJECT"/.git/hooks/* 2>/dev/null; then
+elif _hooks=$(_git_path hooks) && grep -qE "EDPA-MANAGED-HOOK|\.edpa/engine/scripts/" "$_hooks"/* 2>/dev/null; then
   echo "EDPA: re-registering git hooks after update..." >&2
   python3 "$TARGET/scripts/project_setup.py" --refresh-hooks --root "$PROJECT" 1>&2 || true
 fi
