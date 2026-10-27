@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.24.1 — 2026-10-27
+
+### Fixed
+
+- **The engine update aborted in a linked git worktree (D-101).** There
+  `.git` is a file, not a directory. `update_engine.sh` removed
+  `.git/info/lefthook.checksum`, `rm` failed with "Not a directory", and
+  `set -e` ended the SessionStart hook with exit 1 after vendoring, before
+  the lefthook audit and the legacy-backlog warning. Hook self-heal looked
+  for EDPA hooks in `.git/hooks/` and `project_setup.py` installed them
+  there, so a linked worktree of a project without lefthook never refreshed
+  its hooks. Both now resolve the path with `git rev-parse --git-path` when
+  `.git` is a file; a main checkout is unchanged.
+
 ## 2.24.0 — 2026-10-27
 
 `backlog.py validate` and the backlog schema now accept a Story the way
