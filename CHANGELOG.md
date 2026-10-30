@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.25.0 — 2026-10-30
+
+A Feature is now estimated when work on it starts. Before `Implementing` it
+may keep `js: 0`; from `Implementing` on it needs its WSJF estimate. Started
+Features without one draw new warnings, and the write layer will not move
+them on until they are estimated, hence the minor version.
+
+### Fixed
+
+- **The schema rejected the `js: 0` that create writes on a Feature
+  (D-102).** `backlog add` and `edpa_item_create` write a Feature with
+  `js: 0`, meaning "no estimate yet", but the schema — also run by the
+  on-save hook — required `js` above 0. A Feature now needs no estimate
+  before `Implementing`.
+
+### Added
+
+- **A WSJF estimate when a Feature enters work (D-102).** From
+  `Implementing` on, a Feature needs `js`, `bv`, `tc` and `rr_oe` above 0:
+  the engine splits its job size across the status gates, and
+  `backlog.py wsjf` ranks Features by WSJF. The schema flags a started
+  Feature without them, and `backlog.py validate` warns about one in
+  progress; Done Features are not reported. `edpa_item_create` and
+  `edpa_item_transition` refuse to put a Feature into work without them,
+  and `edpa_item_update` refuses to remove them from a started one.
+
 ## 2.24.1 — 2026-10-27
 
 ### Fixed
