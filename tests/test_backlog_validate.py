@@ -106,7 +106,7 @@ SPINE = [
     {"id": "E-1", "type": "Epic", "title": "Access", "parent": "I-1",
      "status": "Implementing"},
     {"id": "F-1", "type": "Feature", "title": "Auth", "parent": "E-1",
-     "status": "Implementing", "js": 3},
+     "status": "Implementing", "js": 3, "bv": 5, "tc": 3, "rr_oe": 2},
 ]
 
 
@@ -176,3 +176,29 @@ def test_unresolved_iteration_errors(edpa_root, iteration, capsys):
     out = capsys.readouterr().out
     assert "has no iteration record in iterations/" in out, out
     assert rc == 1, out
+
+
+# ---------------------------------------------------------------------------
+# D-102: a Feature in progress without its WSJF estimate draws a warning;
+# an unstarted Feature does not need one, and Done Features are history.
+# ---------------------------------------------------------------------------
+
+def _feature(status, **fields):
+    return {"id": "F-2", "type": "Feature", "title": "Search", "parent": "E-1",
+            "status": status, **fields}
+
+
+@pytest.mark.parametrize("status", ["Implementing", "Releasing"])
+def test_feature_in_progress_without_estimate_warns(status, capsys):
+    rc = _run(*SPINE, _feature(status, js=5))
+    out = capsys.readouterr().out
+    assert "F-2 (Search): has no WSJF estimate (needs bv, tc, rr_oe above 0)" in out, out
+    assert rc == 0, out
+
+
+@pytest.mark.parametrize("status", ["Backlog", "Done"])
+def test_unstarted_or_done_feature_draws_no_estimate_warning(status, capsys):
+    rc = _run(*SPINE, _feature(status))
+    out = capsys.readouterr().out
+    assert "has no WSJF estimate" not in out, out
+    assert rc == 0, out

@@ -143,3 +143,32 @@ def test_done_story_with_iteration_passes():
     errors, _ = validate_backlog_schema(
         _path("stories", "S-1"), _story(status="Done", iteration="PI-2026-1.1"))
     assert not errors, errors
+
+
+# ---------------------------------------------------------------------------
+# D-102: create writes a Feature with `js: 0`; the estimate is due when work
+# starts — from Implementing on, all four WSJF inputs above 0.
+# ---------------------------------------------------------------------------
+
+def _feature(**fields):
+    return {"id": "F-1", "type": "Feature", "title": "X", "parent": "E-1", **fields}
+
+
+@pytest.mark.parametrize("status", ["Funnel", "Analyzing", "Backlog"])
+def test_unstarted_feature_without_estimate_passes(status):
+    errors, _ = validate_backlog_schema(
+        _path("features", "F-1"), _feature(status=status, js=0))
+    assert not errors, errors
+
+
+@pytest.mark.parametrize("status", ["Implementing", "Done"])
+def test_started_feature_without_wsjf_estimate_fails(status):
+    errors, _ = validate_backlog_schema(
+        _path("features", "F-1"), _feature(status=status, js=5, bv=0, tc=3))
+    assert any("needs its WSJF estimate" in e and e.endswith("bv, rr_oe") for e in errors), errors
+
+
+def test_started_feature_with_wsjf_estimate_passes():
+    errors, _ = validate_backlog_schema(
+        _path("features", "F-1"), _feature(status="Implementing", js=5, bv=8, tc=3, rr_oe=2))
+    assert not errors, errors

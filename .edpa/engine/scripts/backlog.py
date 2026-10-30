@@ -53,6 +53,7 @@ try:
     # unlike mcp_server it never sys.exit()s at import when the MCP package is
     # absent — `backlog validate` must run without it). See _parent_required.
     from validate_syntax import ITEM_SCHEMA as _ITEM_SCHEMA  # noqa: E402
+    from _feature_estimate import missing_wsjf_estimate as _missing_wsjf_estimate  # noqa: E402
 finally:
     sys.path.pop(0)
 
@@ -862,6 +863,18 @@ def cmd_validate(backlog, args):
             if iteration not in (None, "") and (not isinstance(iteration, str) or iteration not in iteration_ids):
                 errors.append(f"{s['id']} ({s.get('title','')}): iteration {iteration!r} has no iteration record in iterations/ (a PI id is not one)")
 
+    # 5b. A Feature in progress needs its WSJF estimate (D-102). It stays a
+    #     warning for legacy items; the write layer refuses to move a Feature
+    #     into work without one. Done Features are history and not reported.
+    for f in features:
+        if f.get("status") in STARTED_STATUSES and f.get("status") != "Done":
+            missing = _missing_wsjf_estimate(f)
+            if missing:
+                warnings.append(
+                    f"{f['id']} ({f.get('title','')}): has no WSJF estimate "
+                    f"(needs {', '.join(missing)} above 0)"
+                )
+
     # 6. Check WSJF consistency
     for item in epics + features:
         stored_wsjf = item.get("wsjf")
@@ -958,6 +971,7 @@ def cmd_validate(backlog, args):
         ("Parent type hierarchy", not any("expected" in e.lower() for e in errors)),
         ("Iteration assignments", not any("missing iteration" in w for w in warnings)),
         ("Iteration references valid", not any("has no iteration record" in e for e in errors)),
+        ("Feature WSJF estimates", not any("has no WSJF estimate" in w for w in warnings)),
         ("WSJF consistency", not any("stored WSJF" in w for w in warnings)),
         ("No duplicate IDs", not any("Duplicate ID" in e for e in errors)),
         ("CW values valid", not any("unusual cw" in w for w in warnings)),

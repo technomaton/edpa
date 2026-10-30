@@ -711,7 +711,7 @@ Pokud MAD > 0.06, analyzovat kde jsou nejvetsi odchylky:
 ### 3.4 Planovani dalsiho PI
 
 1. **Nove epicy/features** -- pridat pres `backlog.py add` (auto-commit) do `.edpa/backlog/`
-2. **WSJF prioritizace:**
+2. **WSJF prioritizace** -- feature dostane WSJF odhad (`js`, `bv`, `tc`, `rr_oe` nad 0) nejpozdeji pri prechodu do Implementing; bez nej engine prechod odmitne, do te doby smi mit `js: 0`:
 
 ```bash
 python3 .edpa/engine/scripts/backlog.py wsjf

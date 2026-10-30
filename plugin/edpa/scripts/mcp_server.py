@@ -187,6 +187,14 @@ with _sibling_path():
         IdCounterError as _IdCounterError,
         backlog_write_lock as _backlog_write_lock,
     )
+# The Feature estimate rule (D-102), shared with the schema and `backlog
+# validate` so create, update and transition never write what they flag.
+# Its own module, not validate_syntax, which imports _console.
+with _sibling_path():
+    from _feature_estimate import (  # noqa: E402
+        FEATURE_ESTIMATE_STATUSES as _FEATURE_ESTIMATE_STATUSES,
+        missing_wsjf_estimate as _missing_wsjf_estimate,
+    )
 # Read-side directory → type map for the edpa_backlog scan. Superset of the
 # write-path TYPE_DIRS: legacy/migrated projects may hold Task items under
 # backlog/tasks/ (first-class in backlog.py since D-3) — Tasks are readable,
@@ -1578,6 +1586,14 @@ def _handle_item_create(edpa_root: Path, args: dict) -> list[TextContent]:
             f"status {status!r} not valid for {item_type}; "
             f"allowed: {list(allowed)}"
         )
+    # D-102: a Feature created straight into work carries its WSJF estimate.
+    if item_type == "Feature" and status in _FEATURE_ESTIMATE_STATUSES:
+        missing = _missing_wsjf_estimate(args)
+        if missing:
+            return _err(
+                f"a Feature created as {status} needs its WSJF estimate; "
+                f"pass {', '.join(missing)} above 0"
+            )
 
     repo_root = edpa_root.parent
     # D-61: stamp creation time at the single write layer (ADR-002 —
@@ -1692,6 +1708,16 @@ def _handle_item_update(edpa_root: Path, args: dict) -> list[TextContent]:
             for f in ("js", "bv", "tc", "rr_oe"):
                 if item.get(f) is None:
                     item[f] = 0
+            # D-102: an update must not take the WSJF estimate away from a
+            # started Feature; filling part of a legacy one stays allowed.
+            if (item.get("type") == "Feature"
+                    and item.get("status") in _FEATURE_ESTIMATE_STATUSES):
+                removed = [f for f in _missing_wsjf_estimate(item) if f in fields]
+                if removed:
+                    return _err(
+                        f"{safe_id} is {item['status']}: keep "
+                        f"{', '.join(removed)} above 0"
+                    )
             js, bv, tc, rr = item["js"], item["bv"], item["tc"], item["rr_oe"]
             item["wsjf"] = round((bv + tc + rr) / js, 2) if js > 0 else 0.0
             _save_md_item(path, item, body=body)
@@ -1734,6 +1760,14 @@ def _handle_item_transition(edpa_root: Path, args: dict) -> list[TextContent]:
                     f"status {status!r} not valid for {item_type}; "
                     f"allowed: {list(allowed)}"
                 )
+            # D-102: a Feature enters work only with its WSJF estimate.
+            if item_type == "Feature" and status in _FEATURE_ESTIMATE_STATUSES:
+                missing = _missing_wsjf_estimate(item)
+                if missing:
+                    return _err(
+                        f"{safe_id} needs its WSJF estimate before {status}: set "
+                        f"{', '.join(missing)} above 0 with edpa_item_update first"
+                    )
 
             body = item.pop("body", "") if isinstance(item, dict) else ""
             item["status"] = status

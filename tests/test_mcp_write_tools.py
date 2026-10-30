@@ -568,6 +568,63 @@ def test_transition_task_item_in_tasks_dir(edpa_root: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# D-102: a Feature enters work only with its WSJF estimate
+# ---------------------------------------------------------------------------
+
+WSJF = {"js": 5, "bv": 8, "tc": 3, "rr_oe": 2}
+
+
+def _epic(edpa_root: Path) -> None:
+    _parse(_handle_item_create(edpa_root, {"type": "Initiative", "title": "I"}))
+    _parse(_handle_item_create(edpa_root, {"type": "Epic", "title": "E", "parent": "I-1"}))
+
+
+def test_feature_transition_into_work_requires_wsjf_estimate(edpa_root: Path) -> None:
+    _epic(edpa_root)
+    _parse(_handle_item_create(edpa_root, {"type": "Feature", "title": "F", "parent": "E-1"}))
+    result = _handle_item_transition(edpa_root, {"item_id": "F-1", "status": "Implementing"})
+    assert _is_err(result)
+    assert "js, bv, tc, rr_oe" in result[0].text
+    assert _read_md(edpa_root, "F-1")["status"] == "Funnel"
+
+    _parse(_handle_item_update(edpa_root, {"item_id": "F-1", "fields": dict(WSJF)}))
+    data = _parse(_handle_item_transition(edpa_root, {"item_id": "F-1", "status": "Implementing"}))
+    assert data["status"] == "Implementing"
+
+
+def test_feature_created_into_work_requires_wsjf_estimate(edpa_root: Path) -> None:
+    _epic(edpa_root)
+    result = _handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1", "status": "Implementing", "js": 5,
+    })
+    assert _is_err(result)
+    assert "bv, tc, rr_oe" in result[0].text
+    data = _parse(_handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1", "status": "Implementing", **WSJF,
+    }))
+    assert data["id"] == "F-1", "the refused create burned an ID"
+
+
+def test_update_cannot_remove_estimate_of_started_feature(edpa_root: Path) -> None:
+    _epic(edpa_root)
+    _parse(_handle_item_create(edpa_root, {
+        "type": "Feature", "title": "F", "parent": "E-1", "status": "Implementing", **WSJF,
+    }))
+    assert _is_err(_handle_item_update(edpa_root, {"item_id": "F-1", "fields": {"js": 0}}))
+    assert _read_md(edpa_root, "F-1")["js"] == 5
+
+
+def test_update_may_fill_part_of_a_legacy_started_feature(edpa_root: Path) -> None:
+    (edpa_root / "backlog" / "features" / "F-9.md").write_text(
+        "---\nid: F-9\ntype: Feature\ntitle: Legacy\nparent: E-1\nstatus: Implementing\n"
+        "js: 0\nbv: 0\ntc: 0\nrr_oe: 0\n---\n",
+        encoding="utf-8",
+    )
+    _parse(_handle_item_update(edpa_root, {"item_id": "F-9", "fields": {"bv": 5}}))
+    assert _read_md(edpa_root, "F-9")["bv"] == 5
+
+
+# ---------------------------------------------------------------------------
 # edpa_item_link_parent
 # ---------------------------------------------------------------------------
 

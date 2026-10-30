@@ -567,7 +567,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
     <h3>3.4 Planning the next PI</h3>
     <ol>
       <li><strong>New epics/features</strong> — add via <code>backlog.py add</code> (auto-commit) into <code>.edpa/backlog/</code></li>
-      <li><strong>WSJF prioritization:</strong> <code>python3 .edpa/engine/scripts/backlog.py wsjf</code></li>
+      <li><strong>WSJF prioritization:</strong> <code>python3 .edpa/engine/scripts/backlog.py wsjf</code>. A Feature gets its WSJF estimate (<code>js</code>, <code>bv</code>, <code>tc</code>, <code>rr_oe</code> above 0) at the latest when it enters Implementing; the engine refuses the transition without it, and until then <code>js: 0</code> is fine.</li>
       <li><strong>Capacity planning</strong> — update <code>.edpa/config/people.yaml</code> (FTE changes, availability)</li>
       <li><strong>Create new iteration files</strong> in <code>.edpa/iterations/</code> for the new PI</li>
     </ol>

@@ -18,6 +18,10 @@ Examples: `S-42 Done`, `F-100 Implementing`, `D-7` (show status menu first).
 **Delivery** (Feature, Story, Defect):
 `Funnel → Analyzing → Backlog → Implementing → Validating → Deploying → Releasing → Done`
 
+A Feature enters `Implementing` or a later status only with its WSJF estimate: `js`,
+`bv`, `tc` and `rr_oe` above 0. Set them first with `/edpa:update`; without them
+`edpa_item_transition` refuses the change.
+
 **Other** (Task, Event, Risk): any status string is accepted.
 
 ## Steps

@@ -39,6 +39,12 @@ try:
     # naming.item_prefixes default). Includes legacy Task so migrated
     # tasks/ items still validate.
     from id_counter import ALL_TYPE_PREFIX as TYPE_PREFIXES  # noqa: E402
+    # The Feature estimate rule (D-102), shared with backlog.py and the
+    # MCP write layer.
+    from _feature_estimate import (  # noqa: E402
+        FEATURE_ESTIMATE_STATUSES,
+        missing_wsjf_estimate,
+    )
 finally:
     sys.path.pop(0)
 
@@ -89,8 +95,10 @@ ITEM_SCHEMA = {
     },
     "Feature": {
         "dir": "features",
-        "required": {"id", "type", "title", "parent", "status", "js"},
-        "optional": {"owner", "assignee", "contributors", "iteration",
+        # `js` and the other WSJF inputs are required from Implementing on
+        # (D-102) — see the estimate check in validate_backlog_schema.
+        "required": {"id", "type", "title", "parent", "status"},
+        "optional": {"js", "owner", "assignee", "contributors", "iteration",
                      "bv", "tc", "rr_oe", "wsjf", "depends_on",
                      "created_at", "closed_at", "updated_at"},
         "statuses": DELIVERY_STATUSES | LEGACY_STATUSES,
@@ -495,7 +503,8 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
     # JS sanity. Only Stories and Defects must have a positive estimate;
     # Initiatives / Epics / Features carry `js` as optional and frequently
     # land with `js: 0` meaning "no estimate yet at this hierarchy level".
-    # Treat 0 as equivalent to missing for the optional-js levels.
+    # Treat 0 as equivalent to missing for the optional-js levels. A started
+    # Feature is checked for its whole WSJF estimate below (D-102).
     js_required = "js" in schema.get("required", set())
     js = data.get("js")
     if js is not None:
@@ -521,6 +530,15 @@ def validate_backlog_schema(path: Path, data, *, strict=False):
             errors.append(f"{path}: iteration must be a string (got {type(iteration).__name__})")
         elif iteration in (None, "") and data.get("status") == "Done":
             errors.append(f"{path}: missing required field 'iteration' (required once a Story is Done)")
+
+    # Feature estimate (D-102): from Implementing on, all four WSJF inputs.
+    if expected_type == "Feature" and data.get("status") in FEATURE_ESTIMATE_STATUSES:
+        missing = missing_wsjf_estimate(data)
+        if missing:
+            errors.append(
+                f"{path}: a {data['status']} Feature needs its WSJF estimate; "
+                f"not above 0: {', '.join(missing)}"
+            )
 
     # Contributors schema (v1.11+). Each entry carries:
     #   - person   (required, person id from people.yaml)
