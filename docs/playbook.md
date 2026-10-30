@@ -4,8 +4,8 @@ Kompletni prirucka pro nasazeni metodiky EDPA (Evidence-Driven Proportional Allo
 
 EDPA V2 je **local-first**: zdrojem pravdy je `.edpa/backlog/**/*.md` (YAML frontmatter), git je audit trail. GitHub je **volitelny** -- zadny GitHub Project, zadne org Issue Types, zadny obousmerny sync.
 
-**Verze:** EDPA 2.24.1
-**Posledni aktualizace:** 2026-10-27
+**Verze:** EDPA 2.25.0
+**Posledni aktualizace:** 2026-10-30
 
 ---
 
@@ -207,7 +207,7 @@ project:
 
 governance:
   # Auto-razitkovano na verzi pluginu instalatorem.
-  methodology: "EDPA 2.24.1"
+  methodology: "EDPA 2.25.0"
   # Jedina vypocetni cesta od v1.14 (zadny simple/full/gates mode selector,
   # zadny audit_mode -- snapshoty vzdy nesou plny signals[] audit trail).
 
@@ -711,7 +711,7 @@ Pokud MAD > 0.06, analyzovat kde jsou nejvetsi odchylky:
 ### 3.4 Planovani dalsiho PI
 
 1. **Nove epicy/features** -- pridat pres `backlog.py add` (auto-commit) do `.edpa/backlog/`
-2. **WSJF prioritizace:**
+2. **WSJF prioritizace** -- feature dostane WSJF odhad (`js`, `bv`, `tc`, `rr_oe` nad 0) nejpozdeji pri prechodu do Implementing; bez nej engine prechod odmitne, do te doby smi mit `js: 0`:
 
 ```bash
 python3 .edpa/engine/scripts/backlog.py wsjf

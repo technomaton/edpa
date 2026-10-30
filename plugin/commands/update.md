@@ -49,6 +49,8 @@ Examples:
 
 - `wsjf` is always recomputed automatically from `js`, `bv`, `tc`, `rr_oe` — do not
   pass it directly.
+- A Feature in `Implementing` or a later status keeps its WSJF estimate: an update
+  that sets `js`, `bv`, `tc` or `rr_oe` to 0 is refused.
 - To change status use `/edpa:change-state`; to reparent an item use
   `edpa_item_link_parent`.
 - Person IDs come from `id:` entries in `.edpa/config/people.yaml`.

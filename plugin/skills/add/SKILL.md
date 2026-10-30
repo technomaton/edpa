@@ -128,6 +128,9 @@ tree if multiple items were added in sequence.
 
 - Initiative/Epic → "Add child items: what Epics/Features go under this?"
 - Story without `--js` → "Set Job Size for WSJF: re-run with `--js <1-100>`"
+- Feature without `--js`, `--bv`, `--tc`, `--rr` → fine until work starts; it needs
+  its WSJF estimate before it enters `Implementing` (a Feature created directly in
+  `Implementing` or later must pass all four)
 - Story without `--iteration` → "Set iteration when known: `--iteration PI-2026-1.X`"
 
 ## What NOT to do

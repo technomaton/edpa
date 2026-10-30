@@ -562,7 +562,7 @@ TOTAL_DEVIATION=0.824000</code></pre>
     <h3>3.4 Plánování dalšího PI</h3>
     <ol>
       <li><strong>Nové epicy/features</strong> — přidat přes <code>backlog.py add</code> (auto-commit) do <code>.edpa/backlog/</code></li>
-      <li><strong>WSJF prioritizace:</strong> <code>python3 .edpa/engine/scripts/backlog.py wsjf</code></li>
+      <li><strong>WSJF prioritizace:</strong> <code>python3 .edpa/engine/scripts/backlog.py wsjf</code>. Feature dostane WSJF odhad (<code>js</code>, <code>bv</code>, <code>tc</code>, <code>rr_oe</code> nad 0) nejpozději při přechodu do Implementing; bez něj engine přechod odmítne, do té doby smí mít <code>js: 0</code>.</li>
       <li><strong>Kapacitní plánování</strong> — aktualizovat <code>.edpa/config/people.yaml</code> (změny FTE, dostupnost)</li>
       <li><strong>Vytvořit nové iteration soubory</strong> v <code>.edpa/iterations/</code> pro nový PI</li>
     </ol>

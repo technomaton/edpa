@@ -292,6 +292,30 @@ def test_story_created_without_assignee_or_iteration_validates(tmp_path, silence
     assert rc == 0, out
 
 
+def test_feature_created_without_estimate_passes_schema(tmp_path, silence_git):
+    """D-102 regression guard: ``add --type Feature`` without ``--js`` writes
+    ``js: 0`` ("no estimate yet"), which the schema used to reject. A Feature
+    is estimated when work starts, so the unstarted one must pass."""
+    import validate_syntax
+    root = _write_workspace(
+        tmp_path,
+        initiatives=[{"id": "I-1", "type": "Initiative", "title": "Root",
+                      "status": "Funnel"}],
+    )
+    from _md_frontmatter import save_md
+    save_md(root / ".edpa" / "backlog" / "epics" / "E-1.md",
+            {"id": "E-1", "type": "Epic", "title": "Access", "status": "Funnel",
+             "parent": "I-1"}, body="")
+
+    backlog.cmd_add(root, backlog.load_backlog(root),
+                    _args(type="Feature", title="Auth", parent="E-1"))
+
+    md_path = root / ".edpa" / "backlog" / "features" / "F-1.md"
+    assert yaml.safe_load(md_path.read_text().split("---")[1])["js"] == 0
+    errors, _warnings = validate_syntax.validate_file(md_path)
+    assert errors == []
+
+
 def test_local_commits_via_git(tmp_path, silence_git):
     """Tail of cmd_add runs ``git add`` + ``git commit`` with conventional msg."""
     root = _write_workspace(tmp_path)
