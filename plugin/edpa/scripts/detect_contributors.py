@@ -771,7 +771,7 @@ def _commit_contributor_refresh(edpa_root: Path, paths: list[Path],
     The bookkeeping commit is:
 
       * pathspec-limited (``git commit … -- <paths>``) — unrelated staged
-        work stays staged, same idiom as local_evidence._git_commit_paths;
+        work stays staged, same idiom as _auto_commit.maybe_commit;
       * run with ``EDPA_NO_LOCAL_EVIDENCE=1`` in the subprocess env so the
         post-commit evidence hook stays silent — machine bookkeeping must
         not create attribution (check_ticket_attached / local_evidence /
