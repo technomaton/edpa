@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.25.1 — 2026-11-05
+
+### Fixed
+
+- **The evidence commit included uncommitted edits of the item it updated
+  (D-103).** The post-commit hook loads an item from the working tree, adds
+  its evidence and saves the file. It then committed the whole file, so any
+  uncommitted edit of that item, such as a new status or a rewritten body,
+  landed in the `chore(evidence):` commit. The hook skips that commit as its
+  own, so the edit got no `yaml_edit` or `state_transition` evidence, and an
+  item that existed only in the working tree was committed as well. The
+  commit now holds each item as `HEAD` has it plus the new evidence, built in
+  a temporary index. The working tree keeps the edits and gains the same
+  evidence, and a staged edit stays staged with the evidence added. An item
+  that `HEAD` does not hold yet stays out of the commit; its evidence waits
+  in the working-tree file. `--materialize` commits the same way.
+
 ## 2.25.0 — 2026-10-30
 
 A Feature is now estimated when work on it starts. Before `Implementing` it

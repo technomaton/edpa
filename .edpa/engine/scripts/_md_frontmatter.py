@@ -98,12 +98,20 @@ def load_md(path: str | Path) -> dict[str, Any] | None:
     except OSError as exc:
         print(f"WARNING: load_md({path}) failed: {exc}", file=sys.stderr)
         return None
+    return parse_md(text, source=str(path))
 
+
+def parse_md(text: str, source: str = "<text>") -> dict[str, Any]:
+    """Parse item text the way :func:`load_md` parses a file.
+
+    ``source`` names the text in warnings, for example a git blob that is
+    not a file in the working tree (D-103).
+    """
     yaml_text, body_text = _split_frontmatter(text)
     try:
         data = yaml.safe_load(yaml_text) if yaml_text.strip() else {}
     except yaml.YAMLError as exc:
-        print(f"WARNING: load_md({path}) YAML parse failed: {exc}", file=sys.stderr)
+        print(f"WARNING: load_md({source}) YAML parse failed: {exc}", file=sys.stderr)
         data = {}
     if not isinstance(data, dict):
         data = {}
@@ -173,6 +181,11 @@ def save_md(path: str | Path, frontmatter: dict[str, Any], body: str = "") -> No
     ``body`` is written verbatim — it should already be Markdown text.
     A trailing newline is ensured.
     """
+    _write_text_atomic(Path(path), format_md(frontmatter, body))
+
+
+def format_md(frontmatter: dict[str, Any], body: str = "") -> str:
+    """Render an item as the text :func:`save_md` writes (D-103)."""
     fm_dict = {k: v for k, v in frontmatter.items() if k != "body"}
     yaml_text = _dump_frontmatter(fm_dict)
     parts = [f"{FRONTMATTER_DELIM}\n", yaml_text]
@@ -185,7 +198,7 @@ def save_md(path: str | Path, frontmatter: dict[str, Any], body: str = "") -> No
         parts.append(body)
         if not body.endswith("\n"):
             parts.append("\n")
-    _write_text_atomic(Path(path), "".join(parts))
+    return "".join(parts)
 
 
 def save_md_item(path: str | Path, item: dict[str, Any]) -> None:
