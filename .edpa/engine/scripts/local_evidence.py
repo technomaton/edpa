@@ -50,13 +50,14 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 try:
-    from _md_frontmatter import load_md, save_md_item  # noqa: E402
+    from _md_frontmatter import format_md, load_md, parse_md, save_md_item  # noqa: E402
     # Canonical type→dir maps (Krok 2). DIR_TO_TYPE lets the D-28 guard
     # classify a malformed item missing `type:` the same way the engine does
     # (engine.load_backlog_items: data.get("type", level)); PREFIX_TO_DIR now
@@ -403,68 +404,142 @@ def _apply_to_item(item_path: Path, new_sigs: list[dict]) -> bool:
     lock = backlog_write_lock(lock_root) if lock_root else contextlib.nullcontext()
     with lock:
         data = load_md(item_path) or {}
-        body = data.pop("body", "") if isinstance(data, dict) else ""
-        existing = data.get("evidence")
-        if existing is None:
-            existing = data.get("ci_signals") or []  # backward-compat read
-        if not isinstance(existing, list):
-            existing = []
-
-        by_ref = {s.get("ref"): s for s in existing if isinstance(s, dict)}
-        changed = False
-        for s in new_sigs:
-            ref = s.get("ref")
-            if ref in by_ref:
-                continue
-            by_ref[ref] = s
-            changed = True
-        if not changed:
+        if not _merge_signals(data, new_sigs):
             return False
-
-        merged = [by_ref[k] for k in sorted(by_ref) if k is not None]
-        data["evidence"] = merged
-        if "ci_signals" in data:
-            del data["ci_signals"]  # converge on V2.1 shape
-        save_md_item(item_path, {**data, "body": body})
+        save_md_item(item_path, data)
         return True
 
 
-def _git_commit_paths(repo_root: Path, paths: list[Path], msg: str) -> bool:
-    """Stage the given paths and commit ONLY them with --no-verify.
+def _merge_signals(data: dict, new_sigs: list[dict]) -> bool:
+    """Merge new signals into ``data["evidence"]`` in place, deduplicated by
+    ref and sorted by ref. Return True if anything was added. Shared by the
+    working-tree write and the committed version of the item (D-103), so
+    both hold the same evidence."""
+    existing = data.get("evidence")
+    if existing is None:
+        existing = data.get("ci_signals") or []  # backward-compat read
+    if not isinstance(existing, list):
+        existing = []
 
-    The commit is pathspec-limited (``git commit … -- <paths>``) so it can
-    never sweep unrelated user-staged work into the auto-generated
-    ``chore(evidence):`` commit — e.g. after ``git add A B && git commit A``
-    file B must stay staged, not get silently swallowed under an auto
-    prefix the ticket hook whitelists (D-41). Same idiom as
-    ``_auto_commit.maybe_commit``; we keep this local helper because the
-    evidence commit additionally needs ``--no-verify`` (bypass arbitrary
-    user pre-commit hooks) and must not skip on unset git identity.
-
-    Safe because we modify frontmatter only (no new IDs, counter
-    unchanged)."""
-    rels = [str(p.relative_to(repo_root)) for p in paths]
-    add = subprocess.run(
-        ["git", "add", "--", *rels],
-        cwd=str(repo_root), capture_output=True, text=True, encoding="utf-8",
-    )
-    if add.returncode != 0:
+    by_ref = {s.get("ref"): s for s in existing if isinstance(s, dict)}
+    changed = False
+    for s in new_sigs:
+        ref = s.get("ref")
+        if ref in by_ref:
+            continue
+        by_ref[ref] = s
+        changed = True
+    if not changed:
         return False
-    commit_res = subprocess.run(
-        ["git", "commit", "--no-verify", "-m", msg, "--", *rels],
-        cwd=str(repo_root), capture_output=True, text=True, encoding="utf-8",
+
+    data["evidence"] = [by_ref[k] for k in sorted(by_ref) if k is not None]
+    if "ci_signals" in data:
+        del data["ci_signals"]  # converge on V2.1 shape
+    return True
+
+
+def _run_git(args: list[str], repo_root: Path, env: dict | None = None,
+             stdin: str | None = None) -> str | None:
+    """Run git in ``repo_root``; return stdout, or None when git fails."""
+    r = subprocess.run(
+        ["git", *args], cwd=str(repo_root), env=env, input=stdin,
+        capture_output=True, text=True, check=False, encoding="utf-8",
     )
-    return commit_res.returncode == 0
+    return r.stdout if r.returncode == 0 else None
 
 
-def _commit_evidence(repo_root: Path, paths: list[Path],
-                     commit: dict, items: list[str]) -> bool:
-    """Stage + commit the post-commit-hook evidence changes."""
+def _blob_with_signals(repo_root: Path, blob: str, rel: str,
+                       sigs: list[dict]) -> str | None:
+    """Write the item held in ``blob`` plus ``sigs`` to the object store and
+    return the new blob id. Return None when the item already holds every
+    signal, or when git fails."""
+    text = _run_git(["cat-file", "blob", blob], repo_root)
+    if text is None:
+        return None
+    data = parse_md(text, source=f"{blob[:12]}:{rel}")
+    if not _merge_signals(data, sigs):
+        return None
+    out = _run_git(["hash-object", "-w", "--stdin", f"--path={rel}"],
+                   repo_root, stdin=format_md(data, data.get("body") or ""))
+    return out.strip() if out else None
+
+
+def _sync_index_entry(repo_root: Path, rel: str, old_blob: str,
+                      new_blob: str, sigs: list[dict]) -> None:
+    """Give the user's index the evidence that was just committed for ``rel``.
+
+    An entry that still held the old committed blob moves to the new one. A
+    staged edit keeps its content and gains the signals, so committing it
+    later does not remove them. Conflicted or missing entries stay as they
+    are."""
+    out = _run_git(["ls-files", "--stage", "--", rel], repo_root)
+    lines = (out or "").splitlines()
+    if len(lines) != 1:
+        return
+    mode, blob, stage = lines[0].split("\t", 1)[0].split()
+    if stage != "0":
+        return
+    target = new_blob if blob == old_blob else _blob_with_signals(
+        repo_root, blob, rel, sigs)
+    if target:
+        _run_git(["update-index", "--cacheinfo", f"{mode},{target},{rel}"],
+                 repo_root)
+
+
+def _git_commit_items(repo_root: Path, updates: dict[Path, list[dict]],
+                      msg: str) -> int | None:
+    """Commit each item as HEAD holds it plus its new signals, and nothing
+    else. Return the number of items committed, or None when git fails.
+
+    The commit is built in a temporary index from HEAD's tree, so it can
+    sweep neither unrelated user-staged work (D-41) nor uncommitted edits of
+    the updated items themselves (D-103) into the auto-generated
+    ``chore(evidence):`` commit, an auto prefix the ticket hook whitelists.
+    An item that HEAD does not hold yet stays out of the commit; its signals
+    wait in the working-tree file, which ``_apply_to_item`` already wrote.
+    The commit runs with ``--no-verify`` (bypass arbitrary user pre-commit
+    hooks) and must not skip on unset git identity. Afterwards the user's
+    index gets the same evidence (``_sync_index_entry``)."""
+    entries = []
+    for path, sigs in updates.items():
+        rel = Path(path).resolve().relative_to(repo_root.resolve()).as_posix()
+        listed = (_run_git(["ls-tree", "HEAD", "--", rel], repo_root) or "").split()
+        if len(listed) < 3:
+            print(f"local_evidence: {rel} is not committed yet; its evidence "
+                  f"stays in the working tree.", file=sys.stderr)
+            continue
+        mode, old_blob = listed[0], listed[2]
+        new_blob = _blob_with_signals(repo_root, old_blob, rel, sigs)
+        if new_blob:
+            entries.append((rel, mode, old_blob, new_blob, sigs))
+    if not entries:
+        return 0
+
+    with tempfile.TemporaryDirectory(prefix="edpa-evidence-") as tmp:
+        env = {**os.environ, "GIT_INDEX_FILE": str(Path(tmp) / "index")}
+        if _run_git(["read-tree", "HEAD"], repo_root, env) is None:
+            return None
+        for rel, mode, _old, new_blob, _sigs in entries:
+            if _run_git(["update-index", "--cacheinfo",
+                         f"{mode},{new_blob},{rel}"], repo_root, env) is None:
+                return None
+        if _run_git(["commit", "--no-verify", "-q", "-m", msg],
+                    repo_root, env) is None:
+            return None
+
+    for rel, _mode, old_blob, new_blob, sigs in entries:
+        _sync_index_entry(repo_root, rel, old_blob, new_blob, sigs)
+    return len(entries)
+
+
+def _commit_evidence(repo_root: Path, updates: dict[Path, list[dict]],
+                     commit: dict, items: list[str]) -> int | None:
+    """Commit the post-commit-hook evidence; see ``_git_commit_items``."""
     items_str = ",".join(items)
     msg = (f"{_SELF_COMMIT_PREFIX} {items_str} from {commit['sha'][:7]}\n\n"
            f"Auto-generated by local_evidence.py post-commit hook.\n"
            f"Source commit: {commit['sha']}")
-    return _git_commit_paths(repo_root, paths, msg)
+    return _git_commit_items(repo_root, updates, msg)
 
 
 def _transition_signals(transitions: list[dict], people: list[dict],
@@ -690,7 +765,7 @@ def cmd_materialize(edpa_root: Path, iteration_id: str) -> int:
     for iid, sigs in _yaml_edit_to_evidence(ye, people).items():
         grouped.setdefault(iid, []).extend(sigs)
 
-    touched: list[Path] = []
+    touched: dict[Path, list[dict]] = {}
     try:
         for iid, sigs in grouped.items():
             p = find_item_path(edpa_root, iid)
@@ -702,7 +777,7 @@ def cmd_materialize(edpa_root: Path, iteration_id: str) -> int:
             _neutralize_foreign_signals(load_md(p) or {}, sigs, p, iteration_id,
                                         edpa_root=edpa_root)
             if _apply_to_item(p, sigs):
-                touched.append(p)
+                touched[p] = sigs
     except BacklogLockTimeout as exc:
         # Fail loud and clean: report, commit nothing half-locked beyond
         # what already landed, and let a re-run (idempotent, dedup-by-ref)
@@ -717,7 +792,7 @@ def cmd_materialize(edpa_root: Path, iteration_id: str) -> int:
                f"({len(touched)} item(s))\n\n"
                f"Auto-generated by local_evidence.py --materialize "
                f"(state_transition + yaml_edit signals).")
-        _git_commit_paths(repo_root, touched, msg)
+        _git_commit_items(repo_root, touched, msg)
     print(f"materialize: {len(touched)} item(s) updated for {iteration_id} "
           f"({len(trans)} transitions, "
           f"{sum(len(v) for v in ye.values())} yaml_edit scanned)")
@@ -875,7 +950,9 @@ def main(argv=None) -> int:
         except (ValueError, KeyError, TypeError):
             commit_iter = None
 
-    touched_paths: list[Path] = []
+    # D-103: the working tree and the commit get the signals separately, so an
+    # uncommitted edit of an item never rides along in the evidence commit.
+    updates: dict[Path, list[dict]] = {}
     try:
         for iid, sigs in grouped.items():
             p = find_item_path(edpa_root, iid)
@@ -889,7 +966,7 @@ def main(argv=None) -> int:
             _neutralize_foreign_signals(load_md(p) or {}, sigs, p, commit_iter,
                                         edpa_root=edpa_root)
             if _apply_to_item(p, sigs):
-                touched_paths.append(p)
+                updates[p] = sigs
     except BacklogLockTimeout as exc:
         # The user's commit already succeeded — never wedge the hook. Stop
         # emitting (each further item would block another timeout window),
@@ -901,15 +978,16 @@ def main(argv=None) -> int:
               "`local_evidence.py --materialize --iteration <ID>` to catch up.",
               file=sys.stderr)
 
-    if not touched_paths:
+    if not updates:
         return 0
 
-    if _commit_evidence(repo_root, touched_paths, commit, list(grouped)):
-        print(f"local_evidence: appended to {len(touched_paths)} "
-              f"item(s) from {commit['sha'][:7]}")
-    else:
+    committed = _commit_evidence(repo_root, updates, commit, list(grouped))
+    if committed is None:
         print(f"local_evidence: warning — failed to commit evidence update",
               file=sys.stderr)
+    elif committed:
+        print(f"local_evidence: appended to {committed} "
+              f"item(s) from {commit['sha'][:7]}")
     return 0
 
 

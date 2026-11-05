@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "plugin" / "edpa" / "scripts"))
 
 import local_evidence as le  # noqa: E402
-from _md_frontmatter import load_md, save_md_item  # noqa: E402
+from _md_frontmatter import _split_frontmatter, load_md, save_md_item  # noqa: E402
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────
@@ -283,6 +283,84 @@ def test_evidence_commit_leaves_unrelated_staged_work_alone(repo: Path) -> None:
     # Evidence content itself landed intact.
     sigs = load_md(repo / ".edpa/backlog/stories/S-1.md")["evidence"]
     assert any(s["type"] == "commit_author" for s in sigs)
+
+
+def _item_at(repo: Path, rel: str, rev: str = "HEAD") -> dict:
+    """Parse an item as git holds it: at a revision, or in the index (``:``)."""
+    spec = f":{rel}" if rev == ":" else f"{rev}:{rel}"
+    yaml_text, body = _split_frontmatter(_git(["show", spec], cwd=repo).stdout)
+    data = yaml.safe_load(yaml_text) or {}
+    data["body"] = body
+    return data
+
+
+def test_evidence_commit_leaves_uncommitted_item_edits_alone(repo: Path) -> None:
+    """D-103: the chore(evidence): commit holds the committed item plus the new
+    evidence, nothing else. An uncommitted edit of that item stays uncommitted
+    in the working tree and gains the same evidence, so committing the edit
+    later does not remove it."""
+    rel = ".edpa/backlog/stories/S-1.md"
+    item = repo / rel
+    save_md_item(item, {**load_md(item), "status": "Validating",
+                        "body": "Draft acceptance notes.\n"})
+    _make_commit(repo, "feat(S-1): implement login",
+                 [("src/login.py", "# code\n")])
+    assert _run_emitter(repo) == 0
+
+    subject = _git(["log", "-1", "--format=%s"], cwd=repo).stdout.strip()
+    assert subject.startswith("chore(evidence):")
+    committed = _item_at(repo, rel)
+    assert committed["status"] == "Implementing"
+    assert committed["body"] == ""
+    assert [s["type"] for s in committed["evidence"]] == ["commit_author"]
+
+    working = load_md(item)
+    assert working["status"] == "Validating"
+    assert working["body"] == "Draft acceptance notes.\n"
+    assert working["evidence"] == committed["evidence"]
+    assert _git(["diff", "--cached", "--name-only"], cwd=repo).stdout.split() == []
+    assert _git(["diff", "--name-only"], cwd=repo).stdout.split() == [rel]
+
+
+def test_evidence_commit_keeps_staged_item_edits_staged(repo: Path) -> None:
+    """D-103: an item edit that is staged but left out of the source commit
+    stays staged, and the staged version gains the evidence too."""
+    rel = ".edpa/backlog/stories/S-1.md"
+    item = repo / rel
+    save_md_item(item, {**load_md(item), "status": "Validating"})
+    (repo / "src").mkdir()
+    (repo / "src" / "login.py").write_text("# code\n")
+    _git(["add", rel, "src/login.py"], cwd=repo)
+    _git(["commit", "-q", "-m", "feat(S-1): implement login", "--",
+          "src/login.py"], cwd=repo)
+    assert _run_emitter(repo) == 0
+
+    committed = _item_at(repo, rel)
+    staged = _item_at(repo, rel, rev=":")
+    assert committed["status"] == "Implementing"
+    assert staged["status"] == "Validating"
+    assert [s["type"] for s in committed["evidence"]] == ["commit_author"]
+    assert staged["evidence"] == committed["evidence"]
+    assert load_md(item)["status"] == "Validating"
+    assert _git(["diff", "--cached", "--name-only"], cwd=repo).stdout.split() == [rel]
+    assert _git(["diff", "--name-only"], cwd=repo).stdout.split() == []
+
+
+def test_evidence_for_an_uncommitted_item_stays_in_the_working_tree(
+        repo: Path) -> None:
+    """D-103: an item that exists only in the working tree is never committed
+    by the emitter; its evidence waits in the file until the item is committed."""
+    rel = ".edpa/backlog/stories/S-9.md"
+    save_md_item(repo / rel, {"id": "S-9", "type": "Story", "title": "Draft",
+                              "status": "Funnel"})
+    head = _make_commit(repo, "feat(S-9): sketch the draft",
+                        [("src/draft.py", "# draft\n")])
+    assert _run_emitter(repo) == 0
+
+    assert _git(["rev-parse", "HEAD"], cwd=repo).stdout.strip() == head
+    assert _git(["ls-files", "--", rel], cwd=repo).stdout == ""
+    sigs = load_md(repo / rel)["evidence"]
+    assert [s["type"] for s in sigs] == ["commit_author"]
 
 
 def test_emit_parses_contribute_directive(repo: Path) -> None:
@@ -568,6 +646,36 @@ def test_materialize_reconcile_is_idempotent(repo: Path) -> None:
     finally:
         os.chdir(old)
     assert n1 == n2
+
+
+def test_materialize_commit_leaves_uncommitted_item_edits_alone(
+        repo: Path) -> None:
+    """D-103: --materialize commits through the same path, so an uncommitted
+    edit of a materialized item stays out of its chore(evidence): commit."""
+    (repo / ".edpa" / "iterations").mkdir(parents=True, exist_ok=True)
+    (repo / ".edpa" / "iterations" / "PI-2026-2.1.yaml").write_text(
+        yaml.safe_dump({"iteration": {
+            "id": "PI-2026-2.1",
+            "start_date": "2026-05-01", "end_date": "2026-05-31"}}))
+    rel = ".edpa/backlog/stories/S-2.md"
+    _commit_status_flip(repo, rel, "Done", "S-2: done")
+    item = repo / rel
+    save_md_item(item, {**load_md(item), "body": "Retrospective notes.\n"})
+
+    old = Path.cwd()
+    try:
+        os.chdir(repo)
+        assert le.cmd_materialize(repo / ".edpa", "PI-2026-2.1") == 0
+    finally:
+        os.chdir(old)
+
+    committed = _item_at(repo, rel)
+    assert committed["body"] == ""
+    assert any(s["type"] == "state_transition" for s in committed["evidence"])
+    working = load_md(item)
+    assert working["body"] == "Retrospective notes.\n"
+    assert working["evidence"] == committed["evidence"]
+    assert _git(["diff", "--cached", "--name-only"], cwd=repo).stdout.split() == []
 
 
 # ─── Phase 2: yaml_edit materialization ───────────────────────────────────

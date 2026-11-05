@@ -202,7 +202,10 @@ by `project_setup.py --with-hooks` (chained from
 `.git/hooks/post-commit`). It emits all five local signal types for
 the commit it just saw and commits the evidence update as
 `chore(evidence): …` — an auto-commit that is itself excluded from
-scoring.
+scoring. That commit holds each item as `HEAD` has it plus the new
+evidence, nothing else: an uncommitted or staged edit of the item stays
+where it was and gains the same evidence, and an item that `HEAD` does
+not hold yet is not committed (D-103).
 
 **`/edpa:materialize` (catch-up, idempotent).** The MCP tool
 `edpa_materialize` / CLI `local_evidence.py --materialize
